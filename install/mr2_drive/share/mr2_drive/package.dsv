@@ -1,0 +1,6 @@
+source;share/mr2_drive/hook/pythonpath.ps1
+source;share/mr2_drive/hook/pythonpath.dsv
+source;share/mr2_drive/hook/pythonpath.sh
+source;share/mr2_drive/hook/ament_prefix_path.ps1
+source;share/mr2_drive/hook/ament_prefix_path.dsv
+source;share/mr2_drive/hook/ament_prefix_path.sh
