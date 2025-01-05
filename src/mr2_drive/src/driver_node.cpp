@@ -7,10 +7,24 @@
 const std::string SWITCH_MODE_SERVICE = "/driving_node/switch_mode";
 const std::string JOYSTICK_TOPIC = "/gamepad";
 const std::string MODE_TOPIC = "/driving_node/is_autonomous";
+const std::string TARGET_TWIST_TOPIC = "/driving_node/target_twist";
+
+// TODO: Implement manual mode
 
 class DrivingNode : public rclcpp::Node {
 public:
   DrivingNode() : Node("driving_node") {
+
+    this->declare_parameter("throttle_index", 5); // R2
+    this->declare_parameter("brake_index", 4);    // L2
+    this->declare_parameter("steering_index", 0); // Left stick x axis
+    this->declare_parameter("vx_index", 2);       // Right stick x axis
+    this->declare_parameter("vy_index", 3);       // Right stick y axis
+    this->declare_parameter("throttle_timeout_ms", 1000);
+    this->declare_parameter("max_vx", 5.0);
+    this->declare_parameter("max_vy", 10.0);
+    this->declare_parameter("max_omega", 5.0);
+
     // Create a service to switch modes (autonomous or manual)
     mode_service_ = this->create_service<std_srvs::srv::SetBool>(
         "switch_mode", std::bind(&DrivingNode::switch_mode_callback, this,
@@ -21,8 +35,8 @@ public:
         this->create_publisher<std_msgs::msg::Bool>(MODE_TOPIC, 10);
 
     // Create a publisher to broadcast the target twist
-    target_twist_publisher_ =
-        this->create_publisher<geometry_msgs::msg::Twist>("target_twist", 10);
+    target_twist_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>(
+        TARGET_TWIST_TOPIC, 10);
 
     // Subscribe to the joystick topic
     joystick_subscriber_ = this->create_subscription<sensor_msgs::msg::Joy>(
@@ -53,10 +67,9 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr
       target_twist_publisher_;
   geometry_msgs::msg::Twist target_twist_;
+  bool throttle_timed_out_ = false;
   std_msgs::msg::Bool
       autonomous_; // Current mode: true = autonomous, false = manual
-
-  const int throttle_timeout_ms_ = 200;
 
   // Service callback for switching modes
   void switch_mode_callback(
@@ -80,40 +93,53 @@ private:
 
   // Callback function for joystick input
   void joystick_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-    last_joystick_time_ = now();
-    // Axis Indices
-    const size_t THROTTLE_INDEX = 5; // R2
-    const size_t BRAKE_INDEX = 4;    // L2
-    const size_t STEERING_INDEX = 0; // Left stick x axis
-    const size_t VX_INDEX = 2;       // Right stick x axis
-    const size_t VY_INDEX = 3;       // Right stick y axis
+    if (!autonomous_.data) {
+      throttle_timed_out_ = false;
+      last_joystick_time_ = now();
+      // Axis Indices
+      size_t throttle_index = this->get_parameter("throttle_index").as_int();
+      size_t brake_index = this->get_parameter("brake_index").as_int();
+      size_t steering_index = this->get_parameter("steering_index").as_int();
+      size_t vx_index = this->get_parameter("vx_index").as_int();
+      size_t vy_index = this->get_parameter("vy_index").as_int();
+      float max_vx = this->get_parameter("max_vx").as_double();
+      float max_vy = this->get_parameter("max_vy").as_double();
+      float max_omega = this->get_parameter("max_omega").as_double();
 
-    // Button Indices
-    const size_t ABORT_BUTTON_INDEX = 5; // R1
+      // Check if the joystick button is pressed
+      double throttle = msg->axes[throttle_index];
+      double brake = msg->axes[brake_index];
+      double steering = msg->axes[steering_index];
+      double vx_offset = msg->axes[vx_index];
+      double vy_offset = -msg->axes[vy_index];
 
-    // Check if the joystick button is pressed
-    double throttle = msg->axes[THROTTLE_INDEX];
-    double brake = msg->axes[BRAKE_INDEX];
-    double steering = msg->axes[STEERING_INDEX];
-    double vx_offset = msg->axes[VX_INDEX];
-    double vy_offset = -msg->axes[VY_INDEX];
+      target_twist_.linear.x = vx_offset * max_vx;
+      target_twist_.linear.y =
+          std::clamp(throttle - brake + vy_offset, -1.0, 1.0) * max_vy;
+      target_twist_.angular.z = -steering * max_omega;
 
-    target_twist_.linear.x = vx_offset;
-    target_twist_.linear.y = throttle - brake + vy_offset;
-    target_twist_.angular.z = -steering;
+      publish_velocity();
+    }
   }
 
   void timeout_check() {
     // Check if the throttle has timed out
+    int throttle_timeout_ms =
+        this->get_parameter("throttle_timeout_ms").as_int();
     auto time_since_last_joystick =
         (now() - last_joystick_time_).nanoseconds() /
         1e6; // Convert to milliseconds
-    if (time_since_last_joystick > throttle_timeout_ms_) {
+    if (time_since_last_joystick > throttle_timeout_ms) {
+
       target_twist_.linear.x = 0.0;
       target_twist_.linear.y = 0.0;
       target_twist_.angular.z = 0.0;
 
-      RCLCPP_WARN(this->get_logger(), "Throttle timeout! Decelerating...");
+      if (!throttle_timed_out_) {
+        throttle_timed_out_ = true;
+        RCLCPP_WARN(this->get_logger(), "Throttle timeout! Decelerating...");
+      }
+
       publish_velocity();
     }
   }
