@@ -20,6 +20,8 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(eigen3_cmake_module REQUIRED)
+find_package(Eigen3)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -34,10 +36,16 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(driver_node src/driver_node.cpp)
+add_executable(steering_node src/steering_node.cpp)
 ament_target_dependencies(driver_node rclcpp std_msgs sensor_msgs std_srvs geometry_msgs)
+ament_target_dependencies(steering_node rclcpp std_msgs sensor_msgs Eigen3 geometry_msgs)
+
+ament_export_dependencies(eigen3_cmake_module)
+ament_export_dependencies(Eigen3)
 
 install(TARGETS
   driver_node
+  steering_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -8,22 +8,27 @@ const std::string SWITCH_MODE_SERVICE = "/driving_node/switch_mode";
 const std::string JOYSTICK_TOPIC = "/gamepad";
 const std::string MODE_TOPIC = "/driving_node/is_autonomous";
 const std::string TARGET_TWIST_TOPIC = "/driving_node/target_twist";
+const std::string CURRENT_TWIST_TOPIC = "/driving_node/current_twist";
 
-// TODO: Implement manual mode
+// TODO: Implement autonomous mode
 
 class DrivingNode : public rclcpp::Node {
 public:
   DrivingNode() : Node("driving_node") {
 
-    this->declare_parameter("throttle_index", 5); // R2
-    this->declare_parameter("brake_index", 4);    // L2
-    this->declare_parameter("steering_index", 0); // Left stick x axis
-    this->declare_parameter("vx_index", 2);       // Right stick x axis
-    this->declare_parameter("vy_index", 3);       // Right stick y axis
-    this->declare_parameter("throttle_timeout_ms", 1000);
-    this->declare_parameter("max_vx", 5.0);
-    this->declare_parameter("max_vy", 10.0);
-    this->declare_parameter("max_omega", 5.0);
+    this->declare_parameter("throttle_index", 5);         // R2
+    this->declare_parameter("brake_index", 4);            // L2
+    this->declare_parameter("steering_index", 0);         // Left stick x axis
+    this->declare_parameter("vx_index", 2);               // Right stick x axis
+    this->declare_parameter("vy_index", 3);               // Right stick y axis
+    this->declare_parameter("throttle_timeout_ms", 1000); // ms
+    this->declare_parameter("max_vx", 5.0);               // m/s
+    this->declare_parameter("max_vy", 10.0);              // m/s
+    this->declare_parameter("max_omega", 5.0);            // rad/s
+    this->declare_parameter("max_x_acceleration", 10.0);  // m/s^2
+    this->declare_parameter("max_y_acceleration", 10.0);  // m/s^2
+    this->declare_parameter("max_lateral_acceleration", 10.0); // m/s^2
+    this->declare_parameter("control_interval", 10);           // ms
 
     // Create a service to switch modes (autonomous or manual)
     mode_service_ = this->create_service<std_srvs::srv::SetBool>(
@@ -38,6 +43,11 @@ public:
     target_twist_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>(
         TARGET_TWIST_TOPIC, 10);
 
+    // Create a publisher to broadcast the current twist
+    current_twist_publisher_ =
+        this->create_publisher<geometry_msgs::msg::Twist>(CURRENT_TWIST_TOPIC,
+                                                          10);
+
     // Subscribe to the joystick topic
     joystick_subscriber_ = this->create_subscription<sensor_msgs::msg::Joy>(
         JOYSTICK_TOPIC, 10,
@@ -46,9 +56,15 @@ public:
 
     // Initialize the timer
     last_joystick_time_ = now();
-    timer_ = this->create_wall_timer(
+    joystick_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100), // Check every 100ms
         std::bind(&DrivingNode::timeout_check, this));
+
+    // Initialize Control timer
+    control_timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(
+            this->get_parameter("control_interval").as_int()),
+        std::bind(&DrivingNode::control_callback, this));
 
     // Publish the initial mode
     autonomous_.data = false;
@@ -62,11 +78,13 @@ private:
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr mode_service_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr mode_publisher_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joystick_subscriber_;
-  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr joystick_timer_;
+  rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::Time last_joystick_time_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr
-      target_twist_publisher_;
-  geometry_msgs::msg::Twist target_twist_;
+      target_twist_publisher_,
+      current_twist_publisher_;
+  geometry_msgs::msg::Twist target_twist_, current_twist_;
   bool throttle_timed_out_ = false;
   std_msgs::msg::Bool
       autonomous_; // Current mode: true = autonomous, false = manual
@@ -120,6 +138,23 @@ private:
 
       publish_velocity();
     }
+  }
+
+  // Control timer callback
+  void control_callback() {
+    float dt = this->get_parameter("control_interval").as_int() / 1000.0;
+    float max_x_acceleration =
+        this->get_parameter("max_x_acceleration").as_double();
+    float max_y_acceleration =
+        this->get_parameter("max_y_acceleration").as_double();
+    float max_lateral_acceleration =
+        this->get_parameter("max_lateral_acceleration").as_double();
+
+    float target_vx = target_twist_.linear.x;
+    float target_vy = target_twist_.linear.y;
+    float target_omega = target_twist_.angular.z;
+
+    // TODO: Implement control logic
   }
 
   void timeout_check() {
