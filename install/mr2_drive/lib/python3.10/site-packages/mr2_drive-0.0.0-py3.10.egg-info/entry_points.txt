@@ -1,3 +1,0 @@
-[console_scripts]
-drive_node = mr2_drive.drive_node:main
-
