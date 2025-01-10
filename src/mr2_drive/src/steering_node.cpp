@@ -48,6 +48,10 @@ private:
   void twist_callback(const geometry_msgs::msg::Twist::SharedPtr msg) {
     update_joint_state(*msg);
     joint_state_publisher_->publish(joint_state_);
+    // Log the updated joint state
+    RCLCPP_INFO(this->get_logger(), "Updated joint state: %f %f %f %f",
+                joint_state_.position[0], joint_state_.position[1],
+                joint_state_.position[2], joint_state_.position[3]);
   }
 
   void update_joint_state(const geometry_msgs::msg::Twist &twist) {
