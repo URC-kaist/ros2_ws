@@ -13,6 +13,13 @@ ament_target_dependencies(mr2_drive_motor_interface
   sensor_msgs
   std_srvs
 )
+
+# Generate messages
+find_package(rosidl_default_generators REQUIRED)
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Pid.msg"
+)
+
 target_link_libraries(mr2_drive_motor_interface
   Boost::system
 )
