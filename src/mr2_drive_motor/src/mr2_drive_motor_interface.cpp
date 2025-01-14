@@ -182,7 +182,7 @@ public:
         "/mr2_drive_motor_interface/current_pid", 10);
 
     // Poll every 500 ms
-    // poll_timer_ = create_wall_timer(500ms, [this]() { this->pollStm32(); });
+    poll_timer_ = create_wall_timer(100ms, [this]() { this->pollStm32(); });
 
     RCLCPP_INFO(get_logger(), "Stm32ControlNode initialized.");
   }
@@ -205,10 +205,10 @@ private:
                   msg->velocity.size());
       return;
     }
-    float v1 = static_cast<float>(msg->velocity[0]);
-    float v2 = static_cast<float>(msg->velocity[1]);
-    float v3 = static_cast<float>(msg->velocity[2]);
-    float v4 = static_cast<float>(msg->velocity[3]);
+    float v1 = static_cast<float>(msg->velocity[0] * 50.0);
+    float v2 = static_cast<float>(msg->velocity[1] * 50.0);
+    float v3 = static_cast<float>(msg->velocity[2] * 50.0);
+    float v4 = static_cast<float>(msg->velocity[3] * 50.0);
     sendWheelSpeeds(v1, v2, v3, v4);
   }
 
@@ -245,31 +245,27 @@ private:
       }
     }
 
-    requestCurrentPid();
-    {
-      std::vector<float> data;
-      if (readFloatsFromSTM32(data)) {
-        // Expect 4 floats = P, I, D, A
-        if (data.size() == 4) {
-          auto pid_msg = mr2_drive_motor::msg::Pid();
-          pid_msg.p = data[0];
-          pid_msg.i = data[1];
-          pid_msg.d = data[2];
-          pid_msg.a = data[3];
-          pid_pub_->publish(pid_msg);
-        }
-      }
-    }
+    // requestCurrentPid();
+    // {
+    //   std::vector<float> data;
+    //   if (readFloatsFromSTM32(data)) {
+    //     // Expect 4 floats = P, I, D, A
+    //     if (data.size() == 4) {
+    //       auto pid_msg = mr2_drive_motor::msg::Pid();
+    //       pid_msg.p = data[0];
+    //       pid_msg.i = data[1];
+    //       pid_msg.d = data[2];
+    //       pid_msg.a = data[3];
+    //       pid_pub_->publish(pid_msg);
+    //     }
+    //   }
+    // }
   }
 
   // -------------------------------------------------------------------------
   // Low-level write
   // -------------------------------------------------------------------------
   bool writePacket(const std::vector<uint8_t> &packet) {
-    RCLCPP_INFO(get_logger(), "Writing packet of size %zu", packet.size());
-    RCLCPP_INFO(get_logger(), "Packet: %02x %02x %02x %02x %02x %02x",
-                packet[0], packet[1], packet[2], packet[3], packet[4],
-                packet[5]);
     if (!serial_port_.is_open()) {
       RCLCPP_ERROR(get_logger(), "Serial port not open!");
       return false;
@@ -328,12 +324,12 @@ private:
     rx_crc |= (static_cast<uint32_t>(buffer[18]) << 16);
     rx_crc |= (static_cast<uint32_t>(buffer[19]) << 24);
 
-    uint32_t calc_crc = computeCRC32(buffer.data(), 16);
-    if (rx_crc != calc_crc) {
-      RCLCPP_WARN(get_logger(), "CRC mismatch: got 0x%08X, expected 0x%08X",
-                  rx_crc, calc_crc);
-      return false;
-    }
+    // uint32_t calc_crc = computeCRC32(buffer.data(), 16);
+    // if (rx_crc != calc_crc) {
+    //   RCLCPP_WARN(get_logger(), "CRC mismatch: got 0x%08X, expected 0x%08X",
+    //               rx_crc, calc_crc);
+    //   return false;
+    // }
 
     // Unpack floats
     floats_out.resize(4);
@@ -370,8 +366,10 @@ private:
   // -------------------------------------------------------------------------
   void sendWheelSpeeds(float v1, float v2, float v3, float v4) {
     float arr[4] = {v1, v2, v3, v4};
+    RCLCPP_INFO(get_logger(), "Sending speeds: %f %f %f %f", v1, v2, v3, v4);
     auto pkt = createPacket(MODE_SET_SPEED, 0 /*all*/, arr);
     writePacket(pkt);
+    RCLCPP_INFO(get_logger(), "Sent speeds");
   }
 
   void sendPidParams(float p, float i, float d, float a) {
@@ -401,7 +399,7 @@ int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
 
   std::string port = (argc > 1) ? argv[1] : "/dev/ttyACM0";
-  unsigned int baud = (argc > 2) ? std::atoi(argv[2]) : 2000000;
+  unsigned int baud = (argc > 2) ? std::atoi(argv[2]) : 921600;
 
   auto node = std::make_shared<Stm32ControlNode>(port, baud);
   rclcpp::spin(node);
