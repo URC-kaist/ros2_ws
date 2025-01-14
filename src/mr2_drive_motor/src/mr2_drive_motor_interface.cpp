@@ -34,6 +34,33 @@ static constexpr size_t SEND_PACKET_SIZE =
     24; // 2B hdr + 1B mode + 1B ID + 16B data + 4B CRC
 static constexpr size_t RECEIVE_PACKET_SIZE = 20; // 16B data + 4B CRC
 
+static constexpr unsigned int ERROR_HARDWARE = 0xFF000000;
+static constexpr unsigned int ERROR_COMMUNICATION_TX = 0xFF010000;
+static constexpr unsigned int ERROR_COMMUNICATION_RX = 0xFF010100;
+static constexpr unsigned int ERROR_CRC = 0xFF020000;
+
+#pragma pack(push, 1)
+struct TxPacket {
+  unsigned short header;
+  uint8_t mode;
+  uint8_t id;
+  float data[4];
+  uint32_t crc;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 1)
+struct RxPacket {
+  unsigned short header;
+  unsigned short state;
+  union {
+    float f[4];
+    uint32_t u[4];
+  };
+  uint32_t crc;
+};
+#pragma pack(pop)
+
 // ---------------------------------------------------------------------------
 // Compute CRC32 (non-reflected). Adjust to match your STM32 firmware exactly.
 // ---------------------------------------------------------------------------
@@ -326,7 +353,8 @@ private:
 
     // uint32_t calc_crc = computeCRC32(buffer.data(), 16);
     // if (rx_crc != calc_crc) {
-    //   RCLCPP_WARN(get_logger(), "CRC mismatch: got 0x%08X, expected 0x%08X",
+    //   RCLCPP_WARN(get_logger(), "CRC mismatch: got 0x%08X, expected
+    //   0x%08X",
     //               rx_crc, calc_crc);
     //   return false;
     // }
