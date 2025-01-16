@@ -1,4 +1,5 @@
 #include <mr2_drive_motor/msg/pid.hpp>
+#include <mr2_drive_motor/srv/pid_params.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_srvs/srv/trigger.hpp>
@@ -132,7 +133,7 @@ public:
         std::bind(&Stm32ControlNode::onJointState, this,
                   std::placeholders::_1));
 
-    pid_service_ = create_service<std_srvs::srv::Trigger>(
+    pid_service_ = create_service<mr2_drive_motor::srv::PidParams>(
         "/set_pid_params",
         std::bind(&Stm32ControlNode::onPidService, this, std::placeholders::_1,
                   std::placeholders::_2));
@@ -219,9 +220,6 @@ private:
     return true;
   }
 
-  // -------------------------------------------------------------------------
-  // 1) onJointState: send speeds to STM32
-  // -------------------------------------------------------------------------
   void onJointState(const sensor_msgs::msg::JointState::SharedPtr msg) {
     // Expect 4 velocities
     if (msg->velocity.size() < 4) {
@@ -240,27 +238,19 @@ private:
     sendWheelSpeeds(v1, v2, v3, v4);
   }
 
-  // -------------------------------------------------------------------------
-  // 2) onPidService: set some example PID params
-  // -------------------------------------------------------------------------
-  void
-  onPidService(const std::shared_ptr<std_srvs::srv::Trigger::Request>,
-               std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
-    // Arbitrary example
-    float p = 1.0f;
-    float i = 0.1f;
-    float d = 0.01f;
-    float a = 0.0f;
+  void onPidService(
+      const std::shared_ptr<mr2_drive_motor::srv::PidParams::Request> request,
+      std::shared_ptr<mr2_drive_motor::srv::PidParams::Response> response) {
+    float p = request->p;
+    float i = request->i;
+    float d = request->d;
+    float a = request->a;
 
     sendPidParams(p, i, d, a);
 
     response->success = true;
-    response->message = "PID set successfully.";
   }
 
-  // -------------------------------------------------------------------------
-  // 3) pollStm32: periodically request data from STM32
-  // -------------------------------------------------------------------------
   void pollStm32() {
     // Request current speed
     requestCurrentSpeed();
@@ -292,12 +282,36 @@ private:
     }
 
     // You could also request PID, parse it, etc., in a similar fashion
-    // ...
+    requestCurrentPid();
+
+    {
+      // Read back the RxPacket
+      RxPacket rx;
+      if (!readRxPacket(rx)) {
+        RCLCPP_WARN(get_logger(), "Failed to read speed packet from STM32");
+        return;
+      }
+
+      // If rx.state != 0, there's an error
+      if (rx.state != 0) {
+        // interpret rx.u[0] as error code
+        RCLCPP_ERROR(get_logger(),
+                     "STM32 reported error state=%u, code=0x%08X, "
+                     "data_1=0x%08X, data_2=0x%08X",
+                     rx.state, rx.u[0], rx.u[1], rx.u[2]);
+        return;
+      }
+
+      // Publish
+      auto msg = mr2_drive_motor::msg::Pid();
+      msg.p = rx.f[0];
+      msg.i = rx.f[1];
+      msg.d = rx.f[2];
+      msg.a = rx.f[3];
+      pid_pub_->publish(msg);
+    }
   }
 
-  // -------------------------------------------------------------------------
-  // 4) Send commands
-  // -------------------------------------------------------------------------
   void sendWheelSpeeds(float v1, float v2, float v3, float v4) {
     float arr[4] = {v1, v2, v3, v4};
     TxPacket pkt = createTxPacket(TX_HEADER, MODE_SET_SPEED, 0 /*id=all*/, arr);
@@ -324,11 +338,20 @@ private:
     }
   }
 
+  void requestCurrentPid() {
+    float dummy[4] = {0, 0, 0, 0};
+    // TODO: add functionality to retrieve all four motors
+    TxPacket pkt = createTxPacket(TX_HEADER, MODE_GET_PID, 1, dummy);
+    if (!writeTxPacket(pkt)) {
+      RCLCPP_ERROR(get_logger(), "Failed to write GET_PID packet!");
+    }
+  }
+
 private:
   // ROS interfaces
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr
       joint_state_sub_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr pid_service_;
+  rclcpp::Service<mr2_drive_motor::srv::PidParams>::SharedPtr pid_service_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr speed_pub_;
   rclcpp::Publisher<mr2_drive_motor::msg::Pid>::SharedPtr pid_pub_;
   rclcpp::TimerBase::SharedPtr poll_timer_;
