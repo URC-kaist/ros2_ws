@@ -232,10 +232,10 @@ private:
     }
 
     // Convert rad/s -> your desired scaling (for example, * 50)
-    float v1 = static_cast<float>(msg->velocity[0] * 50.0f);
-    float v2 = static_cast<float>(msg->velocity[1] * 50.0f);
-    float v3 = static_cast<float>(msg->velocity[2] * 50.0f);
-    float v4 = static_cast<float>(msg->velocity[3] * 50.0f);
+    float v1 = static_cast<float>(msg->velocity[3] * 10.0f);
+    float v2 = static_cast<float>(msg->velocity[1] * 10.0f);
+    float v3 = static_cast<float>(msg->velocity[0] * 10.0f);
+    float v4 = static_cast<float>(msg->velocity[2] * 10.0f);
 
     sendWheelSpeeds(v1, v2, v3, v4);
   }

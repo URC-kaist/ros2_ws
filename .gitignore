@@ -6,3 +6,4 @@ build/mr2_drive
 install
 .cache/clangd/index
 build
+src/.cache/clangd/index
