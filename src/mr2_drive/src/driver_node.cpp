@@ -28,7 +28,7 @@ public:
     this->declare_parameter("max_x_acceleration", 10.0); // m/s^2
     this->declare_parameter("max_y_acceleration", 10.0); // m/s^2
     this->declare_parameter("max_lateral_acceleration", 10.0); // m/s^2
-    this->declare_parameter("control_interval", 10);           // ms
+    this->declare_parameter("control_interval", 20);           // ms
                                                                //
     cache_parameters();
 
