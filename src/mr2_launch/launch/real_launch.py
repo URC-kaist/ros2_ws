@@ -78,7 +78,7 @@ def generate_launch_description():
     ld.add_action(driver_node)
     ld.add_action(steering_node)
     ld.add_action(dynamixel_controller)
-    # ld.add_action(drive_motor_interface)
+    ld.add_action(drive_motor_interface)
     ld.add_action(usb_cam_node)
     ld.add_action(web_video_server_node)
 
