@@ -18,6 +18,7 @@ find_package(Boost REQUIRED COMPONENTS system)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/PidParams.srv"
   "msg/Pid.msg"
 )
 

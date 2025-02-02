@@ -1,4 +1,5 @@
 #include <mr2_drive_motor/msg/pid.hpp>
+#include <mr2_drive_motor/srv/pid_params.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_srvs/srv/trigger.hpp>
@@ -150,7 +151,7 @@ public:
         std::bind(&Stm32ControlNode::onJointState, this,
                   std::placeholders::_1));
 
-    pid_service_ = create_service<std_srvs::srv::Trigger>(
+    pid_service_ = create_service<mr2_drive_motor::srv::PidParams>(
         "/set_pid_params",
         std::bind(&Stm32ControlNode::onPidService, this, std::placeholders::_1,
                   std::placeholders::_2));
@@ -346,12 +347,6 @@ private:
     });
   }
 
-  // -------------------------------------------------------------------------
-  // ROS Callbacks
-  // -------------------------------------------------------------------------
-
-  // (1) Called when we get new JointState from /steering_node/joint_states
-  //     => Send speeds to STM32
   void onJointState(const sensor_msgs::msg::JointState::SharedPtr msg) {
     if (msg->velocity.size() < 4) {
       RCLCPP_WARN(get_logger(),
@@ -369,15 +364,13 @@ private:
     sendWheelSpeeds(v1, v2, v3, v4);
   }
 
-  // (2) Called when /set_pid_params service is invoked
-  void
-  onPidService(const std::shared_ptr<std_srvs::srv::Trigger::Request>,
-               std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
-    // Example
-    float p = 1.0f;
-    float i = 0.1f;
-    float d = 0.01f;
-    float a = 0.0f;
+  void onPidService(
+      const std::shared_ptr<mr2_drive_motor::srv::PidParams::Request> request,
+      std::shared_ptr<mr2_drive_motor::srv::PidParams::Response> response) {
+    float p = request->p;
+    float i = request->i;
+    float d = request->d;
+    float a = request->a;
 
     sendPidParams(p, i, d, a);
 
@@ -412,11 +405,20 @@ private:
     writeTxPacket(pkt);
   }
 
+  void requestCurrentPid() {
+    float dummy[4] = {0, 0, 0, 0};
+    // TODO: add functionality to retrieve all four motors
+    TxPacket pkt = createTxPacket(TX_HEADER, MODE_GET_PID, 1, dummy);
+    if (!writeTxPacket(pkt)) {
+      RCLCPP_ERROR(get_logger(), "Failed to write GET_PID packet!");
+    }
+  }
+
 private:
   // ROS interfaces
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr
       joint_state_sub_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr pid_service_;
+  rclcpp::Service<mr2_drive_motor::srv::PidParams>::SharedPtr pid_service_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr speed_pub_;
   rclcpp::Publisher<mr2_drive_motor::msg::Pid>::SharedPtr pid_pub_;
   rclcpp::TimerBase::SharedPtr poll_timer_;
