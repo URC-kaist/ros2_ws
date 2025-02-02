@@ -5,21 +5,17 @@
 #include <std_srvs/srv/trigger.hpp>
 
 #include <boost/asio.hpp>
-#include <boost/system/error_code.hpp>
-
-// Include Boost.CRC
 #include <boost/crc.hpp>
+#include <boost/system/error_code.hpp>
 
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
-using namespace std::chrono_literals;
-
-// Headers (per your new spec)
 static constexpr uint16_t TX_HEADER = 0xAF40; // PC → STM32
 static constexpr uint16_t RX_HEADER = 0xAA55; // STM32 → PC
 
@@ -38,9 +34,10 @@ static constexpr uint32_t ERROR_COMMUNICATION_RX = 0xFF010100;
 static constexpr uint32_t ERROR_CRC = 0xFF020000;
 // etc.
 
+// Packet Structures
 #pragma pack(push, 1)
 struct TxPacket {
-  uint16_t header; // e.g. 0xAA55
+  uint16_t header;
   uint8_t mode;
   uint8_t id;
   float data[4];
@@ -50,12 +47,12 @@ struct TxPacket {
 
 #pragma pack(push, 1)
 struct RxPacket {
-  uint16_t header; // e.g. 0xAF40
-  uint16_t state;  // 0 = OK, non-zero = error
+  uint16_t header;
+  uint16_t state; // 0 = OK, non-zero = error
 
   union {
     float f[4];    // if state == 0
-    uint32_t u[4]; // if state != 0 (error code, etc.)
+    uint32_t u[4]; // if state != 0 (error codes etc.)
   };
 
   uint32_t crc;
@@ -65,19 +62,26 @@ struct RxPacket {
 static constexpr size_t TX_PACKET_SIZE = sizeof(TxPacket);
 static constexpr size_t RX_PACKET_SIZE = sizeof(RxPacket);
 
-using MyCrc32 =
-    boost::crc_optimal<32,
-                       0x04C11DB7, // polynomial
-                       0xFFFFFFFF, // initial remainder
-                       0x00000000, // final XOR
-                       true,       // reflect input (true = with reflection)
-                       true        // reflect output (true = with reflection)
-                       >;
+// ---------------------------------------------------------------------------
+// CRC Implementation
+// ---------------------------------------------------------------------------
+using MyCrc32 = boost::crc_optimal<32,
+                                   0x04C11DB7, // polynomial
+                                   0xFFFFFFFF, // initial remainder
+                                   0x00000000, // final XOR value
+                                   true,       // reflect input
+                                   true        // reflect output
+                                   >;
 
 uint32_t computeCRC32(const uint8_t *data, size_t length) {
   MyCrc32 crc;
   crc.process_bytes(data, length);
   return crc.checksum();
+}
+
+uint32_t computeRxCrc(const RxPacket &rx) {
+  constexpr size_t length = RX_PACKET_SIZE - sizeof(rx.crc);
+  return computeCRC32(reinterpret_cast<const uint8_t *>(&rx), length);
 }
 
 TxPacket createTxPacket(uint16_t header, uint8_t mode, uint8_t id,
@@ -87,38 +91,43 @@ TxPacket createTxPacket(uint16_t header, uint8_t mode, uint8_t id,
   pkt.mode = mode;
   pkt.id = id;
 
-  // Copy data
   for (int i = 0; i < 4; i++) {
     pkt.data[i] = data[i];
   }
 
-  // Compute CRC over the first (24 - 4) = 20 bytes
-  const size_t crc_length = TX_PACKET_SIZE - sizeof(pkt.crc);
+  // Compute CRC over everything except the final 4 bytes
+  constexpr size_t crc_length = TX_PACKET_SIZE - sizeof(pkt.crc);
   pkt.crc = computeCRC32(reinterpret_cast<const uint8_t *>(&pkt), crc_length);
-
   return pkt;
 }
 
-class Stm32ControlNode : public rclcpp::Node {
+class Stm32ControlNode : public rclcpp::Node,
+                         public std::enable_shared_from_this<Stm32ControlNode> {
 public:
   Stm32ControlNode(const std::string &port_name, unsigned int baud_rate)
       : Node("mr2_drive_motor_interface"), io_context_(),
-        serial_port_(io_context_) {
+        serial_port_(io_context_),
+        write_strand_(boost::asio::make_strand(io_context_)) {
+    // Attempt to open the serial port
     boost::system::error_code ec;
     serial_port_.open(port_name, ec);
     if (ec) {
       RCLCPP_ERROR(get_logger(), "Failed to open port %s: %s",
                    port_name.c_str(), ec.message().c_str());
-      return;
+      // Throw so we don't proceed with a half-initialized node
+      throw std::runtime_error("Serial port open failed");
     }
 
+    // Attempt to set the baud rate
     serial_port_.set_option(boost::asio::serial_port_base::baud_rate(baud_rate),
                             ec);
     if (ec) {
-      RCLCPP_ERROR(get_logger(), "Failed to set baud rate: %s",
+      RCLCPP_ERROR(get_logger(), "Failed to set baud rate %u: %s", baud_rate,
                    ec.message().c_str());
-      return;
+      throw std::runtime_error("Setting baud rate failed");
     }
+
+    // Other serial port settings
     serial_port_.set_option(boost::asio::serial_port_base::character_size(8));
     serial_port_.set_option(boost::asio::serial_port_base::stop_bits(
         boost::asio::serial_port_base::stop_bits::one));
@@ -127,6 +136,15 @@ public:
 
     RCLCPP_INFO(get_logger(), "Opened %s at %u baud.", port_name.c_str(),
                 baud_rate);
+
+    // Start the I/O thread
+    io_thread_ = std::thread([this]() {
+      RCLCPP_INFO(get_logger(), "Starting I/O");
+      io_context_.run();
+    });
+
+    // Begin asynchronous reads
+    startAsyncRead();
 
     joint_state_sub_ = create_subscription<sensor_msgs::msg::JointState>(
         "/steering_node/joint_states", 10,
@@ -140,88 +158,196 @@ public:
 
     speed_pub_ = create_publisher<sensor_msgs::msg::JointState>(
         "/mr2_drive_motor_interface/current_speed", 10);
+
     pid_pub_ = create_publisher<mr2_drive_motor::msg::Pid>(
         "/mr2_drive_motor_interface/current_pid", 10);
 
-    poll_timer_ = create_wall_timer(100ms, [this]() { this->pollStm32(); });
+    // Poll the STM32 at 10 Hz for speed data, etc.
+    poll_timer_ = create_wall_timer(std::chrono::milliseconds(10),
+                                    [this]() { this->poll(); });
 
     RCLCPP_INFO(get_logger(), "Stm32ControlNode initialized.");
   }
 
-  ~Stm32ControlNode() {
+  ~Stm32ControlNode() override {
     if (serial_port_.is_open()) {
       boost::system::error_code ec;
       serial_port_.close(ec);
+      if (ec) {
+        RCLCPP_WARN(get_logger(), "Error closing serial port: %s",
+                    ec.message().c_str());
+      }
+    }
+    // Stop the I/O context and join the thread
+    io_context_.stop();
+    if (io_thread_.joinable()) {
+      io_thread_.join();
     }
   }
 
 private:
-  bool writeTxPacket(const TxPacket &packet) {
-    if (!serial_port_.is_open()) {
-      RCLCPP_ERROR(get_logger(), "Serial port not open for writing!");
-      return false;
-    }
-    boost::system::error_code ec;
+  // -------------------------------------------------------------------------
+  // Start an async read into the read_buffer_
+  // -------------------------------------------------------------------------
+  void startAsyncRead() {
+    serial_port_.async_read_some(
+        boost::asio::buffer(read_buffer_ + bytes_in_buffer_,
+                            MAX_BUFFER_SIZE - bytes_in_buffer_),
+        [this](boost::system::error_code ec, std::size_t bytes_transferred) {
+          if (!ec && bytes_transferred > 0) {
+            RCLCPP_DEBUG(this->get_logger(), "Bytes transferred: %zu",
+                         bytes_transferred);
 
-    // cast packet to raw uint8_t array
-    uint8_t packet_raw[TX_PACKET_SIZE];
-    memcpy(packet_raw, &packet, TX_PACKET_SIZE);
+            bytes_in_buffer_ += bytes_transferred;
+            parseIncomingData();
 
-    size_t n = boost::asio::write(
-        serial_port_, boost::asio::buffer(&packet, TX_PACKET_SIZE), ec);
-    if (ec) {
-      RCLCPP_ERROR(get_logger(), "Write error: %s", ec.message().c_str());
-      return false;
-    }
-    if (n != TX_PACKET_SIZE) {
-      RCLCPP_ERROR(get_logger(), "Wrote %zu of %zu bytes.", n, TX_PACKET_SIZE);
-      return false;
-    }
-    return true;
+            // If there's still room, read again:
+            if (bytes_in_buffer_ < MAX_BUFFER_SIZE) {
+              startAsyncRead();
+            } else {
+              RCLCPP_WARN(this->get_logger(),
+                          "Read buffer overflow! Clearing buffer...");
+              bytes_in_buffer_ = 0;
+              startAsyncRead();
+            }
+          } else {
+            RCLCPP_WARN(this->get_logger(), "Async read error: %s",
+                        ec.message().c_str());
+            // Possibly retry or handle the error
+          }
+        });
   }
 
-  bool readRxPacket(RxPacket &rx_out) {
+  // -------------------------------------------------------------------------
+  // Attempt to parse all complete RxPackets from read_buffer_
+  // -------------------------------------------------------------------------
+  void parseIncomingData() {
+    // We may have multiple packets or partial packets in the buffer.
+    // Keep scanning as long as there's enough data for at least a header.
+
+    size_t offset = 0;
+    while (true) {
+      // Need at least 2 bytes to check for the header
+      if ((bytes_in_buffer_ - offset) < 2) {
+        break;
+      }
+
+      // Check for the 2-byte header 0xAA55 in little-endian form:
+      const uint8_t header_low = 0x55;
+      const uint8_t header_high = 0xAA;
+
+      uint8_t b0 = read_buffer_[offset];
+      uint8_t b1 = read_buffer_[offset + 1];
+
+      if (b0 == header_low && b1 == header_high) {
+        // We found the potential start of a packet
+        if ((bytes_in_buffer_ - offset) < RX_PACKET_SIZE) {
+          // Not enough bytes for a full packet yet
+          break;
+        }
+
+        // We have enough data for a full RxPacket
+        RxPacket rx;
+        std::memcpy(&rx, &read_buffer_[offset], RX_PACKET_SIZE);
+
+        // Double-check the full 16-bit header just to be safe
+        if (rx.header != RX_HEADER) {
+          RCLCPP_WARN(get_logger(),
+                      "Mismatched header in bytes; discarding 2 bytes...");
+          offset += 2;
+          continue;
+        }
+
+        // Check CRC
+        uint32_t calc_crc = computeRxCrc(rx);
+        if (rx.crc == calc_crc) {
+          // Valid packet
+          handleRxPacket(rx);
+          offset += RX_PACKET_SIZE;
+        } else {
+          RCLCPP_WARN(get_logger(),
+                      "Bad CRC. Discarding 2 bytes and continuing search...");
+          offset += 2;
+        }
+      } else {
+        // Not a valid header at offset, move on by 1
+        offset += 1;
+      }
+    }
+
+    // Shift down any leftover bytes
+    if (offset > 0) {
+      size_t remaining = bytes_in_buffer_ - offset;
+      if (remaining > 0) {
+        std::memmove(read_buffer_, read_buffer_ + offset, remaining);
+      }
+      bytes_in_buffer_ = remaining;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Process a valid RxPacket
+  // -------------------------------------------------------------------------
+  void handleRxPacket(const RxPacket &rx) {
+    // If there's an error (rx.state != 0), parse the union as 'u'
+    if (rx.state != 0) {
+      RCLCPP_ERROR(get_logger(),
+                   "STM32 error state=%u, code=0x%08X, data_1=0x%08X, "
+                   "data_2=0x%08X, data_3=0x%08X",
+                   rx.state, rx.u[0], rx.u[1], rx.u[2], rx.u[3]);
+      return;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Send a TxPacket asynchronously
+  // -------------------------------------------------------------------------
+  void writeTxPacket(const TxPacket &packet) {
     if (!serial_port_.is_open()) {
-      RCLCPP_WARN(get_logger(), "Serial port not open for reading!");
-      return false;
+      RCLCPP_ERROR(get_logger(), "Serial port is not open. Cannot write.");
+      return;
     }
 
-    boost::system::error_code ec;
-    size_t n = boost::asio::read(
-        serial_port_, boost::asio::buffer(&rx_out, RX_PACKET_SIZE),
-        boost::asio::transfer_exactly(RX_PACKET_SIZE), ec);
+    // Copy packet data into a shared buffer so it lives through async_write
+    auto buffer_ptr = std::make_shared<std::vector<uint8_t>>(TX_PACKET_SIZE);
+    std::memcpy(buffer_ptr->data(), &packet, TX_PACKET_SIZE);
 
-    if (ec) {
-      RCLCPP_WARN(get_logger(), "Read error: %s", ec.message().c_str());
-      return false;
-    }
-    if (n != RX_PACKET_SIZE) {
-      RCLCPP_WARN(get_logger(), "Partial read: %zu of %zu", n, RX_PACKET_SIZE);
-      return false;
-    }
+    // Post onto the strand. The lambda is then executed in our io_context_
+    // thread *in sequence* with respect to other strand-posted writes.
+    boost::asio::post(write_strand_, [this, buffer_ptr]() {
+      // Double-check the port
+      if (!serial_port_.is_open()) {
+        RCLCPP_ERROR(this->get_logger(), "Serial port closed before write.");
+        return;
+      }
 
-    // Verify header
-    if (rx_out.header != RX_HEADER) {
-      RCLCPP_WARN(get_logger(), "Invalid RX header: 0x%04X (expected 0x%04X)",
-                  rx_out.header, RX_HEADER);
-      return false;
-    }
-
-    // Verify CRC (first 20 bytes, ignoring rx_out.crc)
-    const size_t crc_len = RX_PACKET_SIZE - sizeof(rx_out.crc);
-    uint32_t calc_crc =
-        computeCRC32(reinterpret_cast<const uint8_t *>(&rx_out), crc_len);
-    if (rx_out.crc != calc_crc) {
-      RCLCPP_WARN(get_logger(), "CRC mismatch: got=0x%08X, expected=0x%08X",
-                  rx_out.crc, calc_crc);
-      return false;
-    }
-
-    return true;
+      // Start async_write
+      boost::asio::async_write(
+          serial_port_, boost::asio::buffer(*buffer_ptr),
+          // Bind handler into the strand again (good practice).
+          // Or you can rely on the fact we called async_write from within
+          // the strand. We'll explicitly bind here for clarity.
+          boost::asio::bind_executor(
+              write_strand_,
+              [this, buffer_ptr](const boost::system::error_code &ec,
+                                 std::size_t size_written) {
+                if (ec) {
+                  RCLCPP_ERROR(this->get_logger(), "Async write error: %s",
+                               ec.message().c_str());
+                } else if (size_written != TX_PACKET_SIZE) {
+                  RCLCPP_WARN(this->get_logger(),
+                              "Wrote partial packet (%zu/%zu bytes).",
+                              size_written, TX_PACKET_SIZE);
+                } else {
+                  RCLCPP_DEBUG(this->get_logger(),
+                               "Async write complete (%zu bytes).",
+                               size_written);
+                }
+              }));
+    });
   }
 
   void onJointState(const sensor_msgs::msg::JointState::SharedPtr msg) {
-    // Expect 4 velocities
     if (msg->velocity.size() < 4) {
       RCLCPP_WARN(get_logger(),
                   "JointState has <4 velocities (got %zu). Not sending speeds.",
@@ -229,11 +355,11 @@ private:
       return;
     }
 
-    // Convert rad/s -> your desired scaling (for example, * 50)
-    float v1 = static_cast<float>(msg->velocity[0] * 50.0f);
-    float v2 = static_cast<float>(msg->velocity[1] * 50.0f);
-    float v3 = static_cast<float>(msg->velocity[2] * 50.0f);
-    float v4 = static_cast<float>(msg->velocity[3] * 50.0f);
+    // Example scale from rad/s to something else
+    float v1 = static_cast<float>(msg->velocity[3] * 10.0f);
+    float v2 = static_cast<float>(msg->velocity[1] * 10.0f);
+    float v3 = static_cast<float>(msg->velocity[0] * 10.0f);
+    float v4 = static_cast<float>(msg->velocity[2] * 10.0f);
 
     sendWheelSpeeds(v1, v2, v3, v4);
   }
@@ -249,93 +375,34 @@ private:
     sendPidParams(p, i, d, a);
 
     response->success = true;
+    response->message = "PID parameters sent successfully.";
   }
 
-  void pollStm32() {
-    // Request current speed
+  // (3) Timer callback to poll STM32
+  void poll() {
     requestCurrentSpeed();
-
-    {
-      // Read back the RxPacket
-      RxPacket rx;
-      if (!readRxPacket(rx)) {
-        RCLCPP_WARN(get_logger(), "Failed to read speed packet from STM32");
-        return;
-      }
-
-      // If rx.state != 0, there's an error
-      if (rx.state != 0) {
-        // interpret rx.u[0] as error code
-        RCLCPP_ERROR(get_logger(),
-                     "STM32 reported error state=%u, code=0x%08X, "
-                     "data_1=0x%08X, data_2=0x%08X",
-                     rx.state, rx.u[0], rx.u[1], rx.u[2]);
-        return;
-      }
-
-      // Publish
-      auto msg = sensor_msgs::msg::JointState();
-      msg.header.stamp = now();
-      msg.name = {"wheel_1", "wheel_2", "wheel_3", "wheel_4"};
-      msg.velocity = {rx.f[0], rx.f[1], rx.f[2], rx.f[3]};
-      speed_pub_->publish(msg);
-    }
-
-    // You could also request PID, parse it, etc., in a similar fashion
-    requestCurrentPid();
-
-    {
-      // Read back the RxPacket
-      RxPacket rx;
-      if (!readRxPacket(rx)) {
-        RCLCPP_WARN(get_logger(), "Failed to read speed packet from STM32");
-        return;
-      }
-
-      // If rx.state != 0, there's an error
-      if (rx.state != 0) {
-        // interpret rx.u[0] as error code
-        RCLCPP_ERROR(get_logger(),
-                     "STM32 reported error state=%u, code=0x%08X, "
-                     "data_1=0x%08X, data_2=0x%08X",
-                     rx.state, rx.u[0], rx.u[1], rx.u[2]);
-        return;
-      }
-
-      // Publish
-      auto msg = mr2_drive_motor::msg::Pid();
-      msg.p = rx.f[0];
-      msg.i = rx.f[1];
-      msg.d = rx.f[2];
-      msg.a = rx.f[3];
-      pid_pub_->publish(msg);
-    }
+    // If you also want to poll PID, etc., you can do that here or less often.
   }
 
+  // -------------------------------------------------------------------------
+  // Helper functions to send commands
+  // -------------------------------------------------------------------------
   void sendWheelSpeeds(float v1, float v2, float v3, float v4) {
     float arr[4] = {v1, v2, v3, v4};
     TxPacket pkt = createTxPacket(TX_HEADER, MODE_SET_SPEED, 0 /*id=all*/, arr);
-
-    if (!writeTxPacket(pkt)) {
-      RCLCPP_ERROR(get_logger(), "Failed to write SET_SPEED packet!");
-    }
+    writeTxPacket(pkt);
   }
 
   void sendPidParams(float p, float i, float d, float a) {
     float arr[4] = {p, i, d, a};
     TxPacket pkt = createTxPacket(TX_HEADER, MODE_SET_PID, 0, arr);
-
-    if (!writeTxPacket(pkt)) {
-      RCLCPP_ERROR(get_logger(), "Failed to write SET_PID packet!");
-    }
+    writeTxPacket(pkt);
   }
 
   void requestCurrentSpeed() {
     float dummy[4] = {0, 0, 0, 0};
     TxPacket pkt = createTxPacket(TX_HEADER, MODE_GET_SPEED, 0, dummy);
-    if (!writeTxPacket(pkt)) {
-      RCLCPP_ERROR(get_logger(), "Failed to write GET_SPEED packet!");
-    }
+    writeTxPacket(pkt);
   }
 
   void requestCurrentPid() {
@@ -359,6 +426,14 @@ private:
   // Boost.Asio
   boost::asio::io_context io_context_;
   boost::asio::serial_port serial_port_;
+  boost::asio::strand<boost::asio::io_context::executor_type> write_strand_;
+
+  static constexpr size_t MAX_BUFFER_SIZE = 1024;
+  uint8_t read_buffer_[MAX_BUFFER_SIZE];
+  size_t bytes_in_buffer_ = 0;
+
+  // Thread that runs io_context_.run()
+  std::thread io_thread_;
 };
 
 // ---------------------------------------------------------------------------
@@ -367,12 +442,20 @@ private:
 int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
 
-  // Default to /dev/ttyACM0, 921600 if not specified
-  std::string port = (argc > 1) ? argv[1] : "/dev/ttyACM0";
-  unsigned int baud = (argc > 2) ? std::atoi(argv[2]) : 921600;
+  // Default to /dev/ttyACM0 at 921600 unless overridden
+  // std::string port = (argc > 1) ? argv[1] : "/dev/ttyACM0";
+  // unsigned int baud = (argc > 2) ? std::atoi(argv[2]) : 921600;
+  std::string port = "/dev/ttyACM0";
+  unsigned int baud = 921600;
 
-  auto node = std::make_shared<Stm32ControlNode>(port, baud);
-  rclcpp::spin(node);
+  try {
+    auto node = std::make_shared<Stm32ControlNode>(port, baud);
+    rclcpp::spin(node);
+  } catch (const std::exception &e) {
+    RCLCPP_FATAL(rclcpp::get_logger("mr2_drive_motor_interface"),
+                 "Failed to initialize Stm32ControlNode: %s", e.what());
+  }
+
   rclcpp::shutdown();
   return 0;
 }

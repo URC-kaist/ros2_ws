@@ -9,8 +9,8 @@ class SteeringNode : public rclcpp::Node {
 public:
   SteeringNode() : Node("steering_node") {
 
-    this->declare_parameter("rover_width", 1.0);  // m
-    this->declare_parameter("rover_length", 1.0); // m
+    this->declare_parameter("rover_width", 0.65);   // m
+    this->declare_parameter("rover_length", 0.954); // m
 
     cache_parameters();
 
@@ -48,10 +48,6 @@ private:
   void twist_callback(const geometry_msgs::msg::Twist::SharedPtr msg) {
     update_joint_state(*msg);
     joint_state_publisher_->publish(joint_state_);
-    // Log the updated joint state
-    RCLCPP_INFO(this->get_logger(), "Updated joint state: %f %f %f %f",
-                joint_state_.position[0], joint_state_.position[1],
-                joint_state_.position[2], joint_state_.position[3]);
   }
 
   void update_joint_state(const geometry_msgs::msg::Twist &twist) {
@@ -83,7 +79,19 @@ private:
 
       steering_angles[i] =
           std::remainder(std::atan2(vy, vx) - M_PI / 2.0, M_PI * 2.0);
+
       wheel_speeds[i] = std::sqrt(vx * vx + vy * vy);
+
+      if (std::abs(steering_angles[i]) > M_PI / 2.0) {
+        steering_angles[i] =
+            std::remainder(steering_angles[i] + M_PI, M_PI * 2.0);
+        wheel_speeds[i] *= -1.0;
+      }
+
+      if (vx == 0.0 && vy == 0.0) {
+        steering_angles[i] = 0.0;
+        wheel_speeds[i] = 0.0;
+      }
     }
 
     joint_state_.position[0] = steering_angles[0];
