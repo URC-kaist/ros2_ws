@@ -13,3 +13,10 @@
 2. Enter SSID and PW
 3. `sudo vim /etc/NetworkManager/system-connections/Hotspot.nmconnection`
 4. set `autoconnect=false` to `true`
+
+## Fix CH340 issues
+
+[](https://askubuntu.com/questions/1403705/dev-ttyusb0-not-present-in-ubuntu-22-04)
+
+1. `sudo apt remove brltty`
+2. Unplug and replug USB device

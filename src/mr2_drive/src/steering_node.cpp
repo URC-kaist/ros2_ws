@@ -1,9 +1,12 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 
 const std::string JOINT_STATE_TOPIC = "/steering_node/joint_states";
 const std::string TWIST_TOPIC = "/driving_node/current_twist";
+const std::string DEBUG_INPUT_TOPIC = "/steering_node/debug_input";
+const std::string SET_DEBUG_MODE_SERVICE = "/steering_node/set_debug_mode";
 
 class SteeringNode : public rclcpp::Node {
 public:
@@ -24,6 +27,17 @@ public:
         this->create_publisher<sensor_msgs::msg::JointState>(JOINT_STATE_TOPIC,
                                                              10);
 
+    debug_input_subscriber_ =
+        this->create_subscription<sensor_msgs::msg::JointState>(
+            DEBUG_INPUT_TOPIC, 10,
+            std::bind(&SteeringNode::debug_input_callback, this,
+                      std::placeholders::_1));
+
+    debug_mode_service_ = this->create_service<std_srvs::srv::SetBool>(
+        SET_DEBUG_MODE_SERVICE,
+        std::bind(&SteeringNode::set_debug_mode, this, std::placeholders::_1,
+                  std::placeholders::_2));
+
     joint_state_.name = {"front_left_wheel_joint", "front_right_wheel_joint",
                          "back_left_wheel_joint", "back_right_wheel_joint"};
     joint_state_.position = {0.0, 0.0, 0.0, 0.0};
@@ -33,8 +47,12 @@ public:
 private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr
       target_twist_subscriber_;
+  rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr
+      debug_input_subscriber_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr debug_mode_service_;
   double rover_width_;
   double rover_length_;
+  bool debug_mode_ = false;
 
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr
       joint_state_publisher_;
@@ -46,8 +64,31 @@ private:
   }
 
   void twist_callback(const geometry_msgs::msg::Twist::SharedPtr msg) {
-    update_joint_state(*msg);
+    if (!debug_mode_) {
+      update_joint_state(*msg);
+      joint_state_publisher_->publish(joint_state_);
+    }
+  }
+
+  void
+  set_debug_mode(const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+                 std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+    debug_mode_ = request->data;
+
+    response->success = true;
+    response->message = "Debug mode: " + std::to_string(debug_mode_);
+
+    // Reset joint state just to be safe
+    joint_state_.position = {0.0, 0.0, 0.0, 0.0};
+    joint_state_.velocity = {0.0, 0.0, 0.0, 0.0};
     joint_state_publisher_->publish(joint_state_);
+  }
+
+  void debug_input_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
+    if (debug_mode_) {
+      joint_state_ = *msg;
+      joint_state_publisher_->publish(joint_state_);
+    }
   }
 
   void update_joint_state(const geometry_msgs::msg::Twist &twist) {

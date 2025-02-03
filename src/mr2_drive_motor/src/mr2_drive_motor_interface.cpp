@@ -32,7 +32,6 @@ static constexpr uint32_t ERROR_HARDWARE = 0xFF000000;
 static constexpr uint32_t ERROR_COMMUNICATION_TX = 0xFF010000;
 static constexpr uint32_t ERROR_COMMUNICATION_RX = 0xFF010100;
 static constexpr uint32_t ERROR_CRC = 0xFF020000;
-// etc.
 
 // Packet Structures
 #pragma pack(push, 1)
@@ -162,7 +161,6 @@ public:
     pid_pub_ = create_publisher<mr2_drive_motor::msg::Pid>(
         "/mr2_drive_motor_interface/current_pid", 10);
 
-    // Poll the STM32 at 10 Hz for speed data, etc.
     poll_timer_ = create_wall_timer(std::chrono::milliseconds(10),
                                     [this]() { this->poll(); });
 
@@ -265,7 +263,7 @@ private:
           handleRxPacket(rx);
           offset += RX_PACKET_SIZE;
         } else {
-          RCLCPP_WARN(get_logger(),
+          RCLCPP_INFO(get_logger(),
                       "Bad CRC. Discarding 2 bytes and continuing search...");
           offset += 2;
         }
@@ -297,6 +295,12 @@ private:
                    rx.state, rx.u[0], rx.u[1], rx.u[2], rx.u[3]);
       return;
     }
+
+    auto msg = sensor_msgs::msg::JointState();
+    msg.header.stamp = now();
+    msg.name = {"wheel_1", "wheel_2", "wheel_3", "wheel_4"};
+    msg.velocity = {rx.f[0], rx.f[1], rx.f[2], rx.f[3]};
+    speed_pub_->publish(msg);
   }
 
   // -------------------------------------------------------------------------
@@ -375,7 +379,6 @@ private:
     sendPidParams(p, i, d, a);
 
     response->success = true;
-    response->message = "PID parameters sent successfully.";
   }
 
   // (3) Timer callback to poll STM32
@@ -409,9 +412,7 @@ private:
     float dummy[4] = {0, 0, 0, 0};
     // TODO: add functionality to retrieve all four motors
     TxPacket pkt = createTxPacket(TX_HEADER, MODE_GET_PID, 1, dummy);
-    if (!writeTxPacket(pkt)) {
-      RCLCPP_ERROR(get_logger(), "Failed to write GET_PID packet!");
-    }
+    writeTxPacket(pkt);
   }
 
 private:
