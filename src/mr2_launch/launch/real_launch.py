@@ -68,6 +68,13 @@ def generate_launch_description():
         output='screen'
     )
 
+    bms_node = Node(
+        package='mr2_jk_bms',
+        executable='bms_node',
+        name='bms_node',
+        output='screen'
+    )
+
     # Create and populate the launch description
     ld = LaunchDescription()
 
@@ -81,5 +88,6 @@ def generate_launch_description():
     ld.add_action(drive_motor_interface)
     ld.add_action(usb_cam_node)
     ld.add_action(web_video_server_node)
+    ld.add_action(bms_node)
 
     return ld

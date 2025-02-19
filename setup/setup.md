@@ -20,3 +20,33 @@
 
 1. `sudo apt remove brltty`
 2. Unplug and replug USB device
+
+## Add startup service
+
+1. `chmod +x ~/ros2_ws/script/rover_startup.sh`
+2. `sudo cp ~/ros2_ws/script/mr2_rover.service /etc/systemd/system/`
+3. `sudo systemctl daemon-reload`
+4. `sudo systemctl enable mr2_rover.service`
+5. `sudo systemctl start mr2_rover.service`
+
+## Enable wake on lan
+
+[](https://devdebin.tistory.com/343)
+
+1. `sudo apt-get install net-tools ethtool wakeonlan`
+2. Find out network interface name using `ifconfig`
+3. `sudo vim /etc/systemd/system/wol.service`
+```
+[Unit]
+Description=Configure Wake-up on LAN
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ethtool -s <INTERFACE NAME> wol g
+
+[Install]
+WantedBy=basic.target
+```
+4. `sudo systemctl daemon-reload`
+5. `sudo systemctl enable wol.service`
+6. `sudo systemctl start wol.service`
