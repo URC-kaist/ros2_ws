@@ -56,7 +56,7 @@ WantedBy=basic.target
 2. reboot
 3. `sudo addgroup realtime`
 4. `sudo usermod -a -G realtime $(whoami)`
-5. `sudo nano /etc/security/limits.conf`
+5. `sudo vim /etc/security/limits.conf`
 ```
 @realtime soft rtprio 99
 @realtime soft priority 99
