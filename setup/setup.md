@@ -50,3 +50,19 @@ WantedBy=basic.target
 4. `sudo systemctl daemon-reload`
 5. `sudo systemctl enable wol.service`
 6. `sudo systemctl start wol.service`
+
+## Setting realtime kernel
+1. `sudo pro enable realtime-kernel`
+2. reboot
+3. `sudo addgroup realtime`
+4. `sudo usermod -a -G realtime $(whoami)`
+5. `sudo nano /etc/security/limits.conf`
+```
+@realtime soft rtprio 99
+@realtime soft priority 99
+@realtime soft memlock 102400
+@realtime hard rtprio 99
+@realtime hard priority 99
+@realtime hard memlock 102400
+```
+6. logout and in again
