@@ -14,6 +14,7 @@
   <xacro:swerve_module prefix="rl" parent="left_rocker" xyz="-0.47 -0.08 -0.18"/>
   <xacro:swerve_module prefix="rr" parent="right_rocker" xyz="-0.47 0.08 -0.18"/>
 
+ 
 
 
   <!-- ros2_control plugin -->
@@ -24,6 +25,16 @@
     <parameters>$(find mr2_rover_description)/config/controllers.yaml</parameters>
   </plugin>
 </gazebo>
+<gazebo reference="base_link">
+  <sensor name="left_gnss_sensor" type="navsat">
+    <always_on>1</always_on>
+    <update_rate>1</update_rate>
+    <visualize>true</visualize>
+            <topic>left_gnss/fix</topic>
+            <ignition_frame_id>base_link</ignition_frame_id>
+  </sensor>
+</gazebo>
+
       <ros2_control name="GazeboSimSystem" type="system">
         <hardware>
           <plugin>gz_ros2_control/GazeboSimSystem</plugin>
@@ -50,9 +61,9 @@
         <joint name="rr_steering_joint"><command_interface name="position"/><state_interface name="position"/></joint>
 
         <!-- Wheel velocity interfaces -->
-        <joint name="fl_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
-        <joint name="fr_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
-        <joint name="rl_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
-        <joint name="rr_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/></joint>
+        <joint name="fl_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
+        <joint name="fr_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
+        <joint name="rl_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
+        <joint name="rr_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
       </ros2_control>
 </robot>

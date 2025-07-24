@@ -35,7 +35,7 @@ def generate_launch_description():
     # ───── spawn the robot into Gazebo ───────────────────────────────────
     spawn = Node(package='ros_gz_sim',
                  executable='create',
-                 arguments=['-topic', 'robot_description', '-name', 'rover'])
+                 arguments=['-topic', 'robot_description', '-name', 'rover', '-z', '5.0'])
 
     # ───── load controllers (after ros2_control is running) ─────────────
     jsb_spawner   = Node(package='controller_manager', executable='spawner',
