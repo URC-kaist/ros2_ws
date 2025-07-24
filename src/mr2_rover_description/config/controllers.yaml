@@ -1,0 +1,34 @@
+# mr2_rover_description/config/controllers.yaml
+controller_manager:
+  ros__parameters:
+    update_rate: 100                # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+      publish_rate: 50
+
+    drive_controller:               # 선언만! 세부 파라미터는 아래에서
+      type: velocity_controllers/JointGroupVelocityController
+
+    steering_controller:
+      type: position_controllers/JointGroupPositionController
+
+# ───────────────────────────────────────────────
+drive_controller:
+  ros__parameters:
+    joints:                          # 필수
+      - fl_wheel_joint
+      - fr_wheel_joint
+      - rl_wheel_joint
+      - rr_wheel_joint
+    interface_name: velocity         # JointGroupVelocityController가 요구
+
+steering_controller:
+  ros__parameters:
+    joints:
+      - fl_steering_joint
+      - fr_steering_joint
+      - rl_steering_joint
+      - rr_steering_joint
+    interface_name: position
+

@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="swerve_module" params="prefix parent xyz">
+    <!-- local constants -->
+    <xacro:property name="steer_limit"  value="3.14"/>
+    <xacro:property name="wheel_limit"  value="20.0"/>
+    <xacro:property name="wheel_radius" value="0.11"/>
+    <xacro:property name="wheel_width"  value="0.11"/>
+
+    <!-- Steering link -->
+    <link name="${prefix}_mount">
+      <inertial>
+        <mass value="0.5"/>
+	<inertia ixx="1e-3" ixy="0"  ixz="0"
+            iyy="1e-3" iyz="0"
+            izz="1e-3"/>
+      </inertial>
+      <visual>
+        <geometry>
+          <cylinder radius="0.11" length="0.02"/>
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="0.11" length="0.02"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Wheel link -->
+    <link name="${prefix}_wheel">
+<inertial>
+	    <mass value="0.2"/>
+	    <inertia ixx="1e-3" ixy="0" ixz="0"
+		     iyy="1e-3" iyz="0"
+		     izz="1e-3"/>
+	  </inertial>
+	  <visual>
+	    <origin xyz="0 0 0" rpy="1.5708 0 0"/> <!-- Z축->X축으로 눕힘 -->
+	    <geometry>
+	      <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+	    </geometry>
+	    <material name="Rubber"/>
+	  </visual>
+	  <collision>
+	    <origin xyz="0 0 0" rpy="1.5708 0 0"/> <!-- 동일하게 적용 -->
+	    <geometry>
+	      <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+	    </geometry>
+	  </collision>
+	</link>
+
+    <!-- Steering joint -->
+    <joint name="${prefix}_steering_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child  link="${prefix}_mount"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit effort="5" velocity="${steer_limit}"/>
+    </joint>
+
+    <!-- Wheel-spin joint -->
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="${prefix}_mount"/>
+      <child  link="${prefix}_wheel"/>
+      <origin xyz="0 0 -${wheel_radius}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit effort="5" velocity="${wheel_limit}"/>
+    </joint>
+  </xacro:macro>
+
+</robot>
