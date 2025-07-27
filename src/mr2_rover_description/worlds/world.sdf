@@ -25,6 +25,12 @@
       name="ignition::gazebo::systems::SceneBroadcaster">
     </plugin>
 
+    <plugin
+      filename="ignition-gazebo-sensors-system"
+      name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
     <!-- Processes pose commands -->
     <plugin
       filename="ignition-gazebo-physics-system"

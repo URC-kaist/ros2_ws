@@ -1,69 +1,150 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rover">
-
   <!-- Include component macros -->
   <xacro:include filename="$(find mr2_rover_description)/urdf/rover_base.xacro"/>
   <xacro:include filename="$(find mr2_rover_description)/urdf/swerve_module.xacro"/>
-
   <!-- Chassis -->
   <xacro:rover_base/>
-
   <!-- Four modules -->
   <xacro:swerve_module prefix="fl" parent="left_rocker" xyz=" 0.47 -0.08 -0.18"/>
   <xacro:swerve_module prefix="fr" parent="right_rocker" xyz=" 0.47 0.08 -0.18"/>
   <xacro:swerve_module prefix="rl" parent="left_rocker" xyz="-0.47 -0.08 -0.18"/>
   <xacro:swerve_module prefix="rr" parent="right_rocker" xyz="-0.47 0.08 -0.18"/>
-
- 
-
-
   <!-- ros2_control plugin -->
   <gazebo>
-	  <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-	  <robot_param>robot_description</robot_param>
-	  <robot_param_node>robot_state_publisher</robot_param_node>
-    <parameters>$(find mr2_rover_description)/config/controllers.yaml</parameters>
-  </plugin>
-</gazebo>
-<gazebo reference="base_link">
-  <sensor name="left_gnss_sensor" type="navsat">
-    <always_on>1</always_on>
-    <update_rate>1</update_rate>
-    <visualize>true</visualize>
-            <topic>left_gnss/fix</topic>
-            <ignition_frame_id>base_link</ignition_frame_id>
-  </sensor>
-</gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>$(find mr2_rover_description)/config/controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+  <gazebo reference="left_gnss">
+    <sensor name="left_gnss_sensor" type="navsat">
+      <always_on>1</always_on>
+      <update_rate>1</update_rate>
+      <visualize>true</visualize>
+      <topic>left_gnss/navsat</topic>
+      <ignition_frame_id>left_gnss</ignition_frame_id>
+    </sensor>
+  </gazebo>
+  <gazebo reference="right_gnss">
+    <sensor name="right_gnss_sensor" type="navsat">
+      <always_on>1</always_on>
+      <update_rate>1</update_rate>
+      <visualize>true</visualize>
+      <topic>right_gnss/navsat</topic>
+      <ignition_frame_id>right_gnss</ignition_frame_id>
+    </sensor>
+  </gazebo>
+  <gazebo reference="front_camera">
+    <sensor name="front_camera_sensor" type="rgbd_camera">
+	<update_rate>60</update_rate>
+	<always_on>1</always_on>
+        <visualize>true</visualize>
+	<topic>rgbd_camera</topic>
+        <ignition_frame_id>front_camera</ignition_frame_id>
+        <camera>
+          <horizontal_fov>1.0472</horizontal_fov>
+          <lens>
+            <intrinsics>
+              <!-- fx = fy = width / ( 2 * tan (hfov / 2 ) ) -->
+              <fx>554.25469</fx>
+              <fy>554.25469</fy>
+              <!-- cx = ( width + 1 ) / 2 -->
+              <cx>320.5</cx>
+              <!-- cy = ( height + 1 ) / 2 -->
+              <cy>240.5</cy>
+              <s>0</s>
+            </intrinsics>
+          </lens>
+          <distortion>
+            <k1>0.0</k1>
+            <k2>0.0</k2>
+            <k3>0.0</k3>
+            <p1>0.0</p1>
+            <p2>0.0</p2>
+            <center>0.5 0.5</center>
+          </distortion>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.01</near>
+            <far>300</far>
+          </clip>
+          <depth_camera>
+            <clip>
+              <near>0.1</near>
+              <far>10</far>
+            </clip>
+          </depth_camera>
+          <noise>
+            <type>gaussian</type>
+            <mean>0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+    </sensor>
+  </gazebo>
+  <ros2_control name="GazeboSimSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
 
-      <ros2_control name="GazeboSimSystem" type="system">
-        <hardware>
-          <plugin>gz_ros2_control/GazeboSimSystem</plugin>
-        </hardware>
+    <!-- Mimic Joint -->
+    <joint name="left_rocker_joint">
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="right_rocker_joint">
+      <param name="mimic">left_rocker_joint</param>
+      <param name="multiplier">-1</param>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
 
-	<!-- Mimic Joint -->
-	<joint name="left_rocker_joint">
-	  <state_interface name="position"/>
-	  <state_interface name="velocity"/>
-	  <state_interface name="effort"/>
-	</joint>
-	<joint name="right_rocker_joint">
-	  <param name="mimic">left_rocker_joint</param>
-	  <param name="multiplier">-1</param>
-	  <state_interface name="position"/>
-	  <state_interface name="velocity"/>
-	  <state_interface name="effort"/>
-	</joint>
+    <!-- Steering position interfaces -->
+    <joint name="fl_steering_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="fr_steering_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="rl_steering_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="rr_steering_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
 
-        <!-- Steering position interfaces -->
-        <joint name="fl_steering_joint"><command_interface name="position"/><state_interface name="position"/></joint>
-        <joint name="fr_steering_joint"><command_interface name="position"/><state_interface name="position"/></joint>
-        <joint name="rl_steering_joint"><command_interface name="position"/><state_interface name="position"/></joint>
-        <joint name="rr_steering_joint"><command_interface name="position"/><state_interface name="position"/></joint>
-
-        <!-- Wheel velocity interfaces -->
-        <joint name="fl_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
-        <joint name="fr_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
-        <joint name="rl_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
-        <joint name="rr_wheel_joint"><command_interface name="velocity"/><state_interface name="velocity"/><state_interface name="position"/></joint>
-      </ros2_control>
+    <!-- Wheel velocity interfaces -->
+    <joint name="fl_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="fr_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="rl_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="rr_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="velocity"/>
+      <state_interface name="position"/>
+    </joint>
+  </ros2_control>
 </robot>
