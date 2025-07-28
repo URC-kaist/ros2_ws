@@ -9,7 +9,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     # ─── Arguments ───────────────────────────────────────────────────────────────
     default_rviz = PathJoinSubstitution(
-        [FindPackageShare("mr2_heightmap"), "config", "sim.rviz"]
+        [FindPackageShare("mr2_launch"), "rviz", "sim.rviz"]
     )
     rviz_arg = DeclareLaunchArgument(
         "rviz_config",

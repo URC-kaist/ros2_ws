@@ -79,7 +79,7 @@ def generate_launch_description():
             rsp,
             TimerAction(period=2.0, actions=[spawn]),
             TimerAction(
-                period=4.0, actions=[jsb_spawner, steer_spawner, drive_spawner]
+                period=6.0, actions=[jsb_spawner, steer_spawner, drive_spawner]
             ),
             gz_bridge,
         ]
