@@ -12,13 +12,9 @@ def generate_launch_description():
         Node(
             package='grid_map_demos',
             executable='filters_demo',
-            name='filters_demo',
+            name='grid_map_filters',
             output='screen',
-            parameters=[
-                {'input_topic': '/height_gridmap'},  # adjust as needed
-                {'output_topic': '/traversibility_gridmap'}, # adjust as needed
-                config_file  # this loads the full YAML as ROS params
-            ]
+            parameters=[config_file]
         ),
     ])
 

@@ -1,48 +1,101 @@
-filters_demo:
+grid_map_filters:
   ros__parameters:
-    grid_map_filters:
-      - name: inpaint
+
+    # ───── I/O 토픽 ───────────────────────────
+    input_topic:  /height_gridmap
+    output_topic: /traversibility_gridmap
+
+    # ───── 필터 체인 ──────────────────────────
+    filters:
+
+      filter1:
+        name: buffer_normalizer
+        type: gridMapFilters/BufferNormalizerFilter
+
+      filter3:  # Inpainting으로 결측값 보간
+        name: inpaint
         type: gridMapCv/InpaintFilter
         params:
-          input_layer: elevation
-          output_layer: elevation_filled
-          radius: 0.2
-      - name: slope
-        type: gridMapFilters/SlidingWindowMathExpressionFilter
+          input_layer:  elevation
+          output_layer: elevation_inpainted
+          radius: 0.10
+
+      filter4:  # 반경 평균화로 노이즈 저감
+        name: mean_in_radius
+        type: gridMapFilters/MeanInRadiusFilter
         params:
-          input_layer: elevation_filled
+          input_layer:  elevation_inpainted
+          output_layer: elevation_smooth
+          radius: 0.10
+
+      filter5:  # 표면 법선 벡터 계산
+        name: surface_normals
+        type: gridMapFilters/NormalVectorsFilter
+        params:
+          input_layer:              elevation_inpainted
+          output_layers_prefix:     normal_vectors_
+          radius:                   0.10
+          normal_vector_positive_axis: z
+
+      filter6:  # 법선 벡터를 색상으로 시각화
+        name: normal_color_map
+        type: gridMapFilters/NormalColorMapFilter
+        params:
+          input_layers_prefix: normal_vectors_
+          output_layer:       normal_color
+
+      filter7:  # 경사도(slope) 계산
+        name: slope
+        type: gridMapFilters/MathExpressionFilter
+        params:
           output_layer: slope
-          expression: >-
-            sqrt(square(derivativeX(elevation_filled)) +
-            square(derivativeY(elevation_filled)))
-          compute_empty_cells: true
-          window_size: 3
-      - name: roughness
+          expression: acos(normal_vectors_z)
+
+      filter8:  # 거칠기(roughness) 계산
+        name: roughness
+        type: gridMapFilters/MathExpressionFilter
+        params:
+          output_layer: roughness
+          expression: abs(elevation_inpainted - elevation_smooth)
+
+      filter9:  # 슬로프 기반 에지 검출
+        name: edge_detection
         type: gridMapFilters/SlidingWindowMathExpressionFilter
         params:
-          input_layer: elevation_filled
-          output_layer: roughness
-          expression: >-
-            sqrt(sumOfFinites(square(elevation_filled -
-            meanOfFinites(elevation_filled))) ./
-            numberOfFinites(elevation_filled))
-          window_size: 3
-      - name: traversability
+          input_layer:        slope
+          output_layer:       edges
+          expression: |
+            sqrt(
+              sumOfFinites(
+                square(slope - meanOfFinites(slope))
+              ) ./ numberOfFinites(slope)
+            )
+          compute_empty_cells: false
+          edge_handling:      crop   # options: inside, crop, empty, mean
+          window_length:      0.05   # [m]
+
+      filter10:  # 통행 가능도(traversability) 계산
+        name: traversability
         type: gridMapFilters/MathExpressionFilter
         params:
           output_layer: traversability
-          expression: 0.5 * (1.0 - (slope / 0.6)) + 0.5 * (1.0 - (roughness / 0.1))
-      - name: traversability_lower_threshold
+          expression: |
+            0.5 * (1.0 - (slope     / 0.6)) +
+            0.5 * (1.0 - (roughness / 0.1))
+
+      filter11:  # 하한(0) 클램핑
+        name: traversability_lower_threshold
         type: gridMapFilters/ThresholdFilter
         params:
-          condition_layer: traversability
-          output_layer: traversability
-          lower_threshold: 0
-          set_to: 0
-      - name: traversability_upper_threshold
+          layer:           traversability
+          lower_threshold: 0.0
+          set_to:          0.0
+
+      filter12:  # 상한(1) 클램핑
+        name: traversability_upper_threshold
         type: gridMapFilters/ThresholdFilter
         params:
-          condition_layer: traversability
-          output_layer: traversability
-          upper_threshold: 1
-          set_to: 1
+          layer:           traversability
+          upper_threshold: 1.0
+          set_to:          1.0
+

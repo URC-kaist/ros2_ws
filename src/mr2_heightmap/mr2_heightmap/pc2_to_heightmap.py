@@ -235,7 +235,7 @@ class PC2ToGridMapNode(Node):
         bin_ms = (t_bin - t_trans) * 1000.0
         pub_ms = (t_pub - t_bin) * 1000.0
         tot_ms = (t_pub - t0) * 1000.0
-        self.get_logger().info(
+        self.get_logger().debug(
             f"pts:{pts_total} -> used:{pts_used} cells:{cells_filled} | "
             f"tf:{tf_ms:.1f} read:{read_ms:.1f} roi:{roi_ms:.1f} vox:{vox_ms:.1f} trans:{trans_ms:.1f} bin:{bin_ms:.1f} pub:{pub_ms:.1f} total:{tot_ms:.1f} ms"
         )
