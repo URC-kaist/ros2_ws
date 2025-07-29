@@ -1,0 +1,48 @@
+filters_demo:
+  ros__parameters:
+    grid_map_filters:
+      - name: inpaint
+        type: gridMapCv/InpaintFilter
+        params:
+          input_layer: elevation
+          output_layer: elevation_filled
+          radius: 0.2
+      - name: slope
+        type: gridMapFilters/SlidingWindowMathExpressionFilter
+        params:
+          input_layer: elevation_filled
+          output_layer: slope
+          expression: >-
+            sqrt(square(derivativeX(elevation_filled)) +
+            square(derivativeY(elevation_filled)))
+          compute_empty_cells: true
+          window_size: 3
+      - name: roughness
+        type: gridMapFilters/SlidingWindowMathExpressionFilter
+        params:
+          input_layer: elevation_filled
+          output_layer: roughness
+          expression: >-
+            sqrt(sumOfFinites(square(elevation_filled -
+            meanOfFinites(elevation_filled))) ./
+            numberOfFinites(elevation_filled))
+          window_size: 3
+      - name: traversability
+        type: gridMapFilters/MathExpressionFilter
+        params:
+          output_layer: traversability
+          expression: 0.5 * (1.0 - (slope / 0.6)) + 0.5 * (1.0 - (roughness / 0.1))
+      - name: traversability_lower_threshold
+        type: gridMapFilters/ThresholdFilter
+        params:
+          condition_layer: traversability
+          output_layer: traversability
+          lower_threshold: 0
+          set_to: 0
+      - name: traversability_upper_threshold
+        type: gridMapFilters/ThresholdFilter
+        params:
+          condition_layer: traversability
+          output_layer: traversability
+          upper_threshold: 1
+          set_to: 1

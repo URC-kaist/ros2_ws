@@ -271,8 +271,8 @@ class PC2ToGridMapNode(Node):
 
         arr = Float32MultiArray()
         arr.layout.dim = [
-            MultiArrayDimension(label="rows", size=rows, stride=rows * cols),
-            MultiArrayDimension(label="cols", size=cols, stride=cols),
+            MultiArrayDimension(label="column_index", size=rows, stride=rows * cols),
+            MultiArrayDimension(label="row_index", size=cols, stride=cols),
         ]
         arr.data = heightmap.astype(np.float32).flatten(order="C").tolist()
 
