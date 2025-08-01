@@ -1,0 +1,45 @@
+ekf_filter_node:
+  ros__parameters:
+    # Standard Parameters
+    frequency: 20.0 # To be tuned depending on publishing speed
+    sensor_timeout: 0.5 # Minimum frequency for output
+    two_d_mode: false # Consider Earth's curvature?
+    
+    # Frames:map (field frame) -> odom (estimation) -> base_link (robot frame)
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+    
+    # transform_time_offset:
+    # transform_timeout:
+    
+    # Sensors (message type?)
+    imu0: /imu/data
+    imu0_config: [false, false, false, true, true, true,    # orientation
+                  false, false, false, true, true, true,    # angular velocity
+                  true, true, true]                         # linear acceleration
+    imu0_queue_size: 5
+    imu0_differential: false
+    imu0_relative: true # everything is relative from start (t=0)
+    imu0_remove_gravitational_acceleration: true
+    gravitational_acceleration: 9.81 # Value depends on where you are
+    
+    # initial_state: # Since imu0_relative, don't care
+    
+    publish_tf: true # tf: world_frame (odom) -> base_link_frame (base_link)
+    publish_acceleration: true # respect lagged measurement timestamp
+    print_diagnostics: true # topic /diagnostic to debug config and data
+    
+    # Advanced Parameters (excerpt; refer to wiki for more):
+    # process_noise_covariance: # set Q from EKF
+    # dynamic_process_noise_covariance: # scale Q based on velocity
+    # initial_estimate_covariance: # set P at t=0
+    
+
+    
+    # This node publishes:
+    #   topic odometry/filtered
+    #   tf map_frame -> odom_frame # given there is tf odom -> base_link
+    
+    # Services: set_pose, to manually set currernt state.

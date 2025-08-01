@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>mr2_rover_auto</name>
+  <version>0.0.1</version>
+  <description>Autonomy components for MR2 Rover (launch and config)</description>
+
+  <maintainer email="your.email@example.com">Your Name</maintainer>
+  <license>MIT</license>
+
+  <!-- Core build tool -->
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Dependencies for launch files -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Dependencies for what you're launching -->
+  <exec_depend>robot_localization</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

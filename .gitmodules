@@ -1,0 +1,9 @@
+[submodule "src/iahrs_driver_ros2"]
+	path = src/iahrs_driver_ros2
+	url = https://github.com/URC-kaist/iahrs_driver_ros2
+[submodule "src/rtcm_msgs"]
+	path = src/rtcm_msgs
+	url = https://github.com/tilk/rtcm_msgs
+[submodule "src/ublox_dgnss"]
+	path = src/ublox_dgnss
+	url = https://github.com/URC-kaist/ublox_dgnss
