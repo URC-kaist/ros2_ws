@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 from glob import glob
 
-package_name = "mr2_heightmap"
+package_name = "mr2_autonomous"
 
 setup(
     name=package_name,
@@ -22,7 +22,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "pc2_to_heightmap = mr2_heightmap.pc2_to_heightmap:main",
+            "pc2_to_heightmap = mr2_autonomous.pc2_to_heightmap:main",
         ],
     },
 )

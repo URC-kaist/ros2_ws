@@ -5,7 +5,7 @@ import os
 
 def generate_launch_description():
     config_file = os.path.join(
-        get_package_share_directory('mr2_heightmap'), 'config', 'filter_chain.yaml'
+        get_package_share_directory('mr2_autonomous'), 'config', 'filter_chain.yaml'
     )
 
     return LaunchDescription([

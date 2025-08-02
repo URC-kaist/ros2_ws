@@ -19,7 +19,7 @@ def generate_launch_description():
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
     pc2_to_heightmap = Node(
-        package="mr2_heightmap",
+        package="mr2_autonomous",
         executable="pc2_to_heightmap",
         name="pc2_to_heightmap",
         output="screen",
