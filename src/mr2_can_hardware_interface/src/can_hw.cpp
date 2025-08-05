@@ -30,9 +30,9 @@ public:
     // Local node for parameters / logging
     node_   = rclcpp::Node::make_shared("can_hw");
 
-    // Device plugin loader (package "can_bus_core", base class CanDevice)
+    // Device plugin loader for CanDevice plugins exported under mr2_can_bus_core
     try {
-      loader_ = std::make_shared<pluginlib::ClassLoader<CanDevice>>("can_bus_core", "CanDevice");
+      loader_ = std::make_shared<pluginlib::ClassLoader<CanDevice>>("mr2_can_bus_core", "CanDevice");
     } catch (const pluginlib::PluginlibException & ex) {
       RCLCPP_ERROR(node_->get_logger(), "Pluginlib load error: %s", ex.what());
       return CallbackReturn::ERROR;
