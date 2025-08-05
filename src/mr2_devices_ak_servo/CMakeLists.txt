@@ -20,4 +20,7 @@ pluginlib_export_plugin_description_file(mr2_can_bus_core plugin.xml)
 install(TARGETS ak_servo_device
         LIBRARY DESTINATION lib)
 
+install(FILES plugin.xml
+        DESTINATION share/${PROJECT_NAME})
+
 ament_package()
