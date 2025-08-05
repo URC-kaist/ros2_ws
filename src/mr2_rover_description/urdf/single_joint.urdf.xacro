@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="single_joint">
+  <link name="base_link"/>
+  <link name="link1"/>
+
+  <joint name="joint1" type="revolute">
+    <parent link="base_link"/>
+    <child link="link1"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="10" velocity="1"/>
+  </joint>
+
+  <ros2_control name="CanSystem" type="system">
+    <hardware>
+      <plugin>mr2_can_hardware_interface/CanHW</plugin>
+    </hardware>
+
+    <joint name="joint1">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+      <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+      <param name="motor_id">4</param>
+      <param name="gear_ratio">1.0</param>
+      <param name="can_iface">can0</param>
+    </joint>
+  </ros2_control>
+</robot>
+

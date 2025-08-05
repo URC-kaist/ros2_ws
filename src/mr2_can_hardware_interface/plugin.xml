@@ -1,7 +1,7 @@
-<library path="libcan_hw">
+<library path="mr2_can_hardware_interface">
   <class
-      name="CanHW"
-      type="CanHW"
+      name="mr2_can_hardware_interface/CanHW"
+      type="mr2_can_hardware_interface::CanHW"
       base_class_type="hardware_interface::SystemInterface">
     <description>SystemInterface that bridges CanDevice plugins to ros2_control joint interfaces.</description>
   </class>

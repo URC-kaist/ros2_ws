@@ -25,5 +25,8 @@ install(
   TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION lib)
 
+install(FILES plugin.xml
+  DESTINATION share/${PROJECT_NAME})
+
 
 ament_package()

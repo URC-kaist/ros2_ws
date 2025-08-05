@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <mutex>
 #include <queue>
@@ -72,9 +73,6 @@ private:
 };
 
 // -------------- Inline implementation ----------------
-#ifdef CAN_BUS_CORE_IMPL
-#include <cstring>
-
 inline bool CanBusManager::start(const std::string& iface, int bitrate)
 {
   if (running_) return true;
@@ -87,9 +85,9 @@ inline bool CanBusManager::start(const std::string& iface, int bitrate)
   fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
 
   struct ifreq ifr{}; std::strncpy(ifr.ifr_name, iface.c_str(), IFNAMSIZ-1);
+  struct sockaddr_can addr{};
   if (ioctl(fd_, SIOCGIFINDEX, &ifr) < 0) { perror("SIOCGIFINDEX"); goto err; }
-
-  struct sockaddr_can addr{}; addr.can_family=AF_CAN; addr.can_ifindex=ifr.ifr_ifindex;
+  addr.can_family=AF_CAN; addr.can_ifindex=ifr.ifr_ifindex;
   if (bind(fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) { perror("bind"); goto err; }
 
   if (pipe2(wake_pipe_, O_NONBLOCK) < 0) { perror("pipe2"); goto err; }
@@ -145,4 +143,4 @@ inline void CanBusManager::rx_once_()
   std::lock_guard<std::mutex> lk(lst_mtx_);
   for(const auto &l: listeners_) if((fr.can_id&l.mask)==l.id) l.cb(fr);
 }
-#endif // CAN_BUS_CORE_IMPL
+
