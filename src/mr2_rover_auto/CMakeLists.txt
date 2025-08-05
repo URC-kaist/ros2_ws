@@ -26,7 +26,22 @@ ament_target_dependencies(gps_heading_imu_node
 
 install(TARGETS
   gps_heading_imu_node
-  DESTINATION lib/${PROJECT_NAME}
+  DESTINATION lib/${PROJECT_NAME}/
+)
+
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+install(
+  DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+install(
+  DIRECTORY behavior_trees
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 ament_package()

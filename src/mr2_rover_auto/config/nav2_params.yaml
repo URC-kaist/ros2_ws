@@ -1,0 +1,120 @@
+# Common settings
+use_sim_time: true # true for Gazebo
+
+# 0) Lifecycle Manager ────────────────────────────────
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    node_names:
+      - map_server
+      - global_costmap
+      - local_costmap
+      - planner_server
+      - controller_server
+      - smoother_server
+      - bt_navigator
+
+# 1) BT Navigator ────────────────────────────────
+bt_navigator:
+  ros__parameters:
+    plugin_lib_names: ["nav2_bt_navigator/BehaviorTreeEngine"]
+    bt_xml_filename: "behavior_trees/navigate_bt.xml"
+    planner_server: "planner_server"
+    controller_server: "controller_server"
+
+# 2) Map Server ────────────────────────────────
+map_server:
+  ros__parameters:
+    yaml_filename: "<path_to_your_map>.yaml"
+    use_sim_time: true
+    topic_name: "map"
+    frame_id: "map"
+    allow_no_topic: false
+
+# 3) Global Costmap ────────────────────────────────
+global_costmap:
+  ros__parameters:
+    # frame, update rates, size
+    global_frame: "map"
+    robot_base_frame: "base_link"
+    update_frequency: 5.0
+    publish_frequency: 5.0
+    width: 10.0
+    height: 10.0
+    resolution: 0.05
+
+    # 1) Static map layer
+    static_layer:
+      plugin: "nav2_costmap_2d::StaticLayer"
+      map_topic: "/map"
+      subscribe_to_updates: true
+
+    # 2) Traversability layer (dynamic)
+    traversability_layer:
+      plugin: "your_custom_plugins/TraversabilityLayer"  # or ObstacleLayer repurposed
+      topic: "/traversability_grid"
+      marking: true       # treats high-cost cells as obstacles
+      clearing: false     # only mark, don’t clear
+
+    # 3) Inflation to pad steep/rough areas
+    inflation_layer:
+      plugin: "nav2_costmap_2d::InflationLayer"
+      inflation_radius: 0.6
+
+    # Layer order
+    plugins: ["static_layer", "traversability_layer", "inflation_layer"]
+
+# 4) Planner (A to B) ────────────────────────────────
+planner_a2b_server:
+  ros__parameters:
+    expected_planner_frequency: 5.0 # target frequency to generate path
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+# 5) Planner (Coverage) ────────────────────────────────
+planner_c_server:
+  ros__parameters:
+    expected_planner_frequency: 5.0 # target frequency to generate path
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+# 6) Smoother ────────────────────────────────
+smoother_server:
+  ros__parameters:
+    smoother_plugins: ["SimpleSmoother"] # not savitzky
+    SimpleSmoother:
+      plugin: "nav2_smoother/SimpleSmoother"
+      tolerance: 0.001    # path deviation tolerance [m]
+      max_iterations: 100 # smoothing passes
+      do_refinement: true # refine endpoints
+
+# 7) Controller ────────────────────────────────
+controller_server:
+  ros__parameters:
+    controller_frequency: 10.0
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "nav2_regulated_pure_pursuit_controller/RegulatedPurePursuitController"
+      desired_linear_vel: 0.5
+      min_lookahead_dist: 0.3
+      lookahead_dist: 0.6
+      use_velocity_scaled_lookahead_dist: true
+      max_lookahead_dist: 1.5
+      lookahead_time: 1.5
+
+      # ─── Enable rotation-in-place near goal ───
+      use_rotate_to_heading: true              # trigger in-place rotation when close to goal :contentReference[oaicite:0]{index=0}
+      rotate_to_heading_min_angle: 0.1         # [rad] angular difference to start rotating :contentReference[oaicite:1]{index=1}
+      rotate_to_heading_angular_vel: 0.5       # [rad/s] rotation speed during in-place turn
+
+      # (optional) interpolation for sparser paths
+      use_interpolation: true

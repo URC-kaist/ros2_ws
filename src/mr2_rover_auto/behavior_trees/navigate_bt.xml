@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="Navigate">
+
+  <!-- Main behavior tree -->
+  <BehaviorTree ID="Navigate">
+    <Fallback name="NavigationRoot">
+
+      <!-- Mission 1: Goal-directed navigation -->
+      <ReactiveSequence name="Mission1_GoalDirected">
+        <CheckMissionType expected_mission="NAV_TO_GOAL"/>
+        <ComputePathToPose name="ComputePath" path="planned_path"/>
+        <SmoothPath name="SmoothPath" path="planned_path" smoothed_path="smoothed_path"/>
+        <FollowPath name="FollowPath" path="smoothed_path"/>
+        <GoalReached name="GoalCheck"/>
+        <SignalNavigationComplete/>
+        <FinishNavigation/>
+      </ReactiveSequence>
+
+      <!-- Mission 2: Area coverage with object detection -->
+      <ReactiveSequence name="Mission2_CoverArea">
+        <CheckMissionType expected_mission="COVER_AREA"/>
+        <SetCircularCoverageGoal radius="3.0" center_topic="coverage_center" goal_output="planned_goal"/>
+        <ComputePathToPose name="ComputeCoveragePath" goal="planned_goal" path="coverage_path"/>
+        <SmoothPath name="SmoothCoveragePath" path="coverage_path" smoothed_path="smoothed_coverage_path"/>
+        <FollowPath name="FollowCoveragePath" path="smoothed_coverage_path"/>
+
+        <!-- If object is found, interrupt coverage and switch to recovery mission -->
+        <Fallback name="ObjectFoundInterrupt">
+          <Sequence name="InterruptSequence">
+            <ObjectFound condition_topic="/object_found"/>
+            <GetObjectLocation goal_output="new_goal"/>
+            <SetMissionType mission_type="NAV_TO_GOAL"/>
+            <UpdateGoal goal_input="new_goal"/>
+            <AbortCurrentCoverage/>
+          </Sequence>
+        </Fallback>
+      </ReactiveSequence>
+
+    </Fallback>
+  </BehaviorTree>
+</root>
