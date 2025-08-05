@@ -29,7 +29,8 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, controller_yaml],
+        parameters=[controller_yaml],
+        remappings=[("/controller_manager/robot_description", "/robot_description")],
         output="screen",
     )
 

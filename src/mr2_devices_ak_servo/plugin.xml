@@ -1,6 +1,6 @@
 <library path="libak_servo_device">
   <class
-      name="AkServoDevice"
+      name="mr2_devices_ak_servo/AkServoDevice"
       type="AkServoDevice"
       base_class_type="CanDevice">
     <description>Cubemars AK actuator in Servo mode (Control-ID 6)</description>
