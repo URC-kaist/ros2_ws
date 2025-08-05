@@ -1,0 +1,40 @@
+# Common settings
+use_sim_time: true
+
+# ───────────────────────────────────────────────────────────────────────────────
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 5.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+# ───────────────────────────────────────────────────────────────────────────────
+smoother_server:
+  ros__parameters:
+    smoother_plugins: ["SimpleSmoother"]
+    SimpleSmoother:
+      plugin: "nav2_smoother/SimpleSmoother"
+      tolerance: 0.001
+      max_iterations: 100
+      do_refinement: true
+
+# ───────────────────────────────────────────────────────────────────────────────
+controller_server:
+  ros__parameters:
+    controller_frequency: 10.0
+    controller_plugins: ["FollowPath"]
+    FollowPath:
+      plugin: "nav2_regulated_pure_pursuit_controller/RegulatedPurePursuitController"
+      desired_linear_vel: 0.5
+      min_lookahead_dist: 0.3
+      lookahead_dist: 0.6
+      use_velocity_scaled_lookahead_dist: true
+      max_lookahead_dist: 1.5
+      lookahead_time: 1.5
+      use_rotate_to_heading: true
+      rotate_to_heading_min_angle: 0.785
+      rotate_to_heading_angular_vel: 1.0
