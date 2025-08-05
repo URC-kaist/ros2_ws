@@ -19,5 +19,6 @@
   <!-- Export the plugin -->
   <export>
     <pluginlib plugin_manifest="plugin.xml"/>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>
