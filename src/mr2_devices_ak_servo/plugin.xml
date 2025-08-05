@@ -1,4 +1,4 @@
-<library path="libak_servo_device">
+<library path="ak_servo_device">
   <class
       name="mr2_devices_ak_servo/AkServoDevice"
       type="mr2_devices_ak_servo::AkServoDevice"

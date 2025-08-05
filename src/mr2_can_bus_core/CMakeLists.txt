@@ -22,6 +22,9 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 # link pthread (interface so consumers inherit it)
 target_link_libraries(${PROJECT_NAME} INTERFACE Threads::Threads)
 
+# ensure inline implementations are available to consumers
+target_compile_definitions(${PROJECT_NAME} INTERFACE CAN_BUS_CORE_IMPL)
+
 # --- installation ------------------------------------------------------------
 install(
   DIRECTORY include/

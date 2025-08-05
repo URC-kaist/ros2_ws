@@ -1,4 +1,4 @@
-<library path="libmr2_can_hardware_interface">
+<library path="mr2_can_hardware_interface">
   <class
       name="mr2_can_hardware_interface/CanHW"
       type="mr2_can_hardware_interface::CanHW"
