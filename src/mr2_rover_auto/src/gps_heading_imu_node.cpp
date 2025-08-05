@@ -5,7 +5,7 @@
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <Eigen/Dense>
 #include <tf2/LinearMath/Quaternion.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 using std::placeholders::_1;
 
@@ -138,8 +138,8 @@ private:
 
 int main(int argc, char **argv)
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<GpsHeadingImuNode>());
+  rclcpp::init(argc, argv); // init rclcpp
+  rclcpp::spin(std::make_shared<GpsHeadingImuNode>()); // share pointer, start loop
   rclcpp::shutdown();
   return 0;
 }

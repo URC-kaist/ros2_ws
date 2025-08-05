@@ -8,6 +8,14 @@ def generate_launch_description():
     pkg_share = get_package_share_directory('mr2_rover_auto')
 
     return LaunchDescription([
+        # Dual GPS heading
+        Node(
+            package='mr2_rover_auto',
+            executable='gps_heading_imu_node',
+            name='gps_heading_imu_node',
+            output='screen'
+        ),
+        # robot_localization
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
