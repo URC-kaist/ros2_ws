@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <mutex>
 #include <queue>
@@ -72,9 +73,6 @@ private:
 };
 
 // -------------- Inline implementation ----------------
-#ifdef CAN_BUS_CORE_IMPL
-#include <cstring>
-
 inline bool CanBusManager::start(const std::string& iface, int bitrate)
 {
   if (running_) return true;
@@ -145,4 +143,4 @@ inline void CanBusManager::rx_once_()
   std::lock_guard<std::mutex> lk(lst_mtx_);
   for(const auto &l: listeners_) if((fr.can_id&l.mask)==l.id) l.cb(fr);
 }
-#endif // CAN_BUS_CORE_IMPL
+
