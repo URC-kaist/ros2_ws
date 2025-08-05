@@ -85,9 +85,9 @@ inline bool CanBusManager::start(const std::string& iface, int bitrate)
   fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
 
   struct ifreq ifr{}; std::strncpy(ifr.ifr_name, iface.c_str(), IFNAMSIZ-1);
+  struct sockaddr_can addr{};
   if (ioctl(fd_, SIOCGIFINDEX, &ifr) < 0) { perror("SIOCGIFINDEX"); goto err; }
-
-  struct sockaddr_can addr{}; addr.can_family=AF_CAN; addr.can_ifindex=ifr.ifr_ifindex;
+  addr.can_family=AF_CAN; addr.can_ifindex=ifr.ifr_ifindex;
   if (bind(fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) { perror("bind"); goto err; }
 
   if (pipe2(wake_pipe_, O_NONBLOCK) < 0) { perror("pipe2"); goto err; }
