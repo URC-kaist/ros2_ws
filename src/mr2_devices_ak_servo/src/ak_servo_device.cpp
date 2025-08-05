@@ -3,6 +3,9 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 
+namespace mr2_devices_ak_servo
+{
+
 class AkServoDevice : public CanDevice
 {
 public:
@@ -76,4 +79,6 @@ private:
   std::vector<double> pos_, vel_, eff_, cmd_;
 };
 
-PLUGINLIB_EXPORT_CLASS(AkServoDevice, CanDevice)
+}  // namespace mr2_devices_ak_servo
+
+PLUGINLIB_EXPORT_CLASS(mr2_devices_ak_servo::AkServoDevice, CanDevice)
