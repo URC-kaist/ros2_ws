@@ -4,9 +4,11 @@ controller_manager:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
     joint_position_controller:
-      type: position_controllers/JointPositionController
+      type: position_controllers/JointGroupPositionController
 
 joint_position_controller:
   ros__parameters:
-    joint: joint1
+    joints:
+      - joint1
+    interface_name: position
 
