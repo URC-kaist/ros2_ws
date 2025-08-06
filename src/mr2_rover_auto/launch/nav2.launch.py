@@ -61,21 +61,21 @@ def generate_launch_description():
         Node(
             package='nav2_planner',
             executable='planner_server',
-            name='planner_a2b_server',
+            name='planner_server',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
-        """ Once active, you can send a goal with:
-        ros2 action send_goal /compute_path_to_pose \
-        nav2_msgs/action/ComputePathToPose \
-        "{goal: { header: { frame_id: 'map' }, pose: { position: { x: 1.0, y: 2.0 }, orientation: { w: 1.0 } } }}"
-        """
+        # """ Once active, you can send a goal with:
+        # ros2 action send_goal /compute_path_to_pose \
+        # nav2_msgs/action/ComputePathToPose \
+        # "{goal: { header: { frame_id: 'map' }, pose: { position: { x: 1.0, y: 2.0 }, orientation: { w: 1.0 } } }}"
+        # """
 
-        # 5) Planner: Create path from global costmap; Coverage
+        # 5) Coverage: Create path from global costmap; Coverage
         Node(
-            package='nav2_planner',
-            executable='planner_server',
-            name='planner_c_server',
+            package='opennav_coverage',
+            executable='coverage_server',
+            name='coverage_server',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
@@ -97,4 +97,4 @@ def generate_launch_description():
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
-    ])
+        ])
