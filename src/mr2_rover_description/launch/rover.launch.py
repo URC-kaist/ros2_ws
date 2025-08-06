@@ -49,7 +49,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             "gz_args": [
-                TextSubstitution(text="-r --headless-rendering "),
+                TextSubstitution(text="-r --headless-rendering -s "),
                 world_file,
             ]
         }.items(),
