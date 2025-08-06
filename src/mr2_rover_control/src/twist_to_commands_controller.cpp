@@ -24,7 +24,7 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init()
 controller_interface::InterfaceConfiguration TwistToCommandsController::command_interface_configuration() const
 {
   controller_interface::InterfaceConfiguration conf;
-  conf.type = controller_interface::InterfaceConfigurationType::INDIVIDUAL;
+  conf.type = controller_interface::interface_configuration_type::INDIVIDUAL;
   for (const auto & joint : wheel_joints_) {
     conf.names.push_back(joint + "/velocity");
   }
@@ -37,7 +37,7 @@ controller_interface::InterfaceConfiguration TwistToCommandsController::command_
 controller_interface::InterfaceConfiguration TwistToCommandsController::state_interface_configuration() const
 {
   controller_interface::InterfaceConfiguration conf;
-  conf.type = controller_interface::InterfaceConfigurationType::NONE;
+  conf.type = controller_interface::interface_configuration_type::NONE;
   return conf;
 }
 

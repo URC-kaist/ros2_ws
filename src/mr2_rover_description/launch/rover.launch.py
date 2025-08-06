@@ -91,15 +91,10 @@ def generate_launch_description():
         executable="spawner",
         arguments=["joint_state_broadcaster"],
     )
-    steer_spawner = Node(
+    rover_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["steering_controller"],
-    )
-    drive_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["drive_controller"],
+        arguments=["rover_controller"],
     )
 
     return LaunchDescription(
@@ -110,7 +105,7 @@ def generate_launch_description():
             rsp,
             TimerAction(period=2.0, actions=[spawn]),
             TimerAction(
-                period=6.0, actions=[jsb_spawner, steer_spawner, drive_spawner]
+                period=6.0, actions=[jsb_spawner, rover_controller_spawner]
             ),
             gz_bridge,
         ]
