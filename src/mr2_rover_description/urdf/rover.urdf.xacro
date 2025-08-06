@@ -10,7 +10,7 @@
   <xacro:swerve_module prefix="fr" parent="right_rocker" xyz=" 0.47 0.08 -0.18"/>
   <xacro:swerve_module prefix="rl" parent="left_rocker" xyz="-0.47 -0.08 -0.18"/>
   <xacro:swerve_module prefix="rr" parent="right_rocker" xyz="-0.47 0.08 -0.18"/>
-  <!-- ros2_control plugin -->
+  <!-- ros2_control plugin that loads the TwistToCommands controller -->
   <gazebo>
     <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
       <robot_param>robot_description</robot_param>
