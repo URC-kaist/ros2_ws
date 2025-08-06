@@ -3,9 +3,10 @@
 <package format="3">
   <name>mr2_drive_motor</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  
-  <maintainer email="gmmyung@kaist.ac.kr">urckaist</maintainer>
+  <description>Motor interface for the MR2 drive system.</description>
+
+  <maintainer email="gmmyung@kaist.ac.kr">Gyungmin Myung</maintainer>
+  <author email="gmmyung@kaist.ac.kr">Gyungmin Myung</author>
   <license>MIT</license>
 
   <!-- Build tools -->
