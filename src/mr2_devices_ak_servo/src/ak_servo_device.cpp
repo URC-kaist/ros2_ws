@@ -33,7 +33,7 @@ public:
   void process(const rclcpp::Time &) override
   {
     struct can_frame fr{};
-    fr.can_id  = (0x00000600 | id_) | CAN_EFF_FLAG;   // Control-ID 6
+    fr.can_id  = (0x00000400 | id_) | CAN_EFF_FLAG;   // Control-ID 4
     fr.can_dlc = 8;
     int32_t p  = std::lround(cmd_[0] * 180.0 / M_PI * gear_ * 1e4);
     fr.data[0] = (p >> 24) & 0xFF;
