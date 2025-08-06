@@ -96,9 +96,17 @@
 
     <link name="front_camera"/>
     <joint name="base_to_front_camera" type="fixed">
-	    <origin xyz="${length/2.0} 0 ${height}" rpy="0 ${front_camera_pitch} 0"/>
+            <origin xyz="${length/2.0} 0 ${height}" rpy="0 ${front_camera_pitch} 0"/>
       <parent link="base_link"/>
       <child link="front_camera"/>
+    </joint>
+
+    <!-- IMU mounted at the top of the base box -->
+    <link name="imu_link"/>
+    <joint name="base_to_imu" type="fixed">
+      <origin xyz="0 0 ${height}" rpy="0 0 0"/>
+      <parent link="base_link"/>
+      <child link="imu_link"/>
     </joint>
 
 
