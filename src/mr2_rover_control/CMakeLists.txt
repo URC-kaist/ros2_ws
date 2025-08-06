@@ -12,20 +12,20 @@ find_package(controller_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-add_library(twist_to_commands_controller SHARED
+add_library(${PROJECT_NAME} SHARED
   src/twist_to_commands_controller.cpp
 )
 
-ament_target_dependencies(twist_to_commands_controller
+ament_target_dependencies(${PROJECT_NAME}
   rclcpp rclcpp_lifecycle controller_interface pluginlib geometry_msgs)
 
-target_include_directories(twist_to_commands_controller PRIVATE
+target_include_directories(${PROJECT_NAME} PRIVATE
   include
 )
 
-pluginlib_export_plugin_description_file(controller_interface twist_to_commands_controller.xml)
+pluginlib_export_plugin_description_file(controller_interface plugin.xml)
 
-install(TARGETS twist_to_commands_controller
+install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION lib
 )
 
@@ -33,7 +33,7 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(FILES twist_to_commands_controller.xml
+install(FILES plugin.xml
   DESTINATION share/${PROJECT_NAME}
 )
 
