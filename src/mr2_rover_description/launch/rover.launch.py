@@ -67,7 +67,7 @@ def generate_launch_description():
     spawn = Node(
         package="ros_gz_sim",
         executable="create",
-        arguments=["-topic", "robot_description", "-name", "rover", "-z", "5.0"],
+        arguments=["-topic", "robot_description", "-name", "rover", "-z", "0.0"],
     )
 
     gz_bridge = Node(
