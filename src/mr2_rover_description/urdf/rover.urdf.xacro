@@ -90,7 +90,7 @@
   </gazebo>
   <ros2_control name="GazeboSimSystem" type="system">
     <hardware>
-      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      <plugin>mr2_rover_control/RoverSystem</plugin>
     </hardware>
 
     <!-- Mimic Joint -->

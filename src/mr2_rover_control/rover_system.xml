@@ -1,0 +1,3 @@
+<library path="rover_system">
+  <class name="mr2_rover_control/RoverSystem" type="mr2_rover_control::RoverSystem" base_class_type="hardware_interface::SystemInterface" />
+</library>
