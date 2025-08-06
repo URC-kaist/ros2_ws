@@ -3,8 +3,9 @@
 <package format="3">
   <name>mr2_jk_bms</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="gmmyung@kaist.ac.kr">rover</maintainer>
+  <description>Interface nodes for the JK BMS battery management system.</description>
+  <maintainer email="gmmyung@kaist.ac.kr">Gyungmin Myung</maintainer>
+  <author email="gmmyung@kaist.ac.kr">Gyungmin Myung</author>
   <license>MIT</license>
 
   <depend>rclpy</depend>

@@ -3,8 +3,9 @@
 <package format="3">
   <name>mr2_gazebo</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="gmmyung@kaist.ac.kr">urckaist</maintainer>
+  <description>Gazebo simulation environment for the MR2 robot.</description>
+  <maintainer email="gmmyung@kaist.ac.kr">Gyungmin Myung</maintainer>
+  <author email="gmmyung@kaist.ac.kr">Gyungmin Myung</author>
   <license>MIT</license>
 
   <depend>mr2_description</depend>

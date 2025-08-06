@@ -3,9 +3,10 @@
 <package format="3">
   <name>mr2_launch</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="gmmyung@kaist.ac.kr">urckaist</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Launch files for bringing up and simulating the MR2 robot.</description>
+  <maintainer email="gmmyung@kaist.ac.kr">Gyungmin Myung</maintainer>
+  <author email="gmmyung@kaist.ac.kr">Gyungmin Myung</author>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
