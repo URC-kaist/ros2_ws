@@ -1,0 +1,5 @@
+<library path="mr2_rover_control">
+  <class name="mr2_rover_control/TwistToCommandsController" type="mr2_rover_control::TwistToCommandsController" base_class_type="controller_interface::ControllerInterface">
+    <description>Convert cmd_vel to wheel and steering commands.</description>
+  </class>
+</library>
