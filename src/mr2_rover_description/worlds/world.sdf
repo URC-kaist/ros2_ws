@@ -74,6 +74,11 @@
                 </geometry>
             </visual>
         </link>
+	<material>
+    <ambient>0.2 0.2 0.2 1</ambient>
+    <diffuse>0.8 0.2 0.2 1</diffuse>  <!-- reddish -->
+    <specular>0.1 0.1 0.1 1</specular>
+  </material>
     </model>
   </world>
 </sdf>
