@@ -55,27 +55,22 @@
 	https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun
       </uri>
     </include>
-    <model name="monterey_bay">
+    <model name="mdrs_dem">
         <static>true</static>
         <pose>0 0 -1385 0 0 0</pose>
     	<link name="link">
             <collision name="collision">
                 <geometry>
-                    <heightmap>
-                        <uri>mdrs.tif</uri>
-                        <size>3014 3028 77.227</size>
-                        <pos>0 0 -1385.573</pos>
-                    </heightmap>
+			<mesh>
+		        <uri>mdrs.stl</uri>
+          </mesh>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-                    <heightmap>
-                        <use_terrain_paging>false</use_terrain_paging>
-                        <uri>mdrs.tif</uri>
-                        <size>3014 3028 77.227</size>
-                        <pos>0 0 -1385.573</pos>
-                    </heightmap>
+			<mesh>
+		        <uri>mdrs.stl</uri>
+          </mesh>
                 </geometry>
             </visual>
         </link>
