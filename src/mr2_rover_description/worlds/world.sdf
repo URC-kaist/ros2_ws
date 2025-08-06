@@ -55,7 +55,10 @@
 	https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun
       </uri>
     </include>
-    <link name="link">
+    <model name="monterey_bay">
+        <static>true</static>
+        <pose>0 0 -1385 0 0 0</pose>
+    	<link name="link">
             <collision name="collision">
                 <geometry>
                     <heightmap>
@@ -76,6 +79,7 @@
                 </geometry>
             </visual>
         </link>
+    </model>
   </world>
 </sdf>
 
