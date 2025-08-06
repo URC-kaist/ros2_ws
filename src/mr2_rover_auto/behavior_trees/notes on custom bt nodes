@@ -1,0 +1,36 @@
+🧠 BT XML Design Summary
+The BT (navigate_bt.xml) implements two mission modes:
+
+🔸 Mission 1: Navigate to fixed goal pose
+Compute → Smooth → Follow path
+
+On arrival: emit signal + exit
+
+🔸 Mission 2: Cover a circular area
+Generate a goal from circular boundary (SetCircularCoverageGoal)
+
+Compute → Smooth → Follow path
+
+Interrupt if /object_found is published:
+
+Get new goal
+
+Switch mission to NAV_TO_GOAL
+
+Abort current path and resume with new plan
+
+
+
+
+
+🧩 Notes on Custom BT Nodes
+You will need to implement the following custom condition/action nodes or re-use existing ones with remapping:
+
+Node Name	Type	Description
+CheckMissionType	Condition	Compares current mission mode (NAV_TO_GOAL, COVER_AREA)
+SetCircularCoverageGoal	Action	Computes a goal pose within a circular area
+ObjectFound	Condition	Reads boolean flag from topic
+GetObjectLocation	Action	Extracts object location and returns PoseStamped
+SetMissionType	Action	Writes new mission mode
+SignalNavigationComplete	Action	Emits completion signal (e.g. topic or GPIO)
+AbortCurrentCoverage	Action	Optional, clears current path/goal

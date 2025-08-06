@@ -30,7 +30,7 @@ def generate_launch_description():
                 'smoother_server']}]
         ),
 
-        # 1) BT Navigator
+        # 1) BT Navigator: Load BT XML and available node (=class) implementations
         Node(
             package='nav2_bt_navigator',
             executable='bt_navigator',

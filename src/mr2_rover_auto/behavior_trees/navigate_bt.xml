@@ -39,3 +39,40 @@
     </Fallback>
   </BehaviorTree>
 </root>
+
+
+
+
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Fallback name="MainSelector">
+    
+      <!-- ─────────────────────── Mission 1 ─────────────────────── -->
+      <Sequence name="Mission1_Sequence">
+        <Condition   ID="Mission1Active"             />   <!-- 블랙보드 플래그 or 토픽 신호 -->
+        <ComputePathToPose  name="ComputePath"        plugin="ComputePathToPose"/>
+        <SmoothPath         name="SmoothPath"         plugin="SimpleSmoother"      path="planned_path"       smoothed_path="smoothed_path"/>
+        <FollowPathAction   name="FollowPath"         plugin="FollowPath"          path="smoothed_path"      goal_checker="SimpleGoalChecker"/>
+        <Action             ID="PublishMission1Done"                          />   <!-- 완료 신호 발행 -->
+      </Sequence>
+      
+      <!-- ─────────── Mission 2: 객체 발견 시 Mission 1 분기 ────────── -->
+      <Sequence name="HandleObject">
+        <Condition   ID="Mission2Active"             />
+        <Condition   ID="ObjectDetected"             />   <!-- Depth camera 콜백 -->
+        <Action      ID="SetGoalToObject"            />   <!-- 블랙보드에 목표 위치 설정 -->
+        <ComputePathToPose  name="ComputePathObj"     plugin="ComputePathToPose"/>
+        <SmoothPath         name="SmoothPathObj"      plugin="SimpleSmoother"      path="planned_path"       smoothed_path="smoothed_path"/>
+        <FollowPathAction   name="FollowPathObj"      plugin="FollowPath"          path="smoothed_path"      goal_checker="SimpleGoalChecker"/>
+        <Action             ID="PublishPickupReady"                          />
+      </Sequence>
+      
+      <!-- ─────────────────────── Mission 2 커버링 ─────────────────────── -->
+      <Sequence name="Mission2_CoverArea">
+        <Condition   ID="Mission2Active"             />
+        <Action      ID="CoverAreaCircle"             />   <!-- 지정 원 내부를 토픽 기반으로 순회 -->
+      </Sequence>
+      
+    </Fallback>
+  </BehaviorTree>
+</root>
