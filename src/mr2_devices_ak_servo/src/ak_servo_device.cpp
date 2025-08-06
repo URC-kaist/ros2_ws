@@ -27,8 +27,7 @@ public:
 
     // allocate state/command scalars
     pos_.push_back(0.0); vel_.push_back(0.0);
-    eff_.push_back(0.0);
-    cmd_pos_.push_back(0.0); cmd_vel_.push_back(0.0);
+    eff_.push_back(0.0); cmd_.push_back(0.0);
   }
 
   void process(const rclcpp::Time &) override
@@ -36,15 +35,12 @@ public:
     struct can_frame fr{};
     fr.can_id  = (0x00000600 | id_) | CAN_EFF_FLAG;   // Control-ID 6
     fr.can_dlc = 8;
-    int32_t p  = std::lround(cmd_pos_[0] * 180.0 / M_PI * gear_ * 1e4);
-    int16_t v10 = std::lround(cmd_vel_[0] * gear_ * 3.0 / M_PI);   // rad/s→0.1rpm
+    int32_t p  = std::lround(cmd_[0] * 180.0 / M_PI * gear_ * 1e4);
     fr.data[0] = (p >> 24) & 0xFF;
     fr.data[1] = (p >> 16) & 0xFF;
     fr.data[2] = (p >>  8) & 0xFF;
     fr.data[3] = (p      ) & 0xFF;
-    fr.data[4] = (v10 >> 8) & 0xFF;
-    fr.data[5] = (v10     ) & 0xFF;
-    fr.data[6] = fr.data[7] = 0;   // acceleration = 0
+    fr.data[4] = fr.data[5] = fr.data[6] = fr.data[7] = 0;   // vel/acc = 0
     send(fr, bus_);
   }
 
@@ -57,12 +53,8 @@ public:
     eff.push_back(&eff_[0]);
   }
 
-  void export_command(std::vector<double*> & cmd_pos,
-                      std::vector<double*> & cmd_vel) override
-  {
-    cmd_pos.push_back(&cmd_pos_[0]);
-    cmd_vel.push_back(&cmd_vel_[0]);
-  }
+  void export_command(std::vector<double*> & cmd) override
+  { cmd.push_back(&cmd_[0]); }
 
 private:
   /* -------- CAN status-frame callback -------- */
@@ -84,7 +76,7 @@ private:
   int    id_{0};
   double gear_{1.0};
 
-  std::vector<double> pos_, vel_, eff_, cmd_pos_, cmd_vel_;
+  std::vector<double> pos_, vel_, eff_, cmd_;
 };
 
 }  // namespace mr2_devices_ak_servo

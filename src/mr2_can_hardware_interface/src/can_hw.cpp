@@ -70,17 +70,11 @@ public:
     // collect state / command pointers --------------------------------
     for (auto & dev : devs_) {
       dev->export_state(pos_ptrs_, vel_ptrs_, eff_ptrs_);
-      dev->export_command(cmd_pos_ptrs_, cmd_vel_ptrs_);
+      dev->export_command(cmd_ptrs_);
     }
 
     if (pos_ptrs_.size() != info_.joints.size()) {
       RCLCPP_ERROR(node_->get_logger(), "Mismatch: %zu joints vs %zu pos-ptrs", info_.joints.size(), pos_ptrs_.size());
-      return CallbackReturn::ERROR;
-    }
-
-    if (cmd_pos_ptrs_.size() != info_.joints.size() || cmd_vel_ptrs_.size() != info_.joints.size()) {
-      RCLCPP_ERROR(node_->get_logger(), "Mismatch: %zu joints vs %zu pos-cmd-ptrs / %zu vel-cmd-ptrs",
-                   info_.joints.size(), cmd_pos_ptrs_.size(), cmd_vel_ptrs_.size());
       return CallbackReturn::ERROR;
     }
 
@@ -104,10 +98,8 @@ public:
   std::vector<hardware_interface::CommandInterface> export_command_interfaces() override
   {
     std::vector<hardware_interface::CommandInterface> cis;
-    for (size_t i = 0; i < info_.joints.size(); ++i) {
-      cis.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_POSITION, cmd_pos_ptrs_[i]);
-      cis.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, cmd_vel_ptrs_[i]);
-    }
+    for (size_t i = 0; i < info_.joints.size(); ++i)
+      cis.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_POSITION, cmd_ptrs_[i]);
     return cis;
   }
 
@@ -128,8 +120,7 @@ private:
   std::shared_ptr<pluginlib::ClassLoader<CanDevice>> loader_;
   std::vector<std::shared_ptr<CanDevice>> devs_;
 
-  std::vector<double*> pos_ptrs_, vel_ptrs_, eff_ptrs_;
-  std::vector<double*> cmd_pos_ptrs_, cmd_vel_ptrs_;
+  std::vector<double*> pos_ptrs_, vel_ptrs_, eff_ptrs_, cmd_ptrs_;
   rclcpp::Node::SharedPtr node_;
 };
 

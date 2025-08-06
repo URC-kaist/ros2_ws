@@ -34,10 +34,9 @@ public:
                             std::vector<double*> & eff) = 0;
 
   /**
-   * Export command array pointers for position and velocity commands.
+   * Export command array pointers (usually position commands).
    */
-  virtual void export_command(std::vector<double*> & pos,
-                              std::vector<double*> & vel) = 0;
+  virtual void export_command(std::vector<double*> & cmd) = 0;
 
 protected:
   /** Shorthand for sending on the appropriate bus */
