@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="manipulator" params="length:=0.73 width:=0.49 height:=0.19"> 
-
+  <xacro:macro name="manipulator" params="length:=0.73 width:=0.49 height:=0.19">
     <link name="arm_l1">
       <inertial>
         <mass value="0.1"/>
@@ -9,13 +8,13 @@
       </inertial>
       <visual>
         <geometry>
-		<cylinder radius="0.15" length="0.1"/>
+          <cylinder radius="0.15" length="0.1"/>
         </geometry>
         <origin xyz="0 0 0.05"/>
       </visual>
       <collision>
         <geometry>
-		<cylinder radius="0.15" length="0.1"/>
+          <cylinder radius="0.15" length="0.1"/>
         </geometry>
         <origin xyz="0 0 0.05"/>
       </collision>
@@ -27,13 +26,13 @@
       </inertial>
       <visual>
         <geometry>
-		<cylinder radius="0.05" length="0.4"/>
+          <cylinder radius="0.05" length="0.4"/>
         </geometry>
         <origin xyz="0 0 0.2"/>
       </visual>
       <collision>
         <geometry>
-		<cylinder radius="0.05" length="0.4"/>
+          <cylinder radius="0.05" length="0.4"/>
         </geometry>
         <origin xyz="0 0 0.2"/>
       </collision>
@@ -45,13 +44,13 @@
       </inertial>
       <visual>
         <geometry>
-		<cylinder radius="0.05" length="0.05"/>
+          <cylinder radius="0.05" length="0.05"/>
         </geometry>
         <origin xyz="0.025 0 0" rpy="0 -1.571 0"/>
       </visual>
       <collision>
         <geometry>
-		<cylinder radius="0.05" length="0.05"/>
+          <cylinder radius="0.05" length="0.05"/>
         </geometry>
         <origin xyz="0.025 0 0" rpy="0 -1.571 0"/>
       </collision>
@@ -63,13 +62,13 @@
       </inertial>
       <visual>
         <geometry>
-		<cylinder radius="0.05" length="0.2"/>
+          <cylinder radius="0.05" length="0.2"/>
         </geometry>
         <origin xyz="0 0 -0.1"/>
       </visual>
       <collision>
         <geometry>
-		<cylinder radius="0.05" length="0.2"/>
+          <cylinder radius="0.05" length="0.2"/>
         </geometry>
         <origin xyz="0 0 -0.1"/>
       </collision>
@@ -81,13 +80,13 @@
       </inertial>
       <visual>
         <geometry>
-		<cylinder radius="0.05" length="0.1"/>
+          <cylinder radius="0.05" length="0.1"/>
         </geometry>
         <origin xyz="0.05 0 0" rpy="0 -1.571 0"/>
       </visual>
       <collision>
         <geometry>
-		<cylinder radius="0.05" length="0.1"/>
+          <cylinder radius="0.05" length="0.1"/>
         </geometry>
         <origin xyz="0.05 0 0" rpy="0 -1.571 0"/>
       </collision>
@@ -99,53 +98,53 @@
       </inertial>
       <visual>
         <geometry>
-		<box size="0.1 0.1 0.1"/>
+          <box size="0.1 0.1 0.1"/>
         </geometry>
         <origin xyz="0.05 0 0" rpy="0 0 0"/>
       </visual>
       <collision>
         <geometry>
-		<box size="0.1 0.1 0.1"/>
+          <box size="0.1 0.1 0.1"/>
         </geometry>
         <origin xyz="0.05 0 0" rpy="0 0 0"/>
       </collision>
     </link>
-    <joint name="arm_j1" type="fixed">
+    <joint name="arm_j1" type="revolute">
       <parent link="base_link"/>
       <child link="arm_l1"/>
       <origin xyz="${length/2.0} 0 ${height}" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
       <limit lower="0" upper="1" effort="50" velocity="0.01"/>
     </joint>
-    <joint name="arm_j2" type="fixed">
+    <joint name="arm_j2" type="revolute">
       <parent link="arm_l1"/>
       <child link="arm_l2"/>
       <origin xyz="0.070 0 0.136" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="0" upper="1" effort="50" velocity="0.01"/>
     </joint>
-    <joint name="arm_j3" type="fixed">
+    <joint name="arm_j3" type="revolute">
       <parent link="arm_l2"/>
       <child link="arm_l3"/>
       <origin xyz="0 0 0.495" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="0" upper="1" effort="50" velocity="0.01"/>
     </joint>
-    <joint name="arm_j4" type="fixed">
+    <joint name="arm_j4" type="revolute">
       <parent link="arm_l3"/>
       <child link="arm_l4"/>
       <origin xyz="0.070 0 -0.138" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
       <limit lower="0" upper="1" effort="50" velocity="0.01"/>
     </joint>
-    <joint name="arm_j5" type="fixed">
+    <joint name="arm_j5" type="revolute">
       <parent link="arm_l4"/>
       <child link="arm_l5"/>
       <origin xyz="0 0 -0.260" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
       <limit lower="0" upper="1" effort="50" velocity="0.01"/>
     </joint>
-    <joint name="arm_j6" type="fixed">
+    <joint name="arm_j6" type="revolute">
       <parent link="arm_l5"/>
       <child link="arm_l6"/>
       <origin xyz="0.116 0 0" rpy="0 0 0"/>
@@ -154,4 +153,3 @@
     </joint>
   </xacro:macro>
 </robot>
-
