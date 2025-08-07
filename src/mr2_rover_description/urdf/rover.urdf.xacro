@@ -3,6 +3,7 @@
   <!-- Include component macros -->
   <xacro:include filename="$(find mr2_rover_description)/urdf/rover_base.xacro"/>
   <xacro:include filename="$(find mr2_rover_description)/urdf/swerve_module.xacro"/>
+  <xacro:include filename="$(find mr2_rover_description)/urdf/manipulator.xacro"/>
   <!-- Chassis -->
   <xacro:rover_base/>
   <!-- Four modules -->
@@ -10,6 +11,9 @@
   <xacro:swerve_module prefix="fr" parent="right_rocker" xyz=" 0.47 0.08 -0.18"/>
   <xacro:swerve_module prefix="rl" parent="left_rocker" xyz="-0.47 -0.08 -0.18"/>
   <xacro:swerve_module prefix="rr" parent="right_rocker" xyz="-0.47 0.08 -0.18"/>
+  <!-- Manipulator -->
+  <xacro:manipulator/>
+
   <!-- ros2_control plugin that loads the TwistToCommands controller -->
   <gazebo>
     <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
