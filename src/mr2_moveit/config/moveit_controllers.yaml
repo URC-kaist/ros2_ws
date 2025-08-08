@@ -8,6 +8,7 @@ moveit_simple_controller_manager:
 
   manipulator_controller:
     type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
     joints:
       - arm_j1
       - arm_j2
