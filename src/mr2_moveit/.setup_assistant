@@ -7,7 +7,7 @@ moveit_setup_assistant_config:
   package_settings:
     author_name: Gyungmin Myung
     author_email: gmmyung@kaist.ac.kr
-    generated_timestamp: 1754634951
+    generated_timestamp: 1754636591
   control_xacro:
     command:
       - position
