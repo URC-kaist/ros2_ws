@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: mr2_rover_description
+    relative_path: urdf/rover.urdf.xacro
+  srdf:
+    relative_path: config/rover.srdf
+  package_settings:
+    author_name: Gyungmin Myung
+    author_email: gmmyung@kaist.ac.kr
+    generated_timestamp: 1754634951
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

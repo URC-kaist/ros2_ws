@@ -128,28 +128,28 @@
       <child link="arm_l3"/>
       <origin xyz="0 0 0.495" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
-      <limit lower="" upper="1" effort="50" velocity="0.01"/>
+      <limit lower="-1" upper="1" effort="50" velocity="0.01"/>
     </joint>
     <joint name="arm_j4" type="revolute">
       <parent link="arm_l3"/>
       <child link="arm_l4"/>
       <origin xyz="0.070 0 -0.138" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
-      <limit lower="0" upper="1" effort="50" velocity="0.01"/>
+      <limit lower="-1" upper="1" effort="50" velocity="0.01"/>
     </joint>
     <joint name="arm_j5" type="revolute">
       <parent link="arm_l4"/>
       <child link="arm_l5"/>
       <origin xyz="0 0 -0.260" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
-      <limit lower="0" upper="1" effort="50" velocity="0.01"/>
+      <limit lower="-1" upper="1" effort="50" velocity="0.01"/>
     </joint>
     <joint name="arm_j6" type="revolute">
       <parent link="arm_l5"/>
       <child link="arm_l6"/>
       <origin xyz="0.116 0 0" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
-      <limit lower="0" upper="1" effort="50" velocity="0.01"/>
+      <limit lower="-1" upper="1" effort="50" velocity="0.01"/>
     </joint>
   </xacro:macro>
 </robot>
