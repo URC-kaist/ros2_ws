@@ -1,9 +1,12 @@
-# Goal - GPS coordinate to navigate to
+# Goal - Single GPS coordinate, waypoints will be generated
 float64 target_latitude
 float64 target_longitude
 ---
-# Result - Final outcome
-int32 navigation_result    # 1 = SUCCESS, 0 = NOT_SUCCESS
+# Result - Final outcome with waypoint completion info
+int32 mission_result        # 1 = SUCCESS, 0 = FAILURE
+int32 waypoints_completed    # How many waypoints were successfully visited
 ---
-# Feedback - BT execution status
-int32 bt_status           # 1 = RUNNING, 0 = NOT_RUNNING
+# Feedback - Coverage mission progress
+int32 bt_status             # 1 = RUNNING, 0 = NOT_RUNNING
+int32 total_waypoints       # Total waypoints generated
+int32 current_waypoint_index # Current waypoint being navigated to
