@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3">
+  <BehaviorTree ID="CoverVision">
+    <Sequence>
+      <NavigateToPose goal="{goal}"
+                      server_name="{navtopose_server}"
+                      server_timeout="{server_timeout}"
+                      behavior_tree="{navtopose_bt}"/>
+      <ReactiveSequence>
+        <Inverter>
+          <ObjectDetected isdetected="false"/>
+        </Inverter>
+        <NavigateThroughPoses goals="{goals}"
+                              server_name="{navtoposes_bt}"
+                              server_timeout="{server_timeout}"
+                              behavior_tree="{navtoposes_bt}"/>
+      </ReactiveSequence>
+      <NavigateToPose goal="{goal}"
+                      server_name="{navtopose_bt}"
+                      server_timeout="{server_timeout}"
+                      behavior_tree="{navtopose_bt}"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <!-- Description of Node Models (used by Groot) -->
+  <TreeNodesModel>
+    <Action ID="NavigateThroughPoses">
+      <input_port name="goals">Goals</input_port>
+      <input_port name="server_name">Server name</input_port>
+      <input_port name="server_timeout">Server timeout</input_port>
+      <input_port name="behavior_tree">Behavior tree to run</input_port>
+    </Action>
+    <Action ID="NavigateToPose">
+      <input_port name="goal">Goal</input_port>
+      <input_port name="server_name">Server name</input_port>
+      <input_port name="server_timeout">Server timeout</input_port>
+      <input_port name="behavior_tree">Behavior tree to run</input_port>
+    </Action>
+    <Condition ID="ObjectDetected"
+               editable="true">
+      <input_port name="isdetected">true if object is detected</input_port>
+    </Condition>
+  </TreeNodesModel>
+
+</root>

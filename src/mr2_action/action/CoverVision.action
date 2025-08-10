@@ -1,0 +1,9 @@
+# Goal - GPS coordinate to navigate to
+float64 target_latitude
+float64 target_longitude
+---
+# Result - Final outcome
+int32 navigation_result    # 1 = SUCCESS, 0 = NOT_SUCCESS
+---
+# Feedback - BT execution status
+int32 bt_status           # 1 = RUNNING, 0 = NOT_RUNNING

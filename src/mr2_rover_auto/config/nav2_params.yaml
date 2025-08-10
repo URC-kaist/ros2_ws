@@ -15,13 +15,12 @@ lifecycle_manager_navigation:
       - smoother_server
       - bt_navigator
 
-# 1) BT Navigator ────────────────────────────────
+# 1) BT Navigator Service ────────────────────────────────
 bt_navigator:
   ros__parameters:
-    plugin_lib_names: ["nav2_bt_navigator/BehaviorTreeEngine"] # put node (=class) here
-    bt_xml_filename: "behavior_trees/navigate_bt.xml"
-    planner_server: "planner_server"
-    controller_server: "controller_server"
+    plugin_lib_names:
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_navigate_through_poses_action_bt_node
 
 # 2) Map Server ────────────────────────────────
 map_server:
