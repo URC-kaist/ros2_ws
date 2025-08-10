@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>mr2_rover_auto</name>
-  <version>0.0.1</version>
+  <version>0.0.0</version>
   <description>Autonomy components for MR2 Rover (launch and config)</description>
-
-  <maintainer email="pianojay@naver.com">Your Name</maintainer>
-  <license>MIT</license>
+  <maintainer email="159106973+pianojay@users.noreply.github.com">menny</maintainer>
+  <license>TODO: License delcaration</license>
 
   <!-- Core build tool -->
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -15,16 +15,19 @@
   <exec_depend>launch_ros</exec_depend>
 
   <!-- Dependencies for what you're launching -->
-  <exec_depend>robot_localization</exec_depend>
   <exec_depend>rclcpp</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>rclcpp_action</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
   <exec_depend>tf2</exec_depend>
   <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>ament_index_cpp</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>eigen</exec_depend>
-  <exec_depend>nav2_bringup</exec_depend>
-  <exec_depend>BehaviorTree.CPP</exec_depend>
-  <exec_depend>opennav_coverage</exec_depend>
-  <exec_depend>Fields2Cover</exec_depend>
+  <exec_depend>mr2_action_interface</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
   
   <export>
     <build_type>ament_cmake</build_type>

@@ -1,30 +1,33 @@
+#include "ament_index_cpp/get_package_share_directory.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "rclcpp_components/register_node_macro.hpp" // This is not used frankly.
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
-#include "your_interfaces/action/gnss_navigate.hpp"  // Your custom action interface
+#include "mr2_action_interface/action/gnss_only.hpp"  // Your custom action interface
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include <chrono>
 #include <thread>
 
-class GnssNavigationActionServer : public rclcpp::Node
+class GnssOnlyActionServer : public rclcpp::Node
 {
 public:
-  using GnssNavigate = your_interfaces::action::GnssNavigate;
-  using GoalHandleGnssNavigate = rclcpp_action::ServerGoalHandle<GnssNavigate>;
+  using GnssOnly = mr2_action_interface::action::GnssOnly;
+  using GoalHandleGnssOnly = rclcpp_action::ServerGoalHandle<GnssOnly>;
   using NavigateToPose = nav2_msgs::action::NavigateToPose;
 
-  explicit GnssNavigationActionServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
-  : Node("gnss_navigation_action_server", options)
+  explicit GnssOnlyActionServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : Node("gnss_only_action_server", options)
   {
+    using namespace std::placeholders;
     // Create the action server for GNSS navigation
-    this->action_server_ = rclcpp_action::create_server<GnssNavigate>(
+    this->action_server_ = rclcpp_action::create_server<GnssOnly>(
       this,
-      "gnss_navigate",
-      std::bind(&GnssNavigationActionServer::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-      std::bind(&GnssNavigationActionServer::handle_cancel, this, std::placeholders::_1),
-      std::bind(&GnssNavigationActionServer::handle_accepted, this, std::placeholders::_1));
+      "gnss_only",
+      std::bind(&GnssOnlyActionServer::handle_goal, this, _1, _2),
+      std::bind(&GnssOnlyActionServer::handle_cancel, this, _1),
+      std::bind(&GnssOnlyActionServer::handle_accepted, this, _1));
 
     // Create action client for Nav2's NavigateToPose (which will use your GnssOnly.xml BT)
     this->nav2_action_client_ = rclcpp_action::create_client<NavigateToPose>(
@@ -39,16 +42,16 @@ public:
   }
 
 private:
-  rclcpp_action::Server<GnssNavigate>::SharedPtr action_server_;
+  rclcpp_action::Server<GnssOnly>::SharedPtr action_server_;
   rclcpp_action::Client<NavigateToPose>::SharedPtr nav2_action_client_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID & uuid,
-    std::shared_ptr<const GnssNavigate::Goal> goal)
+    std::shared_ptr<const GnssOnly::Goal> goal)
   {
     RCLCPP_INFO(this->get_logger(), 
-                "Received GNSS navigation goal: lat=%.6f, lon=%.6f", 
+                "Received GNSS navigation goal: lat=%.8f, lon=%.8f", 
                 goal->target_latitude, goal->target_longitude);
     
     // Basic validation
@@ -67,10 +70,12 @@ private:
   }
 
   rclcpp_action::CancelResponse handle_cancel(
-    const std::shared_ptr<GoalHandleGnssNavigate> goal_handle)
+    const std::shared_ptr<GoalHandleGnssOnly> goal_handle)
   {
     RCLCPP_INFO(this->get_logger(), "Received cancel request - stopping robot safely");
     
+    // TODO: Smooth break (linear ramp down)
+
     // Send zero velocity commands to stop robot smoothly
     auto stop_cmd = geometry_msgs::msg::Twist();
     stop_cmd.linear.x = 0.0;
@@ -92,17 +97,17 @@ private:
     return rclcpp_action::CancelResponse::ACCEPT;
   }
 
-  void handle_accepted(const std::shared_ptr<GoalHandleGnssNavigate> goal_handle)
+  void handle_accepted(const std::shared_ptr<GoalHandleGnssOnly> goal_handle)
   {
     // Execute in separate thread to avoid blocking
-    std::thread{std::bind(&GnssNavigationActionServer::execute, this, goal_handle)}.detach();
+    std::thread{std::bind(&GnssOnlyActionServer::execute, this, goal_handle)}.detach();
   }
 
-  void execute(const std::shared_ptr<GoalHandleGnssNavigate> goal_handle)
+  void execute(const std::shared_ptr<GoalHandleGnssOnly> goal_handle)
   {
     const auto goal = goal_handle->get_goal();
-    auto feedback = std::make_shared<GnssNavigate::Feedback>();
-    auto result = std::make_shared<GnssNavigate::Result>();
+    auto feedback = std::make_shared<GnssOnly::Feedback>();
+    auto result = std::make_shared<GnssOnly::Result>();
     
     RCLCPP_INFO(this->get_logger(), "Starting GNSS navigation execution");
     
@@ -113,7 +118,7 @@ private:
       // Create Nav2 goal with your custom BT
       auto nav2_goal = NavigateToPose::Goal();
       nav2_goal.pose = target_pose;
-      nav2_goal.behavior_tree = get_package_share_directory("your_package") + "/bt_trees/GnssOnly.xml";
+      nav2_goal.behavior_tree = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + "/bt_trees/GnssOnly.xml";
       
       // Set BT running feedback
       feedback->bt_status = 1;  // RUNNING
@@ -196,6 +201,7 @@ private:
     pose.header.stamp = this->now();
     
     // TODO: Implement proper GPS to map coordinate conversion
+    // (Just use Navsat transform node... -> tf: WGS84 (GNSS)-> ENU (map))
     // This depends on your map's origin and coordinate system
     // For now, using a placeholder conversion
     
@@ -212,13 +218,6 @@ private:
     return pose;
   }
 
-  std::string get_package_share_directory(const std::string& package_name)
-  {
-    // You'll need to implement this or use ament_index_python equivalent for C++
-    // For now, return a placeholder path
-    return "/path/to/your/package/share";  // Replace with actual path resolution
-  }
-
   // Store current Nav2 goal handle for cancellation
   std::shared_ptr<rclcpp_action::ClientGoalHandle<NavigateToPose>> current_nav2_goal_handle_;
 };
@@ -226,7 +225,7 @@ private:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<GnssNavigationActionServer>();
+  auto node = std::make_shared<GnssOnlyActionServer>();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
