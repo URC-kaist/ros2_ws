@@ -7,12 +7,3 @@
 [submodule "src/ublox_dgnss"]
 	path = src/ublox_dgnss
 	url = https://github.com/URC-kaist/ublox_dgnss
-[submodule "src/BehaviorTree.CPP"]
-	path = src/BehaviorTree.CPP
-	url = https://github.com/BehaviorTree/BehaviorTree.CPP
-[submodule "src/Fields2Cover"]
-	path = src/Fields2Cover
-	url = https://github.com/Fields2Cover/Fields2Cover
-[submodule "src/opennav_coverage"]
-	path = src/opennav_coverage
-	url = https://github.com/open-navigation/opennav_coverage
