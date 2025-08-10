@@ -118,7 +118,7 @@ private:
       // Create Nav2 goal with your custom BT
       auto nav2_goal = NavigateToPose::Goal();
       nav2_goal.pose = target_pose;
-      nav2_goal.behavior_tree = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + "/bt_trees/GnssOnly.xml";
+      nav2_goal.behavior_tree = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + "/behavior_trees/GnssOnly.xml";
       
       // Set BT running feedback
       feedback->bt_status = 1;  // RUNNING

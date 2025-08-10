@@ -1,3 +1,4 @@
+#include "ament_index_cpp/get_package_share_directory.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "mr2_action_interface/action/cover_vision.hpp"
@@ -122,7 +123,7 @@ private:
       // Step 2: Create Nav2 goal with generated waypoints and CoverVision.xml BT
       auto nav2_goal = NavigateThroughPoses::Goal();
       nav2_goal.poses = waypoints;
-      nav2_goal.behavior_tree = get_bt_xml_path("CoverVision.xml");  // Your custom BT
+      nav2_goal.behavior_tree = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + "/behavior_trees/CoverVision.xml";  // Your custom BT
       
       // Step 3: Set up Nav2 action callbacks
       auto send_goal_options = rclcpp_action::Client<NavigateThroughPoses>::SendGoalOptions();
