@@ -1,15 +1,20 @@
+# .launch.py for Nav2 bringup
+# Make sure the estimator.launch.py is launched.
+# This has to be launched before action server/client.
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, TimerAction 
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 import os
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
-    pkg_share = get_package_share_directory('mr2_rover_auto')
-    params_file = os.path.join(pkg_share, 'config', 'nav2_params.yaml')
+    pkg_share = get_package_share_directory("mr2_rover_auto")
+    params_file = os.path.join(pkg_share, "config", "nav2_params.yaml")
 
     return LaunchDescription([
+        # For Gazebo, set to true. For field test, set to false.
         DeclareLaunchArgument('use_sim_time', default_value='false'),
 
         # 0) Lifecycle Manager
@@ -22,12 +27,10 @@ def generate_launch_description():
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'autostart': True,
             'node_names': [
-                'bt_navigator',
-                'map_server',
-                'global_costmap',
-                'planner_server',
-                'controller_server',
-                'smoother_server']}]
+                'bt_navigator', 'map_server', 'global_costmap', 'local_costmap',
+                'planner_server', 'smoother_server', 'controller_server'
+                ]
+            }]
         ),
 
         # 1) BT Navigator: Load BT XML and available node (=class) implementations
@@ -57,25 +60,20 @@ def generate_launch_description():
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
 
-        # 4) Planner: Create path from global costmap; A to B
+        # 4) Local Costmap: In case of MPPI (RPP will not use this and get proximity)
+        Node(
+            package='nav2_costmap_2d',
+            executable='nav2_costmap_2d',
+            name='local_costmap',
+            output='screen',
+            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
+        ),
+
+        # 5) Planner: Create path from global costmap; A to B
         Node(
             package='nav2_planner',
             executable='planner_server',
             name='planner_server',
-            output='screen',
-            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
-        ),
-        # """ Once active, you can send a goal with:
-        # ros2 action send_goal /compute_path_to_pose \
-        # nav2_msgs/action/ComputePathToPose \
-        # "{goal: { header: { frame_id: 'map' }, pose: { position: { x: 1.0, y: 2.0 }, orientation: { w: 1.0 } } }}"
-        # """
-
-        # 5) Coverage: Create path from global costmap; Coverage
-        Node(
-            package='opennav_coverage',
-            executable='coverage_server',
-            name='coverage_server',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
@@ -97,4 +95,4 @@ def generate_launch_description():
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
-        ])
+    ])

@@ -1,6 +1,9 @@
-# Goal - Single GPS coordinate, waypoints will be generated
+# CoverVision.action definitions
+# Goal - GPS coordinate, radius, object type
 float64 target_latitude
 float64 target_longitude
+float64 target_radius       # in meters
+int32 object_type          # 0 = AR tag, 1 = mallet, 2 = bottle 
 ---
 # Result - Final outcome with waypoint completion info
 int32 mission_result        # 1 = SUCCESS, 0 = FAILURE

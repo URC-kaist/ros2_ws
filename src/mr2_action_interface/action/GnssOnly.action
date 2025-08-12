@@ -1,3 +1,4 @@
+# GnssOnly.action definitions
 # Goal - GPS coordinate to navigate to
 float64 target_latitude
 float64 target_longitude

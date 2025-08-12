@@ -25,82 +25,49 @@ find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
 
-# Executable
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 add_executable(gps_heading_imu_node src/gps_heading_imu_node.cpp)
 ament_target_dependencies(gps_heading_imu_node
-  rclcpp
-  sensor_msgs
-  tf2
-  tf2_geometry_msgs
-  Eigen3
+  rclcpp sensor_msgs
+  tf2 tf2_geometry_msgs Eigen3
 )
 
-# Action server and client
-add_executable(gnssonly_action_server src/gnssonly_action_server.cpp)
-ament_target_dependencies(gnssonly_action_server
-  ament_index_cpp
-  rclcpp
-  rclcpp_action
-  rclcpp_components
-  geometry_msgs
-  nav2_msgs
-  mr2_action_interface
-  tf2
-  tf2_geometry_msgs
-  nav2_bringup
+add_executable(gnss_only_server src/gnss_only_server.cpp)
+ament_target_dependencies(gnss_only_server
+rclcpp rclcpp_action nav2_msgs geometry_msgs nav_msgs sensor_msgs
+tf2_ros tf2_geometry_msgs mr2_action_interface
 )
-add_executable(covervision_action_server src/covervision_action_server.cpp)
-ament_target_dependencies(covervision_action_server
-  ament_index_cpp
-  rclcpp
-  rclcpp_action
-  rclcpp_components
-  geometry_msgs
-  nav2_msgs
-  mr2_action_interface
-  tf2
-  tf2_geometry_msgs
-  nav2_bringup
-  behaviortree_cpp_v3
-  nav2_behavior_tree
+
+add_executable(cover_vision_server src/cover_vision_server.cpp)
+ament_target_dependencies(cover_vision_server
+rclcpp rclcpp_action nav2_msgs geometry_msgs nav_msgs sensor_msgs
+tf2_ros tf2_geometry_msgs mr2_action_interface
 )
-add_executable(mission_action_client src/mission_action_client.cpp)
-ament_target_dependencies(mission_action_client
-  rclcpp
-  rclcpp_action
-  rclcpp_components
-  mr2_action_interface
-  std_msgs
-  nav2_bringup
-  nav2_msgs
-  tf2
-  tf2_geometry_msgs
+
+add_executable(gnss_only_client src/gnss_only_client.cpp)
+ament_target_dependencies(gnss_only_client
+rclcpp rclcpp_action mr2_action_interface
+)
+
+add_executable(cover_vision_client src/cover_vision_client.cpp)
+ament_target_dependencies(cover_vision_client
+rclcpp rclcpp_action mr2_action_interface
 )
 
 install(TARGETS
   gps_heading_imu_node
+  gnss_only_server
+  cover_vision_server
+  gnss_only_client
+  cover_vision_client
   DESTINATION lib/${PROJECT_NAME}/
 )
 
-install(
-  DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-install(
-  DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-install(
-  DIRECTORY behavior_trees
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-install(
-  DIRECTORY maps
-  DESTINATION share/${PROJECT_NAME}/
-)
+install( DIRECTORY include DESTINATION include )
+install( DIRECTORY launch DESTINATION share/${PROJECT_NAME}/ )
+install( DIRECTORY config DESTINATION share/${PROJECT_NAME}/ )
+install( DIRECTORY behavior_trees DESTINATION share/${PROJECT_NAME}/)
+install( DIRECTORY maps DESTINATION share/${PROJECT_NAME}/ )
 
 ament_package()
-
