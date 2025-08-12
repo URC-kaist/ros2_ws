@@ -1,15 +1,14 @@
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "rclcpp_components/register_node_macro.hpp" // This is not used frankly.
+#include "mr2_action_interface/action/gnss_only.hpp"  // Your custom action interface
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
-#include "mr2_action_interface/action/gnss_only.hpp"  // Your custom action interface
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include <chrono>
 #include <thread>
-
+ 
 class GnssOnlyActionServer : public rclcpp::Node
 {
 public:
@@ -118,7 +117,7 @@ private:
       // Create Nav2 goal with your custom BT
       auto nav2_goal = NavigateToPose::Goal();
       nav2_goal.pose = target_pose;
-      nav2_goal.behavior_tree = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + "/behavior_trees/GnssOnly.xml";
+      // nav2_goal.behavior_tree = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + "/behavior_trees/GnssOnly.xml";
       
       // Set BT running feedback
       feedback->bt_status = 1;  // RUNNING

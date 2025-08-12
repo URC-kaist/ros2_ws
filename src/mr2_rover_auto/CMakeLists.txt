@@ -15,6 +15,7 @@ find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_bringup REQUIRED)
 find_package(nav2_msgs REQUIRED)
+find_package(nav2_behavior_tree REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(ament_index_cpp REQUIRED)
@@ -22,6 +23,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
+find_package(behaviortree_cpp_v3 REQUIRED)
 
 # Executable
 add_executable(gps_heading_imu_node src/gps_heading_imu_node.cpp)
@@ -59,6 +61,8 @@ ament_target_dependencies(covervision_action_server
   tf2
   tf2_geometry_msgs
   nav2_bringup
+  behaviortree_cpp_v3
+  nav2_behavior_tree
 )
 add_executable(mission_action_client src/mission_action_client.cpp)
 ament_target_dependencies(mission_action_client

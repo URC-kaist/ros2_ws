@@ -2,11 +2,14 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "mr2_action_interface/action/cover_vision.hpp"
-#include "nav2_msgs/action/navigate_through_poses.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "behaviortree_cpp_v3/bt_factory.h"
+#include "nav2_behavior_tree/bt_action_node.hpp"
+#include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "nav2_msgs/action/navigate_through_poses.hpp"
 #include <vector>
 #include <thread>
 #include <chrono>
@@ -16,7 +19,6 @@ class CoverVisionActionServer : public rclcpp::Node
 public:
   using CoverVision = mr2_action_interface::action::CoverVision;
   using GoalHandleCover = rclcpp_action::ServerGoalHandle<CoverVision>;
-  using NavigateThroughPoses = nav2_msgs::action::NavigateThroughPoses;
 
   explicit CoverVisionActionServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("cover_vision_action_server", options)
@@ -29,25 +31,32 @@ public:
       std::bind(&CoverVisionActionServer::handle_cancel, this, std::placeholders::_1),
       std::bind(&CoverVisionActionServer::handle_accepted, this, std::placeholders::_1));
 
-    // Create action client for Nav2's NavigateThroughPoses (uses CoverVision.xml BT)
-    this->nav2_client_ = rclcpp_action::create_client<NavigateThroughPoses>(
-      this, "navigate_through_poses");
-
     // Publisher for emergency stop
     this->cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
 
     // Parameters for coverage pattern
-    this->declare_parameter("coverage_spacing", 5.0);  // meters between coverage lines
-    this->declare_parameter("coverage_area_size", 20.0);  // square area size in meters
+    this->declare_parameter("coverage_spacing", 5.0);
+    this->declare_parameter("coverage_area_size", 20.0);
 
+    // Initialize BehaviorTree factory
+    factory_ = std::make_shared<BT::BehaviorTreeFactory>();
+    
+    // Register Nav2 BT nodes (you'll need to include nav2_behavior_tree plugins)
+    // This registers all the standard Nav2 BT nodes like NavigateToPose, etc.
+    // You might need to manually register the nodes you're using
+    nav2_behavior_tree::BtActionNode<nav2_msgs::action::NavigateToPose>
+      ::registerFromPlugin(factory_, "NavigateToPose");
+    nav2_behavior_tree::BtActionNode<nav2_msgs::action::NavigateThroughPoses>
+      ::registerFromPlugin(factory_, "NavigateThroughPoses");
+    
     RCLCPP_INFO(this->get_logger(), "🎯 CoverVision Action Server initialized");
-    RCLCPP_INFO(this->get_logger(), "   Generates waypoints for coverage missions");
   }
 
 private:
   rclcpp_action::Server<CoverVision>::SharedPtr action_server_;
-  rclcpp_action::Client<NavigateThroughPoses>::SharedPtr nav2_client_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
+  std::shared_ptr<BT::BehaviorTreeFactory> factory_;
+  std::shared_ptr<BT::Tree> current_tree_;
 
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID & uuid,
@@ -60,12 +69,6 @@ private:
     // Basic validation
     if (std::abs(goal->target_latitude) > 90.0 || std::abs(goal->target_longitude) > 180.0) {
       RCLCPP_ERROR(this->get_logger(), "❌ Invalid GPS coordinates");
-      return rclcpp_action::GoalResponse::REJECT;
-    }
-    
-    // Check if Nav2 is available
-    if (!nav2_client_->wait_for_action_server(std::chrono::seconds(5))) {
-      RCLCPP_ERROR(this->get_logger(), "❌ Nav2 NavigateThroughPoses server not available");
       return rclcpp_action::GoalResponse::REJECT;
     }
     
@@ -85,10 +88,10 @@ private:
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     
-    // Cancel the underlying Nav2 action if active
-    if (current_nav2_goal_handle_) {
-      auto cancel_result = nav2_client_->async_cancel_goal(current_nav2_goal_handle_);
-      RCLCPP_INFO(this->get_logger(), "🛑 Cancelled Nav2 navigation goal");
+    // Stop the behavior tree
+    if (current_tree_) {
+      // Halt the tree execution
+      current_tree_->haltTree();
     }
     
     return rclcpp_action::CancelResponse::ACCEPT;
@@ -96,7 +99,6 @@ private:
 
   void handle_accepted(const std::shared_ptr<GoalHandleCover> goal_handle)
   {
-    // Execute in separate thread
     std::thread{std::bind(&CoverVisionActionServer::execute, this, goal_handle)}.detach();
   }
 
@@ -109,90 +111,84 @@ private:
     RCLCPP_INFO(this->get_logger(), "🚀 Starting Coverage mission execution");
     
     try {
-      // Step 1: Generate waypoints from the target GPS coordinate
+      // Step 1: Generate waypoints
       auto waypoints = generate_coverage_waypoints(goal->target_latitude, goal->target_longitude);
-      
       RCLCPP_INFO(this->get_logger(), "📍 Generated %zu waypoints for coverage", waypoints.size());
       
-      // Update feedback with waypoint info
+      // Step 2: Set up blackboard with mission data
+      BT::Blackboard::Ptr blackboard = BT::Blackboard::create();
+      
+      // Convert target GPS to pose for initial approach
+      auto target_pose = convert_gps_to_map_pose(goal->target_latitude, goal->target_longitude);
+      blackboard->set<geometry_msgs::msg::PoseStamped>("goal", target_pose);
+      blackboard->set<std::vector<geometry_msgs::msg::PoseStamped>>("goals", waypoints);
+      
+      // Set server names (these should match your Nav2 configuration)
+      blackboard->set<std::string>("navtopose_server", "navigate_to_pose");
+      blackboard->set<std::string>("navtoposes_server", "navigate_through_poses");
+      blackboard->set<std::string>("server_timeout", "10");
+      
+      // You might want to set different BT files for sub-actions, or use default
+      blackboard->set<std::string>("navtopose_bt", "");  // Empty = use default
+      blackboard->set<std::string>("navtoposes_bt", ""); // Empty = use default
+      
+      // Step 3: Load and execute your behavior tree
+      std::string bt_xml_file = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + 
+                               "/behavior_trees/CoverVision.xml";
+      
+      current_tree_ = std::make_shared<BT::Tree>(factory_->createTreeFromFile(bt_xml_file, blackboard));
+      
+      // Step 4: Execute the behavior tree
       feedback->bt_status = 1;  // RUNNING
       feedback->total_waypoints = waypoints.size();
-      feedback->current_waypoint_index = 0;
       goal_handle->publish_feedback(feedback);
       
-      // Step 2: Create Nav2 goal with generated waypoints and CoverVision.xml BT
-      auto nav2_goal = NavigateThroughPoses::Goal();
-      nav2_goal.poses = waypoints;
-      nav2_goal.behavior_tree = ament_index_cpp::get_package_share_directory("mr2_rover_auto") + "/behavior_trees/CoverVision.xml";  // Your custom BT
+      BT::NodeStatus status = BT::NodeStatus::RUNNING;
       
-      // Step 3: Set up Nav2 action callbacks
-      auto send_goal_options = rclcpp_action::Client<NavigateThroughPoses>::SendGoalOptions();
+      while (status == BT::NodeStatus::RUNNING) {
+        status = current_tree_->tickRootWhileRunning(std::chrono::milliseconds(10));
+        
+        // Check if goal was cancelled
+        if (goal_handle->is_canceling()) {
+          current_tree_->haltTree();
+          result->mission_result = 0;
+          result->waypoints_completed = 0;
+          goal_handle->canceled(result);
+          return;
+        }
+        
+        // Update feedback
+        feedback->bt_status = (status == BT::NodeStatus::RUNNING) ? 1 : 0;
+        goal_handle->publish_feedback(feedback);
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
       
-      send_goal_options.goal_response_callback = 
-        [this](std::shared_ptr<rclcpp_action::ClientGoalHandle<NavigateThroughPoses>> nav2_handle) {
-          if (!nav2_handle) {
-            RCLCPP_ERROR(this->get_logger(), "❌ Nav2 goal was rejected");
-          } else {
-            RCLCPP_INFO(this->get_logger(), "✅ Nav2 accepted coverage waypoints");
-            current_nav2_goal_handle_ = nav2_handle;
-          }
-        };
-      
-      send_goal_options.feedback_callback =
-        [this, goal_handle, feedback](
-          std::shared_ptr<rclcpp_action::ClientGoalHandle<NavigateThroughPoses>>,
-          const std::shared_ptr<const NavigateThroughPoses::Feedback> nav2_feedback) {
-          
-          // Update our feedback with Nav2's progress
-          feedback->bt_status = 1;  // RUNNING
-          // feedback->current_waypoint_index = nav2_feedback->current_waypoint;
-          goal_handle->publish_feedback(feedback);
-          
-          // RCLCPP_INFO(this->get_logger(), "📊 Coverage progress: waypoint %d/%zu", 
-          //             nav2_feedback->current_waypoint + 1, feedback->total_waypoints);
-        };
-      
-      send_goal_options.result_callback =
-        [this, goal_handle, feedback, result](
-          const rclcpp_action::ClientGoalHandle<NavigateThroughPoses>::WrappedResult & nav2_result) {
-          
-          // Coverage mission finished
-          feedback->bt_status = 0;  // NOT RUNNING
-          goal_handle->publish_feedback(feedback);
-          
-          if (nav2_result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-            RCLCPP_INFO(this->get_logger(), "🎉 Coverage mission succeeded");
-            result->mission_result = 1;  // SUCCESS
-            result->waypoints_completed = feedback->total_waypoints;
-            goal_handle->succeed(result);
-          } else if (nav2_result.code == rclcpp_action::ResultCode::CANCELED) {
-            RCLCPP_INFO(this->get_logger(), "🛑 Coverage mission was cancelled");
-            result->mission_result = 0;  // NOT SUCCESS
-            result->waypoints_completed = feedback->current_waypoint_index;
-            goal_handle->canceled(result);
-          } else {
-            RCLCPP_ERROR(this->get_logger(), "❌ Coverage mission failed");
-            result->mission_result = 0;  // NOT SUCCESS
-            result->waypoints_completed = feedback->current_waypoint_index;
-            goal_handle->abort(result);
-          }
-          
-          current_nav2_goal_handle_.reset();
-        };
-      
-      // Send the goal to Nav2
-      auto future = nav2_client_->async_send_goal(nav2_goal, send_goal_options);
+      // Step 5: Handle completion
+      if (status == BT::NodeStatus::SUCCESS) {
+        RCLCPP_INFO(this->get_logger(), "🎉 Coverage mission succeeded");
+        result->mission_result = 1;
+        result->waypoints_completed = waypoints.size();
+        goal_handle->succeed(result);
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "❌ Coverage mission failed");
+        result->mission_result = 0;
+        result->waypoints_completed = 0;
+        goal_handle->abort(result);
+      }
       
     } catch (const std::exception& e) {
       RCLCPP_ERROR(this->get_logger(), "💥 Exception in coverage mission: %s", e.what());
       
-      feedback->bt_status = 0;  // NOT RUNNING
+      feedback->bt_status = 0;
       goal_handle->publish_feedback(feedback);
       
-      result->mission_result = 0;  // NOT SUCCESS
+      result->mission_result = 0;
       result->waypoints_completed = 0;
       goal_handle->abort(result);
     }
+    
+    current_tree_.reset();
   }
 
   // Generate coverage waypoints in a lawn mower pattern
@@ -200,13 +196,12 @@ private:
   {
     std::vector<geometry_msgs::msg::PoseStamped> waypoints;
     
-    // Get parameters
     double spacing = this->get_parameter("coverage_spacing").as_double();
     double area_size = this->get_parameter("coverage_area_size").as_double();
     
-    // Convert center GPS to map coordinates (placeholder - implement your conversion)
-    double center_x = center_lon * 111320.0;  // Rough conversion
-    double center_y = center_lat * 110540.0;  // Rough conversion
+    // Convert center GPS to map coordinates
+    double center_x = center_lon * 111320.0;  // Replace with proper conversion
+    double center_y = center_lat * 110540.0;  // Replace with proper conversion
     
     // Generate lawn mower pattern
     double half_size = area_size / 2.0;
@@ -214,17 +209,15 @@ private:
     
     for (double y = center_y - half_size; y <= center_y + half_size; y += spacing) {
       if (going_right) {
-        // Left to right
         for (double x = center_x - half_size; x <= center_x + half_size; x += spacing) {
-          waypoints.push_back(create_waypoint(x, y, 0.0));  // 0 degrees heading
+          waypoints.push_back(create_waypoint(x, y, 0.0));
         }
       } else {
-        // Right to left
         for (double x = center_x + half_size; x >= center_x - half_size; x -= spacing) {
-          waypoints.push_back(create_waypoint(x, y, 3.14159));  // 180 degrees heading
+          waypoints.push_back(create_waypoint(x, y, 3.14159));
         }
       }
-      going_right = !going_right;  // Alternate direction
+      going_right = !going_right;
     }
     
     RCLCPP_INFO(this->get_logger(), "🗺️  Generated lawn mower pattern: %zu waypoints", waypoints.size());
@@ -248,14 +241,23 @@ private:
     return waypoint;
   }
 
-  std::string get_bt_xml_path(const std::string& bt_filename)
+  geometry_msgs::msg::PoseStamped convert_gps_to_map_pose(double latitude, double longitude)
   {
-    // Return path to your BT XML file
-    // You might want to use ament_index_cpp to find package path
-    return "/path/to/your/package/behavior_trees/" + bt_filename;  // Placeholder
+    geometry_msgs::msg::PoseStamped pose;
+    pose.header.frame_id = "map";
+    pose.header.stamp = this->now();
+    
+    // TODO: Implement proper GPS to map coordinate conversion
+    pose.pose.position.x = longitude * 111320.0;  // Replace with proper transform
+    pose.pose.position.y = latitude * 110540.0;   // Replace with proper transform
+    pose.pose.position.z = 0.0;
+    
+    tf2::Quaternion quat;
+    quat.setRPY(0, 0, 0);
+    pose.pose.orientation = tf2::toMsg(quat);
+    
+    return pose;
   }
-
-  std::shared_ptr<rclcpp_action::ClientGoalHandle<NavigateThroughPoses>> current_nav2_goal_handle_;
 };
 
 int main(int argc, char ** argv)
