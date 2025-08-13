@@ -3,7 +3,7 @@ grid_map_filters:
 
     # ───── I/O 토픽 ───────────────────────────
     input_topic:  /height_gridmap
-    output_topic: /traversibility_gridmap
+    output_topic: /traversability_gridmap
 
     # ───── 필터 체인 ──────────────────────────
     filters:
