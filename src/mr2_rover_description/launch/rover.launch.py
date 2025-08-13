@@ -81,6 +81,7 @@ def generate_launch_description():
             "/rgbd_camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
             "/rgbd_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked",
             "/imu@sensor_msgs/msg/Imu@gz.msgs.IMU",
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock", # for /clock with use_sim_time=true
         ],
         output="screen",
     )

@@ -13,7 +13,7 @@ navsat_transform:
     publish_filtered_gps: false # do not publish estimation back to WGS84
     use_odometry_yaw: false # use fresh imu/data yaw
     wait_for_datum: true
-    datum: [38.4065, -110.7919, 0.0, map, base_link]  # ex: MDRS
+    datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)
 
 ekf_filter_node:
   ros__parameters:
@@ -22,7 +22,7 @@ ekf_filter_node:
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
-    world_frame: odom    # or map, depending on use
+    world_frame: map # publish tf: map -> odom
 
     imu0: imu/data
     imu0_config: [false, false, false, true, true, true, # global orientation
@@ -88,4 +88,4 @@ navsat_transform_query: # copied configuration from navsat_transform
     publish_filtered_gps: false # do not publish estimation back to WGS84
     use_odometry_yaw: false # use fresh imu/data yaw
     wait_for_datum: true
-    datum: [38.4065, -110.7919, 0.0, map, base_link]  # ex: MDRS
+    datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)

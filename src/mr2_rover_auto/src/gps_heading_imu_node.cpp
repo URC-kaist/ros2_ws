@@ -15,6 +15,12 @@ public:
   GpsHeadingImuNode()
       : Node("gps_heading_imu_node")
   {
+    // Node clock; for all time operations
+    clk_ = this->get_clock();
+
+    last_imu_time_ = rclcpp::Time(0, 0, clk_->get_clock_type());
+    last_gps_time_ = rclcpp::Time(0, 0, clk_->get_clock_type());
+
     // ROS Parameters (can be tuned at runtime)
     yaw_offset_rad_      = declare_parameter<double>("yaw_offset_rad", -M_PI_2); // 90° left-mount (north-south = north)
     K_comp_              = declare_parameter<double>("yaw_blend_gain", 0.04); // complementary gain
@@ -42,6 +48,9 @@ public:
   }
 
 private:
+  // Node clock
+  rclcpp::Clock::SharedPtr clk_;
+
   // ROS interfaces
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_north_sub_;
@@ -139,9 +148,10 @@ private:
     if (!last_north_fix_ || !last_south_fix_) return;
     const auto &N = *last_north_fix_;
     const auto &S = *last_south_fix_;
-    const rclcpp::Time tN = N.header.stamp;
-    const rclcpp::Time tS = S.header.stamp;
-    if (tN <= rclcpp::Time{} || tS <= rclcpp::Time{}) return;
+    const rclcpp::Time tN(N.header.stamp, RCL_ROS_TIME);
+    const rclcpp::Time tS(S.header.stamp, RCL_ROS_TIME);
+    const rclcpp::Time zero(0, 0, RCL_ROS_TIME);
+    if (tN <= zero || tS <= zero) return;
 
     // 0.a Basic validity (finite lat/lon; optional: check status/covariance type)
     if (!std::isfinite(N.latitude) || !std::isfinite(N.longitude) ||

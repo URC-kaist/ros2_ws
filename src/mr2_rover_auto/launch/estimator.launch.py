@@ -3,7 +3,7 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.substitutions import LaunchConfiguration
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -14,7 +14,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         # For Gazebo, set to true. For field test, set to false.
-        DeclareLaunchArgument("use_sim_time", default_value="false"),
+        DeclareLaunchArgument("use_sim_time", default_value="true"),
 
         #### A. Dual GPS Global heading calculation
         # 1) rewrite yaw of imu/local_data to imu/data
@@ -22,7 +22,13 @@ def generate_launch_description():
             package='mr2_rover_auto',
             executable='gps_heading_imu_node',
             name='gps_heading_imu_node',
-            output='screen'
+            output='screen',
+            parameters=[
+                {"use_sim_time": LaunchConfiguration("use_sim_time")}
+            ],
+            remappings=[('rover_north/fix', '/left_gnss/navsat'),
+                        ('rover_south/fix', '/right_gnss/navsat'),
+                        ('imu/local_data', '/imu')]
         ),
 
         #### B. Estimator for robot_localization
@@ -52,9 +58,10 @@ def generate_launch_description():
                        'odom', 'base_link']
         ), # XXX DO NOT USE odom frame for localization!
 
-        # Please consult the graph or Jaeuk:
+        # Please consult the graph:
         # https://docs.ros.org/en/noetic/api/robot_localization/html/integrating_gps.html
         # 3) GPS -> odometry/gps
+        TimerAction(period=2.0, actions=[
         Node(
             package="robot_localization",
             executable="navsat_transform_node",
@@ -65,11 +72,13 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=[
-                ("gps/fix", "rover_north/fix"),
+                # ("gps/fix", "rover_north/fix"),
+                ("gps/fix", "/right_gnss/navsat"),
+                ("imu/data", "/imu/data"),
             ],
         ),
 
-        # 4) Single EKF: publish tf: map -> base_link
+        # 4) Single EKF: publish tf: map -> odom
         Node(
             package="robot_localization",
             executable="ekf_node",
@@ -78,6 +87,9 @@ def generate_launch_description():
             parameters=[
                 params_file,
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
+            ],
+            remappings=[
+                ("imu/data", "/imu/data"),
             ],
         ),
 
@@ -95,9 +107,11 @@ def generate_launch_description():
             ],
             remappings=[
                 ("gps/fix", "query/fix"),
-                ("odometry/gps", "query/gps")
+                ("odometry/gps", "query/gps"),
+                ("imu/data", "/imu/data"),
             ],
-        ),
+        )
+        ]),
         
         #### C. Traversability tf (pitch -30 deg, for now)
         # 6) Define depth camera pose from base_link

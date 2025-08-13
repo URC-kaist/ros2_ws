@@ -21,7 +21,7 @@ def generate_launch_description():
     )
     headless_arg = DeclareLaunchArgument(
         "headless",
-        default_value="false",
+        default_value="true",
         description="Run without GUI components",
     )
 
