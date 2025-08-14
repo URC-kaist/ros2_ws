@@ -1,0 +1,8 @@
+# Consult gdalinfo for the map's origin and resolution.
+image: "maps/filter_mean_slope_length_norm.png"    # 0~255 회색 PNG
+resolution: 0.783011944543186       # 예: 1.0  (1 px = 1 m)
+origin: [-110.804931, 38.396078, 0.0]            # 맵 좌표계 원점(좌하단 픽셀의 map 좌표)
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25
+mode: "scale"                         # 그레이스케일 -> 확률 스케일링

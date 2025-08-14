@@ -10,10 +10,11 @@ navsat_transform:
     yaw_offset: 0.0
     zero_altitude: false # false to respect z-axis data
     broadcast_cartesian_transform: false # we do not use UTM
-    publish_filtered_gps: false # do not publish estimation back to WGS84
+    publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: false # use fresh imu/data yaw
     wait_for_datum: true
-    datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)
+    # datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)
+    datum: [-22.9867, -43.2025, -11.8852] # For gazebo
 
 ekf_filter_node:
   ros__parameters:
@@ -85,7 +86,8 @@ navsat_transform_query: # copied configuration from navsat_transform
     yaw_offset: 0.0
     zero_altitude: false # false to respect z-axis data
     broadcast_cartesian_transform: false # we do not use UTM
-    publish_filtered_gps: false # do not publish estimation back to WGS84
+    publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: false # use fresh imu/data yaw
     wait_for_datum: true
-    datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)
+    # datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)
+    datum: [-22.9867, -43.2025, -11.8852] # For gazebo

@@ -16,5 +16,20 @@ def generate_launch_description():
             output='screen',
             parameters=[config_file]
         ),
+
+        Node(
+            package="mr2_autonomous",
+            executable="gridmap_to_occupancy",
+            name="gridmap_to_occupancy",
+            output="screen",
+            parameters=[{
+                "input_topic": "/traversability_gridmap",  # your filters’ output
+                "output_topic": "/traversability_occupancy",
+                "layer": "traversability",                 # set to your actual layer id
+                "min_value": 0.0,
+                "max_value": 1.0,
+                "invert": True,                            # good(1)→low cost; bad(0)→high cost
+            }],
+        )
     ])
 

@@ -15,16 +15,14 @@ def generate_launch_description():
 
     return LaunchDescription([
         # For Gazebo, set to true. For field test, set to false.
-        DeclareLaunchArgument('use_sim_time', default_value='false'),
+        DeclareLaunchArgument('use_sim_time', default_value='true'),
 
         # 0) Lifecycle Manager
         Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
+            package='nav2_lifecycle_manager', executable='lifecycle_manager',
             name='lifecycle_manager_navigation',
             output='screen',
-            parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time'),
             'autostart': True,
             'node_names': [
                 'bt_navigator', 'map_server', 'global_costmap', 'local_costmap',
@@ -35,8 +33,7 @@ def generate_launch_description():
 
         # 1) BT Navigator: Load BT XML and available node (=class) implementations
         Node(
-            package='nav2_bt_navigator',
-            executable='bt_navigator',
+            package='nav2_bt_navigator', executable='bt_navigator',
             name='bt_navigator',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
@@ -44,17 +41,15 @@ def generate_launch_description():
 
         # 2) Map Server: Publish pre-baked static occupancy /map
         Node(
-        package='nav2_map_server',
-        executable='map_server',
-        name='map_server',
-        output='screen',
-        parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}],
+            package='nav2_map_server', executable='map_server',
+            name='map_server',
+            output='screen',
+            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
 
         # 3) Global Costmap: /map + TraversabilityLayer (or ObstacleLayer) + InflationLayer
         Node(
-            package='nav2_costmap_2d',
-            executable='nav2_costmap_2d',
+            package='nav2_costmap_2d', executable='nav2_costmap_2d',
             name='global_costmap',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
@@ -62,8 +57,7 @@ def generate_launch_description():
 
         # 4) Local Costmap: In case of MPPI (RPP will not use this and get proximity)
         Node(
-            package='nav2_costmap_2d',
-            executable='nav2_costmap_2d',
+            package='nav2_costmap_2d', executable='nav2_costmap_2d',
             name='local_costmap',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
@@ -71,8 +65,7 @@ def generate_launch_description():
 
         # 5) Planner: Create path from global costmap; A to B
         Node(
-            package='nav2_planner',
-            executable='planner_server',
+            package='nav2_planner', executable='planner_server',
             name='planner_server',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
@@ -80,8 +73,7 @@ def generate_launch_description():
 
         # 6) Smoother
         Node(
-            package='nav2_smoother',
-            executable='smoother_server',
+            package='nav2_smoother', executable='smoother_server',
             name='smoother_server',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
@@ -89,8 +81,7 @@ def generate_launch_description():
 
         # 7) Controller
         Node(
-            package='nav2_controller',
-            executable='controller_server',
+            package='nav2_controller', executable='controller_server',
             name='controller_server',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
