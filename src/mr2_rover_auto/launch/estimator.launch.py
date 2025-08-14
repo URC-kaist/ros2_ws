@@ -37,7 +37,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_imu',
-            arguments=['-0.1', '0.0', '-0.1', '0.0', '0.0', '0.0',
+            arguments=['0.0', '0.19', '0.0', '0.0', '0.0', '0.0',
                        # behind below of robot center
                        'base_link', 'imu_link']
         ),
@@ -45,7 +45,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_gps_north',
-            arguments=['0.0', '0.1', '0.0', '0.0', '0.0', '0.0',
+            arguments=['0.0', '0.245', '0.0', '0.0', '0.0', '0.0',
                        # left of robot center
                        'base_link', 'gps_north_link']
         ),
@@ -119,7 +119,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_cam_east',
-            arguments=['0.1', '0.0', '0.0', '0.0', '-0.523599', '0.0',
+            arguments=['0.1', '0.0', '0.0', '0.0', '0.3491', '0.0',
                        # front of robot, facing front, tilted toward ground
                        'base_link', 'cam_east_link']
         ),
@@ -127,7 +127,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_cam_north',
-            arguments=['0.0', '0.1', '0.0', '0.0', '-0.523599', '1.570796',
+            arguments=['0.0', '0.1', '0.0', '0.0', '0.3491', '1.570796',
                        # left of robot, facing left, tilted toward ground
                        'base_link', 'cam_north_link']
         ),
@@ -135,7 +135,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_tf_cam_south',
-            arguments=['0.0', '-0.1', '0.0', '0.0', '-0.523599', '-1.570796',
+            arguments=['0.0', '-0.1', '0.0', '0.0', '0.3491', '-1.570796',
                        # left of robot, facing left, tilted toward ground
                        'base_link', 'cam_south_link']
         ),

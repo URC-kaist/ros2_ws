@@ -23,7 +23,7 @@ public:
 
     // ROS Parameters (can be tuned at runtime)
     yaw_offset_rad_      = declare_parameter<double>("yaw_offset_rad", -M_PI_2); // 90° left-mount (north-south = north)
-    K_comp_              = declare_parameter<double>("yaw_blend_gain", 0.04); // complementary gain
+    K_comp_              = declare_parameter<double>("yaw_blend_gain", 0); // complementary gain
     max_gps_age_         = declare_parameter<double>("max_gps_age", 1.0);     // [s] Ignore old GNSS yaw
     max_pair_skew_       = declare_parameter<double>("max_pair_skew", 0.2);   // [s] Threshold of simultaneity
     min_baseline_xy_     = declare_parameter<double>("min_baseline_xy", 0.4); // [m] Minimum allowed distance between GPS RX to reject huge error
