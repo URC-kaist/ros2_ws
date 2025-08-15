@@ -44,6 +44,17 @@ def generate_launch_description():
         }.items(),
     )
 
+    traversability_map_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_autonomous"), "launch", "traversability_map.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "headless": LaunchConfiguration("headless")
+        }.items(),
+    )
+
     rviz2 = Node(
         package="rviz2",
         executable="rviz2",
@@ -58,6 +69,7 @@ def generate_launch_description():
         rviz_arg,
         headless_arg,
         rover_launch,
+        traversability_map_launch,
         pc2_to_heightmap,
         rviz2,
     ])

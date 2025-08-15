@@ -12,7 +12,7 @@
           <RecoveryNode number_of_retries="1" name="ComputePathToPose">
             <Sequence name="ComputeAndSmoothPath">
               <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
-              <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}"/>
+              <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}" smoother_id="SGSmoother"/>
             </Sequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>

@@ -12,8 +12,8 @@
             <ReactiveSequence>
               <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.7"/>
               <Sequence name="ComputeAndSmoothPath">
-                <ComputePathThroughPoses goal="{goals}" path="{path}" planner_id="GridBased"/>
-                <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}"/>
+                <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+                <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}" smoother_id="SGSmoother"/>
               </Sequence>
             </ReactiveSequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>

@@ -6,6 +6,8 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#include <thread>
+#include <cmath>
 
 class GpsConverter {
 public:
@@ -37,14 +39,13 @@ public:
     // 2) Wait for query/gps to update (Odometry in ENU, usually in map/odom frame)
     const auto t0 = node_->now();
     while (rclcpp::ok() && (node_->now() - t0) < timeout) {
-      if (have_gps_ && rclcpp::Time(last_gps_.header.stamp) >= rclcpp::Time(fix.header.stamp)) break;
-      rclcpp::sleep_for(std::chrono::milliseconds(10));
-      rclcpp::executors::SingleThreadedExecutor exec;
-      exec.add_node(node_->shared_from_this());
-      exec.spin_some();
+      if (have_gps_ &&
+        rclcpp::Time(last_gps_.header.stamp) >= rclcpp::Time(fix.header.stamp)) break;
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      // No local executor needed if the main app is spinning this node.
     }
     if (!have_gps_ || rclcpp::Time(last_gps_.header.stamp) < rclcpp::Time(fix.header.stamp)) {
-      RCLCPP_WARN(node_->get_logger(), "GPS query timeout");
+      RCLCPP_WARN(node_->get_logger(), "GPS query timeout (no updated Odom from navsat_transform_node)");
       return false;
     }
     

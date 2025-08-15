@@ -4,7 +4,7 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.substitutions import LaunchConfiguration
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -12,31 +12,34 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     pkg_share = get_package_share_directory("mr2_rover_auto")
     params_file = os.path.join(pkg_share, "config", "nav2_params.yaml")
+    nav_to_pose_bt_file = os.path.join(pkg_share, "behavior_trees", "my_navigate_to_pose.xml")
+    nav_through_bt_file = os.path.join(pkg_share, "behavior_trees", "my_navigate_through_poses.xml")
+    map_file = os.path.join(pkg_share, "maps", "map.yaml")
 
     return LaunchDescription([
         # For Gazebo, set to true. For field test, set to false.
         DeclareLaunchArgument('use_sim_time', default_value='true'),
-
-        # 0) Lifecycle Manager
-        Node(
-            package='nav2_lifecycle_manager', executable='lifecycle_manager',
-            name='lifecycle_manager_navigation',
-            output='screen',
-            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'autostart': True,
-            'node_names': [
-                'bt_navigator', 'map_server', 'global_costmap', 'local_costmap',
-                'planner_server', 'smoother_server', 'controller_server'
-                ]
-            }]
-        ),
+        DeclareLaunchArgument('pose_xml', default_value=nav_to_pose_bt_file),
+        DeclareLaunchArgument('poses_xml', default_value=nav_through_bt_file),
+        DeclareLaunchArgument('map', default_value=map_file),
 
         # 1) BT Navigator: Load BT XML and available node (=class) implementations
         Node(
             package='nav2_bt_navigator', executable='bt_navigator',
             name='bt_navigator',
             output='screen',
-            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
+            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                        {'default_nav_to_pose_bt_xml': LaunchConfiguration('pose_xml')},
+                        {'default_nav_through_poses_bt_xml': LaunchConfiguration('poses_xml')}],
+        ),
+
+        # 1.5) Behavior Server: For spin, wait, backup, etc.
+        Node(
+            package="nav2_behaviors",
+            executable="behavior_server",
+            name="behavior_server",
+            output="screen",
+            parameters=[params_file, {"use_sim_time": LaunchConfiguration("use_sim_time")}],
         ),
 
         # 2) Map Server: Publish pre-baked static occupancy /map
@@ -44,24 +47,11 @@ def generate_launch_description():
             package='nav2_map_server', executable='map_server',
             name='map_server',
             output='screen',
-            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
+            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')},
+                        {'yaml_filename': LaunchConfiguration('map')}],
         ),
 
-        # 3) Global Costmap: /map + TraversabilityLayer (or ObstacleLayer) + InflationLayer
-        Node(
-            package='nav2_costmap_2d', executable='nav2_costmap_2d',
-            name='global_costmap',
-            output='screen',
-            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
-        ),
-
-        # 4) Local Costmap: In case of MPPI (RPP will not use this and get proximity)
-        Node(
-            package='nav2_costmap_2d', executable='nav2_costmap_2d',
-            name='local_costmap',
-            output='screen',
-            parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
-        ),
+        # 3) 4) Costmap nodes are launched by planner and controller servers.
 
         # 5) Planner: Create path from global costmap; A to B
         Node(
@@ -85,5 +75,23 @@ def generate_launch_description():
             name='controller_server',
             output='screen',
             parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time')}]
+        ),
+
+        # 8) Lifecycle Manager (XXX this has to be the last one to be launched)
+        TimerAction( period=2.0,  # Wait for all nodes to be ready
+            actions=[
+            Node(
+                package='nav2_lifecycle_manager', executable='lifecycle_manager',
+                name='lifecycle_manager_navigation',
+                output='screen',
+                parameters=[params_file, {'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'autostart': True,
+                'node_names': [ # List of nodes to be managed
+                    'bt_navigator', 'behavior_server', 'map_server',
+                    'planner_server', 'smoother_server', 'controller_server'
+                    ]
+                }]
+            ),
+            ]
         ),
     ])
