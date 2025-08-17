@@ -69,7 +69,7 @@ def generate_launch_description():
         rviz_arg,
         headless_arg,
         rover_launch,
-        traversability_map_launch,
         pc2_to_heightmap,
+        traversability_map_launch,
         rviz2,
     ])
