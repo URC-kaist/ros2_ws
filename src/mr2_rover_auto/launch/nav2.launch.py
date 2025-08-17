@@ -1,5 +1,7 @@
 # Modification of the original file:
 #   /opt/ros/humble/share/nav2_bringup/launch/bringup_launch.py
+# Modified to include custom parameters and launch configurations.
+# Also removed SLAM-related nodes and configurations.
 
 # Copyright (c) 2018 Intel Corporation
 #
@@ -36,7 +38,7 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
 
-    # Our variables
+    # Our directories
     pkg_share = get_package_share_directory("mr2_rover_auto")
     default_params = os.path.join(pkg_share, "config", "nav2_params.yaml")
     default_map = os.path.join(pkg_share, "maps", "my_map.yaml")
@@ -98,16 +100,17 @@ def generate_launch_description():
 
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
+        default_value=default_map, # our map.yaml
         description='Full path to map yaml file to load')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='false',
+        default_value='true', # true for simulation false for real robot
         description='Use simulation (Gazebo) clock if true')
 
     declare_params_file_cmd = DeclareLaunchArgument(
         'params_file',
-        default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
+        default_value=default_params, # our nav2_params.yaml
         description='Full path to the ROS2 parameters file to use for all launched nodes')
 
     declare_autostart_cmd = DeclareLaunchArgument(
@@ -143,7 +146,7 @@ def generate_launch_description():
             output='screen'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(launch_dir,
+            PythonLaunchDescriptionSource(os.path.join(pkg_share, # our launch
                                                        'map.launch.py')),
             launch_arguments={'namespace': namespace,
                               'map': map_yaml_file,

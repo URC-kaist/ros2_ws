@@ -1,5 +1,6 @@
 # Modification of the original file:
 #   /opt/ros/humble/share/nav2_bringup/launch/localization_launch.py
+# Now it does not launch the AMCL node (everything else is the same)
 
 # Copyright (c) 2018 Intel Corporation
 #
@@ -44,7 +45,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
-    lifecycle_nodes = ['map_server', 'amcl']
+    lifecycle_nodes = ['map_server']
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -124,16 +125,6 @@ def generate_launch_description():
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings),
             Node(
-                package='nav2_amcl',
-                executable='amcl',
-                name='amcl',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings),
-            Node(
                 package='nav2_lifecycle_manager',
                 executable='lifecycle_manager',
                 name='lifecycle_manager_localization',
@@ -153,12 +144,6 @@ def generate_launch_description():
                 package='nav2_map_server',
                 plugin='nav2_map_server::MapServer',
                 name='map_server',
-                parameters=[configured_params],
-                remappings=remappings),
-            ComposableNode(
-                package='nav2_amcl',
-                plugin='nav2_amcl::AmclNode',
-                name='amcl',
                 parameters=[configured_params],
                 remappings=remappings),
             ComposableNode(
