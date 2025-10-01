@@ -1,7 +1,7 @@
-<library path="ak_servo_device">
+<library path="arm_device">
   <class
-      name="mr2_devices_ak_servo/AkServoDevice"
-      type="mr2_devices_ak_servo::AkServoDevice"
+      name="mr2_devices_arm/ArmDevice"
+      type="mr2_devices_arm::ArmDevice"
       base_class_type="CanDevice">
     <description>Cubemars AK actuator in Servo mode (Control-ID 6)</description>
   </class>

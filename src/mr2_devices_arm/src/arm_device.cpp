@@ -3,10 +3,10 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 
-namespace mr2_devices_ak_servo
+namespace mr2_devices_arm
 {
 
-class AkServoDevice : public CanDevice
+class ArmDevice : public CanDevice
 {
 public:
   void configure(const hardware_interface::ComponentInfo & ji,
@@ -79,6 +79,6 @@ private:
   std::vector<double> pos_, vel_, eff_, cmd_;
 };
 
-}  // namespace mr2_devices_ak_servo
+}  // namespace mr2_devices_arm
 
-PLUGINLIB_EXPORT_CLASS(mr2_devices_ak_servo::AkServoDevice, CanDevice)
+PLUGINLIB_EXPORT_CLASS(mr2_devices_arm::ArmDevice, CanDevice)
