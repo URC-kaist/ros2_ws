@@ -3,7 +3,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -26,6 +26,8 @@ def generate_launch_description():
     )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
+    use_sim_time = SetParameter(name="use_sim_time", value=True)
+
     pc2_to_heightmap = Node(
         package="mr2_autonomous",
         executable="pc2_to_heightmap",
@@ -44,6 +46,26 @@ def generate_launch_description():
         }.items(),
     )
 
+    traversibility_map_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("mr2_autonomous"),
+                    "launch",
+                    "traversibility_map.launch.py",
+                ]
+            )
+        )
+    )
+
+    move_group_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_moveit"), "launch", "move_group.launch.py"]
+            )
+        )
+    )
+
     rviz2 = Node(
         package="rviz2",
         executable="rviz2",
@@ -57,7 +79,10 @@ def generate_launch_description():
     return LaunchDescription([
         rviz_arg,
         headless_arg,
+        use_sim_time,
         rover_launch,
         pc2_to_heightmap,
+        traversibility_map_launch,
+        move_group_launch,
         rviz2,
     ])
