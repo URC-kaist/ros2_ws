@@ -14,7 +14,9 @@ public:
   {
     node_   = node;
     id_     = std::stoi(ji.parameters.at("motor_id"));
-    gear_   = std::stod(ji.parameters.at("gear_ratio"));
+
+    auto gear_it = ji.parameters.find("gear_ratio");
+    gear_ = (gear_it != ji.parameters.end()) ? std::stod(gear_it->second) : 1.0;
     iface_  = ji.parameters.at("can_iface");        // e.g. "can0"
 
     // obtain bus & store shared_ptr

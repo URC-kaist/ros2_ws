@@ -11,6 +11,7 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         (f"share/{package_name}/launch", glob("launch/*.launch.py")),
         (f"share/{package_name}/urdf", glob("urdf/*.xacro")),
+        (f"share/{package_name}/ros2_control", glob("ros2_control/*.xacro")),
         (f"share/{package_name}/config", glob("config/*")),
         (f"share/{package_name}/worlds", glob("worlds/*")),
         (f"share/{package_name}", ["package.xml"]),
