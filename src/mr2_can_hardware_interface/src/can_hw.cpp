@@ -86,7 +86,7 @@ public:
       if (plugin_it == joint.parameters.end())
       {
         RCLCPP_ERROR(node_->get_logger(),
-          "Joint %s missing <param name=\\"device_plugin\\">", joint.name.c_str());
+          "Joint %s missing <param name=\"device_plugin\">", joint.name.c_str());
         return CallbackReturn::ERROR;
       }
 
