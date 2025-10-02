@@ -11,31 +11,55 @@
       <joint name="arm_j1">
         <command_interface name="position"/>
         <state_interface name="position"/>
+        <param name="actuator">motor1</param>
+        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+        <param name="motor_id">1</param>
+        <param name="can_iface">${can_iface}</param>
       </joint>
 
       <joint name="arm_j2">
         <command_interface name="position"/>
         <state_interface name="position"/>
+        <param name="actuator">motor2</param>
+        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+        <param name="motor_id">2</param>
+        <param name="can_iface">${can_iface}</param>
       </joint>
 
       <joint name="arm_j3">
         <command_interface name="position"/>
         <state_interface name="position"/>
+        <param name="actuator">motor3</param>
+        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+        <param name="motor_id">3</param>
+        <param name="can_iface">${can_iface}</param>
       </joint>
 
       <joint name="arm_j4">
         <command_interface name="position"/>
         <state_interface name="position"/>
+        <param name="actuator">motor4</param>
+        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+        <param name="motor_id">4</param>
+        <param name="can_iface">${can_iface}</param>
       </joint>
 
       <joint name="arm_j5">
         <command_interface name="position"/>
         <state_interface name="position"/>
+        <param name="actuator">motor5</param>
+        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+        <param name="motor_id">5</param>
+        <param name="can_iface">${can_iface}</param>
       </joint>
 
       <joint name="arm_j6">
         <command_interface name="position"/>
         <state_interface name="position"/>
+        <param name="actuator">motor6</param>
+        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+        <param name="motor_id">6</param>
+        <param name="can_iface">${can_iface}</param>
       </joint>
 
       <transmission name="arm_j1_transmission">
@@ -43,9 +67,6 @@
         <actuator name="motor1" role="motor1">
           <command_interface name="position"/>
           <state_interface name="position"/>
-          <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-          <param name="motor_id">1</param>
-          <param name="can_iface">${can_iface}</param>
         </actuator>
         <joint name="arm_j1" role="arm_j1">
           <mechanical_reduction>1.0</mechanical_reduction>
@@ -58,17 +79,11 @@
           <command_interface name="position"/>
           <state_interface name="position"/>
           <mechanical_reduction>1.0</mechanical_reduction>
-          <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-          <param name="motor_id">2</param>
-          <param name="can_iface">${can_iface}</param>
         </actuator>
         <actuator name="motor3" role="motor3">
           <command_interface name="position"/>
           <state_interface name="position"/>
           <mechanical_reduction>1.0</mechanical_reduction>
-          <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-          <param name="motor_id">3</param>
-          <param name="can_iface">${can_iface}</param>
         </actuator>
         <joint name="arm_j2" role="arm_j2">
           <mechanical_reduction>50.0</mechanical_reduction>
@@ -85,9 +100,6 @@
         <actuator name="motor4" role="motor4">
           <command_interface name="position"/>
           <state_interface name="position"/>
-          <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-          <param name="motor_id">4</param>
-          <param name="can_iface">${can_iface}</param>
         </actuator>
         <joint name="arm_j4" role="arm_j4">
           <mechanical_reduction>1.0</mechanical_reduction>
@@ -99,9 +111,6 @@
         <actuator name="motor5" role="motor5">
           <command_interface name="position"/>
           <state_interface name="position"/>
-          <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-          <param name="motor_id">5</param>
-          <param name="can_iface">${can_iface}</param>
         </actuator>
         <joint name="arm_j5" role="arm_j5">
           <mechanical_reduction>1.0</mechanical_reduction>
@@ -113,9 +122,6 @@
         <actuator name="motor6" role="motor6">
           <command_interface name="position"/>
           <state_interface name="position"/>
-          <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-          <param name="motor_id">6</param>
-          <param name="can_iface">${can_iface}</param>
         </actuator>
         <joint name="arm_j6" role="arm_j6">
           <mechanical_reduction>1.0</mechanical_reduction>

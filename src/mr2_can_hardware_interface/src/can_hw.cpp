@@ -80,7 +80,71 @@ public:
         return CallbackReturn::ERROR;
       }
 
-      (void)get_joint(joint.name);
+      auto & joint_data = get_joint(joint.name);
+
+      const auto plugin_it = joint.parameters.find("device_plugin");
+      if (plugin_it == joint.parameters.end())
+      {
+        RCLCPP_ERROR(node_->get_logger(),
+          "Joint %s missing <param name=\\"device_plugin\\">", joint.name.c_str());
+        return CallbackReturn::ERROR;
+      }
+
+      const auto actuator_it = joint.parameters.find("actuator");
+      joint_data.actuator_name =
+        actuator_it != joint.parameters.end() ? actuator_it->second : joint.name;
+
+      auto & actuator = get_actuator(joint_data.actuator_name);
+
+      if (!actuator.configured)
+      {
+        std::shared_ptr<CanDevice> dev;
+        try
+        {
+          dev = loader_->createSharedInstance(plugin_it->second);
+        }
+        catch (const pluginlib::PluginlibException & ex)
+        {
+          RCLCPP_ERROR(node_->get_logger(), "Failed to load device plugin %s: %s",
+            plugin_it->second.c_str(), ex.what());
+          return CallbackReturn::ERROR;
+        }
+
+        try
+        {
+          dev->configure(joint, node_.get());
+        }
+        catch (const std::exception & ex)
+        {
+          RCLCPP_ERROR(node_->get_logger(), "Device %s configure() threw: %s",
+            joint.name.c_str(), ex.what());
+          return CallbackReturn::ERROR;
+        }
+
+        const auto pos_idx = pos_ptrs_.size();
+        const auto vel_idx = vel_ptrs_.size();
+        const auto eff_idx = eff_ptrs_.size();
+        const auto cmd_idx = cmd_ptrs_.size();
+
+        dev->export_state(pos_ptrs_, vel_ptrs_, eff_ptrs_);
+        dev->export_command(cmd_ptrs_);
+
+        actuator.state_ptr = pos_ptrs_.size() > pos_idx ? pos_ptrs_[pos_idx] : nullptr;
+        actuator.velocity_ptr = vel_ptrs_.size() > vel_idx ? vel_ptrs_[vel_idx] : nullptr;
+        actuator.effort_ptr = eff_ptrs_.size() > eff_idx ? eff_ptrs_[eff_idx] : nullptr;
+        actuator.command_ptr = cmd_ptrs_.size() > cmd_idx ? cmd_ptrs_[cmd_idx] : nullptr;
+
+        if (!actuator.state_ptr || !actuator.command_ptr)
+        {
+          RCLCPP_ERROR(node_->get_logger(),
+            "Device for actuator %s failed to export state/command interfaces",
+            actuator.name.c_str());
+          return CallbackReturn::ERROR;
+        }
+
+        actuator.configured = true;
+        devs_.push_back(std::move(dev));
+      }
     }
 
     for (const auto & transmission_info : info_.transmissions)
@@ -136,49 +200,10 @@ public:
 
         if (!actuator.configured)
         {
-          auto it = actuator_info.parameters.find("device_plugin");
-          if (it == actuator_info.parameters.end())
-          {
-            RCLCPP_ERROR(node_->get_logger(), "Actuator %s missing <param name=\"device_plugin\">",
-              actuator_info.name.c_str());
-            return CallbackReturn::ERROR;
-          }
-
-          const std::string & plugin_name = it->second;
-
-          std::shared_ptr<CanDevice> dev;
-          try
-          {
-            dev = loader_->createSharedInstance(plugin_name);
-          }
-          catch (const pluginlib::PluginlibException & ex)
-          {
-            RCLCPP_ERROR(node_->get_logger(), "Failed to load device plugin %s: %s",
-              plugin_name.c_str(), ex.what());
-            return CallbackReturn::ERROR;
-          }
-
-          try
-          {
-            dev->configure(actuator_info, node_.get());
-          }
-          catch (const std::exception & ex)
-          {
-            RCLCPP_ERROR(node_->get_logger(), "Device %s configure() threw: %s",
-              actuator_info.name.c_str(), ex.what());
-            return CallbackReturn::ERROR;
-          }
-
-          dev->export_state(pos_ptrs_, vel_ptrs_, eff_ptrs_);
-          dev->export_command(cmd_ptrs_);
-
-          actuator.state_ptr = pos_ptrs_.empty() ? nullptr : pos_ptrs_.back();
-          actuator.velocity_ptr = vel_ptrs_.empty() ? nullptr : vel_ptrs_.back();
-          actuator.effort_ptr = eff_ptrs_.empty() ? nullptr : eff_ptrs_.back();
-          actuator.command_ptr = cmd_ptrs_.empty() ? nullptr : cmd_ptrs_.back();
-          actuator.configured = true;
-
-          devs_.push_back(std::move(dev));
+          RCLCPP_ERROR(node_->get_logger(),
+            "Transmission '%s' references actuator '%s' with no configured device",
+            transmission_info.name.c_str(), actuator_info.name.c_str());
+          return CallbackReturn::ERROR;
         }
 
         actuator_handles.emplace_back(actuator_info.name, hardware_interface::HW_IF_POSITION,
@@ -318,6 +343,7 @@ private:
     double command{0.0};
     double state{0.0};
     double transmission_passthrough{0.0};
+    std::string actuator_name;
   };
 
   struct ActuatorData
