@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>mr2_devices_arm</name>
+  <name>mr2_devices_ak_servo</name>
   <version>0.0.0</version>
-  <description>MR2 arm device plugins for Cubemars actuators</description>
+  <description>TODO: Package description</description>
   <maintainer email="gmmyung@kaist.ac.kr">mr2</maintainer>
   <license>MIT</license>
 
