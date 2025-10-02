@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rover">
+  <xacro:arg name="can_iface" default="can0"/>
   <!-- Include component macros -->
   <xacro:include filename="$(find mr2_rover_description)/urdf/rover_base.xacro"/>
   <xacro:include filename="$(find mr2_rover_description)/urdf/swerve_module.xacro"/>

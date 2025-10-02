@@ -20,7 +20,21 @@ def generate_launch_description():
     bridge_yaml = PathJoinSubstitution([desc_pkg, "config", "gz_bridge.yaml"])
     world_file = PathJoinSubstitution([desc_pkg, "worlds", "world.sdf"])
 
-    robot_description = {"robot_description": Command(["xacro ", xacro_file])}
+    can_iface = LaunchConfiguration("can_iface")
+    can_iface_arg = DeclareLaunchArgument(
+        "can_iface",
+        default_value="can0",
+        description="CAN interface used by the AK servo hardware",
+    )
+
+    robot_description = {
+        "robot_description": Command([
+            "xacro ",
+            xacro_file,
+            " can_iface:=",
+            can_iface,
+        ])
+    }
 
     headless = LaunchConfiguration("headless")
     headless_arg = DeclareLaunchArgument(
@@ -105,6 +119,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             headless_arg,
+            can_iface_arg,
             gz_sim,
             gz_sim_headless,
             rsp,

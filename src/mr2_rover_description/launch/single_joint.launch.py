@@ -1,6 +1,6 @@
 from launch import LaunchDescription
-from launch.actions import TimerAction
-from launch.substitutions import Command, PathJoinSubstitution
+from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -18,7 +18,21 @@ def generate_launch_description():
         "single_joint_controllers.yaml",
     ])
 
-    robot_description = {"robot_description": Command(["xacro ", xacro_file])}
+    can_iface = LaunchConfiguration("can_iface")
+    can_iface_arg = DeclareLaunchArgument(
+        "can_iface",
+        default_value="can0",
+        description="CAN interface used by the AK servo hardware",
+    )
+
+    robot_description = {
+        "robot_description": Command([
+            "xacro ",
+            xacro_file,
+            " can_iface:=",
+            can_iface,
+        ])
+    }
 
     rsp = Node(
         package="robot_state_publisher",
@@ -48,6 +62,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            can_iface_arg,
             rsp,
             ros2_control_node,
             TimerAction(period=2.0, actions=[jsb_spawner]),
