@@ -14,7 +14,6 @@ public:
   {
     node_   = node;
     id_     = std::stoi(ji.parameters.at("motor_id"));
-    gear_   = std::stod(ji.parameters.at("gear_ratio"));
     iface_  = ji.parameters.at("can_iface");        // e.g. "can0"
 
     // obtain bus & store shared_ptr
@@ -35,7 +34,7 @@ public:
     struct can_frame fr{};
     fr.can_id  = (0x00000400 | id_) | CAN_EFF_FLAG;   // Control-ID 4
     fr.can_dlc = 8;
-    int32_t p  = std::lround(cmd_[0] * 180.0 / M_PI * gear_ * 1e4);
+    int32_t p  = std::lround(cmd_[0] * 180.0 / M_PI * 1e4);
     fr.data[0] = (p >> 24) & 0xFF;
     fr.data[1] = (p >> 16) & 0xFF;
     fr.data[2] = (p >>  8) & 0xFF;
@@ -64,8 +63,8 @@ private:
     int16_t v10 = (f.data[2] << 8) | f.data[3];
     int16_t c01 = (f.data[4] << 8) | f.data[5];
 
-    pos_[0] = (p10 / 10.0) / gear_ * (M_PI / 180.0);
-    vel_[0] = (v10 * 10.0) / gear_ * (M_PI / 30.0);   // rpm→rad/s
+    pos_[0] = (p10 / 10.0) * (M_PI / 180.0);
+    vel_[0] = (v10 * 10.0) * (M_PI / 30.0);   // rpm→rad/s
     eff_[0] = c01 / 100.0;                            // amps
   }
 
@@ -74,7 +73,6 @@ private:
   std::shared_ptr<CanBusManager> bus_;
   std::string iface_;
   int    id_{0};
-  double gear_{1.0};
 
   std::vector<double> pos_, vel_, eff_, cmd_;
 };
