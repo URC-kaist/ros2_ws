@@ -64,6 +64,10 @@ public:
 
     for (const auto & joint : info_.joints)
     {
+      auto & joint_data = get_joint(joint.name);
+      joint_data.has_velocity_state = false;
+      joint_data.has_effort_state = false;
+
       if (joint.command_interfaces.size() != 1 ||
           joint.command_interfaces[0].name != hardware_interface::HW_IF_POSITION)
       {
@@ -72,15 +76,36 @@ public:
         return CallbackReturn::ERROR;
       }
 
-      if (joint.state_interfaces.size() != 1 ||
-          joint.state_interfaces[0].name != hardware_interface::HW_IF_POSITION)
+      bool has_position_state = false;
+      for (const auto & state_iface : joint.state_interfaces)
       {
-        RCLCPP_ERROR(node_->get_logger(), "Joint %s must expose a single position state interface",
-          joint.name.c_str());
-        return CallbackReturn::ERROR;
+        if (state_iface.name == hardware_interface::HW_IF_POSITION)
+        {
+          has_position_state = true;
+        }
+        else if (state_iface.name == hardware_interface::HW_IF_VELOCITY)
+        {
+          joint_data.has_velocity_state = true;
+        }
+        else if (state_iface.name == hardware_interface::HW_IF_EFFORT)
+        {
+          joint_data.has_effort_state = true;
+        }
+        else
+        {
+          RCLCPP_ERROR(node_->get_logger(),
+            "Joint %s exposes unsupported state interface '%s'",
+            joint.name.c_str(), state_iface.name.c_str());
+          return CallbackReturn::ERROR;
+        }
       }
 
-      auto & joint_data = get_joint(joint.name);
+      if (!has_position_state)
+      {
+        RCLCPP_ERROR(node_->get_logger(),
+          "Joint %s must expose a position state interface", joint.name.c_str());
+        return CallbackReturn::ERROR;
+      }
 
       const auto plugin_it = joint.parameters.find("device_plugin");
       if (plugin_it == joint.parameters.end())
@@ -182,17 +207,62 @@ public:
       }
 
       std::vector<transmission_interface::JointHandle> joint_handles;
-      joint_handles.reserve(transmission_info.joints.size());
+      joint_handles.reserve(transmission_info.joints.size() * 3);
 
       for (const auto & joint_info : transmission_info.joints)
       {
         auto & joint = get_joint(joint_info.name);
-        joint_handles.emplace_back(joint_info.name, hardware_interface::HW_IF_POSITION,
-          &joint.transmission_passthrough);
+
+        bool position_added = false;
+        bool velocity_added = false;
+        bool effort_added = false;
+
+        auto add_joint_handle = [&](const std::string & interface) {
+          if (interface == hardware_interface::HW_IF_POSITION && !position_added)
+          {
+            joint_handles.emplace_back(joint_info.name, hardware_interface::HW_IF_POSITION,
+              &joint.transmission_passthrough);
+            position_added = true;
+          }
+          else if (interface == hardware_interface::HW_IF_VELOCITY && !velocity_added)
+          {
+            joint_handles.emplace_back(joint_info.name, hardware_interface::HW_IF_VELOCITY,
+              &joint.transmission_velocity);
+            velocity_added = true;
+          }
+          else if (interface == hardware_interface::HW_IF_EFFORT && !effort_added)
+          {
+            joint_handles.emplace_back(joint_info.name, hardware_interface::HW_IF_EFFORT,
+              &joint.transmission_effort);
+            effort_added = true;
+          }
+        };
+
+        add_joint_handle(hardware_interface::HW_IF_POSITION);
+
+        if (joint.has_velocity_state)
+        {
+          add_joint_handle(hardware_interface::HW_IF_VELOCITY);
+        }
+
+        if (joint.has_effort_state)
+        {
+          add_joint_handle(hardware_interface::HW_IF_EFFORT);
+        }
+
+        for (const auto & cmd_iface : joint_info.command_interfaces)
+        {
+          add_joint_handle(cmd_iface);
+        }
+
+        for (const auto & state_iface : joint_info.state_interfaces)
+        {
+          add_joint_handle(state_iface);
+        }
       }
 
       std::vector<transmission_interface::ActuatorHandle> actuator_handles;
-      actuator_handles.reserve(transmission_info.actuators.size());
+      actuator_handles.reserve(transmission_info.actuators.size() * 3);
 
       for (const auto & actuator_info : transmission_info.actuators)
       {
@@ -206,8 +276,52 @@ public:
           return CallbackReturn::ERROR;
         }
 
-        actuator_handles.emplace_back(actuator_info.name, hardware_interface::HW_IF_POSITION,
-          &actuator.transmission_passthrough);
+        bool position_added = false;
+        bool velocity_added = false;
+        bool effort_added = false;
+
+        auto add_actuator_handle = [&](const std::string & interface) {
+          if (interface == hardware_interface::HW_IF_POSITION && !position_added)
+          {
+            actuator_handles.emplace_back(actuator_info.name, hardware_interface::HW_IF_POSITION,
+              &actuator.transmission_passthrough);
+            position_added = true;
+          }
+          else if (interface == hardware_interface::HW_IF_VELOCITY && !velocity_added)
+          {
+            actuator_handles.emplace_back(actuator_info.name, hardware_interface::HW_IF_VELOCITY,
+              &actuator.transmission_velocity);
+            velocity_added = true;
+          }
+          else if (interface == hardware_interface::HW_IF_EFFORT && !effort_added)
+          {
+            actuator_handles.emplace_back(actuator_info.name, hardware_interface::HW_IF_EFFORT,
+              &actuator.transmission_effort);
+            effort_added = true;
+          }
+        };
+
+        add_actuator_handle(hardware_interface::HW_IF_POSITION);
+
+        if (actuator.velocity_ptr)
+        {
+          add_actuator_handle(hardware_interface::HW_IF_VELOCITY);
+        }
+
+        if (actuator.effort_ptr)
+        {
+          add_actuator_handle(hardware_interface::HW_IF_EFFORT);
+        }
+
+        for (const auto & cmd_iface : actuator_info.command_interfaces)
+        {
+          add_actuator_handle(cmd_iface);
+        }
+
+        for (const auto & state_iface : actuator_info.state_interfaces)
+        {
+          add_actuator_handle(state_iface);
+        }
       }
 
       try
@@ -239,7 +353,7 @@ public:
   std::vector<hardware_interface::StateInterface> export_state_interfaces() override
   {
     std::vector<hardware_interface::StateInterface> interfaces;
-    interfaces.reserve(info_.joints.size());
+    interfaces.reserve(info_.joints.size() * 3);
 
     for (const auto & joint : info_.joints)
     {
@@ -249,8 +363,22 @@ public:
         continue;
       }
 
+      auto & joint_data = joints_[it->second];
+
       interfaces.emplace_back(joint.name, hardware_interface::HW_IF_POSITION,
-        &joints_[it->second].state);
+        &joint_data.state);
+
+      if (joint_data.has_velocity_state)
+      {
+        interfaces.emplace_back(joint.name, hardware_interface::HW_IF_VELOCITY,
+          &joint_data.velocity);
+      }
+
+      if (joint_data.has_effort_state)
+      {
+        interfaces.emplace_back(joint.name, hardware_interface::HW_IF_EFFORT,
+          &joint_data.effort);
+      }
     }
 
     return interfaces;
@@ -284,8 +412,32 @@ public:
       {
         actuator.state = *actuator.state_ptr;
       }
+      else
+      {
+        actuator.state = 0.0;
+      }
+
+      if (actuator.velocity_ptr)
+      {
+        actuator.velocity = *actuator.velocity_ptr;
+      }
+      else
+      {
+        actuator.velocity = 0.0;
+      }
+
+      if (actuator.effort_ptr)
+      {
+        actuator.effort = *actuator.effort_ptr;
+      }
+      else
+      {
+        actuator.effort = 0.0;
+      }
 
       actuator.transmission_passthrough = actuator.state;
+      actuator.transmission_velocity = actuator.velocity;
+      actuator.transmission_effort = actuator.effort;
     }
 
     for (auto & transmission : transmissions_)
@@ -296,6 +448,8 @@ public:
     for (auto & joint : joints_)
     {
       joint.state = joint.transmission_passthrough;
+      joint.velocity = joint.transmission_velocity;
+      joint.effort = joint.transmission_effort;
     }
 
     return return_type::OK;
@@ -306,6 +460,8 @@ public:
     for (auto & joint : joints_)
     {
       joint.transmission_passthrough = joint.command;
+      joint.transmission_velocity = 0.0;
+      joint.transmission_effort = 0.0;
     }
 
     for (auto & transmission : transmissions_)
@@ -342,8 +498,14 @@ private:
     std::string name;
     double command{0.0};
     double state{0.0};
+    double velocity{0.0};
+    double effort{0.0};
     double transmission_passthrough{0.0};
+    double transmission_velocity{0.0};
+    double transmission_effort{0.0};
     std::string actuator_name;
+    bool has_velocity_state{false};
+    bool has_effort_state{false};
   };
 
   struct ActuatorData
@@ -356,7 +518,11 @@ private:
     std::string name;
     double command{0.0};
     double state{0.0};
+    double velocity{0.0};
+    double effort{0.0};
     double transmission_passthrough{0.0};
+    double transmission_velocity{0.0};
+    double transmission_effort{0.0};
     double * state_ptr{nullptr};
     double * velocity_ptr{nullptr};
     double * effort_ptr{nullptr};
