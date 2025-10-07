@@ -24,6 +24,11 @@ def generate_launch_description():
         default_value="false",
         description="Run without GUI components",
     )
+    can_iface_arg = DeclareLaunchArgument(
+        "can_iface",
+        default_value="can0",
+        description="CAN interface used by the AK servo hardware",
+    )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
     use_sim_time = SetParameter(name="use_sim_time", value=True)
@@ -42,7 +47,8 @@ def generate_launch_description():
             )
         ),
         launch_arguments={
-            "headless": LaunchConfiguration("headless")
+            "headless": LaunchConfiguration("headless"),
+            "can_iface": LaunchConfiguration("can_iface"),
         }.items(),
     )
 
@@ -79,6 +85,7 @@ def generate_launch_description():
     return LaunchDescription([
         rviz_arg,
         headless_arg,
+        can_iface_arg,
         use_sim_time,
         rover_launch,
         pc2_to_heightmap,
