@@ -14,11 +14,17 @@ add_library(ak_servo_device SHARED src/ak_servo_device.cpp)
 ament_target_dependencies(ak_servo_device
   mr2_can_bus_core hardware_interface pluginlib rclcpp)
 
+add_executable(mock_ak_servo_node src/mock_ak_servo_node.cpp)
+ament_target_dependencies(mock_ak_servo_node mr2_can_bus_core rclcpp)
+
 # export plugin
 pluginlib_export_plugin_description_file(mr2_can_bus_core plugin.xml)
 
 install(TARGETS ak_servo_device
         LIBRARY DESTINATION lib)
+
+install(TARGETS mock_ak_servo_node
+        RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(FILES plugin.xml
         DESTINATION share/${PROJECT_NAME})

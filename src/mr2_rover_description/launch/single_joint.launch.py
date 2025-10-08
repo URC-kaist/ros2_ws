@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.conditions import IfCondition
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -25,6 +26,13 @@ def generate_launch_description():
         description="CAN interface used by the AK servo hardware",
     )
 
+    use_mock_servo = LaunchConfiguration("use_mock_servo")
+    use_mock_servo_arg = DeclareLaunchArgument(
+        "use_mock_servo",
+        default_value="true",
+        description="Start mock AK servo that emulates CAN feedback",
+    )
+
     robot_description = {
         "robot_description": Command([
             "xacro ",
@@ -34,10 +42,11 @@ def generate_launch_description():
         ])
     }
 
-    rsp = Node(
+    robot_state_publisher_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
         parameters=[robot_description],
+        output="screen",
     )
 
     ros2_control_node = Node(
@@ -45,6 +54,17 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[controller_yaml],
         remappings=[("/controller_manager/robot_description", "/robot_description")],
+        output="screen",
+    )
+
+    mock_servo_node = Node(
+        package="mr2_devices_ak_servo",
+        executable="mock_ak_servo_node",
+        parameters=[{
+            "can_iface": can_iface,
+            "motor_id": 4,
+        }],
+        condition=IfCondition(use_mock_servo),
         output="screen",
     )
 
@@ -63,10 +83,11 @@ def generate_launch_description():
     return LaunchDescription(
         [
             can_iface_arg,
-            rsp,
+            use_mock_servo_arg,
+            robot_state_publisher_node,
+            mock_servo_node,
             ros2_control_node,
             TimerAction(period=2.0, actions=[jsb_spawner]),
             TimerAction(period=3.0, actions=[joint_spawner]),
         ]
     )
-

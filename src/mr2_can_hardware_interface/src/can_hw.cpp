@@ -5,10 +5,10 @@
 #include <utility>
 #include <vector>
 
-#include "rclcpp/rclcpp.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_loader.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "transmission_interface/four_bar_linkage_transmission_loader.hpp"
 #include "transmission_interface/simple_transmission_loader.hpp"
@@ -20,30 +20,25 @@
 using hardware_interface::CallbackReturn;
 using hardware_interface::return_type;
 
-namespace mr2_can_hardware_interface
-{
+namespace mr2_can_hardware_interface {
 
-class CanHW : public hardware_interface::SystemInterface
-{
+class CanHW : public hardware_interface::SystemInterface {
 public:
   CanHW() = default;
   ~CanHW() override = default;
 
-  CallbackReturn on_init(const hardware_interface::HardwareInfo & info) override
-  {
-    if (SystemInterface::on_init(info) != CallbackReturn::SUCCESS)
-    {
+  CallbackReturn
+  on_init(const hardware_interface::HardwareInfo &info) override {
+    if (SystemInterface::on_init(info) != CallbackReturn::SUCCESS) {
       return CallbackReturn::ERROR;
     }
 
     node_ = rclcpp::Node::make_shared("can_hw");
 
-    try
-    {
-      loader_ = std::make_shared<pluginlib::ClassLoader<CanDevice>>("mr2_can_bus_core", "CanDevice");
-    }
-    catch (const pluginlib::PluginlibException & ex)
-    {
+    try {
+      loader_ = std::make_shared<pluginlib::ClassLoader<CanDevice>>(
+          "mr2_can_bus_core", "CanDevice");
+    } catch (const pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(), "Pluginlib load error: %s", ex.what());
       return CallbackReturn::ERROR;
     }
@@ -62,62 +57,74 @@ public:
     transmission_interface::SimpleTransmissionLoader simple_loader;
     transmission_interface::FourBarLinkageTransmissionLoader four_bar_loader;
 
-    for (const auto & joint : info_.joints)
-    {
+    for (const auto &joint : info_.joints) {
+      auto &joint_data = get_joint(joint.name);
+      joint_data.has_velocity_state = false;
+      joint_data.has_effort_state = false;
+
       if (joint.command_interfaces.size() != 1 ||
-          joint.command_interfaces[0].name != hardware_interface::HW_IF_POSITION)
-      {
-        RCLCPP_ERROR(node_->get_logger(), "Joint %s must expose a single position command interface",
-          joint.name.c_str());
+          joint.command_interfaces[0].name !=
+              hardware_interface::HW_IF_POSITION) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "Joint %s must expose a single position command interface",
+                     joint.name.c_str());
         return CallbackReturn::ERROR;
       }
 
-      if (joint.state_interfaces.size() != 1 ||
-          joint.state_interfaces[0].name != hardware_interface::HW_IF_POSITION)
-      {
-        RCLCPP_ERROR(node_->get_logger(), "Joint %s must expose a single position state interface",
-          joint.name.c_str());
-        return CallbackReturn::ERROR;
+      bool has_position_state = false;
+      for (const auto &state_iface : joint.state_interfaces) {
+        if (state_iface.name == hardware_interface::HW_IF_POSITION) {
+          has_position_state = true;
+        } else if (state_iface.name == hardware_interface::HW_IF_VELOCITY) {
+          joint_data.has_velocity_state = true;
+        } else if (state_iface.name == hardware_interface::HW_IF_EFFORT) {
+          joint_data.has_effort_state = true;
+        } else {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Joint %s exposes unsupported state interface '%s'",
+                       joint.name.c_str(), state_iface.name.c_str());
+          return CallbackReturn::ERROR;
+        }
       }
 
-      auto & joint_data = get_joint(joint.name);
+      if (!has_position_state) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "Joint %s must expose a position state interface",
+                     joint.name.c_str());
+        return CallbackReturn::ERROR;
+      }
 
       const auto plugin_it = joint.parameters.find("device_plugin");
-      if (plugin_it == joint.parameters.end())
-      {
+      if (plugin_it == joint.parameters.end()) {
         RCLCPP_ERROR(node_->get_logger(),
-          "Joint %s missing <param name=\"device_plugin\">", joint.name.c_str());
+                     "Joint %s missing <param name=\"device_plugin\">",
+                     joint.name.c_str());
         return CallbackReturn::ERROR;
       }
 
       const auto actuator_it = joint.parameters.find("actuator");
-      joint_data.actuator_name =
-        actuator_it != joint.parameters.end() ? actuator_it->second : joint.name;
+      joint_data.actuator_name = actuator_it != joint.parameters.end()
+                                     ? actuator_it->second
+                                     : joint.name;
 
-      auto & actuator = get_actuator(joint_data.actuator_name);
+      auto &actuator = get_actuator(joint_data.actuator_name);
 
-      if (!actuator.configured)
-      {
+      if (!actuator.configured) {
         std::shared_ptr<CanDevice> dev;
-        try
-        {
+        try {
           dev = loader_->createSharedInstance(plugin_it->second);
-        }
-        catch (const pluginlib::PluginlibException & ex)
-        {
-          RCLCPP_ERROR(node_->get_logger(), "Failed to load device plugin %s: %s",
-            plugin_it->second.c_str(), ex.what());
+        } catch (const pluginlib::PluginlibException &ex) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Failed to load device plugin %s: %s",
+                       plugin_it->second.c_str(), ex.what());
           return CallbackReturn::ERROR;
         }
 
-        try
-        {
+        try {
           dev->configure(joint, node_.get());
-        }
-        catch (const std::exception & ex)
-        {
+        } catch (const std::exception &ex) {
           RCLCPP_ERROR(node_->get_logger(), "Device %s configure() threw: %s",
-            joint.name.c_str(), ex.what());
+                       joint.name.c_str(), ex.what());
           return CallbackReturn::ERROR;
         }
 
@@ -129,16 +136,20 @@ public:
         dev->export_state(pos_ptrs_, vel_ptrs_, eff_ptrs_);
         dev->export_command(cmd_ptrs_);
 
-        actuator.state_ptr = pos_ptrs_.size() > pos_idx ? pos_ptrs_[pos_idx] : nullptr;
-        actuator.velocity_ptr = vel_ptrs_.size() > vel_idx ? vel_ptrs_[vel_idx] : nullptr;
-        actuator.effort_ptr = eff_ptrs_.size() > eff_idx ? eff_ptrs_[eff_idx] : nullptr;
-        actuator.command_ptr = cmd_ptrs_.size() > cmd_idx ? cmd_ptrs_[cmd_idx] : nullptr;
+        actuator.state_ptr =
+            pos_ptrs_.size() > pos_idx ? pos_ptrs_[pos_idx] : nullptr;
+        actuator.velocity_ptr =
+            vel_ptrs_.size() > vel_idx ? vel_ptrs_[vel_idx] : nullptr;
+        actuator.effort_ptr =
+            eff_ptrs_.size() > eff_idx ? eff_ptrs_[eff_idx] : nullptr;
+        actuator.command_ptr =
+            cmd_ptrs_.size() > cmd_idx ? cmd_ptrs_[cmd_idx] : nullptr;
 
-        if (!actuator.state_ptr || !actuator.command_ptr)
-        {
+        if (!actuator.state_ptr || !actuator.command_ptr) {
           RCLCPP_ERROR(node_->get_logger(),
-            "Device for actuator %s failed to export state/command interfaces",
-            actuator.name.c_str());
+                       "Device for actuator %s failed to export state/command "
+                       "interfaces",
+                       actuator.name.c_str());
           return CallbackReturn::ERROR;
         }
 
@@ -147,184 +158,281 @@ public:
       }
     }
 
-    for (const auto & transmission_info : info_.transmissions)
-    {
+    for (const auto &transmission_info : info_.transmissions) {
       std::shared_ptr<transmission_interface::Transmission> transmission;
-      try
-      {
-        if (transmission_info.type == "transmission_interface/SimpleTransmission")
-        {
+      try {
+        if (transmission_info.type ==
+            "transmission_interface/SimpleTransmission") {
           transmission = simple_loader.load(transmission_info);
-        }
-        else if (transmission_info.type == "transmission_interface/FourBarLinkageTransmission")
-        {
+        } else if (transmission_info.type ==
+                   "transmission_interface/FourBarLinkageTransmission") {
           transmission = four_bar_loader.load(transmission_info);
-        }
-        else
-        {
-          RCLCPP_ERROR(node_->get_logger(), "Unsupported transmission type '%s'",
-            transmission_info.type.c_str());
+        } else {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Unsupported transmission type '%s'",
+                       transmission_info.type.c_str());
           return CallbackReturn::ERROR;
         }
-      }
-      catch (const transmission_interface::TransmissionInterfaceException & ex)
-      {
-        RCLCPP_ERROR(node_->get_logger(), "Error while loading transmission '%s': %s",
-          transmission_info.name.c_str(), ex.what());
+      } catch (
+          const transmission_interface::TransmissionInterfaceException &ex) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "Error while loading transmission '%s': %s",
+                     transmission_info.name.c_str(), ex.what());
         return CallbackReturn::ERROR;
       }
 
-      if (!transmission)
-      {
+      if (!transmission) {
         RCLCPP_ERROR(node_->get_logger(),
-          "Loader returned null transmission for '%s'", transmission_info.name.c_str());
+                     "Loader returned null transmission for '%s'",
+                     transmission_info.name.c_str());
         return CallbackReturn::ERROR;
       }
 
       std::vector<transmission_interface::JointHandle> joint_handles;
-      joint_handles.reserve(transmission_info.joints.size());
+      joint_handles.reserve(transmission_info.joints.size() * 3);
 
-      for (const auto & joint_info : transmission_info.joints)
-      {
-        auto & joint = get_joint(joint_info.name);
-        joint_handles.emplace_back(joint_info.name, hardware_interface::HW_IF_POSITION,
-          &joint.transmission_passthrough);
+      for (const auto &joint_info : transmission_info.joints) {
+        auto &joint = get_joint(joint_info.name);
+
+        bool position_added = false;
+        bool velocity_added = false;
+        bool effort_added = false;
+
+        auto add_joint_handle = [&](const std::string &interface) {
+          if (interface == hardware_interface::HW_IF_POSITION &&
+              !position_added) {
+            joint_handles.emplace_back(joint_info.name,
+                                       hardware_interface::HW_IF_POSITION,
+                                       &joint.transmission_passthrough);
+            position_added = true;
+          } else if (interface == hardware_interface::HW_IF_VELOCITY &&
+                     !velocity_added) {
+            joint_handles.emplace_back(joint_info.name,
+                                       hardware_interface::HW_IF_VELOCITY,
+                                       &joint.transmission_velocity);
+            velocity_added = true;
+          } else if (interface == hardware_interface::HW_IF_EFFORT &&
+                     !effort_added) {
+            joint_handles.emplace_back(joint_info.name,
+                                       hardware_interface::HW_IF_EFFORT,
+                                       &joint.transmission_effort);
+            effort_added = true;
+          }
+        };
+
+        add_joint_handle(hardware_interface::HW_IF_POSITION);
+
+        if (joint.has_velocity_state) {
+          add_joint_handle(hardware_interface::HW_IF_VELOCITY);
+        }
+
+        if (joint.has_effort_state) {
+          add_joint_handle(hardware_interface::HW_IF_EFFORT);
+        }
+
+        for (const auto &cmd_iface : joint_info.command_interfaces) {
+          add_joint_handle(cmd_iface);
+        }
+
+        for (const auto &state_iface : joint_info.state_interfaces) {
+          add_joint_handle(state_iface);
+        }
       }
 
       std::vector<transmission_interface::ActuatorHandle> actuator_handles;
-      actuator_handles.reserve(transmission_info.actuators.size());
+      actuator_handles.reserve(transmission_info.actuators.size() * 3);
 
-      for (const auto & actuator_info : transmission_info.actuators)
-      {
-        auto & actuator = get_actuator(actuator_info.name);
+      for (const auto &actuator_info : transmission_info.actuators) {
+        auto &actuator = get_actuator(actuator_info.name);
 
-        if (!actuator.configured)
-        {
+        if (!actuator.configured) {
           RCLCPP_ERROR(node_->get_logger(),
-            "Transmission '%s' references actuator '%s' with no configured device",
-            transmission_info.name.c_str(), actuator_info.name.c_str());
+                       "Transmission '%s' references actuator '%s' with no "
+                       "configured device",
+                       transmission_info.name.c_str(),
+                       actuator_info.name.c_str());
           return CallbackReturn::ERROR;
         }
 
-        actuator_handles.emplace_back(actuator_info.name, hardware_interface::HW_IF_POSITION,
-          &actuator.transmission_passthrough);
+        bool position_added = false;
+        bool velocity_added = false;
+        bool effort_added = false;
+
+        auto add_actuator_handle = [&](const std::string &interface) {
+          if (interface == hardware_interface::HW_IF_POSITION &&
+              !position_added) {
+            actuator_handles.emplace_back(actuator_info.name,
+                                          hardware_interface::HW_IF_POSITION,
+                                          &actuator.transmission_passthrough);
+            position_added = true;
+          } else if (interface == hardware_interface::HW_IF_VELOCITY &&
+                     !velocity_added) {
+            actuator_handles.emplace_back(actuator_info.name,
+                                          hardware_interface::HW_IF_VELOCITY,
+                                          &actuator.transmission_velocity);
+            velocity_added = true;
+          } else if (interface == hardware_interface::HW_IF_EFFORT &&
+                     !effort_added) {
+            actuator_handles.emplace_back(actuator_info.name,
+                                          hardware_interface::HW_IF_EFFORT,
+                                          &actuator.transmission_effort);
+            effort_added = true;
+          }
+        };
+
+        add_actuator_handle(hardware_interface::HW_IF_POSITION);
+
+        if (actuator.velocity_ptr) {
+          add_actuator_handle(hardware_interface::HW_IF_VELOCITY);
+        }
+
+        if (actuator.effort_ptr) {
+          add_actuator_handle(hardware_interface::HW_IF_EFFORT);
+        }
+
+        for (const auto &cmd_iface : actuator_info.command_interfaces) {
+          add_actuator_handle(cmd_iface);
+        }
+
+        for (const auto &state_iface : actuator_info.state_interfaces) {
+          add_actuator_handle(state_iface);
+        }
       }
 
-      try
-      {
+      try {
         transmission->configure(joint_handles, actuator_handles);
-      }
-      catch (const transmission_interface::TransmissionInterfaceException & ex)
-      {
-        RCLCPP_ERROR(node_->get_logger(), "Error while configuring transmission '%s': %s",
-          transmission_info.name.c_str(), ex.what());
+      } catch (
+          const transmission_interface::TransmissionInterfaceException &ex) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "Error while configuring transmission '%s': %s",
+                     transmission_info.name.c_str(), ex.what());
         return CallbackReturn::ERROR;
       }
 
       transmissions_.push_back(std::move(transmission));
     }
 
-    if (transmissions_.empty())
-    {
-      RCLCPP_ERROR(node_->get_logger(), "No transmissions defined for CAN hardware interface");
+    if (transmissions_.empty()) {
+      RCLCPP_ERROR(node_->get_logger(),
+                   "No transmissions defined for CAN hardware interface");
       return CallbackReturn::ERROR;
     }
 
-    RCLCPP_INFO(node_->get_logger(), "CanHW initialised: %zu joints, %zu actuators, %zu transmissions",
-      joints_.size(), actuators_.size(), transmissions_.size());
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "CanHW initialised: %zu joints, %zu actuators, %zu transmissions",
+        joints_.size(), actuators_.size(), transmissions_.size());
 
     return CallbackReturn::SUCCESS;
   }
 
-  std::vector<hardware_interface::StateInterface> export_state_interfaces() override
-  {
+  std::vector<hardware_interface::StateInterface>
+  export_state_interfaces() override {
     std::vector<hardware_interface::StateInterface> interfaces;
-    interfaces.reserve(info_.joints.size());
+    interfaces.reserve(info_.joints.size() * 3);
 
-    for (const auto & joint : info_.joints)
-    {
+    for (const auto &joint : info_.joints) {
       auto it = joint_index_.find(joint.name);
-      if (it == joint_index_.end())
-      {
+      if (it == joint_index_.end()) {
         continue;
       }
 
+      auto &joint_data = joints_[it->second];
+
       interfaces.emplace_back(joint.name, hardware_interface::HW_IF_POSITION,
-        &joints_[it->second].state);
+                              &joint_data.state);
+
+      if (joint_data.has_velocity_state) {
+        interfaces.emplace_back(joint.name, hardware_interface::HW_IF_VELOCITY,
+                                &joint_data.velocity);
+      }
+
+      if (joint_data.has_effort_state) {
+        interfaces.emplace_back(joint.name, hardware_interface::HW_IF_EFFORT,
+                                &joint_data.effort);
+      }
     }
 
     return interfaces;
   }
 
-  std::vector<hardware_interface::CommandInterface> export_command_interfaces() override
-  {
+  std::vector<hardware_interface::CommandInterface>
+  export_command_interfaces() override {
     std::vector<hardware_interface::CommandInterface> interfaces;
     interfaces.reserve(info_.joints.size());
 
-    for (const auto & joint : info_.joints)
-    {
+    for (const auto &joint : info_.joints) {
       auto it = joint_index_.find(joint.name);
-      if (it == joint_index_.end())
-      {
+      if (it == joint_index_.end()) {
         continue;
       }
 
       interfaces.emplace_back(joint.name, hardware_interface::HW_IF_POSITION,
-        &joints_[it->second].command);
+                              &joints_[it->second].command);
     }
 
     return interfaces;
   }
 
-  return_type read(const rclcpp::Time &, const rclcpp::Duration &) override
-  {
-    for (auto & actuator : actuators_)
-    {
-      if (actuator.state_ptr)
-      {
+  return_type read(const rclcpp::Time &, const rclcpp::Duration &) override {
+    for (auto &actuator : actuators_) {
+      if (actuator.state_ptr) {
         actuator.state = *actuator.state_ptr;
+      } else {
+        actuator.state = 0.0;
+      }
+
+      if (actuator.velocity_ptr) {
+        actuator.velocity = *actuator.velocity_ptr;
+      } else {
+        actuator.velocity = 0.0;
+      }
+
+      if (actuator.effort_ptr) {
+        actuator.effort = *actuator.effort_ptr;
+      } else {
+        actuator.effort = 0.0;
       }
 
       actuator.transmission_passthrough = actuator.state;
+      actuator.transmission_velocity = actuator.velocity;
+      actuator.transmission_effort = actuator.effort;
     }
 
-    for (auto & transmission : transmissions_)
-    {
+    for (auto &transmission : transmissions_) {
       transmission->actuator_to_joint();
     }
 
-    for (auto & joint : joints_)
-    {
+    for (auto &joint : joints_) {
       joint.state = joint.transmission_passthrough;
+      joint.velocity = joint.transmission_velocity;
+      joint.effort = joint.transmission_effort;
     }
 
     return return_type::OK;
   }
 
-  return_type write(const rclcpp::Time & now, const rclcpp::Duration &) override
-  {
-    for (auto & joint : joints_)
-    {
+  return_type write(const rclcpp::Time &now,
+                    const rclcpp::Duration &) override {
+    for (auto &joint : joints_) {
       joint.transmission_passthrough = joint.command;
+      joint.transmission_velocity = 0.0;
+      joint.transmission_effort = 0.0;
     }
 
-    for (auto & transmission : transmissions_)
-    {
+    for (auto &transmission : transmissions_) {
       transmission->joint_to_actuator();
     }
 
-    for (auto & actuator : actuators_)
-    {
+    for (auto &actuator : actuators_) {
       actuator.command = actuator.transmission_passthrough;
 
-      if (actuator.command_ptr)
-      {
+      if (actuator.command_ptr) {
         *actuator.command_ptr = actuator.command;
       }
     }
 
-    for (auto & dev : devs_)
-    {
+    for (auto &dev : devs_) {
       dev->process(now);
     }
 
@@ -332,43 +440,43 @@ public:
   }
 
 private:
-  struct JointData
-  {
-    explicit JointData(std::string name_in)
-    : name(std::move(name_in))
-    {
-    }
+  struct JointData {
+    explicit JointData(std::string name_in) : name(std::move(name_in)) {}
 
     std::string name;
     double command{0.0};
     double state{0.0};
+    double velocity{0.0};
+    double effort{0.0};
     double transmission_passthrough{0.0};
+    double transmission_velocity{0.0};
+    double transmission_effort{0.0};
     std::string actuator_name;
+    bool has_velocity_state{false};
+    bool has_effort_state{false};
   };
 
-  struct ActuatorData
-  {
-    explicit ActuatorData(std::string name_in)
-    : name(std::move(name_in))
-    {
-    }
+  struct ActuatorData {
+    explicit ActuatorData(std::string name_in) : name(std::move(name_in)) {}
 
     std::string name;
     double command{0.0};
     double state{0.0};
+    double velocity{0.0};
+    double effort{0.0};
     double transmission_passthrough{0.0};
-    double * state_ptr{nullptr};
-    double * velocity_ptr{nullptr};
-    double * effort_ptr{nullptr};
-    double * command_ptr{nullptr};
+    double transmission_velocity{0.0};
+    double transmission_effort{0.0};
+    double *state_ptr{nullptr};
+    double *velocity_ptr{nullptr};
+    double *effort_ptr{nullptr};
+    double *command_ptr{nullptr};
     bool configured{false};
   };
 
-  JointData & get_joint(const std::string & name)
-  {
+  JointData &get_joint(const std::string &name) {
     auto it = joint_index_.find(name);
-    if (it == joint_index_.end())
-    {
+    if (it == joint_index_.end()) {
       joints_.emplace_back(name);
       joint_index_[name] = joints_.size() - 1;
       return joints_.back();
@@ -377,11 +485,9 @@ private:
     return joints_[it->second];
   }
 
-  ActuatorData & get_actuator(const std::string & name)
-  {
+  ActuatorData &get_actuator(const std::string &name) {
     auto it = actuator_index_.find(name);
-    if (it == actuator_index_.end())
-    {
+    if (it == actuator_index_.end()) {
       actuators_.emplace_back(name);
       actuator_index_[name] = actuators_.size() - 1;
       return actuators_.back();
@@ -397,7 +503,8 @@ private:
   std::unordered_map<std::string, size_t> actuator_index_;
   std::vector<JointData> joints_;
   std::vector<ActuatorData> actuators_;
-  std::vector<std::shared_ptr<transmission_interface::Transmission>> transmissions_;
+  std::vector<std::shared_ptr<transmission_interface::Transmission>>
+      transmissions_;
 
   std::vector<double *> pos_ptrs_;
   std::vector<double *> vel_ptrs_;
@@ -407,8 +514,8 @@ private:
   rclcpp::Node::SharedPtr node_;
 };
 
-}  // namespace mr2_can_hardware_interface
+} // namespace mr2_can_hardware_interface
 
 #include "pluginlib/class_list_macros.hpp"
-PLUGINLIB_EXPORT_CLASS(mr2_can_hardware_interface::CanHW, hardware_interface::SystemInterface)
-
+PLUGINLIB_EXPORT_CLASS(mr2_can_hardware_interface::CanHW,
+                       hardware_interface::SystemInterface)

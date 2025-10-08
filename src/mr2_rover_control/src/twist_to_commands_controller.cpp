@@ -5,11 +5,9 @@
 
 #include "pluginlib/class_list_macros.hpp"
 
-namespace mr2_rover_control
-{
+namespace mr2_rover_control {
 
-controller_interface::CallbackReturn TwistToCommandsController::on_init()
-{
+controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<std::vector<std::string>>("wheel_joints", {});
   auto_declare<std::vector<std::string>>("steering_joints", {});
   auto_declare<double>("wheel_base", 0.94);
@@ -21,34 +19,34 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init()
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::InterfaceConfiguration TwistToCommandsController::command_interface_configuration() const
-{
+controller_interface::InterfaceConfiguration
+TwistToCommandsController::command_interface_configuration() const {
   controller_interface::InterfaceConfiguration conf;
   conf.type = controller_interface::interface_configuration_type::INDIVIDUAL;
-  for (const auto & joint : wheel_joints_) {
+  for (const auto &joint : wheel_joints_) {
     conf.names.push_back(joint + "/velocity");
   }
-  for (const auto & joint : steering_joints_) {
+  for (const auto &joint : steering_joints_) {
     conf.names.push_back(joint + "/position");
   }
   return conf;
 }
 
-controller_interface::InterfaceConfiguration TwistToCommandsController::state_interface_configuration() const
-{
+controller_interface::InterfaceConfiguration
+TwistToCommandsController::state_interface_configuration() const {
   controller_interface::InterfaceConfiguration conf;
   conf.type = controller_interface::interface_configuration_type::NONE;
   return conf;
 }
 
-controller_interface::CallbackReturn TwistToCommandsController::on_configure(
-  const rclcpp_lifecycle::State &)
-{
+controller_interface::CallbackReturn
+TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   wheel_joints_ = get_node()->get_parameter("wheel_joints").as_string_array();
-  steering_joints_ = get_node()->get_parameter("steering_joints").as_string_array();
+  steering_joints_ =
+      get_node()->get_parameter("steering_joints").as_string_array();
   if (wheel_joints_.size() != 4 || steering_joints_.size() != 4) {
     RCLCPP_ERROR(get_node()->get_logger(),
-      "Expected 4 wheel joints and 4 steering joints");
+                 "Expected 4 wheel joints and 4 steering joints");
     return controller_interface::CallbackReturn::ERROR;
   }
   wheel_base_ = get_node()->get_parameter("wheel_base").as_double();
@@ -59,8 +57,9 @@ controller_interface::CallbackReturn TwistToCommandsController::on_configure(
   const auto cmd_topic = get_node()->get_parameter("cmd_vel_topic").as_string();
 
   sub_twist_ = get_node()->create_subscription<geometry_msgs::msg::Twist>(
-    cmd_topic, rclcpp::SystemDefaultsQoS(),
-    std::bind(&TwistToCommandsController::twistCb, this, std::placeholders::_1));
+      cmd_topic, rclcpp::SystemDefaultsQoS(),
+      std::bind(&TwistToCommandsController::twistCb, this,
+                std::placeholders::_1));
 
   last_twist_.linear.x = 0.0;
   last_twist_.angular.z = 0.0;
@@ -68,37 +67,34 @@ controller_interface::CallbackReturn TwistToCommandsController::on_configure(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn TwistToCommandsController::on_activate(
-  const rclcpp_lifecycle::State &)
-{
+controller_interface::CallbackReturn
+TwistToCommandsController::on_activate(const rclcpp_lifecycle::State &) {
   publishZeros();
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn TwistToCommandsController::on_deactivate(
-  const rclcpp_lifecycle::State &)
-{
+controller_interface::CallbackReturn
+TwistToCommandsController::on_deactivate(const rclcpp_lifecycle::State &) {
   publishZeros();
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-void TwistToCommandsController::twistCb(const geometry_msgs::msg::Twist::SharedPtr msg)
-{
+void TwistToCommandsController::twistCb(
+    const geometry_msgs::msg::Twist::SharedPtr msg) {
   last_twist_ = *msg;
   last_twist_time_ = get_node()->now();
 }
 
-void TwistToCommandsController::publishZeros()
-{
+void TwistToCommandsController::publishZeros() {
   for (size_t i = 0; i < 4; ++i) {
     command_interfaces_[i].set_value(0.0);
     command_interfaces_[i + 4].set_value(0.0);
   }
 }
 
-controller_interface::return_type TwistToCommandsController::update(
-  const rclcpp::Time &, const rclcpp::Duration &)
-{
+controller_interface::return_type
+TwistToCommandsController::update(const rclcpp::Time &,
+                                  const rclcpp::Duration &) {
   if ((get_node()->now() - last_twist_time_).seconds() > timeout_) {
     publishZeros();
     return controller_interface::return_type::OK;
@@ -111,19 +107,22 @@ controller_interface::return_type TwistToCommandsController::update(
   const double hx = wheel_base_ * 0.5;
   const double hy = track_width_ * 0.5;
 
-  struct Wheel { double x; double y; };
-  const std::array<Wheel,4> wheels = {{
-    { +hx, -hy },  // FL
-    { +hx, +hy },  // FR
-    { -hx, -hy },  // RL
-    { -hx, +hy }   // RR
+  struct Wheel {
+    double x;
+    double y;
+  };
+  const std::array<Wheel, 4> wheels = {{
+      {+hx, -hy}, // FL
+      {+hx, +hy}, // FR
+      {-hx, -hy}, // RL
+      {-hx, +hy}  // RR
   }};
 
-  std::array<double,4> steer{};
-  std::array<double,4> speed{};
+  std::array<double, 4> steer{};
+  std::array<double, 4> speed{};
 
   for (size_t i = 0; i < wheels.size(); ++i) {
-    const auto & w = wheels[i];
+    const auto &w = wheels[i];
     const double vx_i = vx - wz * w.y;
     const double vy_i = vy + wz * w.x;
     double ang = std::atan2(vy_i, vx_i);
@@ -145,7 +144,7 @@ controller_interface::return_type TwistToCommandsController::update(
   return controller_interface::return_type::OK;
 }
 
-}  // namespace mr2_rover_control
+} // namespace mr2_rover_control
 
-PLUGINLIB_EXPORT_CLASS(mr2_rover_control::TwistToCommandsController, controller_interface::ControllerInterface)
-
+PLUGINLIB_EXPORT_CLASS(mr2_rover_control::TwistToCommandsController,
+                       controller_interface::ControllerInterface)
