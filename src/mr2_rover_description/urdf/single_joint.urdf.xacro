@@ -2,8 +2,29 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="single_joint">
   <xacro:arg name="can_iface" default="can0"/>
 
-  <link name="base_link"/>
-  <link name="link1"/>
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.025" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2 0.2 0.05"/>
+      </geometry>
+      <material name="base_blue">
+        <color rgba="0.2 0.2 0.8 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <link name="link1">
+    <visual>
+      <origin xyz="0.15 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.3 0.05 0.05"/>
+      </geometry>
+      <material name="link_orange">
+        <color rgba="0.9 0.5 0.2 1.0"/>
+      </material>
+    </visual>
+  </link>
 
   <joint name="joint1" type="revolute">
     <parent link="base_link"/>
@@ -43,4 +64,3 @@
     </transmission>
   </ros2_control>
 </robot>
-
