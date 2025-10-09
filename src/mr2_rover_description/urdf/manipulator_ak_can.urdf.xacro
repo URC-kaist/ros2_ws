@@ -5,9 +5,9 @@
   <link name="base_link"/>
 
   <xacro:include filename="manipulator.xacro"/>
-  <xacro:include filename="$(find mr2_rover_description)/ros2_control/manipulator_ak_can.ros2_control.xacro"/>
+  <xacro:include filename="$(find mr2_rover_description)/ros2_control/rover_can.ros2_control.xacro"/>
 
   <xacro:manipulator/>
 
-  <xacro:manipulator_ak_can_ros2_control name="ArmCanSystem" can_iface="$(arg can_iface)"/>
+  <xacro:rover_can_ros2_control name="ArmCanSystem" can_iface="$(arg can_iface)"/>
 </robot>

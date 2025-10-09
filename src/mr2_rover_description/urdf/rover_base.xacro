@@ -2,7 +2,9 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:macro name="rover_base" params="length:=0.73 width:=0.49 height:=0.19 mass:=10 rocker_size:=0.1 rocker_mass:=0.5 joint_effort:=50 joint_vel:=2.0 joint_lim:=1.57 front_camera_pitch:=0.3491">
 
-    <link name="base_link">
+    <link name="base_link"/>
+
+    <link name="base_chassis">
       <inertial>
         <mass value="${mass}"/>
         <inertia ixx="${mass*(width*width + height*height)/12.0}" iyy="${mass*(length*length + height*height)/12.0}" izz="${mass*(length*length + width*width)/12.0}" ixy="0" ixz="0" iyz="0"/>
@@ -20,6 +22,12 @@
         <origin xyz="0 0 ${height/2.0}"/>
       </collision>
     </link>
+
+    <joint name="base_link_to_chassis" type="fixed">
+      <parent link="base_link"/>
+      <child link="base_chassis"/>
+      <origin xyz="0 0 0"/>
+    </joint>
 
     <link name="left_rocker">
       <inertial>
@@ -42,7 +50,7 @@
     </link>
 
     <joint name="left_rocker_joint" type="revolute">
-      <parent link="base_link"/>
+      <parent link="base_chassis"/>
       <child link="left_rocker"/>
       <origin xyz="0 -${width/2.0} 0" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
@@ -71,7 +79,7 @@
     </link>
 
     <joint name="right_rocker_joint" type="revolute">
-      <parent link="base_link"/>
+      <parent link="base_chassis"/>
       <child link="right_rocker"/>
       <origin xyz="0 ${width/2.0} 0" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
@@ -81,7 +89,7 @@
     </joint>
 
     <joint name="right_rocker_joint_mimic" type="fixed">
-      <parent link="base_link" />
+      <parent link="base_chassis" />
       <child link="dummy_link" />
     </joint>
 
@@ -90,21 +98,21 @@
     <link name="left_gnss"/>
     <joint name="base_to_left_gnss" type="fixed">
       <origin xyz="0 ${-width/2.0} 0" rpy="0 0 0"/>
-      <parent link="base_link"/>
+      <parent link="base_chassis"/>
       <child link="left_gnss"/>
     </joint>
 
     <link name="right_gnss"/>
     <joint name="base_to_right_gnss" type="fixed">
       <origin xyz="0 ${width/2.0} 0" rpy="0 0 0"/>
-      <parent link="base_link"/>
+      <parent link="base_chassis"/>
       <child link="right_gnss"/>
     </joint>
 
     <link name="front_camera"/>
     <joint name="base_to_front_camera" type="fixed">
             <origin xyz="${length/2.0} 0 ${height}" rpy="0 ${front_camera_pitch} 0"/>
-      <parent link="base_link"/>
+      <parent link="base_chassis"/>
       <child link="front_camera"/>
     </joint>
 
@@ -112,7 +120,7 @@
     <link name="imu_link"/>
     <joint name="base_to_imu" type="fixed">
       <origin xyz="0 0 ${height}" rpy="0 0 0"/>
-      <parent link="base_link"/>
+      <parent link="base_chassis"/>
       <child link="imu_link"/>
     </joint>
 
