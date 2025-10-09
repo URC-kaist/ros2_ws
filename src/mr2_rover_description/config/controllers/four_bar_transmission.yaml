@@ -1,0 +1,15 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 200
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+      publish_rate: 50
+    four_bar_position_controller:
+      type: position_controllers/JointGroupPositionController
+
+four_bar_position_controller:
+  ros__parameters:
+    joints:
+      - input_joint
+      - output_joint
+    interface_name: position

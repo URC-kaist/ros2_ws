@@ -16,8 +16,6 @@ def generate_launch_description():
     desc_pkg = FindPackageShare("mr2_rover_description")
 
     xacro_file = PathJoinSubstitution([desc_pkg, "urdf", "rover.urdf.xacro"])
-    ctrl_yaml = PathJoinSubstitution([desc_pkg, "config", "controllers.yaml"])
-    bridge_yaml = PathJoinSubstitution([desc_pkg, "config", "gz_bridge.yaml"])
     world_file = PathJoinSubstitution([desc_pkg, "worlds", "world.sdf"])
 
     can_iface = LaunchConfiguration("can_iface")
@@ -27,13 +25,27 @@ def generate_launch_description():
         description="CAN interface used by the AK servo hardware",
     )
 
+    controller_config = LaunchConfiguration("controller_config")
+    controller_config_arg = DeclareLaunchArgument(
+        "controller_config",
+        default_value=PathJoinSubstitution(
+            [desc_pkg, "config", "controllers", "rover_controllers.yaml"]
+        ),
+        description="YAML file with controller manager configuration",
+    )
+
     robot_description = {
-        "robot_description": Command([
-            "xacro ",
-            xacro_file,
-            " can_iface:=",
-            can_iface,
-        ])
+        "robot_description": Command(
+            [
+                "xacro ",
+                xacro_file,
+                " ros2_control_mode:=gazebo",
+                " can_iface:=",
+                can_iface,
+                " ros2_control_config:=",
+                controller_config,
+            ]
+        )
     }
 
     headless = LaunchConfiguration("headless")
@@ -120,6 +132,7 @@ def generate_launch_description():
         [
             headless_arg,
             can_iface_arg,
+            controller_config_arg,
             gz_sim,
             gz_sim_headless,
             rsp,

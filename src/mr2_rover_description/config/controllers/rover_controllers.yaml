@@ -1,4 +1,4 @@
-# mr2_rover_description/config/controllers.yaml
+# mr2_rover_description/config/controllers/rover_controllers.yaml
 controller_manager:
   ros__parameters:
     update_rate: 100
