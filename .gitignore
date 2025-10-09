@@ -1,9 +1,6 @@
-build/mr2_drive/prefix_override/__pycache__
-log
-src/build/mr2_drive/prefix_override/__pycache__
-src/install/mr2_drive/lib/python3.10/site-packages/mr2_drive/__pycache__
-build/mr2_drive
-install
-.cache/clangd/index
-build
-src/.cache/clangd/index
+build/
+install/
+log/
+.cache/
+src/.cache/
+**/__pycache__/
