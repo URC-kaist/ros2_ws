@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.conditions import IfCondition
 from launch.substitutions import (
     Command,
     LaunchConfiguration,
@@ -31,6 +32,13 @@ def generate_launch_description():
         description="YAML file with controller manager configuration",
     )
 
+    use_mock_servos = LaunchConfiguration("use_mock_servos")
+    use_mock_servos_arg = DeclareLaunchArgument(
+        "use_mock_servos",
+        default_value="false",
+        description="Start mock AK servo nodes that emulate the manipulator CAN motors",
+    )
+
     robot_description = {
         "robot_description": Command(
             [
@@ -51,6 +59,17 @@ def generate_launch_description():
         parameters=[robot_description],
         output="screen",
     )
+
+    mock_servo_nodes = [
+        Node(
+            package="mr2_devices_ak_servo",
+            executable="mock_ak_servo_node",
+            parameters=[{"can_iface": can_iface, "motor_id": motor_id}],
+            condition=IfCondition(use_mock_servos),
+            output="screen",
+        )
+        for motor_id in range(1, 7)
+    ]
 
     ros2_control = Node(
         package="controller_manager",
@@ -82,7 +101,9 @@ def generate_launch_description():
         [
             can_iface_arg,
             controller_config_arg,
+            use_mock_servos_arg,
             rsp,
+            *mock_servo_nodes,
             ros2_control,
             TimerAction(period=2.0, actions=[jsb_spawner]),
             TimerAction(
