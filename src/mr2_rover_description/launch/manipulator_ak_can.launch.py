@@ -1,0 +1,100 @@
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.conditions import IfCondition
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+
+def generate_launch_description():
+    desc_pkg = FindPackageShare("mr2_rover_description")
+
+    xacro_file = PathJoinSubstitution(
+        [desc_pkg, "urdf", "manipulator_ak_can.urdf.xacro"]
+    )
+    default_controller = PathJoinSubstitution(
+        [desc_pkg, "config", "controllers", "manipulator_controllers.yaml"]
+    )
+
+    can_iface = LaunchConfiguration("can_iface")
+    can_iface_arg = DeclareLaunchArgument(
+        "can_iface",
+        default_value="can0",
+        description="CAN interface connected to the manipulator hardware",
+    )
+
+    controller_config = LaunchConfiguration("controller_config")
+    controller_config_arg = DeclareLaunchArgument(
+        "controller_config",
+        default_value=default_controller,
+        description="YAML file with controller manager configuration for the manipulator",
+    )
+
+    use_mock_servos = LaunchConfiguration("use_mock_servos")
+    use_mock_servos_arg = DeclareLaunchArgument(
+        "use_mock_servos",
+        default_value="false",
+        description="Start mock AK servo nodes that emulate the manipulator CAN motors",
+    )
+
+    robot_description = {
+        "robot_description": Command(
+            [
+                "xacro ",
+                xacro_file,
+                " can_iface:=",
+                can_iface,
+            ]
+        )
+    }
+
+    rsp = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        parameters=[robot_description],
+        output="screen",
+    )
+
+    mock_servo_nodes = [
+        Node(
+            package="mr2_devices_ak_servo",
+            executable="mock_ak_servo_node",
+            parameters=[{"can_iface": can_iface, "motor_id": motor_id}],
+            condition=IfCondition(use_mock_servos),
+            output="screen",
+        )
+        for motor_id in range(1, 7)
+    ]
+
+    ros2_control = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        parameters=[controller_config, robot_description],
+        output="screen",
+    )
+
+    jsb_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster"],
+        output="screen",
+    )
+    manipulator_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["manipulator_controller"],
+        output="screen",
+    )
+
+    return LaunchDescription(
+        [
+            can_iface_arg,
+            controller_config_arg,
+            use_mock_servos_arg,
+            rsp,
+            *mock_servo_nodes,
+            ros2_control,
+            TimerAction(period=2.0, actions=[jsb_spawner]),
+            TimerAction(period=4.0, actions=[manipulator_controller_spawner]),
+        ]
+    )
