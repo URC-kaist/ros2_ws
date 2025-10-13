@@ -10,7 +10,8 @@ find_package(rclcpp REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(ak_servo_device SHARED src/ak_servo_device.cpp)
+add_library(ak_servo_device SHARED
+  src/ak_servo_device.cpp)
 ament_target_dependencies(ak_servo_device
   mr2_can_bus_core hardware_interface pluginlib rclcpp)
 

@@ -4,3 +4,4 @@ log/
 .cache/
 src/.cache/
 **/__pycache__/
+.roslog

@@ -12,6 +12,7 @@
   <depend>gz_ros2_control_demos</depend>
   <depend>ros2_controllers</depend>
   <depend>ros2_control</depend>
+  <depend>mr2_devices_sensors</depend>
   <exec_depend>joint_state_broadcaster</exec_depend>
   <exec_depend>position_controllers</exec_depend>
 

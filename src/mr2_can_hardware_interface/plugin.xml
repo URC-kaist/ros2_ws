@@ -5,4 +5,16 @@
       base_class_type="hardware_interface::SystemInterface">
     <description>SystemInterface that bridges CanDevice plugins to ros2_control joint interfaces.</description>
   </class>
+  <class
+      name="mr2_can_hardware_interface/CoupledLimitEncoderPolicy"
+      type="mr2_can_hardware_interface::CoupledLimitEncoderPolicy"
+      base_class_type="mr2_can_hardware_interface::HomingPolicy">
+    <description>Homing policy for mechanically coupled joints using a limit switch and absolute encoder.</description>
+  </class>
+  <class
+      name="mr2_can_hardware_interface/AbsoluteEncoderPolicy"
+      type="mr2_can_hardware_interface::AbsoluteEncoderPolicy"
+      base_class_type="mr2_can_hardware_interface::HomingPolicy">
+    <description>Homing policy that zeroes a joint using an absolute encoder reading.</description>
+  </class>
 </library>

@@ -17,6 +17,8 @@
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
         <param name="motor_id">1</param>
         <param name="can_iface">${can_iface}</param>
+        <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
+        <param name="homing_encoder_state">arm_j1_abs</param>
       </joint>
 
       <joint name="arm_j2">
@@ -28,6 +30,14 @@
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
         <param name="motor_id">2</param>
         <param name="can_iface">${can_iface}</param>
+        <param name="homing_plugin">mr2_can_hardware_interface/CoupledLimitEncoderPolicy</param>
+        <param name="homing_group">arm_j2_j3</param>
+        <param name="homing_limit_state">arm_j2_limit_switch</param>
+        <param name="homing_encoder_state">arm_j3_abs</param>
+        <param name="homing_search_direction">negative</param>
+        <param name="homing_approach_speed">0.35</param>
+        <param name="homing_fine_speed">0.05</param>
+        <param name="homing_backoff_distance">0.12</param>
       </joint>
 
       <joint name="arm_j3">
@@ -39,6 +49,8 @@
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
         <param name="motor_id">3</param>
         <param name="can_iface">${can_iface}</param>
+        <param name="homing_plugin">mr2_can_hardware_interface/CoupledLimitEncoderPolicy</param>
+        <param name="homing_group">arm_j2_j3</param>
       </joint>
 
       <joint name="arm_j4">
@@ -74,6 +86,35 @@
         <param name="can_iface">${can_iface}</param>
       </joint>
 
+      <gpio name="arm_j2_limit_sensor">
+        <param name="device_plugin">mr2_devices_sensors/LimitSwitchDevice</param>
+        <param name="can_iface">${can_iface}</param>
+        <param name="can_id">0x181</param>
+        <param name="state_name">arm_j2_limit_switch</param>
+        <param name="counter_name">arm_j2_limit_counter</param>
+        <param name="timestamp_name">arm_j2_limit_timestamp_ms</param>
+        <param name="edge_name">arm_j2_limit_edge</param>
+        <param name="active_high">true</param>
+      </gpio>
+
+      <gpio name="arm_j1_abs_encoder">
+        <param name="device_plugin">mr2_devices_sensors/AbsoluteEncoderDevice</param>
+        <param name="can_iface">${can_iface}</param>
+        <param name="can_id">0x180</param>
+        <param name="state_name">arm_j1_abs</param>
+        <param name="flags_name">arm_j1_abs_flags</param>
+        <param name="ticks_per_rev">4096</param>
+      </gpio>
+
+      <gpio name="arm_j3_abs_encoder">
+        <param name="device_plugin">mr2_devices_sensors/AbsoluteEncoderDevice</param>
+        <param name="can_iface">${can_iface}</param>
+        <param name="can_id">0x182</param>
+        <param name="state_name">arm_j3_abs</param>
+        <param name="flags_name">arm_j3_abs_flags</param>
+        <param name="ticks_per_rev">4096</param>
+      </gpio>
+
       <transmission name="arm_j1_transmission">
         <plugin>transmission_interface/SimpleTransmission</plugin>
         <actuator name="motor1" role="motor1">
@@ -83,7 +124,7 @@
           <state_interface name="effort"/>
         </actuator>
         <joint name="arm_j1" role="arm_j1">
-          <mechanical_reduction>1.0</mechanical_reduction>
+          <mechanical_reduction>3.0</mechanical_reduction>
         </joint>
       </transmission>
 

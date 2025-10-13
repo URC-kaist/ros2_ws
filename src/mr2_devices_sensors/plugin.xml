@@ -1,0 +1,14 @@
+<library path="mr2_devices_sensors">
+  <class
+      name="mr2_devices_sensors/AbsoluteEncoderDevice"
+      type="mr2_devices_sensors::AbsoluteEncoderDevice"
+      base_class_type="CanDevice">
+    <description>Single absolute encoder on CAN bus.</description>
+  </class>
+  <class
+      name="mr2_devices_sensors/LimitSwitchDevice"
+      type="mr2_devices_sensors::LimitSwitchDevice"
+      base_class_type="CanDevice">
+    <description>Limit switch event publisher over CAN.</description>
+  </class>
+</library>

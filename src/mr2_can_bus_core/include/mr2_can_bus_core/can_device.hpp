@@ -6,6 +6,8 @@
 #include <memory>
 #include <rclcpp/node.hpp>
 #include <rclcpp/time.hpp>
+#include <string>
+#include <utility>
 #include <vector>
 
 class CanDevice {
@@ -26,7 +28,8 @@ public:
 
   /**
    * Export state arrays (pointers) so the ros2_control SystemInterface can
-   * wire them into the joint_state interfaces.
+   * wire them into the hardware state interfaces (e.g. position/velocity/effort)
+   * that controllers and broadcasters consume.
    */
   virtual void export_state(std::vector<double *> &pos,
                             std::vector<double *> &vel,
@@ -36,6 +39,14 @@ public:
    * Export command array pointers (usually position commands).
    */
   virtual void export_command(std::vector<double *> &cmd) = 0;
+
+  /**
+   * Export additional named state scalars. These can represent auxiliary
+   * sensors such as limit switches or absolute encoders that do not map to a
+   * joint directly. The default implementation does nothing.
+   */
+  virtual void export_named_states(
+      std::vector<std::pair<std::string, double *>> &) {}
 
 protected:
   /** Shorthand for sending on the appropriate bus */

@@ -9,6 +9,7 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_loader.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_lifecycle/state.hpp"
 
 #include "transmission_interface/four_bar_linkage_transmission_loader.hpp"
 #include "transmission_interface/simple_transmission_loader.hpp"
@@ -16,6 +17,7 @@
 #include "transmission_interface/transmission_interface_exception.hpp"
 
 #include "mr2_can_bus_core/can_device.hpp"
+#include "mr2_can_hardware_interface/homing_policy.hpp"
 
 using hardware_interface::CallbackReturn;
 using hardware_interface::return_type;
@@ -43,6 +45,17 @@ public:
       return CallbackReturn::ERROR;
     }
 
+    try {
+      homing_loader_ =
+          std::make_shared<pluginlib::ClassLoader<HomingPolicy>>(
+              "mr2_can_hardware_interface",
+              "mr2_can_hardware_interface::HomingPolicy");
+    } catch (const pluginlib::PluginlibException &ex) {
+      RCLCPP_ERROR(node_->get_logger(),
+                   "Failed to load homing policy plugins: %s", ex.what());
+      return CallbackReturn::ERROR;
+    }
+
     joint_index_.clear();
     actuator_index_.clear();
     joints_.clear();
@@ -53,9 +66,22 @@ public:
     eff_ptrs_.clear();
     cmd_ptrs_.clear();
     devs_.clear();
+    named_states_.clear();
+    homing_instances_.clear();
+    homing_active_ = false;
+    homed_ = false;
+    homing_failed_ = false;
+    homing_error_message_.clear();
 
     transmission_interface::SimpleTransmissionLoader simple_loader;
     transmission_interface::FourBarLinkageTransmissionLoader four_bar_loader;
+
+    struct HomingConfig {
+      std::string plugin;
+      HomingPolicy::ParamMap params;
+      std::vector<std::string> joints;
+    };
+    std::unordered_map<std::string, HomingConfig> homing_configs;
 
     for (const auto &joint : info_.joints) {
       auto &joint_data = get_joint(joint.name);
@@ -153,9 +179,86 @@ public:
           return CallbackReturn::ERROR;
         }
 
+        std::vector<std::pair<std::string, double *>> named_entries;
+        dev->export_named_states(named_entries);
+        if (register_named_states(named_entries) != CallbackReturn::SUCCESS) {
+          return CallbackReturn::ERROR;
+        }
+
         actuator.configured = true;
         devs_.push_back(std::move(dev));
       }
+
+      const auto homing_plugin_it =
+          joint.parameters.find("homing_plugin");
+      if (homing_plugin_it != joint.parameters.end()) {
+        const std::string group =
+            joint.parameters.count("homing_group")
+                ? joint.parameters.at("homing_group")
+                : joint.name;
+
+        auto &cfg = homing_configs[group];
+        if (!cfg.plugin.empty() && cfg.plugin != homing_plugin_it->second) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Conflicting homing plugins declared for group '%s'",
+                       group.c_str());
+          return CallbackReturn::ERROR;
+        }
+
+        cfg.plugin = homing_plugin_it->second;
+        cfg.joints.push_back(joint.name);
+
+        for (const auto &param : joint.parameters) {
+          if (param.first.rfind("homing_", 0) == 0 &&
+              param.first != "homing_plugin" &&
+              param.first != "homing_group") {
+            const std::string key = param.first.substr(std::string("homing_").size());
+            cfg.params[key] = param.second;
+          }
+        }
+      }
+    }
+
+    for (const auto &gpio : info_.gpios) {
+      const auto plugin_it = gpio.parameters.find("device_plugin");
+      if (plugin_it == gpio.parameters.end()) {
+        RCLCPP_ERROR(
+            node_->get_logger(),
+            "GPIO component %s missing <param name=\"device_plugin\">",
+            gpio.name.c_str());
+        return CallbackReturn::ERROR;
+      }
+
+      std::shared_ptr<CanDevice> dev;
+      try {
+        dev = loader_->createSharedInstance(plugin_it->second);
+      } catch (const pluginlib::PluginlibException &ex) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "Failed to load GPIO device plugin %s: %s",
+                     plugin_it->second.c_str(), ex.what());
+        return CallbackReturn::ERROR;
+      }
+
+      try {
+        dev->configure(gpio, node_.get());
+      } catch (const std::exception &ex) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "GPIO device %s configure() threw: %s", gpio.name.c_str(),
+                     ex.what());
+        return CallbackReturn::ERROR;
+      }
+
+      std::vector<std::pair<std::string, double *>> named_entries;
+      dev->export_named_states(named_entries);
+      if (register_named_states(named_entries) != CallbackReturn::SUCCESS) {
+        return CallbackReturn::ERROR;
+      }
+
+      // Allow devices to export state/command buffers if they choose to.
+      dev->export_state(pos_ptrs_, vel_ptrs_, eff_ptrs_);
+      dev->export_command(cmd_ptrs_);
+
+      devs_.push_back(std::move(dev));
     }
 
     for (const auto &transmission_info : info_.transmissions) {
@@ -312,6 +415,66 @@ public:
       transmissions_.push_back(std::move(transmission));
     }
 
+    if (!homing_configs.empty()) {
+      HomingPolicy::NamedStateMap state_map;
+      state_map.reserve(named_states_.size());
+      for (const auto &entry : named_states_) {
+        state_map.emplace(entry.first,
+                          static_cast<const double *>(entry.second));
+      }
+
+      for (auto &[group, cfg] : homing_configs) {
+        if (cfg.plugin.empty()) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Homing group '%s' missing plugin type", group.c_str());
+          return CallbackReturn::ERROR;
+        }
+
+        std::shared_ptr<HomingPolicy> policy;
+        try {
+          policy = homing_loader_->createSharedInstance(cfg.plugin);
+        } catch (const pluginlib::PluginlibException &ex) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Failed to load homing policy '%s': %s",
+                       cfg.plugin.c_str(), ex.what());
+          return CallbackReturn::ERROR;
+        }
+
+        std::vector<HomingPolicy::JointHandle> handles;
+        handles.reserve(cfg.joints.size());
+        for (const auto &joint_name : cfg.joints) {
+          auto it = joint_index_.find(joint_name);
+          if (it == joint_index_.end()) {
+            RCLCPP_ERROR(node_->get_logger(),
+                         "Homing group '%s' references unknown joint '%s'",
+                         group.c_str(), joint_name.c_str());
+            return CallbackReturn::ERROR;
+          }
+
+          auto &joint = joints_[it->second];
+          handles.push_back({joint.name,
+                             &joint.command,
+                             &joint.state,
+                             joint.has_velocity_state ? &joint.velocity : nullptr,
+                             &joint.offset});
+        }
+
+        policy->configure(node_, handles, state_map, cfg.params);
+        if (policy->has_error()) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Homing policy for group '%s' failed to configure: %s",
+                       group.c_str(), policy->error_message().c_str());
+          return CallbackReturn::ERROR;
+        }
+
+        homing_instances_.push_back({group, policy, cfg.joints});
+      }
+
+      RCLCPP_INFO(node_->get_logger(),
+                  "Configured %zu homing policy plugins.",
+                  homing_instances_.size());
+    }
+
     if (transmissions_.empty()) {
       RCLCPP_ERROR(node_->get_logger(),
                    "No transmissions defined for CAN hardware interface");
@@ -374,6 +537,42 @@ public:
     return interfaces;
   }
 
+  CallbackReturn
+  on_activate(const rclcpp_lifecycle::State &previous_state) override {
+    (void)previous_state;
+    const auto now = node_->get_clock()->now();
+    homing_failed_ = false;
+    homing_error_message_.clear();
+
+    if (homing_instances_.empty()) {
+      homed_ = true;
+      homing_active_ = false;
+      return CallbackReturn::SUCCESS;
+    }
+
+    homed_ = false;
+    homing_active_ = true;
+
+    for (auto &instance : homing_instances_) {
+      if (!instance.policy) {
+        continue;
+      }
+      instance.policy->reset();
+      instance.policy->begin(now);
+    }
+
+    RCLCPP_INFO(node_->get_logger(),
+                "Starting homing sequence (%zu policies)", homing_instances_.size());
+    return CallbackReturn::SUCCESS;
+  }
+
+  CallbackReturn
+  on_deactivate(const rclcpp_lifecycle::State &previous_state) override {
+    (void)previous_state;
+    homing_active_ = false;
+    return CallbackReturn::SUCCESS;
+  }
+
   return_type read(const rclcpp::Time &, const rclcpp::Duration &) override {
     for (auto &actuator : actuators_) {
       if (actuator.state_ptr) {
@@ -404,7 +603,7 @@ public:
     }
 
     for (auto &joint : joints_) {
-      joint.state = joint.transmission_passthrough;
+      joint.state = joint.transmission_passthrough - joint.offset;
       joint.velocity = joint.transmission_velocity;
       joint.effort = joint.transmission_effort;
     }
@@ -412,10 +611,64 @@ public:
     return return_type::OK;
   }
 
-  return_type write(const rclcpp::Time &now,
-                    const rclcpp::Duration &) override {
+  return_type
+  write(const rclcpp::Time &now, const rclcpp::Duration &period) override {
+    if (homing_failed_) {
+      return return_type::ERROR;
+    }
+
+    if (homing_active_) {
+      for (auto &joint : joints_) {
+        joint.command = joint.state;
+      }
+
+      for (auto &instance : homing_instances_) {
+        if (instance.policy) {
+          instance.policy->update(now, period);
+        }
+      }
+
+      bool all_finished = true;
+      for (auto &instance : homing_instances_) {
+        if (!instance.policy) {
+          continue;
+        }
+
+        if (instance.policy->has_error()) {
+          homing_failed_ = true;
+          homing_error_message_ = instance.policy->error_message();
+          RCLCPP_ERROR(
+              node_->get_logger(),
+              "Homing policy '%s' reported error: %s", instance.group.c_str(),
+              homing_error_message_.c_str());
+          homing_active_ = false;
+          return return_type::ERROR;
+        }
+
+        if (!instance.policy->is_finished()) {
+          all_finished = false;
+        }
+      }
+
+      if (all_finished) {
+        for (auto &instance : homing_instances_) {
+          if (instance.policy) {
+            instance.policy->finalize(now);
+          }
+        }
+        homing_active_ = false;
+        homed_ = true;
+        RCLCPP_INFO(node_->get_logger(),
+                    "Homing sequence completed successfully.");
+      }
+    } else if (!homed_) {
+      for (auto &joint : joints_) {
+        joint.command = joint.state;
+      }
+    }
+
     for (auto &joint : joints_) {
-      joint.transmission_passthrough = joint.command;
+      joint.transmission_passthrough = joint.command + joint.offset;
       joint.transmission_velocity = 0.0;
       joint.transmission_effort = 0.0;
     }
@@ -448,6 +701,7 @@ private:
     double state{0.0};
     double velocity{0.0};
     double effort{0.0};
+    double offset{0.0};
     double transmission_passthrough{0.0};
     double transmission_velocity{0.0};
     double transmission_effort{0.0};
@@ -496,7 +750,37 @@ private:
     return actuators_[it->second];
   }
 
+  CallbackReturn register_named_states(
+      const std::vector<std::pair<std::string, double *>> &states) {
+    for (const auto &entry : states) {
+      if (!entry.second) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "Named state '%s' has null pointer.",
+                     entry.first.c_str());
+        return CallbackReturn::ERROR;
+      }
+
+      auto [it, inserted] =
+          named_states_.emplace(entry.first, entry.second);
+
+      if (!inserted) {
+        RCLCPP_WARN(node_->get_logger(),
+                    "Named state '%s' already registered. Overwriting pointer.",
+                    entry.first.c_str());
+        it->second = entry.second;
+      }
+    }
+    return CallbackReturn::SUCCESS;
+  }
+
+  struct HomingInstance {
+    std::string group;
+    std::shared_ptr<HomingPolicy> policy;
+    std::vector<std::string> joint_names;
+  };
+
   std::shared_ptr<pluginlib::ClassLoader<CanDevice>> loader_;
+  std::shared_ptr<pluginlib::ClassLoader<HomingPolicy>> homing_loader_;
   std::vector<std::shared_ptr<CanDevice>> devs_;
 
   std::unordered_map<std::string, size_t> joint_index_;
@@ -510,6 +794,13 @@ private:
   std::vector<double *> vel_ptrs_;
   std::vector<double *> eff_ptrs_;
   std::vector<double *> cmd_ptrs_;
+
+  std::unordered_map<std::string, double *> named_states_;
+  std::vector<HomingInstance> homing_instances_;
+  bool homing_active_{false};
+  bool homed_{false};
+  bool homing_failed_{false};
+  std::string homing_error_message_;
 
   rclcpp::Node::SharedPtr node_;
 };

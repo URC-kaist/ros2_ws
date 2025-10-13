@@ -12,7 +12,15 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(transmission_interface REQUIRED)
 
-add_library(${PROJECT_NAME} SHARED src/can_hw.cpp)
+add_library(${PROJECT_NAME} SHARED
+  src/can_hw.cpp
+  src/coupled_limit_encoder_policy.cpp
+  src/absolute_encoder_policy.cpp)
+
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
 
 ament_target_dependencies(${PROJECT_NAME}
   mr2_can_bus_core
@@ -22,6 +30,7 @@ ament_target_dependencies(${PROJECT_NAME}
   transmission_interface)
 
 pluginlib_export_plugin_description_file(hardware_interface plugin.xml)
+pluginlib_export_plugin_description_file(mr2_can_hardware_interface plugin.xml)
 
 install(
   TARGETS ${PROJECT_NAME}
@@ -29,6 +38,9 @@ install(
 
 install(FILES plugin.xml
   DESTINATION share/${PROJECT_NAME})
+
+install(DIRECTORY include/
+  DESTINATION include)
 
 
 ament_package()
