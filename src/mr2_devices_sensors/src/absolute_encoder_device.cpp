@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cctype>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -95,6 +96,7 @@ public:
     zero_offset_rad_ = zero_rad;
 
     state_name_ = require_param(info.parameters, "state_name");
+    error_state_name_ = state_name_ + "_error";
     auto raw_it = info.parameters.find("raw_name");
     if (raw_it != info.parameters.end()) {
       raw_name_ = raw_it->second;
@@ -106,6 +108,9 @@ public:
 
     logger_ = node->get_logger();
     ros_clock_ = node->get_clock();
+
+    timeout_sec_ = parse_double(info.parameters, "timeout_sec", 0.5);
+    last_frame_time_ = ros_clock_->now();
 
     const std::string angle_topic = make_sensor_topic(state_name_);
     angle_topic_ = angle_topic;
@@ -134,7 +139,30 @@ public:
                [this](const can_frame &frame) { on_frame(frame); });
   }
 
-  void process(const rclcpp::Time &) override {}
+  void process(const rclcpp::Time &now) override {
+    const double since_last = (now - last_frame_time_).seconds();
+    const bool timed_out = since_last > timeout_sec_;
+
+    if (timed_out) {
+      error_ = 1.0;
+      if (!timeout_warned_) {
+        RCLCPP_ERROR(logger_,
+                     "Absolute encoder 0x%03X timed out (%.3f s > %.3f s)",
+                     can_id_, since_last, timeout_sec_);
+        timeout_warned_ = true;
+      }
+      timeout_active_ = true;
+    } else {
+      error_ = 0.0;
+      if (timeout_active_) {
+        RCLCPP_WARN(logger_,
+                    "Absolute encoder 0x%03X feedback recovered after timeout.",
+                    can_id_);
+        timeout_active_ = false;
+      }
+      timeout_warned_ = false;
+    }
+  }
 
   void export_state(std::vector<double *> &, std::vector<double *> &,
                     std::vector<double *> &) override {}
@@ -150,6 +178,7 @@ public:
     if (!flags_name_.empty()) {
       states.emplace_back(flags_name_, &flags_);
     }
+    states.emplace_back(error_state_name_, &error_);
   }
 
 private:
@@ -189,6 +218,13 @@ private:
       msg.data = flags_;
       flags_pub_->publish(msg);
     }
+
+    if (ros_clock_) {
+      last_frame_time_ = ros_clock_->now();
+    }
+    frame_received_ = true;
+    error_ = 0.0;
+    timeout_warned_ = false;
   }
 
   rclcpp::Node *node_{nullptr};
@@ -211,10 +247,17 @@ private:
   std::string state_name_;
   std::string raw_name_;
   std::string flags_name_;
+  std::string error_state_name_;
 
   double angle_rad_{0.0};
   double raw_counts_{0.0};
   double flags_{0.0};
+  bool frame_received_{false};
+  bool timeout_warned_{false};
+  bool timeout_active_{false};
+  double error_{1.0};
+  double timeout_sec_{0.5};
+  rclcpp::Time last_frame_time_;
 };
 
 } // namespace mr2_devices_sensors

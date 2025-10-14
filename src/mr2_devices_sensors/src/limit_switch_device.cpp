@@ -2,6 +2,7 @@
 
 #include "pluginlib/class_list_macros.hpp"
 
+#include "rclcpp/clock.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/qos.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -9,6 +10,7 @@
 
 #include <cctype>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -60,6 +62,20 @@ inline int parse_int(const std::unordered_map<std::string, std::string> &params,
     throw std::runtime_error("Invalid integer for " + key + ": " + it->second);
   }
 }
+inline double parse_double(const std::unordered_map<std::string, std::string> &params,
+                           const std::string &key, double def) {
+  auto it = params.find(key);
+  if (it == params.end()) {
+    return def;
+  }
+  try {
+    return std::stod(it->second);
+  } catch (const std::exception &) {
+    throw std::runtime_error("Invalid numeric for " + key + ": " + it->second);
+  }
+}
+
+
 
 inline std::string make_sensor_topic(const std::string &name) {
   if (name.empty()) {
@@ -121,9 +137,37 @@ public:
 
     add_filter(bus_, can_id_, kStdIdMask,
                [this](const can_frame &frame) { on_frame(frame); });
+
+    timeout_sec_ = parse_double(info.parameters, "timeout_sec", 0.5);
+    ros_clock_ = node->get_clock();
+    last_frame_time_ = ros_clock_->now();
+    error_state_name_ = state_name_ + "_error";
   }
 
-  void process(const rclcpp::Time &) override {}
+  void process(const rclcpp::Time &now) override {
+    const double since_last = (now - last_frame_time_).seconds();
+    const bool timed_out = since_last > timeout_sec_;
+
+    if (timed_out) {
+      error_ = 1.0;
+      if (!timeout_warned_) {
+        RCLCPP_ERROR(logger_,
+                     "Limit switch 0x%03X timed out (%.3f s > %.3f s)",
+                     can_id_, since_last, timeout_sec_);
+        timeout_warned_ = true;
+      }
+      timeout_active_ = true;
+    } else {
+      error_ = 0.0;
+      if (timeout_active_) {
+        RCLCPP_WARN(logger_,
+                    "Limit switch 0x%03X recovered after timeout.",
+                    can_id_);
+        timeout_active_ = false;
+      }
+      timeout_warned_ = false;
+    }
+  }
   void export_state(std::vector<double *> &, std::vector<double *> &,
                     std::vector<double *> &) override {}
   void export_command(std::vector<double *> &) override {}
@@ -134,6 +178,7 @@ public:
     if (!edge_name_.empty()) {
       states.emplace_back(edge_name_, &edge_);
     }
+    states.emplace_back(error_state_name_, &error_);
   }
 
 private:
@@ -179,6 +224,13 @@ private:
     last_state_ = mapped_state;
     edge_ = edge_value;
 
+    if (ros_clock_) {
+      last_frame_time_ = ros_clock_->now();
+    }
+    frame_received_ = true;
+    error_ = 0.0;
+    timeout_warned_ = false;
+
     if (state_pub_) {
       std_msgs::msg::Bool msg;
       msg.data = state_ > 0.5;
@@ -196,6 +248,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr state_pub_;
   rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr edge_pub_;
   rclcpp::Logger logger_{rclcpp::get_logger("limit_switch_device")};
+  rclcpp::Clock::SharedPtr ros_clock_;
   std::string state_topic_;
   std::string edge_topic_;
   std::string iface_;
@@ -205,12 +258,19 @@ private:
 
   std::string state_name_;
   std::string edge_name_;
+  std::string error_state_name_;
 
   double state_{0.0};
   double edge_{0.0};
   double last_state_{0.0};
   bool last_state_valid_{false};
   bool reserved_warned_{false};
+  bool frame_received_{false};
+  bool timeout_warned_{false};
+  bool timeout_active_{false};
+  double error_{1.0};
+  double timeout_sec_{0.5};
+  rclcpp::Time last_frame_time_;
 };
 
 } // namespace mr2_devices_sensors
