@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="single_joint">
   <xacro:arg name="can_iface" default="can0"/>
+  <xacro:arg name="motor_id" default="4"/>
+  <xacro:property name="actuator_name" value="motor$(arg motor_id)"/>
 
   <link name="base_link">
     <visual>
@@ -44,15 +46,38 @@
       <state_interface name="position"/>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
-      <param name="actuator">motor4</param>
+      <param name="actuator">${actuator_name}</param>
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-      <param name="motor_id">4</param>
+      <param name="motor_id">$(arg motor_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
     </joint>
 
+
+
+    <gpio name="joint1_aux_encoder">
+      <param name="device_plugin">mr2_devices_sensors/AbsoluteEncoderDevice</param>
+      <param name="can_iface">$(arg can_iface)</param>
+      <param name="can_id">0x180</param>
+      <param name="ticks_per_rev">4096</param>
+      <param name="direction">1.0</param>
+      <param name="zero_offset_deg">0.0</param>
+      <param name="state_name">joint1/encoder_aux_angle</param>
+      <param name="raw_name">joint1/encoder_aux_raw</param>
+      <param name="flags_name">joint1/encoder_aux_flags</param>
+    </gpio>
+
+
+    <gpio name="joint1_limit_switch">
+      <param name="device_plugin">mr2_devices_sensors/LimitSwitchDevice</param>
+      <param name="can_iface">$(arg can_iface)</param>
+      <param name="can_id">0x181</param>
+      <param name="state_name">joint1/limit_switch_state</param>
+      <param name="edge_name">joint1/limit_switch_edge</param>
+      <param name="active_high">true</param>
+    </gpio>
     <transmission name="joint1_transmission">
       <plugin>transmission_interface/SimpleTransmission</plugin>
-      <actuator name="motor4" role="motor4">
+      <actuator name="${actuator_name}" role="${actuator_name}">
         <command_interface name="position"/>
         <state_interface name="position"/>
         <state_interface name="velocity"/>

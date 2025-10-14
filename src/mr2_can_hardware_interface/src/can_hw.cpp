@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -544,6 +545,10 @@ public:
     homing_failed_ = false;
     homing_error_message_.clear();
 
+    for (auto &joint : joints_) {
+      joint.command_seeded = false;
+    }
+
     if (homing_instances_.empty()) {
       homed_ = true;
       homing_active_ = false;
@@ -606,6 +611,11 @@ public:
       joint.state = joint.transmission_passthrough - joint.offset;
       joint.velocity = joint.transmission_velocity;
       joint.effort = joint.transmission_effort;
+
+      if (!joint.command_seeded && std::isfinite(joint.state)) {
+        joint.command = joint.state;
+        joint.command_seeded = true;
+      }
     }
 
     return return_type::OK;
@@ -708,6 +718,7 @@ private:
     std::string actuator_name;
     bool has_velocity_state{false};
     bool has_effort_state{false};
+    bool command_seeded{false};
   };
 
   struct ActuatorData {

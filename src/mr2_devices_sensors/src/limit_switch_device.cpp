@@ -2,6 +2,12 @@
 
 #include "pluginlib/class_list_macros.hpp"
 
+#include "rclcpp/logger.hpp"
+#include "rclcpp/qos.hpp"
+#include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/int8.hpp"
+
+#include <cctype>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -55,6 +61,26 @@ inline int parse_int(const std::unordered_map<std::string, std::string> &params,
   }
 }
 
+inline std::string make_sensor_topic(const std::string &name) {
+  if (name.empty()) {
+    return {};
+  }
+  std::string sanitized;
+  sanitized.reserve(name.size());
+  for (char ch : name) {
+    unsigned char uc = static_cast<unsigned char>(ch);
+    if (std::isalnum(uc) || ch == '/' || ch == '_') {
+      sanitized.push_back(ch);
+    } else {
+      sanitized.push_back('_');
+    }
+  }
+  if (!sanitized.empty() && sanitized.front() == '/') {
+    return sanitized;
+  }
+  return std::string("can_sensors/") + sanitized;
+}
+
 } // namespace
 
 class LimitSwitchDevice : public CanDevice {
@@ -69,17 +95,23 @@ public:
     active_high_ = parse_bool(info.parameters, "active_high", true);
 
     state_name_ = require_param(info.parameters, "state_name");
-    auto counter_it = info.parameters.find("counter_name");
-    if (counter_it != info.parameters.end()) {
-      counter_name_ = counter_it->second;
-    }
-    auto timestamp_it = info.parameters.find("timestamp_name");
-    if (timestamp_it != info.parameters.end()) {
-      timestamp_name_ = timestamp_it->second;
-    }
     auto edge_it = info.parameters.find("edge_name");
     if (edge_it != info.parameters.end()) {
       edge_name_ = edge_it->second;
+    }
+
+    logger_ = node->get_logger();
+
+    const std::string state_topic = make_sensor_topic(state_name_);
+    state_topic_ = state_topic;
+    state_pub_ = node->create_publisher<std_msgs::msg::Bool>(
+        state_topic, rclcpp::SensorDataQoS());
+
+    if (!edge_name_.empty()) {
+      const std::string edge_topic = make_sensor_topic(edge_name_);
+      edge_topic_ = edge_topic;
+      edge_pub_ = node->create_publisher<std_msgs::msg::Int8>(
+          edge_topic, rclcpp::SensorDataQoS());
     }
 
     bus_ = CanBusRegistry::get(iface_, bitrate_);
@@ -99,12 +131,6 @@ public:
   void export_named_states(
       std::vector<std::pair<std::string, double *>> &states) override {
     states.emplace_back(state_name_, &state_);
-    if (!counter_name_.empty()) {
-      states.emplace_back(counter_name_, &counter_);
-    }
-    if (!timestamp_name_.empty()) {
-      states.emplace_back(timestamp_name_, &timestamp_ms_);
-    }
     if (!edge_name_.empty()) {
       states.emplace_back(edge_name_, &edge_);
     }
@@ -123,45 +149,68 @@ private:
   void on_frame(const can_frame &frame) {
     const bool pressed = (frame.data[0] & 0x1) != 0;
     const double logical = pressed ? 1.0 : 0.0;
-    state_ = active_high_ ? logical : (logical > 0.5 ? 0.0 : 1.0);
+    const double mapped_state =
+        active_high_ ? logical : (logical > 0.5 ? 0.0 : 1.0);
 
-    const uint16_t counter = (static_cast<uint16_t>(frame.data[2]) << 8) |
-                             static_cast<uint16_t>(frame.data[3]);
-    counter_ = static_cast<double>(counter);
-
-    const uint32_t timestamp = (static_cast<uint32_t>(frame.data[4]) << 24) |
-                               (static_cast<uint32_t>(frame.data[5]) << 16) |
-                               (static_cast<uint32_t>(frame.data[6]) << 8) |
-                               static_cast<uint32_t>(frame.data[7]);
-    timestamp_ms_ = static_cast<double>(timestamp);
-
-    if (!edge_name_.empty()) {
-      if (frame.data[1] & 0x1) {
-        edge_ = 1.0;
-      } else if (frame.data[1] & 0x2) {
-        edge_ = -1.0;
-      } else {
-        edge_ = 0.0;
+    if (!reserved_warned_) {
+      for (int i = 1; i < 8; ++i) {
+        if (frame.data[i] != 0) {
+          reserved_warned_ = true;
+          RCLCPP_WARN(logger_,
+                      "Limit switch 0x%03X reserved byte %d non-zero (%u)",
+                      can_id_, i, static_cast<unsigned int>(frame.data[i]));
+          break;
+        }
       }
+    }
+
+    double edge_value = 0.0;
+    if (last_state_valid_) {
+      if (mapped_state > 0.5 && last_state_ <= 0.5) {
+        edge_value = 1.0;
+      } else if (mapped_state <= 0.5 && last_state_ > 0.5) {
+        edge_value = -1.0;
+      }
+    } else {
+      last_state_valid_ = true;
+    }
+
+    state_ = mapped_state;
+    last_state_ = mapped_state;
+    edge_ = edge_value;
+
+    if (state_pub_) {
+      std_msgs::msg::Bool msg;
+      msg.data = state_ > 0.5;
+      state_pub_->publish(msg);
+    }
+    if (edge_pub_ && (edge_value != 0.0)) {
+      std_msgs::msg::Int8 msg;
+      msg.data = static_cast<int8_t>(edge_value > 0.0 ? 1 : -1);
+      edge_pub_->publish(msg);
     }
   }
 
   rclcpp::Node *node_{nullptr};
   std::shared_ptr<CanBusManager> bus_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr state_pub_;
+  rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr edge_pub_;
+  rclcpp::Logger logger_{rclcpp::get_logger("limit_switch_device")};
+  std::string state_topic_;
+  std::string edge_topic_;
   std::string iface_;
   int bitrate_{1'000'000};
   uint32_t can_id_{0};
   bool active_high_{true};
 
   std::string state_name_;
-  std::string counter_name_;
-  std::string timestamp_name_;
   std::string edge_name_;
 
   double state_{0.0};
-  double counter_{0.0};
-  double timestamp_ms_{0.0};
   double edge_{0.0};
+  double last_state_{0.0};
+  bool last_state_valid_{false};
+  bool reserved_warned_{false};
 };
 
 } // namespace mr2_devices_sensors

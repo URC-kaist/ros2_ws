@@ -2,8 +2,14 @@
 
 #include "pluginlib/class_list_macros.hpp"
 
+#include "rclcpp/clock.hpp"
+#include "rclcpp/logger.hpp"
+#include "rclcpp/qos.hpp"
+#include "std_msgs/msg/float64.hpp"
+
 #include <cmath>
 #include <cstdint>
+#include <cctype>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -50,6 +56,26 @@ inline double parse_double(const std::unordered_map<std::string, std::string> &p
   }
 }
 
+inline std::string make_sensor_topic(const std::string &name) {
+  if (name.empty()) {
+    return {};
+  }
+  std::string sanitized;
+  sanitized.reserve(name.size());
+  for (char ch : name) {
+    unsigned char uc = static_cast<unsigned char>(ch);
+    if (std::isalnum(uc) || ch == '/' || ch == '_') {
+      sanitized.push_back(ch);
+    } else {
+      sanitized.push_back('_');
+    }
+  }
+  if (!sanitized.empty() && sanitized.front() == '/') {
+    return sanitized;
+  }
+  return std::string("can_sensors/") + sanitized;
+}
+
 } // namespace
 
 class AbsoluteEncoderDevice : public CanDevice {
@@ -76,6 +102,27 @@ public:
     auto flags_it = info.parameters.find("flags_name");
     if (flags_it != info.parameters.end()) {
       flags_name_ = flags_it->second;
+    }
+
+    logger_ = node->get_logger();
+    ros_clock_ = node->get_clock();
+
+    const std::string angle_topic = make_sensor_topic(state_name_);
+    angle_topic_ = angle_topic;
+    angle_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+        angle_topic, rclcpp::SensorDataQoS());
+
+    if (!raw_name_.empty()) {
+      const std::string raw_topic = make_sensor_topic(raw_name_);
+      raw_topic_ = raw_topic;
+      raw_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+          raw_topic, rclcpp::SensorDataQoS());
+    }
+    if (!flags_name_.empty()) {
+      const std::string flags_topic = make_sensor_topic(flags_name_);
+      flags_topic_ = flags_topic;
+      flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+          flags_topic, rclcpp::SensorDataQoS());
     }
 
     bus_ = CanBusRegistry::get(iface_, bitrate_);
@@ -126,10 +173,34 @@ private:
     if (!flags_name_.empty()) {
       flags_ = static_cast<double>(frame.data[3]);
     }
+
+    if (angle_pub_) {
+      std_msgs::msg::Float64 msg;
+      msg.data = angle_rad_;
+      angle_pub_->publish(msg);
+    }
+    if (raw_pub_) {
+      std_msgs::msg::Float64 msg;
+      msg.data = raw_counts_;
+      raw_pub_->publish(msg);
+    }
+    if (flags_pub_) {
+      std_msgs::msg::Float64 msg;
+      msg.data = flags_;
+      flags_pub_->publish(msg);
+    }
   }
 
   rclcpp::Node *node_{nullptr};
   std::shared_ptr<CanBusManager> bus_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr angle_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr raw_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr flags_pub_;
+  rclcpp::Logger logger_{rclcpp::get_logger("absolute_encoder_device")};
+  rclcpp::Clock::SharedPtr ros_clock_;
+  std::string angle_topic_;
+  std::string raw_topic_;
+  std::string flags_topic_;
   std::string iface_;
   int bitrate_{1'000'000};
   uint32_t can_id_{0};

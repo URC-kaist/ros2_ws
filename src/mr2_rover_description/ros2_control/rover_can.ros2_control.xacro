@@ -91,8 +91,6 @@
         <param name="can_iface">${can_iface}</param>
         <param name="can_id">0x181</param>
         <param name="state_name">arm_j2_limit_switch</param>
-        <param name="counter_name">arm_j2_limit_counter</param>
-        <param name="timestamp_name">arm_j2_limit_timestamp_ms</param>
         <param name="edge_name">arm_j2_limit_edge</param>
         <param name="active_high">true</param>
       </gpio>

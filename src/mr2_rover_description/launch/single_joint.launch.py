@@ -3,6 +3,7 @@ from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -27,10 +28,17 @@ def generate_launch_description():
         description="CAN interface used by the AK servo hardware",
     )
 
+    motor_id = LaunchConfiguration("motor_id")
+    motor_id_arg = DeclareLaunchArgument(
+        "motor_id",
+        default_value="4",
+        description="Motor ID assigned to the single joint actuator",
+    )
+
     use_mock_servo = LaunchConfiguration("use_mock_servo")
     use_mock_servo_arg = DeclareLaunchArgument(
         "use_mock_servo",
-        default_value="true",
+        default_value="false",
         description="Start mock AK servo that emulates CAN feedback",
     )
 
@@ -40,6 +48,8 @@ def generate_launch_description():
             xacro_file,
             " can_iface:=",
             can_iface,
+            " motor_id:=",
+            motor_id,
         ])
     }
 
@@ -53,8 +63,7 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[controller_yaml],
-        remappings=[("/controller_manager/robot_description", "/robot_description")],
+        parameters=[controller_yaml, robot_description],
         output="screen",
     )
 
@@ -63,7 +72,7 @@ def generate_launch_description():
         executable="mock_ak_servo_node",
         parameters=[{
             "can_iface": can_iface,
-            "motor_id": 4,
+            "motor_id": ParameterValue(motor_id, value_type=int),
         }],
         condition=IfCondition(use_mock_servo),
         output="screen",
@@ -84,6 +93,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             can_iface_arg,
+            motor_id_arg,
             use_mock_servo_arg,
             robot_state_publisher_node,
             mock_servo_node,
