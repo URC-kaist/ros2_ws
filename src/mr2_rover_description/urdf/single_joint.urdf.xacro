@@ -72,7 +72,6 @@
       <param name="can_iface">$(arg can_iface)</param>
       <param name="can_id">0x181</param>
       <param name="state_name">joint1/limit_switch_state</param>
-      <param name="edge_name">joint1/limit_switch_edge</param>
       <param name="active_high">true</param>
     </gpio>
     <transmission name="joint1_transmission">
