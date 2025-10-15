@@ -125,13 +125,12 @@ public:
 
     struct can_frame fr {};
     fr.can_id = (0x00000400 | id_) | CAN_EFF_FLAG;
-    fr.can_dlc = 8;
+    fr.can_dlc = 4;
     const int32_t p = std::lround(cmd_[0] * 180.0 / M_PI * 1e4);
     fr.data[0] = (p >> 24) & 0xFF;
     fr.data[1] = (p >> 16) & 0xFF;
     fr.data[2] = (p >> 8) & 0xFF;
     fr.data[3] = (p)&0xFF;
-    fr.data[4] = fr.data[5] = fr.data[6] = fr.data[7] = 0;
     send(fr, bus_);
   }
 
