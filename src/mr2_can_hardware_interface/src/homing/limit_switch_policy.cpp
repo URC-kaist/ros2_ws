@@ -113,14 +113,26 @@ public:
 
   void begin(const rclcpp::Time &now) override {
     start_time_ = now;
-    target_ = joint_.state ? *joint_.state : 0.0;
+    target_ = 0.0;
     phase_ = Phase::Idle;
     finished_ = false;
     error_ = false;
     backoff_remaining_ = 0.0;
     limit_sampled_ = false;
     limit_pressed_prev_ = false;
-    transition_to(Phase::SearchFast, "begin homing");
+    initial_state_acquired_ =
+        joint_.state && std::isfinite(*joint_.state);
+    if (initial_state_acquired_) {
+      target_ = *joint_.state;
+      apply_target();
+      transition_to(Phase::SearchFast, "begin homing");
+    } else {
+      apply_target();
+      if (node_) {
+        RCLCPP_INFO(node_->get_logger(),
+                    "LimitSwitchPolicy: waiting for initial joint state before homing");
+      }
+    }
   }
 
   void update(const rclcpp::Time &now,
@@ -159,6 +171,20 @@ public:
     }
 
     const double dt = period.seconds();
+
+    if (!initial_state_acquired_) {
+      if (joint_.state && std::isfinite(*joint_.state)) {
+        target_ = *joint_.state;
+        apply_target();
+        initial_state_acquired_ = true;
+        start_time_ = now;
+        transition_to(Phase::SearchFast,
+                      "initial joint state acquired");
+      } else {
+        apply_target();
+      }
+      return;
+    }
     const double limit_val = limit_state_ ? *limit_state_ : 0.0;
     const bool sample_valid =
         !limit_watchdog_state_ || *limit_watchdog_state_ >= -0.5;
@@ -249,6 +275,7 @@ public:
     backoff_remaining_ = 0.0;
     limit_sampled_ = false;
     limit_pressed_prev_ = false;
+    initial_state_acquired_ = false;
   }
 
 private:
@@ -359,6 +386,7 @@ private:
   rclcpp::Time start_time_;
   bool limit_sampled_{false};
   bool limit_pressed_prev_{false};
+  bool initial_state_acquired_{false};
 
   void sanitize_positive(double &value, double fallback,
                          const char *param_name) {
