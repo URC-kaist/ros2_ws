@@ -127,7 +127,9 @@ public:
       apply_target();
       transition_to(Phase::SearchFast, "begin homing");
     } else {
-      apply_target();
+      if (joint_.command && std::isfinite(*joint_.command)) {
+        target_ = *joint_.command;
+      }
       if (node_) {
         RCLCPP_INFO(node_->get_logger(),
                     "LimitSwitchPolicy: waiting for initial joint state before homing");
@@ -181,7 +183,9 @@ public:
         transition_to(Phase::SearchFast,
                       "initial joint state acquired");
       } else {
-        apply_target();
+        if (joint_.command && std::isfinite(*joint_.command)) {
+          target_ = *joint_.command;
+        }
       }
       return;
     }
