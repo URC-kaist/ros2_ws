@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -708,13 +709,13 @@ private:
 
     std::string name;
     double command{0.0};
-    double state{0.0};
-    double velocity{0.0};
-    double effort{0.0};
+    double state{std::numeric_limits<double>::quiet_NaN()};
+    double velocity{std::numeric_limits<double>::quiet_NaN()};
+    double effort{std::numeric_limits<double>::quiet_NaN()};
     double offset{0.0};
-    double transmission_passthrough{0.0};
-    double transmission_velocity{0.0};
-    double transmission_effort{0.0};
+    double transmission_passthrough{std::numeric_limits<double>::quiet_NaN()};
+    double transmission_velocity{std::numeric_limits<double>::quiet_NaN()};
+    double transmission_effort{std::numeric_limits<double>::quiet_NaN()};
     std::string actuator_name;
     bool has_velocity_state{false};
     bool has_effort_state{false};
@@ -726,12 +727,12 @@ private:
 
     std::string name;
     double command{0.0};
-    double state{0.0};
-    double velocity{0.0};
-    double effort{0.0};
-    double transmission_passthrough{0.0};
-    double transmission_velocity{0.0};
-    double transmission_effort{0.0};
+    double state{std::numeric_limits<double>::quiet_NaN()};
+    double velocity{std::numeric_limits<double>::quiet_NaN()};
+    double effort{std::numeric_limits<double>::quiet_NaN()};
+    double transmission_passthrough{std::numeric_limits<double>::quiet_NaN()};
+    double transmission_velocity{std::numeric_limits<double>::quiet_NaN()};
+    double transmission_effort{std::numeric_limits<double>::quiet_NaN()};
     double *state_ptr{nullptr};
     double *velocity_ptr{nullptr};
     double *effort_ptr{nullptr};
