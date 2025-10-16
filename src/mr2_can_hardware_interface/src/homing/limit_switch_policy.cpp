@@ -118,6 +118,8 @@ public:
     finished_ = false;
     error_ = false;
     backoff_remaining_ = 0.0;
+    limit_sampled_ = false;
+    limit_pressed_prev_ = false;
     transition_to(Phase::SearchFast, "begin homing");
   }
 
@@ -158,10 +160,29 @@ public:
 
     const double dt = period.seconds();
     const double limit_val = limit_state_ ? *limit_state_ : 0.0;
+    const bool sample_valid =
+        !limit_watchdog_state_ || *limit_watchdog_state_ >= -0.5;
+
+    if (!sample_valid) {
+      start_time_ = now;
+      return;
+    }
+
+    const bool limit_pressed = limit_val > kReleaseThreshold;
+
+    if (!limit_sampled_) {
+      limit_sampled_ = true;
+      limit_pressed_prev_ = limit_pressed;
+      if (limit_pressed) {
+        backoff_remaining_ = backoff_distance_;
+        transition_to(Phase::Backoff,
+                      "initial limit engaged at start");
+      }
+    }
 
     switch (phase_) {
     case Phase::SearchFast:
-      if (limit_val > kReleaseThreshold) {
+      if (limit_pressed && !limit_pressed_prev_) {
         backoff_remaining_ = backoff_distance_;
         transition_to(Phase::Backoff,
                       "limit detected during fast approach");
@@ -180,7 +201,7 @@ public:
       break;
 
     case Phase::ApproachSlow:
-      if (limit_val > kReleaseThreshold) {
+      if (limit_pressed && !limit_pressed_prev_) {
         transition_to(Phase::Capture,
                       "limit detected during fine approach");
         finalize_offsets();
@@ -205,6 +226,7 @@ public:
     }
 
     apply_target();
+    limit_pressed_prev_ = limit_pressed;
   }
 
   bool is_finished() const override { return finished_; }
@@ -225,6 +247,8 @@ public:
     error_message_.clear();
     phase_ = Phase::Idle;
     backoff_remaining_ = 0.0;
+    limit_sampled_ = false;
+    limit_pressed_prev_ = false;
   }
 
 private:
@@ -333,6 +357,8 @@ private:
   bool error_{false};
   std::string error_message_;
   rclcpp::Time start_time_;
+  bool limit_sampled_{false};
+  bool limit_pressed_prev_{false};
 
   void sanitize_positive(double &value, double fallback,
                          const char *param_name) {
