@@ -69,19 +69,6 @@ public:
     }
     limit_state_ = limit_it->second;
 
-    const std::string limit_error_key =
-        parse_string(params, "limit_error_state");
-    if (!limit_error_key.empty()) {
-      const auto limit_error_it = named_states.find(limit_error_key);
-      if (limit_error_it == named_states.end()) {
-        error_message_ =
-            "Named state '" + limit_error_key + "' not found for limit error.";
-        error_ = true;
-        return;
-      }
-      limit_error_state_ = limit_error_it->second;
-    }
-
     const std::string limit_watchdog_key =
         parse_string(params, "limit_watchdog_state");
     if (!limit_watchdog_key.empty()) {
@@ -141,13 +128,6 @@ public:
         start_time_ = now;
         return;
       }
-    }
-
-    if (limit_error_state_ && *limit_error_state_ > 0.5) {
-      error_ = true;
-      error_message_ = "Limit switch watchdog reported timeout.";
-      phase_ = Phase::Error;
-      return;
     }
 
     if ((now - start_time_).seconds() > timeout_) {
@@ -260,7 +240,6 @@ private:
   JointHandle joint_;
 
   const double *limit_state_{nullptr};
-  const double *limit_error_state_{nullptr};
   const double *limit_watchdog_state_{nullptr};
 
   double approach_speed_{kDefaultApproachSpeed};

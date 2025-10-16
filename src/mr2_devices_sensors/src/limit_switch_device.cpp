@@ -141,9 +141,7 @@ public:
     timeout_sec_ = parse_double(info.parameters, "timeout_sec", 0.5);
     ros_clock_ = node->get_clock();
     last_frame_time_ = ros_clock_->now();
-    error_state_name_ = state_name_ + "_error";
     watchdog_state_name_ = state_name_ + "_watchdog";
-    error_ = 0.0;
     watchdog_state_ = -1.0;
     frame_received_ = false;
   }
@@ -153,7 +151,6 @@ public:
     const bool timed_out = since_last > timeout_sec_;
 
     if (timed_out) {
-      error_ = 1.0;
       watchdog_state_ = 1.0;
       if (!timeout_warned_) {
         RCLCPP_ERROR(logger_,
@@ -163,7 +160,6 @@ public:
       }
       timeout_active_ = true;
     } else {
-      error_ = 0.0;
       if (frame_received_) {
         watchdog_state_ = 0.0;
       } else {
@@ -188,7 +184,6 @@ public:
     if (!edge_name_.empty()) {
       states.emplace_back(edge_name_, &edge_);
     }
-    states.emplace_back(error_state_name_, &error_);
     states.emplace_back(watchdog_state_name_, &watchdog_state_);
   }
 
@@ -239,7 +234,6 @@ private:
       last_frame_time_ = ros_clock_->now();
     }
     frame_received_ = true;
-    error_ = 0.0;
     watchdog_state_ = 0.0;
     timeout_warned_ = false;
 
@@ -270,7 +264,6 @@ private:
 
   std::string state_name_;
   std::string edge_name_;
-  std::string error_state_name_;
   std::string watchdog_state_name_;
 
   double state_{0.0};
@@ -281,7 +274,6 @@ private:
   bool frame_received_{false};
   bool timeout_warned_{false};
   bool timeout_active_{false};
-  double error_{0.0};
   double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;

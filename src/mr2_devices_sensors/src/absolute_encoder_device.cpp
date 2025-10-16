@@ -96,7 +96,6 @@ public:
     zero_offset_rad_ = zero_rad;
 
     state_name_ = require_param(info.parameters, "state_name");
-    error_state_name_ = state_name_ + "_error";
     auto raw_it = info.parameters.find("raw_name");
     if (raw_it != info.parameters.end()) {
       raw_name_ = raw_it->second;
@@ -132,7 +131,6 @@ public:
 
     watchdog_state_name_ = state_name_ + "_watchdog";
     watchdog_state_ = -1.0;
-    error_ = 0.0;
     frame_received_ = false;
 
     bus_ = CanBusRegistry::get(iface_, bitrate_);
@@ -149,7 +147,6 @@ public:
     const bool timed_out = since_last > timeout_sec_;
 
     if (timed_out) {
-      error_ = 1.0;
       watchdog_state_ = 1.0;
       if (!timeout_warned_) {
         RCLCPP_ERROR(logger_,
@@ -159,7 +156,6 @@ public:
       }
       timeout_active_ = true;
     } else {
-      error_ = 0.0;
       if (frame_received_) {
         watchdog_state_ = 0.0;
       } else {
@@ -189,7 +185,6 @@ public:
     if (!flags_name_.empty()) {
       states.emplace_back(flags_name_, &flags_);
     }
-    states.emplace_back(error_state_name_, &error_);
     states.emplace_back(watchdog_state_name_, &watchdog_state_);
   }
 
@@ -235,7 +230,6 @@ private:
       last_frame_time_ = ros_clock_->now();
     }
     frame_received_ = true;
-    error_ = 0.0;
     watchdog_state_ = 0.0;
     timeout_warned_ = false;
   }
@@ -260,7 +254,6 @@ private:
   std::string state_name_;
   std::string raw_name_;
   std::string flags_name_;
-  std::string error_state_name_;
   std::string watchdog_state_name_;
 
   double angle_rad_{0.0};
@@ -269,7 +262,6 @@ private:
   bool frame_received_{false};
   bool timeout_warned_{false};
   bool timeout_active_{false};
-  double error_{0.0};
   double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;

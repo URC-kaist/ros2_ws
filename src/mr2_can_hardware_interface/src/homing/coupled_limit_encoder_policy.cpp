@@ -81,19 +81,6 @@ public:
     limit_state_ = limit_it->second;
     encoder_state_ = encoder_it->second;
 
-    const std::string limit_error_key =
-        parse_string(params, "limit_error_state");
-    if (!limit_error_key.empty()) {
-      const auto limit_error_it = named_states.find(limit_error_key);
-      if (limit_error_it == named_states.end()) {
-        error_message_ =
-            "Named state '" + limit_error_key + "' not found for limit error.";
-        error_ = true;
-        return;
-      }
-      limit_error_state_ = limit_error_it->second;
-    }
-
     const std::string limit_watchdog_key =
         parse_string(params, "limit_watchdog_state");
     if (!limit_watchdog_key.empty()) {
@@ -106,20 +93,6 @@ public:
         return;
       }
       limit_watchdog_state_ = limit_watchdog_it->second;
-    }
-
-    const std::string encoder_error_key =
-        parse_string(params, "encoder_error_state");
-    if (!encoder_error_key.empty()) {
-      const auto encoder_error_it = named_states.find(encoder_error_key);
-      if (encoder_error_it == named_states.end()) {
-        error_message_ =
-            "Named state '" + encoder_error_key +
-            "' not found for encoder error.";
-        error_ = true;
-        return;
-      }
-      encoder_error_state_ = encoder_error_it->second;
     }
 
     const std::string encoder_watchdog_key =
@@ -184,13 +157,6 @@ public:
       }
     }
 
-    if (limit_error_state_ && *limit_error_state_ > 0.5) {
-      error_ = true;
-      error_message_ = "Limit switch watchdog reported timeout.";
-      phase_ = Phase::Error;
-      return;
-    }
-
     if (encoder_watchdog_state_) {
       const double watchdog = *encoder_watchdog_state_;
       if (watchdog > 0.5) {
@@ -203,13 +169,6 @@ public:
         start_time_ = now;
         return;
       }
-    }
-
-    if (encoder_error_state_ && *encoder_error_state_ > 0.5) {
-      error_ = true;
-      error_message_ = "Absolute encoder watchdog reported timeout.";
-      phase_ = Phase::Error;
-      return;
     }
 
     if ((now - start_time_).seconds() > timeout_) {
@@ -360,8 +319,6 @@ private:
 
   const double *limit_state_{nullptr};
   const double *encoder_state_{nullptr};
-  const double *limit_error_state_{nullptr};
-  const double *encoder_error_state_{nullptr};
   const double *limit_watchdog_state_{nullptr};
   const double *encoder_watchdog_state_{nullptr};
 

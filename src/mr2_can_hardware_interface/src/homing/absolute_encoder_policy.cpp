@@ -40,19 +40,6 @@ public:
 
     encoder_state_ = ptr_it->second;
 
-    const auto error_state_it = params.find("encoder_error_state");
-    if (error_state_it != params.end()) {
-      const auto error_ptr_it = named_states.find(error_state_it->second);
-      if (error_ptr_it == named_states.end()) {
-        error_message_ =
-            "Named state '" + error_state_it->second +
-            "' not found for absolute encoder error.";
-        error_ = true;
-        return;
-      }
-      encoder_error_state_ = error_ptr_it->second;
-    }
-
     const auto watchdog_state_it = params.find("encoder_watchdog_state");
     if (watchdog_state_it != params.end()) {
       const auto watchdog_ptr_it =
@@ -103,12 +90,6 @@ public:
       }
     }
 
-    if (encoder_error_state_ && *encoder_error_state_ > 0.5) {
-      error_ = true;
-      error_message_ = "Absolute encoder reported watchdog timeout.";
-      return;
-    }
-
     if (!encoder_state_ || !joint_.state || !joint_.offset) {
       error_ = true;
       error_message_ = "Absolute encoder pointers not initialised.";
@@ -153,7 +134,6 @@ private:
   rclcpp::Node::SharedPtr node_;
   JointHandle joint_;
   const double *encoder_state_{nullptr};
-  const double *encoder_error_state_{nullptr};
   const double *encoder_watchdog_state_{nullptr};
   double home_offset_{0.0};
 
