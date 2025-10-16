@@ -14,8 +14,9 @@ find_package(transmission_interface REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/can_hw.cpp
-  src/coupled_limit_encoder_policy.cpp
-  src/absolute_encoder_policy.cpp)
+  src/homing/coupled_limit_encoder_policy.cpp
+  src/homing/absolute_encoder_policy.cpp
+  src/homing/limit_switch_policy.cpp)
 
 target_include_directories(${PROJECT_NAME}
   PUBLIC

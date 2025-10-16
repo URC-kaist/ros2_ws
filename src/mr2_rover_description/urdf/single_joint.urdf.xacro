@@ -50,6 +50,14 @@
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
       <param name="motor_id">$(arg motor_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
+      <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
+      <param name="homing_limit_state">joint1/limit_switch_state</param>
+      <param name="homing_limit_error_state">joint1/limit_switch_state_error</param>
+      <param name="homing_search_direction">negative</param>
+      <param name="homing_approach_speed">0.35</param>
+      <param name="homing_fine_speed">0.05</param>
+      <param name="homing_backoff_distance">0.12</param>
+      <param name="homing_home_position">0.0</param>
     </joint>
 
 
