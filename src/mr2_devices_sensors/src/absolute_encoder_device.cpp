@@ -130,6 +130,11 @@ public:
           flags_topic, rclcpp::SensorDataQoS());
     }
 
+    watchdog_state_name_ = state_name_ + "_watchdog";
+    watchdog_state_ = -1.0;
+    error_ = 0.0;
+    frame_received_ = false;
+
     bus_ = CanBusRegistry::get(iface_, bitrate_);
     if (!bus_) {
       throw std::runtime_error("Cannot open CAN bus: " + iface_);
@@ -145,6 +150,7 @@ public:
 
     if (timed_out) {
       error_ = 1.0;
+      watchdog_state_ = 1.0;
       if (!timeout_warned_) {
         RCLCPP_ERROR(logger_,
                      "Absolute encoder 0x%03X timed out (%.3f s > %.3f s)",
@@ -154,6 +160,11 @@ public:
       timeout_active_ = true;
     } else {
       error_ = 0.0;
+      if (frame_received_) {
+        watchdog_state_ = 0.0;
+      } else {
+        watchdog_state_ = -1.0;
+      }
       if (timeout_active_) {
         RCLCPP_WARN(logger_,
                     "Absolute encoder 0x%03X feedback recovered after timeout.",
@@ -179,6 +190,7 @@ public:
       states.emplace_back(flags_name_, &flags_);
     }
     states.emplace_back(error_state_name_, &error_);
+    states.emplace_back(watchdog_state_name_, &watchdog_state_);
   }
 
 private:
@@ -224,6 +236,7 @@ private:
     }
     frame_received_ = true;
     error_ = 0.0;
+    watchdog_state_ = 0.0;
     timeout_warned_ = false;
   }
 
@@ -248,6 +261,7 @@ private:
   std::string raw_name_;
   std::string flags_name_;
   std::string error_state_name_;
+  std::string watchdog_state_name_;
 
   double angle_rad_{0.0};
   double raw_counts_{0.0};
@@ -255,7 +269,8 @@ private:
   bool frame_received_{false};
   bool timeout_warned_{false};
   bool timeout_active_{false};
-  double error_{1.0};
+  double error_{0.0};
+  double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;
 };

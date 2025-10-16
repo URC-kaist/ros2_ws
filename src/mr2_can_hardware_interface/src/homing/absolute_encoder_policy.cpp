@@ -53,6 +53,19 @@ public:
       encoder_error_state_ = error_ptr_it->second;
     }
 
+    const auto watchdog_state_it = params.find("encoder_watchdog_state");
+    if (watchdog_state_it != params.end()) {
+      const auto watchdog_ptr_it =
+          named_states.find(watchdog_state_it->second);
+      if (watchdog_ptr_it == named_states.end()) {
+        error_message_ = "Named state '" + watchdog_state_it->second +
+                         "' not found for absolute encoder watchdog.";
+        error_ = true;
+        return;
+      }
+      encoder_watchdog_state_ = watchdog_ptr_it->second;
+    }
+
     auto offset_it = params.find("home_offset");
     if (offset_it != params.end()) {
       try {
@@ -76,6 +89,18 @@ public:
   void update(const rclcpp::Time &, const rclcpp::Duration &) override {
     if (error_ || finished_) {
       return;
+    }
+
+    if (encoder_watchdog_state_) {
+      const double watchdog = *encoder_watchdog_state_;
+      if (watchdog > 0.5) {
+        error_ = true;
+        error_message_ = "Absolute encoder watchdog reported timeout.";
+        return;
+      }
+      if (watchdog < -0.5) {
+        return;
+      }
     }
 
     if (encoder_error_state_ && *encoder_error_state_ > 0.5) {
@@ -129,6 +154,7 @@ private:
   JointHandle joint_;
   const double *encoder_state_{nullptr};
   const double *encoder_error_state_{nullptr};
+  const double *encoder_watchdog_state_{nullptr};
   double home_offset_{0.0};
 
   bool finished_{false};

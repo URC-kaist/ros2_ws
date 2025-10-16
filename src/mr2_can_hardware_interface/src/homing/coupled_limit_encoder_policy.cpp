@@ -94,6 +94,20 @@ public:
       limit_error_state_ = limit_error_it->second;
     }
 
+    const std::string limit_watchdog_key =
+        parse_string(params, "limit_watchdog_state");
+    if (!limit_watchdog_key.empty()) {
+      const auto limit_watchdog_it = named_states.find(limit_watchdog_key);
+      if (limit_watchdog_it == named_states.end()) {
+        error_message_ =
+            "Named state '" + limit_watchdog_key +
+            "' not found for limit watchdog state.";
+        error_ = true;
+        return;
+      }
+      limit_watchdog_state_ = limit_watchdog_it->second;
+    }
+
     const std::string encoder_error_key =
         parse_string(params, "encoder_error_state");
     if (!encoder_error_key.empty()) {
@@ -106,6 +120,21 @@ public:
         return;
       }
       encoder_error_state_ = encoder_error_it->second;
+    }
+
+    const std::string encoder_watchdog_key =
+        parse_string(params, "encoder_watchdog_state");
+    if (!encoder_watchdog_key.empty()) {
+      const auto encoder_watchdog_it =
+          named_states.find(encoder_watchdog_key);
+      if (encoder_watchdog_it == named_states.end()) {
+        error_message_ =
+            "Named state '" + encoder_watchdog_key +
+            "' not found for encoder watchdog state.";
+        error_ = true;
+        return;
+      }
+      encoder_watchdog_state_ = encoder_watchdog_it->second;
     }
 
     approach_speed_ =
@@ -141,11 +170,39 @@ public:
       return;
     }
 
+    if (limit_watchdog_state_) {
+      const double watchdog = *limit_watchdog_state_;
+      if (watchdog > 0.5) {
+        error_ = true;
+        error_message_ = "Limit switch watchdog reported timeout.";
+        phase_ = Phase::Error;
+        return;
+      }
+      if (watchdog < -0.5) {
+        start_time_ = now;
+        return;
+      }
+    }
+
     if (limit_error_state_ && *limit_error_state_ > 0.5) {
       error_ = true;
       error_message_ = "Limit switch watchdog reported timeout.";
       phase_ = Phase::Error;
       return;
+    }
+
+    if (encoder_watchdog_state_) {
+      const double watchdog = *encoder_watchdog_state_;
+      if (watchdog > 0.5) {
+        error_ = true;
+        error_message_ = "Absolute encoder watchdog reported timeout.";
+        phase_ = Phase::Error;
+        return;
+      }
+      if (watchdog < -0.5) {
+        start_time_ = now;
+        return;
+      }
     }
 
     if (encoder_error_state_ && *encoder_error_state_ > 0.5) {
@@ -305,6 +362,8 @@ private:
   const double *encoder_state_{nullptr};
   const double *limit_error_state_{nullptr};
   const double *encoder_error_state_{nullptr};
+  const double *limit_watchdog_state_{nullptr};
+  const double *encoder_watchdog_state_{nullptr};
 
   std::string limit_state_key_;
   std::string encoder_state_key_;

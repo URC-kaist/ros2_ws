@@ -82,6 +82,20 @@ public:
       limit_error_state_ = limit_error_it->second;
     }
 
+    const std::string limit_watchdog_key =
+        parse_string(params, "limit_watchdog_state");
+    if (!limit_watchdog_key.empty()) {
+      const auto limit_watchdog_it = named_states.find(limit_watchdog_key);
+      if (limit_watchdog_it == named_states.end()) {
+        error_message_ =
+            "Named state '" + limit_watchdog_key +
+            "' not found for limit watchdog state.";
+        error_ = true;
+        return;
+      }
+      limit_watchdog_state_ = limit_watchdog_it->second;
+    }
+
     approach_speed_ =
         std::abs(parse_double(params, "approach_speed", kDefaultApproachSpeed));
     fine_speed_ =
@@ -113,6 +127,20 @@ public:
               const rclcpp::Duration &period) override {
     if (error_ || finished_) {
       return;
+    }
+
+    if (limit_watchdog_state_) {
+      const double watchdog = *limit_watchdog_state_;
+      if (watchdog > 0.5) {
+        error_ = true;
+        error_message_ = "Limit switch watchdog reported timeout.";
+        phase_ = Phase::Error;
+        return;
+      }
+      if (watchdog < -0.5) {
+        start_time_ = now;
+        return;
+      }
     }
 
     if (limit_error_state_ && *limit_error_state_ > 0.5) {
@@ -233,6 +261,7 @@ private:
 
   const double *limit_state_{nullptr};
   const double *limit_error_state_{nullptr};
+  const double *limit_watchdog_state_{nullptr};
 
   double approach_speed_{kDefaultApproachSpeed};
   double fine_speed_{kDefaultFineSpeed};

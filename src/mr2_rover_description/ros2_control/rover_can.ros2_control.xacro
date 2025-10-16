@@ -19,6 +19,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
         <param name="homing_encoder_state">arm_j1_abs</param>
+        <param name="homing_encoder_watchdog_state">arm_j1_abs_watchdog</param>
         <param name="homing_encoder_error_state">arm_j1_abs_error</param>
       </joint>
 
@@ -35,6 +36,8 @@
         <param name="homing_group">arm_j2_j3</param>
         <param name="homing_limit_state">arm_j2_limit_switch</param>
         <param name="homing_encoder_state">arm_j3_abs</param>
+        <param name="homing_limit_watchdog_state">arm_j2_limit_switch_watchdog</param>
+        <param name="homing_encoder_watchdog_state">arm_j3_abs_watchdog</param>
         <param name="homing_search_direction">negative</param>
         <param name="homing_approach_speed">0.35</param>
         <param name="homing_fine_speed">0.05</param>
@@ -53,6 +56,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/CoupledLimitEncoderPolicy</param>
         <param name="homing_group">arm_j2_j3</param>
+        <param name="homing_encoder_watchdog_state">arm_j3_abs_watchdog</param>
         <param name="homing_encoder_error_state">arm_j3_abs_error</param>
       </joint>
 
