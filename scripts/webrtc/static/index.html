@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GStreamer WebRTC Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>body{font-family:system-ui, sans-serif;margin:24px} video{max-width:100%;background:#000;border-radius:12px}</style>
+</head>
+<body>
+  <h1>WebRTC Viewer</h1>
+  <p>If you don’t see video after a few seconds, check the sender logs.</p>
+  <video id="remote" autoplay playsinline controls muted></video>
+  <script>
+    (async () => {
+      const remote = document.getElementById('remote');
+
+      const ws = new WebSocket(`ws://${location.host}/ws?role=viewer`);
+
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      let remoteDescriptionSet = false;
+      const pendingRemoteCandidates = [];
+      const mediaStream = new MediaStream();
+      remote.srcObject = mediaStream;
+
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+
+      pc.ontrack = (ev) => {
+        console.log('[viewer] ontrack', ev.track.kind);
+        const incoming = ev.streams && ev.streams[0] ? ev.streams[0].getTracks() : [ev.track];
+        for (const track of incoming) {
+          if (!mediaStream.getTracks().includes(track)) {
+            mediaStream.addTrack(track);
+          }
+        }
+        remote.srcObject = mediaStream;
+        remote.play().catch((err) => console.warn('[viewer] play() blocked', err));
+      };
+
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          console.log('[viewer] sending candidate');
+          ws.send(JSON.stringify({ type: 'candidate', candidate: ev.candidate }));
+        }
+      };
+
+      ws.onopen = async () => {
+        console.log('[viewer] ws open');
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        console.log('[viewer] sending offer');
+        ws.send(JSON.stringify({ type: 'offer', sdp: offer.sdp }));
+      };
+
+      ws.onmessage = async (ev) => {
+        const msg = JSON.parse(ev.data);
+        console.log('[viewer] msg', msg.type);
+        if (msg.type === 'answer') {
+          await pc.setRemoteDescription({ type: 'answer', sdp: msg.sdp });
+          console.log('[viewer] remote description set');
+           remoteDescriptionSet = true;
+           for (const candidate of pendingRemoteCandidates.splice(0)) {
+             try {
+               await pc.addIceCandidate(candidate);
+               console.log('[viewer] added queued candidate');
+             } catch (err) {
+               console.warn('[viewer] addIceCandidate (pending) error', err);
+             }
+           }
+        } else if (msg.type === 'candidate') {
+          // Accept either a full candidate object or a minimal structure
+          const c = msg.candidate;
+          const candidate = c.candidate ? c : { candidate: c, sdpMLineIndex: msg.sdpMLineIndex ?? 0 };
+          if (!remoteDescriptionSet) {
+            pendingRemoteCandidates.push(candidate);
+            console.log('[viewer] queued candidate');
+          } else {
+            try {
+              await pc.addIceCandidate(candidate);
+              console.log('[viewer] added candidate');
+            } catch (err) {
+              console.warn('[viewer] addIceCandidate error', err);
+            }
+          }
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

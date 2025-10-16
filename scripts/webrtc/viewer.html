@@ -1,0 +1,75 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>GStreamer WebRTC Viewer (Video Only)</title>
+<style>
+  body { font-family: system-ui, sans-serif; padding: 16px; }
+  video { width: min(100%, 960px); background:#000; border-radius:12px; }
+  code { background:#f5f5f5; padding:2px 6px; border-radius:6px; }
+</style>
+
+<h1>GStreamer → WebRTC Viewer (Video)</h1>
+<p>Signaling: <code id="sig"></code></p>
+<video id="v" playsinline autoplay controls muted></video>
+
+<script>
+const v = document.getElementById('v');
+const sig = document.getElementById('sig');
+const wsUrl = `ws://${location.host}/ws?role=viewer`;
+sig.textContent = wsUrl;
+
+const pc = new RTCPeerConnection({
+  iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }]
+});
+
+// request a recvonly video stream so the sender can provide media
+pc.addTransceiver("video", { direction: "recvonly" });
+pc.addTransceiver("audio", { direction: "recvonly" });
+
+pc.ontrack = (e) => {
+  console.log("[viewer] got track");
+  if (!v.srcObject) v.srcObject = new MediaStream();
+  e.streams[0].getVideoTracks().forEach(t => v.srcObject.addTrack(t));
+};
+
+pc.onicecandidate = (e) => {
+  if (e.candidate) wsSend({ type: "candidate", candidate: e.candidate });
+};
+
+async function initiateOffer() {
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    wsSend({ type: "offer", sdp: pc.localDescription.sdp });
+  } catch (err) {
+    console.error("[viewer] offer error", err);
+  }
+}
+
+let ws = new WebSocket(wsUrl);
+ws.onopen = () => {
+  console.log("[viewer] ws open");
+  initiateOffer();
+};
+ws.onclose = () => console.log("[viewer] ws closed");
+ws.onerror  = (e) => console.error("[viewer] ws error", e);
+
+ws.onmessage = async (e) => {
+  const msg = JSON.parse(e.data);
+  console.log("[viewer] msg", msg.type);
+
+  if (msg.type === "answer") {
+    await pc.setRemoteDescription({ type: "answer", sdp: msg.sdp });
+  } else if (msg.type === "candidate") {
+    try {
+      await pc.addIceCandidate(msg.candidate);
+    } catch (err) {
+      console.warn("[viewer] addIceCandidate error:", err);
+    }
+  }
+};
+
+function wsSend(o){
+  if (ws.readyState === 1) ws.send(JSON.stringify(o));
+  else setTimeout(()=>wsSend(o), 100);
+}
+</script>
