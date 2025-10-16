@@ -38,22 +38,10 @@ public:
     temperature_pub_ = node->create_publisher<sensor_msgs::msg::Temperature>(
         temperature_topic, rclcpp::SystemDefaultsQoS());
 
-    const uint32_t schema_feedback_id =
-        ((static_cast<uint32_t>(id_) & 0x1FFFFF) << 8) | 0x29U;
-    add_filter(bus_, schema_feedback_id, 0x1FFFFFFF,
-               [this](const can_frame &f) { on_status(f); });
-
-    const uint32_t legacy_feedback_id =
+    const uint32_t canonical_feedback_id =
         (0x00002900U | (static_cast<uint32_t>(id_) & 0xFFU));
-    if (legacy_feedback_id != schema_feedback_id) {
-      add_filter(bus_, legacy_feedback_id, 0x1FFFFFFF,
-                 [this](const can_frame &f) { on_status(f); });
-      RCLCPP_WARN(logger_,
-                  "AK servo %d listening on legacy feedback ID 0x%08X in "
-                  "addition to schema ID 0x%08X; please confirm configuration.",
-                  id_, static_cast<unsigned int>(legacy_feedback_id),
-                  static_cast<unsigned int>(schema_feedback_id));
-    }
+    add_filter(bus_, canonical_feedback_id, 0x1FFFFFFF,
+               [this](const can_frame &f) { on_status(f); });
 
     pos_.push_back(std::numeric_limits<double>::quiet_NaN());
     vel_.push_back(0.0);
