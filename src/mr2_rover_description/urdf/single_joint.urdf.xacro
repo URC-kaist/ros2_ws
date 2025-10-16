@@ -54,9 +54,10 @@
       <param name="homing_limit_state">joint1/limit_switch_state</param>
       <param name="homing_limit_watchdog_state">joint1/limit_switch_state_watchdog</param>
       <param name="homing_search_direction">negative</param>
-      <param name="homing_approach_speed">0.35</param>
-      <param name="homing_fine_speed">0.05</param>
-      <param name="homing_backoff_distance">0.12</param>
+      <param name="homing_approach_speed">0.10</param>
+      <param name="homing_backoff_speed">0.05</param>
+      <param name="homing_fine_speed">0.03</param>
+      <param name="homing_backoff_distance">0.08</param>
       <param name="homing_home_position">0.0</param>
     </joint>
 
