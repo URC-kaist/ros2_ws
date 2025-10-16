@@ -47,7 +47,10 @@ public:
     pos_.push_back(std::numeric_limits<double>::quiet_NaN());
     vel_.push_back(0.0);
     eff_.push_back(0.0);
-    cmd_.push_back(0.0);
+    command_out_.push_back(0.0);
+    desired_cmd_.push_back(std::numeric_limits<double>::quiet_NaN());
+    hold_position_.store(std::numeric_limits<double>::quiet_NaN(),
+                         std::memory_order_relaxed);
 
     first_status_received_.store(false, std::memory_order_relaxed);
     timed_out_.store(false, std::memory_order_relaxed);
@@ -93,29 +96,47 @@ public:
     }
 
     if (!initial_command_synced_.load(std::memory_order_acquire)) {
-      const double commanded = cmd_[0];
+      double desired = desired_cmd_[0];
+      if (std::isnan(desired)) {
+        desired = position_rad;
+        desired_cmd_[0] = desired;
+      }
+
       if (!controller_command_initialized_.load(std::memory_order_acquire)) {
-        last_controller_command_.store(commanded, std::memory_order_release);
-        initial_controller_command_.store(commanded, std::memory_order_release);
+        last_controller_command_.store(desired, std::memory_order_release);
+        initial_controller_command_.store(desired, std::memory_order_release);
         controller_command_initialized_.store(true, std::memory_order_release);
-        cmd_[0] = position_rad;
+        command_out_[0] = position_rad;
+        hold_position_.store(position_rad, std::memory_order_release);
       } else {
-        last_controller_command_.store(commanded, std::memory_order_release);
+        last_controller_command_.store(desired, std::memory_order_release);
         const double initial_command =
             initial_controller_command_.load(std::memory_order_acquire);
         if (std::isnan(initial_command) ||
-            std::fabs(commanded - initial_command) > kCommandReleaseThreshold) {
+            std::fabs(desired - initial_command) > kCommandReleaseThreshold) {
           initial_command_synced_.store(true, std::memory_order_release);
+          command_out_[0] = desired;
+          hold_position_.store(desired, std::memory_order_release);
         } else {
-          cmd_[0] = position_rad;
+          const double hold =
+              hold_position_.load(std::memory_order_acquire);
+          command_out_[0] = std::isnan(hold) ? position_rad : hold;
         }
       }
+    } else {
+      double desired = desired_cmd_[0];
+      if (std::isnan(desired)) {
+        desired = position_rad;
+        desired_cmd_[0] = desired;
+      }
+      command_out_[0] = desired;
+      hold_position_.store(desired, std::memory_order_release);
     }
 
     struct can_frame fr {};
     fr.can_id = (0x00000400 | id_) | CAN_EFF_FLAG;
     fr.can_dlc = 4;
-    const int32_t p = std::lround(cmd_[0] * 180.0 / M_PI * 1e4);
+    const int32_t p = std::lround(command_out_[0] * 180.0 / M_PI * 1e4);
     fr.data[0] = (p >> 24) & 0xFF;
     fr.data[1] = (p >> 16) & 0xFF;
     fr.data[2] = (p >> 8) & 0xFF;
@@ -131,7 +152,7 @@ public:
   }
 
   void export_command(std::vector<double *> &cmd) override {
-    cmd.push_back(&cmd_[0]);
+    cmd.push_back(&desired_cmd_[0]);
   }
 
 private:
@@ -212,15 +233,16 @@ private:
     }
 
     if (!first_status_received_.load(std::memory_order_acquire)) {
-      cmd_[0] = pos_[0];
+      const double current = position_rad;
+      command_out_[0] = current;
+      desired_cmd_[0] = current;
+      hold_position_.store(current, std::memory_order_release);
       last_status_nanosec_.store(now_ns, std::memory_order_release);
       first_status_received_.store(true, std::memory_order_release);
       initial_command_synced_.store(false, std::memory_order_release);
       controller_command_initialized_.store(false, std::memory_order_release);
-      last_controller_command_.store(std::numeric_limits<double>::quiet_NaN(),
-                                     std::memory_order_release);
-      initial_controller_command_.store(std::numeric_limits<double>::quiet_NaN(),
-                                        std::memory_order_release);
+      last_controller_command_.store(current, std::memory_order_release);
+      initial_controller_command_.store(current, std::memory_order_release);
       timed_out_.store(false, std::memory_order_release);
       last_error_code_.store(error_code, std::memory_order_release);
       if (!recovered_logged_.exchange(true, std::memory_order_acq_rel)) {
@@ -233,6 +255,13 @@ private:
         timed_out_.store(false, std::memory_order_release);
         RCLCPP_WARN(logger_,
                     "AK servo %d feedback recovered after timeout.", id_);
+      }
+    }
+
+    if (!initial_command_synced_.load(std::memory_order_acquire)) {
+      hold_position_.store(position_rad, std::memory_order_release);
+      if (std::isnan(desired_cmd_[0])) {
+        desired_cmd_[0] = position_rad;
       }
     }
   }
@@ -269,7 +298,10 @@ private:
   std::atomic<int8_t> last_temperature_c_{0};
   std::atomic<uint8_t> last_error_code_{0};
 
-  std::vector<double> pos_, vel_, eff_, cmd_;
+  std::vector<double> pos_, vel_, eff_;
+  std::vector<double> command_out_;
+  std::vector<double> desired_cmd_;
+  std::atomic<double> hold_position_{std::numeric_limits<double>::quiet_NaN()};
 };
 
 } // namespace mr2_devices_ak_servo
