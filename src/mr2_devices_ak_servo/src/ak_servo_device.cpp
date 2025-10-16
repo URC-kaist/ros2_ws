@@ -47,14 +47,13 @@ public:
                [this](const can_frame &f) { on_status(f); });
 
     pos_.push_back(std::numeric_limits<double>::quiet_NaN());
-    vel_.push_back(0.0);
-    eff_.push_back(0.0);
-    command_out_.push_back(0.0);
+    vel_.push_back(std::numeric_limits<double>::quiet_NaN());
+    eff_.push_back(std::numeric_limits<double>::quiet_NaN());
+    command_out_.push_back(std::numeric_limits<double>::quiet_NaN());
     desired_cmd_.push_back(std::numeric_limits<double>::quiet_NaN());
     hold_position_.store(std::numeric_limits<double>::quiet_NaN(),
                          std::memory_order_relaxed);
 
-    first_status_received_.store(false, std::memory_order_relaxed);
     timed_out_.store(false, std::memory_order_relaxed);
     last_status_nanosec_.store(0, std::memory_order_relaxed);
     configure_time_nanosec_.store(0, std::memory_order_relaxed);
@@ -78,16 +77,18 @@ public:
       // captured first call time
     }
 
-    if (!first_status_received_.load(std::memory_order_acquire)) {
-      if (now_ns - configure_time_nanosec_.load(std::memory_order_acquire) >
-          kStatusTimeoutNanosec) {
+    const int64_t last_status =
+        last_status_nanosec_.load(std::memory_order_acquire);
+    if (last_status <= 0) {
+      const int64_t configure_time =
+          configure_time_nanosec_.load(std::memory_order_acquire);
+      if (configure_time > 0 &&
+          now_ns - configure_time > kStatusTimeoutNanosec) {
         mark_timeout("no status frames received");
       }
       return;
     }
 
-    const int64_t last_status =
-        last_status_nanosec_.load(std::memory_order_acquire);
     if (last_status > 0 && now_ns - last_status > kStatusTimeoutNanosec) {
       mark_timeout("status stream stalled");
       return;
@@ -95,6 +96,10 @@ public:
 
     const double position_rad = pos_[0];
     if (!std::isfinite(position_rad)) {
+      return;
+    }
+
+    if (!std::isfinite(command_out_[0])) {
       return;
     }
 
@@ -241,30 +246,25 @@ private:
       }
     }
 
-    if (!first_status_received_.load(std::memory_order_acquire)) {
+    last_status_nanosec_.store(now_ns, std::memory_order_release);
+
+    if (!std::isfinite(command_out_[0])) {
       const double current = pos_[0];
       command_out_[0] = current;
       desired_cmd_[0] = current;
       hold_position_.store(current, std::memory_order_release);
-      last_status_nanosec_.store(now_ns, std::memory_order_release);
-      first_status_received_.store(true, std::memory_order_release);
       initial_command_synced_.store(false, std::memory_order_release);
       controller_command_initialized_.store(false, std::memory_order_release);
       last_controller_command_.store(current, std::memory_order_release);
       initial_controller_command_.store(current, std::memory_order_release);
-      timed_out_.store(false, std::memory_order_release);
-      last_error_code_.store(error_code, std::memory_order_release);
-      if (!recovered_logged_.exchange(true, std::memory_order_acq_rel)) {
-        RCLCPP_WARN(logger_,
-                    "AK servo %d feedback recovered after timeout.", id_);
-      }
-    } else {
-      last_status_nanosec_.store(now_ns, std::memory_order_release);
-      if (timed_out_.load(std::memory_order_acquire)) {
-        timed_out_.store(false, std::memory_order_release);
-        RCLCPP_WARN(logger_,
-                    "AK servo %d feedback recovered after timeout.", id_);
-      }
+    }
+
+    const bool was_timed_out =
+        timed_out_.exchange(false, std::memory_order_acq_rel);
+    if (was_timed_out &&
+        !recovered_logged_.exchange(true, std::memory_order_acq_rel)) {
+      RCLCPP_WARN(logger_,
+                  "AK servo %d feedback recovered after timeout.", id_);
     }
 
     if (!initial_command_synced_.load(std::memory_order_acquire)) {
@@ -297,7 +297,6 @@ private:
   std::string joint_name_;
   std::string temperature_frame_id_;
   int id_{0};
-  std::atomic<bool> first_status_received_{false};
   std::atomic<bool> timed_out_{false};
   std::atomic<int64_t> last_status_nanosec_{0};
   std::atomic<int64_t> configure_time_nanosec_{0};
