@@ -3,8 +3,11 @@
 #include "pluginlib/class_list_macros.hpp"
 
 #include "rclcpp/clock.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/node.hpp"
 #include "rclcpp/qos.hpp"
+#include "rclcpp/utilities.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/int8.hpp"
 
@@ -237,15 +240,15 @@ private:
     watchdog_state_ = 0.0;
     timeout_warned_ = false;
 
-    if (state_pub_) {
+    if (state_pub_ && can_publish()) {
       std_msgs::msg::Bool msg;
       msg.data = state_ > 0.5;
-      state_pub_->publish(msg);
+      safe_publish(state_pub_, msg);
     }
-    if (edge_pub_ && (edge_value != 0.0)) {
+    if (edge_pub_ && (edge_value != 0.0) && can_publish()) {
       std_msgs::msg::Int8 msg;
       msg.data = static_cast<int8_t>(edge_value > 0.0 ? 1 : -1);
-      edge_pub_->publish(msg);
+      safe_publish(edge_pub_, msg);
     }
   }
 
@@ -277,6 +280,33 @@ private:
   double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;
+
+  template<typename MsgT>
+  void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
+                    const MsgT &msg) {
+    if (!pub || !can_publish()) {
+      return;
+    }
+    try {
+      pub->publish(msg);
+    } catch (const rclcpp::exceptions::RCLError &ex) {
+      RCLCPP_WARN_ONCE(logger_,
+                       "Limit switch publisher inactive during shutdown: %s",
+                       ex.what());
+    }
+  }
+
+  bool can_publish() const {
+    if (!node_) {
+      return false;
+    }
+    auto base = node_->get_node_base_interface();
+    if (!base) {
+      return false;
+    }
+    auto context = base->get_context();
+    return context && context->is_valid() && rclcpp::ok(context);
+  }
 };
 
 } // namespace mr2_devices_sensors

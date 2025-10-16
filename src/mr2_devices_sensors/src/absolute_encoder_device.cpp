@@ -3,8 +3,11 @@
 #include "pluginlib/class_list_macros.hpp"
 
 #include "rclcpp/clock.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/node.hpp"
 #include "rclcpp/qos.hpp"
+#include "rclcpp/utilities.hpp"
 #include "std_msgs/msg/float64.hpp"
 
 #include <cmath>
@@ -210,20 +213,20 @@ private:
       flags_ = static_cast<double>(frame.data[3]);
     }
 
-    if (angle_pub_) {
+    if (angle_pub_ && can_publish()) {
       std_msgs::msg::Float64 msg;
       msg.data = angle_rad_;
-      angle_pub_->publish(msg);
+      safe_publish(angle_pub_, msg);
     }
-    if (raw_pub_) {
+    if (raw_pub_ && can_publish()) {
       std_msgs::msg::Float64 msg;
       msg.data = raw_counts_;
-      raw_pub_->publish(msg);
+      safe_publish(raw_pub_, msg);
     }
-    if (flags_pub_) {
+    if (flags_pub_ && can_publish()) {
       std_msgs::msg::Float64 msg;
       msg.data = flags_;
-      flags_pub_->publish(msg);
+      safe_publish(flags_pub_, msg);
     }
 
     if (ros_clock_) {
@@ -265,6 +268,33 @@ private:
   double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;
+
+  template<typename MsgT>
+  void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
+                    const MsgT &msg) {
+    if (!pub || !can_publish()) {
+      return;
+    }
+    try {
+      pub->publish(msg);
+    } catch (const rclcpp::exceptions::RCLError &ex) {
+      RCLCPP_WARN_ONCE(logger_,
+                       "Absolute encoder publisher inactive during shutdown: %s",
+                       ex.what());
+    }
+  }
+
+  bool can_publish() const {
+    if (!node_) {
+      return false;
+    }
+    auto base = node_->get_node_base_interface();
+    if (!base) {
+      return false;
+    }
+    auto context = base->get_context();
+    return context && context->is_valid() && rclcpp::ok(context);
+  }
 };
 
 } // namespace mr2_devices_sensors
