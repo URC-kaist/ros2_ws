@@ -2,6 +2,7 @@
 #include "mr2_can_bus_core/can_device.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/clock.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/qos.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
@@ -176,10 +177,15 @@ private:
     const int64_t now_ns = clock_.now().nanoseconds();
     if (temperature_pub_) {
       sensor_msgs::msg::Temperature msg;
-      if (ros_clock_) {
-        msg.header.stamp = ros_clock_->now();
-      } else {
-        msg.header.stamp = rclcpp::Time(now_ns, RCL_STEADY_TIME);
+      msg.header.stamp = rclcpp::Time(now_ns, RCL_STEADY_TIME);
+      if (ros_clock_ && rclcpp::ok()) {
+        try {
+          msg.header.stamp = ros_clock_->now();
+        } catch (const rclcpp::exceptions::RCLError &ex) {
+          RCLCPP_WARN_ONCE(logger_,
+                           "AK servo %d failed to query ROS clock during shutdown: %s",
+                           id_, ex.what());
+        }
       }
       msg.header.frame_id = temperature_frame_id_;
       msg.temperature = static_cast<double>(temp_c);
