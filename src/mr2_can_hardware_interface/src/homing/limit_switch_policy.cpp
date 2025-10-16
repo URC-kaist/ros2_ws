@@ -85,12 +85,22 @@ public:
 
     approach_speed_ =
         std::abs(parse_double(params, "approach_speed", kDefaultApproachSpeed));
+    backoff_speed_ = std::abs(parse_double(
+        params, "backoff_speed",
+        params.count("approach_speed") ? approach_speed_
+                                       : kDefaultApproachSpeed));
     fine_speed_ =
         std::abs(parse_double(params, "fine_speed", kDefaultFineSpeed));
     backoff_distance_ =
         std::abs(parse_double(params, "backoff_distance", kDefaultBackoffDistance));
     timeout_ = std::max(1e-3, parse_double(params, "timeout", kDefaultTimeout));
     home_position_ = parse_double(params, "home_position", 0.0);
+
+    sanitize_positive(approach_speed_, kDefaultApproachSpeed, "approach_speed");
+    sanitize_positive(backoff_speed_, approach_speed_, "backoff_speed");
+    sanitize_positive(fine_speed_, kDefaultFineSpeed, "fine_speed");
+    sanitize_positive(backoff_distance_, kDefaultBackoffDistance, "backoff_distance");
+    sanitize_positive(timeout_, kDefaultTimeout, "timeout");
 
     const std::string dir =
         parse_string(params, "search_direction", "negative");
@@ -104,10 +114,11 @@ public:
   void begin(const rclcpp::Time &now) override {
     start_time_ = now;
     target_ = joint_.state ? *joint_.state : 0.0;
-    phase_ = Phase::SearchFast;
+    phase_ = Phase::Idle;
     finished_ = false;
     error_ = false;
     backoff_remaining_ = 0.0;
+    transition_to(Phase::SearchFast, "begin homing");
   }
 
   void update(const rclcpp::Time &now,
@@ -121,7 +132,11 @@ public:
       if (watchdog > 0.5) {
         error_ = true;
         error_message_ = "Limit switch watchdog reported timeout.";
-        phase_ = Phase::Error;
+        if (node_) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "LimitSwitchPolicy: %s", error_message_.c_str());
+        }
+        transition_to(Phase::Error, "watchdog timeout");
         return;
       }
       if (watchdog < -0.5) {
@@ -133,7 +148,11 @@ public:
     if ((now - start_time_).seconds() > timeout_) {
       error_ = true;
       error_message_ = "Homing timeout exceeded.";
-      phase_ = Phase::Error;
+      if (node_) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "LimitSwitchPolicy: %s", error_message_.c_str());
+      }
+      transition_to(Phase::Error, "timeout exceeded");
       return;
     }
 
@@ -142,32 +161,38 @@ public:
 
     switch (phase_) {
     case Phase::SearchFast:
-      integrate_target(dt, search_sign_ * approach_speed_);
       if (limit_val > kReleaseThreshold) {
-        phase_ = Phase::Backoff;
         backoff_remaining_ = backoff_distance_;
+        transition_to(Phase::Backoff,
+                      "limit detected during fast approach");
+        break;
       }
+      integrate_target(dt, search_sign_ * approach_speed_);
       break;
 
     case Phase::Backoff:
-      integrate_target(dt, -search_sign_ * approach_speed_);
-      backoff_remaining_ -= std::abs(search_sign_ * approach_speed_) * dt;
+      integrate_target(dt, -search_sign_ * backoff_speed_);
+      backoff_remaining_ -= backoff_speed_ * dt;
       if (limit_val < kReleaseThreshold && backoff_remaining_ <= 0.0) {
-        phase_ = Phase::ApproachSlow;
+        transition_to(Phase::ApproachSlow,
+                      "completed backoff, re-approaching slowly");
       }
       break;
 
     case Phase::ApproachSlow:
-      integrate_target(dt, search_sign_ * fine_speed_);
       if (limit_val > kReleaseThreshold) {
-        phase_ = Phase::Capture;
+        transition_to(Phase::Capture,
+                      "limit detected during fine approach");
+        finalize_offsets();
+        finished_ = true;
+        transition_to(Phase::Done, "homing sequence complete");
+        break;
       }
+      integrate_target(dt, search_sign_ * fine_speed_);
       break;
 
     case Phase::Capture:
-      finalize_offsets();
-      finished_ = true;
-      phase_ = Phase::Done;
+      // Capture handled in ApproachSlow when limit re-engages.
       break;
 
     case Phase::Done:
@@ -204,6 +229,57 @@ public:
 
 private:
   enum class Phase { Idle, SearchFast, Backoff, ApproachSlow, Capture, Done, Error };
+
+  static const char *phase_name(Phase phase) {
+    switch (phase) {
+    case Phase::Idle:
+      return "idle";
+    case Phase::SearchFast:
+      return "search_fast";
+    case Phase::Backoff:
+      return "backoff";
+    case Phase::ApproachSlow:
+      return "approach_slow";
+    case Phase::Capture:
+      return "capture";
+    case Phase::Done:
+      return "done";
+    case Phase::Error:
+      return "error";
+    }
+    return "unknown";
+  }
+
+  void transition_to(Phase new_phase, const char *reason) {
+    if (phase_ == new_phase) {
+      return;
+    }
+    Phase old_phase = phase_;
+    phase_ = new_phase;
+    if (node_) {
+      if (new_phase == Phase::Error) {
+        if (reason) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "LimitSwitchPolicy: %s -> %s (%s)",
+                       phase_name(old_phase), phase_name(new_phase), reason);
+        } else {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "LimitSwitchPolicy: %s -> %s",
+                       phase_name(old_phase), phase_name(new_phase));
+        }
+      } else {
+        if (reason) {
+          RCLCPP_INFO(node_->get_logger(),
+                      "LimitSwitchPolicy: %s -> %s (%s)",
+                      phase_name(old_phase), phase_name(new_phase), reason);
+        } else {
+          RCLCPP_INFO(node_->get_logger(),
+                      "LimitSwitchPolicy: %s -> %s",
+                      phase_name(old_phase), phase_name(new_phase));
+        }
+      }
+    }
+  }
 
   void integrate_target(double dt, double velocity) {
     if (!joint_.command) {
@@ -243,6 +319,7 @@ private:
   const double *limit_watchdog_state_{nullptr};
 
   double approach_speed_{kDefaultApproachSpeed};
+  double backoff_speed_{kDefaultApproachSpeed};
   double fine_speed_{kDefaultFineSpeed};
   double backoff_distance_{kDefaultBackoffDistance};
   double backoff_remaining_{0.0};
@@ -256,6 +333,18 @@ private:
   bool error_{false};
   std::string error_message_;
   rclcpp::Time start_time_;
+
+  void sanitize_positive(double &value, double fallback,
+                         const char *param_name) {
+    if (!std::isfinite(value) || value <= 0.0) {
+      value = fallback;
+      if (node_) {
+        RCLCPP_WARN(node_->get_logger(),
+                    "LimitSwitchPolicy: parameter '%s' invalid, using %.3f",
+                    param_name, fallback);
+      }
+    }
+  }
 };
 
 } // namespace mr2_can_hardware_interface

@@ -64,6 +64,7 @@ public:
                                    std::memory_order_relaxed);
     initial_controller_command_.store(std::numeric_limits<double>::quiet_NaN(),
                                       std::memory_order_relaxed);
+    release_logged_.store(false, std::memory_order_relaxed);
   }
 
   void process(const rclcpp::Time &) override {
@@ -97,40 +98,46 @@ public:
       return;
     }
 
-    if (!initial_command_synced_.load(std::memory_order_acquire)) {
-      double desired = desired_cmd_[0];
-      if (std::isnan(desired)) {
-        desired = position_rad;
-        desired_cmd_[0] = desired;
-      }
+    double desired = desired_cmd_[0];
+    if (std::isnan(desired)) {
+      desired = position_rad;
+      desired_cmd_[0] = desired;
+    }
 
-      if (!controller_command_initialized_.load(std::memory_order_acquire)) {
-        last_controller_command_.store(desired, std::memory_order_release);
-        initial_controller_command_.store(desired, std::memory_order_release);
-        controller_command_initialized_.store(true, std::memory_order_release);
-        command_out_[0] = position_rad;
-        hold_position_.store(position_rad, std::memory_order_release);
-      } else {
-        last_controller_command_.store(desired, std::memory_order_release);
-        const double initial_command =
-            initial_controller_command_.load(std::memory_order_acquire);
-        if (std::isnan(initial_command) ||
-            std::fabs(desired - initial_command) > kCommandReleaseThreshold) {
-          initial_command_synced_.store(true, std::memory_order_release);
-          command_out_[0] = desired;
-          hold_position_.store(desired, std::memory_order_release);
-        } else {
-          const double hold =
-              hold_position_.load(std::memory_order_acquire);
-          command_out_[0] = std::isnan(hold) ? position_rad : hold;
+    if (!controller_command_initialized_.load(std::memory_order_acquire)) {
+      controller_command_initialized_.store(true, std::memory_order_release);
+      initial_controller_command_.store(desired, std::memory_order_release);
+      last_controller_command_.store(desired, std::memory_order_release);
+      hold_position_.store(position_rad, std::memory_order_release);
+      release_logged_.store(false, std::memory_order_release);
+    } else {
+      last_controller_command_.store(desired, std::memory_order_release);
+    }
+
+    double hold = hold_position_.load(std::memory_order_acquire);
+    if (std::isnan(hold)) {
+      hold = position_rad;
+      hold_position_.store(hold, std::memory_order_release);
+    }
+
+    if (!initial_command_synced_.load(std::memory_order_acquire)) {
+      hold = position_rad;
+      hold_position_.store(hold, std::memory_order_release);
+
+      if (std::fabs(desired - hold) <= kCommandReleaseThreshold) {
+        initial_command_synced_.store(true, std::memory_order_release);
+        command_out_[0] = desired;
+        hold_position_.store(desired, std::memory_order_release);
+        if (!release_logged_.exchange(true, std::memory_order_acq_rel) &&
+            node_) {
+          RCLCPP_INFO(node_->get_logger(),
+                      "AK servo %d released to controller command (%.4f rad).",
+                      id_, desired);
         }
+      } else {
+        command_out_[0] = hold;
       }
     } else {
-      double desired = desired_cmd_[0];
-      if (std::isnan(desired)) {
-        desired = position_rad;
-        desired_cmd_[0] = desired;
-      }
       command_out_[0] = desired;
       hold_position_.store(desired, std::memory_order_release);
     }
@@ -301,6 +308,7 @@ private:
   std::atomic<bool> recovered_logged_{true};
   std::atomic<int8_t> last_temperature_c_{0};
   std::atomic<uint8_t> last_error_code_{0};
+  std::atomic<bool> release_logged_{false};
 
   std::vector<double> pos_, vel_, eff_;
   std::vector<double> command_out_;
