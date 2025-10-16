@@ -2,6 +2,8 @@
 
 #include "pluginlib/class_list_macros.hpp"
 
+#include "rclcpp/logging.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -218,6 +220,12 @@ private:
     const double raw_position = *joint_.state + *joint_.offset;
     *joint_.offset = raw_position - home_position_;
     target_ = home_position_;
+    if (node_) {
+      RCLCPP_INFO(
+          node_->get_logger(),
+          "Homed joint '%s': offset=%.6f rad (raw=%.6f rad, home=%.6f rad)",
+          joint_.name.c_str(), *joint_.offset, raw_position, home_position_);
+    }
   }
 
   rclcpp::Node::SharedPtr node_;

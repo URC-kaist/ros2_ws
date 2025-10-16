@@ -2,6 +2,8 @@
 
 #include "pluginlib/class_list_macros.hpp"
 
+#include "rclcpp/logging.hpp"
+
 #include <stdexcept>
 
 namespace mr2_can_hardware_interface {
@@ -93,6 +95,13 @@ public:
       const double joint_angle = *joint_.state;
       *joint_.offset = joint_angle - absolute_angle;
       computed_ = true;
+      if (node_) {
+        RCLCPP_INFO(node_->get_logger(),
+                    "Homed joint '%s' via absolute encoder: offset=%.6f rad "
+                    "(encoder=%.6f rad, joint=%.6f rad)",
+                    joint_.name.c_str(), *joint_.offset, absolute_angle,
+                    joint_angle);
+      }
     }
 
     finished_ = true;

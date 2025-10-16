@@ -2,6 +2,8 @@
 
 #include "pluginlib/class_list_macros.hpp"
 
+#include "rclcpp/logging.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -249,15 +251,38 @@ private:
   }
 
   void finalize_offsets() {
+    double joint0_offset = 0.0;
+    double joint1_offset = 0.0;
+    double joint0_position = 0.0;
+    double joint1_position = 0.0;
+    bool joint0_valid = false;
+    bool joint1_valid = false;
+
     if (joints_[0].offset && joints_[0].state) {
-      *joints_[0].offset = *joints_[0].state;
+      joint0_position = *joints_[0].state;
+      *joints_[0].offset = joint0_position;
+      joint0_offset = *joints_[0].offset;
+      joint0_valid = true;
     }
     if (joints_[1].offset && joints_[1].state) {
+      joint1_position = *joints_[1].state;
       const double encoder_angle =
-          encoder_state_ ? *encoder_state_ : (*joints_[1].state);
-      const double desired =
-          encoder_angle + encoder_home_shift_;
-      *joints_[1].offset = *joints_[1].state - desired;
+          encoder_state_ ? *encoder_state_ : joint1_position;
+      const double desired = encoder_angle + encoder_home_shift_;
+      *joints_[1].offset = joint1_position - desired;
+      joint1_offset = *joints_[1].offset;
+      joint1_valid = true;
+    }
+
+    if (node_ && joint0_valid && joint1_valid) {
+      const double encoder_angle =
+          encoder_state_ ? *encoder_state_ : joint1_position;
+      RCLCPP_INFO(node_->get_logger(),
+                  "Homed coupled joints '%s'/'%s': offsets=(%.6f, %.6f) rad "
+                  "(joint states=(%.6f, %.6f) rad, encoder=%.6f rad, shift=%.6f rad)",
+                  joints_[0].name.c_str(), joints_[1].name.c_str(),
+                  joint0_offset, joint1_offset, joint0_position, joint1_position,
+                  encoder_angle, encoder_home_shift_);
     }
   }
 
