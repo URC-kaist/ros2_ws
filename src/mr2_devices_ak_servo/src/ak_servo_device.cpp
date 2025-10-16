@@ -4,6 +4,7 @@
 #include "rclcpp/clock.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/node.hpp"
 #include "rclcpp/qos.hpp"
 #include "sensor_msgs/msg/temperature.hpp"
 #include <atomic>
@@ -20,6 +21,7 @@ public:
 
   void configure(const hardware_interface::ComponentInfo &ji,
                  rclcpp::Node *node) override {
+    node_ = node;
     joint_name_ = ji.name;
     id_ = std::stoi(ji.parameters.at("motor_id"));
     iface_ = ji.parameters.at("can_iface");
@@ -196,7 +198,7 @@ private:
     last_temperature_c_.store(temp_c, std::memory_order_release);
 
     const int64_t now_ns = clock_.now().nanoseconds();
-    if (temperature_pub_) {
+    if (temperature_pub_ && can_publish()) {
       sensor_msgs::msg::Temperature msg;
       msg.header.stamp = rclcpp::Time(now_ns, RCL_STEADY_TIME);
       if (ros_clock_ && rclcpp::ok()) {
@@ -211,7 +213,7 @@ private:
       msg.header.frame_id = temperature_frame_id_;
       msg.temperature = static_cast<double>(temp_c);
       msg.variance = -1.0;
-      temperature_pub_->publish(msg);
+      safe_publish(temperature_pub_, msg);
     }
 
     const uint8_t prev_error =
@@ -233,7 +235,7 @@ private:
     }
 
     if (!first_status_received_.load(std::memory_order_acquire)) {
-      const double current = position_rad;
+      const double current = pos_[0];
       command_out_[0] = current;
       desired_cmd_[0] = current;
       hold_position_.store(current, std::memory_order_release);
@@ -259,9 +261,10 @@ private:
     }
 
     if (!initial_command_synced_.load(std::memory_order_acquire)) {
-      hold_position_.store(position_rad, std::memory_order_release);
+      const double current = pos_[0];
+      hold_position_.store(current, std::memory_order_release);
       if (std::isnan(desired_cmd_[0])) {
-        desired_cmd_[0] = position_rad;
+        desired_cmd_[0] = current;
       }
     }
   }
@@ -278,6 +281,7 @@ private:
   }
 
   std::shared_ptr<CanBusManager> bus_;
+  rclcpp::Node *node_{nullptr};
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temperature_pub_;
   rclcpp::Logger logger_{rclcpp::get_logger("ak_servo_device")};
   rclcpp::Clock::SharedPtr ros_clock_;
@@ -302,6 +306,33 @@ private:
   std::vector<double> command_out_;
   std::vector<double> desired_cmd_;
   std::atomic<double> hold_position_{std::numeric_limits<double>::quiet_NaN()};
+
+  template<typename MsgT>
+  void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
+                    const MsgT &msg) {
+    if (!pub || !can_publish()) {
+      return;
+    }
+    try {
+      pub->publish(msg);
+    } catch (const rclcpp::exceptions::RCLError &ex) {
+      RCLCPP_WARN_ONCE(logger_,
+                       "AK servo publisher inactive during shutdown: %s",
+                       ex.what());
+    }
+  }
+
+  bool can_publish() const {
+    if (!node_) {
+      return false;
+    }
+    auto base = node_->get_node_base_interface();
+    if (!base) {
+      return false;
+    }
+    auto context = base->get_context();
+    return context && context->is_valid() && rclcpp::ok(context);
+  }
 };
 
 } // namespace mr2_devices_ak_servo
