@@ -75,7 +75,7 @@ def generate_launch_description():
             "motor_id": ParameterValue(motor_id, value_type=int),
             "limit_switch_enabled": True,
             "limit_switch_can_id": ParameterValue(0x181, value_type=int),
-            "limit_switch_pressed": True,
+            "limit_switch_pressed": False,
             "initial_position_rad": 0.0,
         }],
         condition=IfCondition(use_mock_servo),
