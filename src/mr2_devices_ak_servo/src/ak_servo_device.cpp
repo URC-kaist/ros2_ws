@@ -155,6 +155,10 @@ public:
     fr.data[1] = (p >> 16) & 0xFF;
     fr.data[2] = (p >> 8) & 0xFF;
     fr.data[3] = (p)&0xFF;
+    RCLCPP_INFO(logger_,
+                "AK servo %d command: %.6f rad (%.3f deg)",
+                id_, command_out_[0],
+                command_out_[0] * 180.0 / M_PI);
     send(fr, bus_);
   }
 
