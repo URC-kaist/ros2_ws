@@ -36,6 +36,7 @@ public:
     limit_switch_trigger_position_rad_ = declare_parameter<double>(
         "limit_switch_trigger_position_rad",
         std::numeric_limits<double>::quiet_NaN());
+    initial_position_rad_ = declare_parameter<double>("initial_position_rad", 0.0);
 
     if (update_rate_hz_ <= 0.0) {
       throw std::runtime_error("update_rate_hz must be positive");
@@ -60,6 +61,12 @@ public:
         std::chrono::duration<double>(1.0 / update_rate_hz_));
     timer_ =
         create_wall_timer(period, std::bind(&MockAkServoNode::update, this));
+
+    {
+      std::lock_guard<std::mutex> lock(state_mtx_);
+      position_rad_ = apply_position_limits(initial_position_rad_);
+      target_position_rad_ = position_rad_;
+    }
 
     last_time_ = std::chrono::steady_clock::now();
     RCLCPP_INFO(get_logger(), "Mock AK servo started on %s id %d",
@@ -190,6 +197,7 @@ private:
   double max_effort_amp_{6.0};
   double position_limit_rad_{M_PI};
   double max_integration_dt_{0.05};
+  double initial_position_rad_{0.0};
   bool limit_switch_enabled_{true};
   int limit_switch_can_id_{0x181};
   bool limit_switch_active_high_{true};

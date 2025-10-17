@@ -76,6 +76,7 @@ def generate_launch_description():
             "limit_switch_enabled": True,
             "limit_switch_can_id": ParameterValue(0x181, value_type=int),
             "limit_switch_pressed": True,
+            "initial_position_rad": 0.0,
         }],
         condition=IfCondition(use_mock_servo),
         output="screen",
