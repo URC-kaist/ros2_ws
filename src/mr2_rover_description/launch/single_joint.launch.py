@@ -78,6 +78,19 @@ def generate_launch_description():
         output="screen",
     )
 
+    mock_limit_switch_node = Node(
+        package="mr2_devices_sensors",
+        executable="mock_limit_switch_node",
+        parameters=[{
+            "can_iface": can_iface,
+            "can_id": ParameterValue(0x181, value_type=int),
+            "update_rate_hz": 100.0,
+            "pressed": True,
+        }],
+        condition=IfCondition(use_mock_servo),
+        output="screen",
+    )
+
     jsb_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -97,6 +110,7 @@ def generate_launch_description():
             use_mock_servo_arg,
             robot_state_publisher_node,
             mock_servo_node,
+            mock_limit_switch_node,
             ros2_control_node,
             TimerAction(period=2.0, actions=[jsb_spawner]),
             TimerAction(period=3.0, actions=[joint_spawner]),

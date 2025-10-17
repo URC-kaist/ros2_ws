@@ -20,10 +20,19 @@ ament_target_dependencies(${PROJECT_NAME}
   pluginlib
   rclcpp)
 
+add_executable(mock_limit_switch_node
+  src/mock_limit_switch_node.cpp)
+ament_target_dependencies(mock_limit_switch_node
+  mr2_can_bus_core
+  rclcpp)
+
 pluginlib_export_plugin_description_file(mr2_can_bus_core plugin.xml)
 
 install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION lib)
+
+install(TARGETS mock_limit_switch_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(FILES plugin.xml
   DESTINATION share/${PROJECT_NAME})
