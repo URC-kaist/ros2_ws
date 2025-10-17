@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -26,9 +27,21 @@ public:
     max_velocity_rad_s_ = declare_parameter<double>("max_velocity", 4.0);
     effort_gain_ = declare_parameter<double>("effort_gain", 4.0);
     max_effort_amp_ = declare_parameter<double>("max_effort_amp", 6.0);
+    position_limit_rad_ = declare_parameter<double>("position_limit_rad", M_PI);
+    max_integration_dt_ = declare_parameter<double>("max_integration_dt", 0.05);
+    limit_switch_enabled_ = declare_parameter<bool>("limit_switch_enabled", true);
+    limit_switch_can_id_ = declare_parameter<int>("limit_switch_can_id", 0x181);
+    limit_switch_active_high_ = declare_parameter<bool>("limit_switch_active_high", true);
+    limit_switch_pressed_constant_ = declare_parameter<bool>("limit_switch_pressed", true);
+    limit_switch_trigger_position_rad_ = declare_parameter<double>(
+        "limit_switch_trigger_position_rad",
+        std::numeric_limits<double>::quiet_NaN());
 
     if (update_rate_hz_ <= 0.0) {
       throw std::runtime_error("update_rate_hz must be positive");
+    }
+    if (limit_switch_can_id_ < 0 || limit_switch_can_id_ > 0x1FFFFFFF) {
+      throw std::runtime_error("limit_switch_can_id out of range");
     }
 
     bus_ = CanBusRegistry::get(can_iface_);
@@ -72,7 +85,7 @@ private:
     const double target_rad = target_deg * M_PI / 180.0;
 
     std::lock_guard<std::mutex> lock(state_mtx_);
-    target_position_rad_ = target_rad;
+    target_position_rad_ = apply_position_limits(target_rad);
   }
 
   void update() {
@@ -80,6 +93,9 @@ private:
     double dt = std::chrono::duration<double>(now - last_time_).count();
     if (dt <= 0.0) {
       dt = 1.0 / update_rate_hz_;
+    }
+    if (max_integration_dt_ > 0.0) {
+      dt = std::min(dt, max_integration_dt_);
     }
     last_time_ = now;
 
@@ -94,16 +110,22 @@ private:
       const double error = target - position;
       const double max_step = max_velocity_rad_s_ * dt;
       const double step = std::clamp(error, -max_step, max_step);
-      position_rad_ += step;
+      position_rad_ = apply_position_limits(position_rad_ + step);
 
-      velocity_rad_s_ = step / dt;
+      if (position_limit_rad_ > 0.0 && std::fabs(position_rad_) >= position_limit_rad_ - 1e-6 && std::fabs(error) > max_step) {
+        velocity_rad_s_ = 0.0;
+      } else {
+        velocity_rad_s_ = step / dt;
+      }
       effort_amp_ =
           std::clamp(error * effort_gain_, -max_effort_amp_, max_effort_amp_);
 
       position = position_rad_;
+      target_position_rad_ = apply_position_limits(target_position_rad_);
     }
 
     publish_status(position, velocity_rad_s_, effort_amp_);
+    publish_limit_switch(position);
   }
 
   void publish_status(double position, double velocity, double effort) {
@@ -130,6 +152,33 @@ private:
     bus_->enqueue_tx(status);
   }
 
+  void publish_limit_switch(double position) {
+    if (!limit_switch_enabled_) {
+      return;
+    }
+
+    bool pressed = limit_switch_pressed_constant_;
+    if (std::isfinite(limit_switch_trigger_position_rad_)) {
+      const bool triggered = position <= limit_switch_trigger_position_rad_;
+      pressed = limit_switch_active_high_ ? triggered : !triggered;
+    } else if (!limit_switch_active_high_) {
+      pressed = !pressed;
+    }
+
+    struct can_frame frame {};
+    frame.can_id = static_cast<uint32_t>(limit_switch_can_id_) & 0x1FFFFFFFU;
+    frame.can_dlc = 1;
+    frame.data[0] = pressed ? 0x1 : 0x0;
+    bus_->enqueue_tx(frame);
+  }
+
+  double apply_position_limits(double value) const {
+    if (position_limit_rad_ <= 0.0 || !std::isfinite(position_limit_rad_)) {
+      return value;
+    }
+    return std::clamp(value, -position_limit_rad_, position_limit_rad_);
+  }
+
   rclcpp::TimerBase::SharedPtr timer_;
   std::shared_ptr<CanBusManager> bus_;
 
@@ -139,6 +188,14 @@ private:
   double max_velocity_rad_s_{4.0};
   double effort_gain_{4.0};
   double max_effort_amp_{6.0};
+  double position_limit_rad_{M_PI};
+  double max_integration_dt_{0.05};
+  bool limit_switch_enabled_{true};
+  int limit_switch_can_id_{0x181};
+  bool limit_switch_active_high_{true};
+  bool limit_switch_pressed_constant_{true};
+  double limit_switch_trigger_position_rad_{
+      std::numeric_limits<double>::quiet_NaN()};
 
   std::mutex state_mtx_;
   double target_position_rad_{0.0};

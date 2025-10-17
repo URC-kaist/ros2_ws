@@ -73,19 +73,9 @@ def generate_launch_description():
         parameters=[{
             "can_iface": can_iface,
             "motor_id": ParameterValue(motor_id, value_type=int),
-        }],
-        condition=IfCondition(use_mock_servo),
-        output="screen",
-    )
-
-    mock_limit_switch_node = Node(
-        package="mr2_devices_sensors",
-        executable="mock_limit_switch_node",
-        parameters=[{
-            "can_iface": can_iface,
-            "can_id": ParameterValue(0x181, value_type=int),
-            "update_rate_hz": 100.0,
-            "pressed": True,
+            "limit_switch_enabled": True,
+            "limit_switch_can_id": ParameterValue(0x181, value_type=int),
+            "limit_switch_pressed": True,
         }],
         condition=IfCondition(use_mock_servo),
         output="screen",
@@ -110,7 +100,6 @@ def generate_launch_description():
             use_mock_servo_arg,
             robot_state_publisher_node,
             mock_servo_node,
-            mock_limit_switch_node,
             ros2_control_node,
             TimerAction(period=2.0, actions=[jsb_spawner]),
             TimerAction(period=3.0, actions=[joint_spawner]),
