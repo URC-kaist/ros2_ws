@@ -48,10 +48,9 @@ public:
     }
 
     try {
-      homing_loader_ =
-          std::make_shared<pluginlib::ClassLoader<HomingPolicy>>(
-              "mr2_can_hardware_interface",
-              "mr2_can_hardware_interface::HomingPolicy");
+      homing_loader_ = std::make_shared<pluginlib::ClassLoader<HomingPolicy>>(
+          "mr2_can_hardware_interface",
+          "mr2_can_hardware_interface::HomingPolicy");
     } catch (const pluginlib::PluginlibException &ex) {
       RCLCPP_ERROR(node_->get_logger(),
                    "Failed to load homing policy plugins: %s", ex.what());
@@ -63,10 +62,7 @@ public:
     joints_.clear();
     actuators_.clear();
     transmissions_.clear();
-    pos_ptrs_.clear();
-    vel_ptrs_.clear();
-    eff_ptrs_.clear();
-    cmd_ptrs_.clear();
+    device_states_.clear();
     devs_.clear();
     named_states_.clear();
     homing_instances_.clear();
@@ -156,24 +152,14 @@ public:
           return CallbackReturn::ERROR;
         }
 
-        const auto pos_idx = pos_ptrs_.size();
-        const auto vel_idx = vel_ptrs_.size();
-        const auto eff_idx = eff_ptrs_.size();
-        const auto cmd_idx = cmd_ptrs_.size();
+        DevicePointers &device_state = device_states_[actuator.name];
+        device_state = {};
 
-        dev->export_state(pos_ptrs_, vel_ptrs_, eff_ptrs_);
-        dev->export_command(cmd_ptrs_);
+        dev->export_state(device_state.state_ptr, device_state.velocity_ptr,
+                          device_state.effort_ptr);
+        dev->export_command(device_state.command_ptr);
 
-        actuator.state_ptr =
-            pos_ptrs_.size() > pos_idx ? pos_ptrs_[pos_idx] : nullptr;
-        actuator.velocity_ptr =
-            vel_ptrs_.size() > vel_idx ? vel_ptrs_[vel_idx] : nullptr;
-        actuator.effort_ptr =
-            eff_ptrs_.size() > eff_idx ? eff_ptrs_[eff_idx] : nullptr;
-        actuator.command_ptr =
-            cmd_ptrs_.size() > cmd_idx ? cmd_ptrs_[cmd_idx] : nullptr;
-
-        if (!actuator.state_ptr || !actuator.command_ptr) {
+        if (!device_state.state_ptr || !device_state.command_ptr) {
           RCLCPP_ERROR(node_->get_logger(),
                        "Device for actuator %s failed to export state/command "
                        "interfaces",
@@ -188,16 +174,15 @@ public:
         }
 
         actuator.configured = true;
+        actuator.device = &device_state;
         devs_.push_back(std::move(dev));
       }
 
-      const auto homing_plugin_it =
-          joint.parameters.find("homing_plugin");
+      const auto homing_plugin_it = joint.parameters.find("homing_plugin");
       if (homing_plugin_it != joint.parameters.end()) {
-        const std::string group =
-            joint.parameters.count("homing_group")
-                ? joint.parameters.at("homing_group")
-                : joint.name;
+        const std::string group = joint.parameters.count("homing_group")
+                                      ? joint.parameters.at("homing_group")
+                                      : joint.name;
 
         auto &cfg = homing_configs[group];
         if (!cfg.plugin.empty() && cfg.plugin != homing_plugin_it->second) {
@@ -212,9 +197,9 @@ public:
 
         for (const auto &param : joint.parameters) {
           if (param.first.rfind("homing_", 0) == 0 &&
-              param.first != "homing_plugin" &&
-              param.first != "homing_group") {
-            const std::string key = param.first.substr(std::string("homing_").size());
+              param.first != "homing_plugin" && param.first != "homing_group") {
+            const std::string key =
+                param.first.substr(std::string("homing_").size());
             cfg.params[key] = param.second;
           }
         }
@@ -224,10 +209,9 @@ public:
     for (const auto &gpio : info_.gpios) {
       const auto plugin_it = gpio.parameters.find("device_plugin");
       if (plugin_it == gpio.parameters.end()) {
-        RCLCPP_ERROR(
-            node_->get_logger(),
-            "GPIO component %s missing <param name=\"device_plugin\">",
-            gpio.name.c_str());
+        RCLCPP_ERROR(node_->get_logger(),
+                     "GPIO component %s missing <param name=\"device_plugin\">",
+                     gpio.name.c_str());
         return CallbackReturn::ERROR;
       }
 
@@ -257,8 +241,12 @@ public:
       }
 
       // Allow devices to export state/command buffers if they choose to.
-      dev->export_state(pos_ptrs_, vel_ptrs_, eff_ptrs_);
-      dev->export_command(cmd_ptrs_);
+      double *state_ptr = nullptr;
+      double *velocity_ptr = nullptr;
+      double *effort_ptr = nullptr;
+      double *command_ptr = nullptr;
+      dev->export_state(state_ptr, velocity_ptr, effort_ptr);
+      dev->export_command(command_ptr);
 
       devs_.push_back(std::move(dev));
     }
@@ -387,11 +375,11 @@ public:
 
         add_actuator_handle(hardware_interface::HW_IF_POSITION);
 
-        if (actuator.velocity_ptr) {
+        if (actuator.device && actuator.device->velocity_ptr) {
           add_actuator_handle(hardware_interface::HW_IF_VELOCITY);
         }
 
-        if (actuator.effort_ptr) {
+        if (actuator.device && actuator.device->effort_ptr) {
           add_actuator_handle(hardware_interface::HW_IF_EFFORT);
         }
 
@@ -454,11 +442,10 @@ public:
           }
 
           auto &joint = joints_[it->second];
-          handles.push_back({joint.name,
-                             &joint.command,
-                             &joint.state,
-                             joint.has_velocity_state ? &joint.velocity : nullptr,
-                             &joint.offset});
+          handles.push_back(
+              {joint.name, &joint.command, &joint.state,
+               joint.has_velocity_state ? &joint.velocity : nullptr,
+               &joint.offset});
         }
 
         policy->configure(node_, handles, state_map, cfg.params);
@@ -472,8 +459,7 @@ public:
         homing_instances_.push_back({group, policy, cfg.joints});
       }
 
-      RCLCPP_INFO(node_->get_logger(),
-                  "Configured %zu homing policy plugins.",
+      RCLCPP_INFO(node_->get_logger(), "Configured %zu homing policy plugins.",
                   homing_instances_.size());
     }
 
@@ -567,8 +553,8 @@ public:
       instance.policy->begin(now);
     }
 
-    RCLCPP_INFO(node_->get_logger(),
-                "Starting homing sequence (%zu policies)", homing_instances_.size());
+    RCLCPP_INFO(node_->get_logger(), "Starting homing sequence (%zu policies)",
+                homing_instances_.size());
     return CallbackReturn::SUCCESS;
   }
 
@@ -581,23 +567,12 @@ public:
 
   return_type read(const rclcpp::Time &, const rclcpp::Duration &) override {
     for (auto &actuator : actuators_) {
-      if (actuator.state_ptr) {
-        actuator.state = *actuator.state_ptr;
-      } else {
-        actuator.state = 0.0;
-      }
-
-      if (actuator.velocity_ptr) {
-        actuator.velocity = *actuator.velocity_ptr;
-      } else {
-        actuator.velocity = 0.0;
-      }
-
-      if (actuator.effort_ptr) {
-        actuator.effort = *actuator.effort_ptr;
-      } else {
-        actuator.effort = 0.0;
-      }
+      const auto *device = actuator.device;
+      actuator.state = (device && device->state_ptr) ? *device->state_ptr : 0.0;
+      actuator.velocity =
+          (device && device->velocity_ptr) ? *device->velocity_ptr : 0.0;
+      actuator.effort =
+          (device && device->effort_ptr) ? *device->effort_ptr : 0.0;
 
       actuator.transmission_passthrough = actuator.state;
       actuator.transmission_velocity = actuator.velocity;
@@ -622,8 +597,8 @@ public:
     return return_type::OK;
   }
 
-  return_type
-  write(const rclcpp::Time &now, const rclcpp::Duration &period) override {
+  return_type write(const rclcpp::Time &now,
+                    const rclcpp::Duration &period) override {
     if (homing_failed_) {
       return return_type::ERROR;
     }
@@ -648,10 +623,9 @@ public:
         if (instance.policy->has_error()) {
           homing_failed_ = true;
           homing_error_message_ = instance.policy->error_message();
-          RCLCPP_ERROR(
-              node_->get_logger(),
-              "Homing policy '%s' reported error: %s", instance.group.c_str(),
-              homing_error_message_.c_str());
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Homing policy '%s' reported error: %s",
+                       instance.group.c_str(), homing_error_message_.c_str());
           homing_active_ = false;
           return return_type::ERROR;
         }
@@ -671,6 +645,9 @@ public:
         homed_ = true;
         RCLCPP_INFO(node_->get_logger(),
                     "Homing sequence completed successfully.");
+        for (auto &joint : joints_) {
+          RCLCPP_INFO(node_->get_logger(), "command: %f", joint.command);
+        }
       }
     } else if (!homed_) {
       for (auto &joint : joints_) {
@@ -690,9 +667,8 @@ public:
 
     for (auto &actuator : actuators_) {
       actuator.command = actuator.transmission_passthrough;
-
-      if (actuator.command_ptr) {
-        *actuator.command_ptr = actuator.command;
+      if (actuator.device && actuator.device->command_ptr) {
+        *actuator.device->command_ptr = actuator.command;
       }
     }
 
@@ -722,6 +698,13 @@ private:
     bool command_seeded{false};
   };
 
+  struct DevicePointers {
+    double *state_ptr{nullptr};
+    double *velocity_ptr{nullptr};
+    double *effort_ptr{nullptr};
+    double *command_ptr{nullptr};
+  };
+
   struct ActuatorData {
     explicit ActuatorData(std::string name_in) : name(std::move(name_in)) {}
 
@@ -733,10 +716,7 @@ private:
     double transmission_passthrough{std::numeric_limits<double>::quiet_NaN()};
     double transmission_velocity{std::numeric_limits<double>::quiet_NaN()};
     double transmission_effort{std::numeric_limits<double>::quiet_NaN()};
-    double *state_ptr{nullptr};
-    double *velocity_ptr{nullptr};
-    double *effort_ptr{nullptr};
-    double *command_ptr{nullptr};
+    DevicePointers *device{nullptr};
     bool configured{false};
   };
 
@@ -766,14 +746,12 @@ private:
       const std::vector<std::pair<std::string, double *>> &states) {
     for (const auto &entry : states) {
       if (!entry.second) {
-        RCLCPP_ERROR(node_->get_logger(),
-                     "Named state '%s' has null pointer.",
+        RCLCPP_ERROR(node_->get_logger(), "Named state '%s' has null pointer.",
                      entry.first.c_str());
         return CallbackReturn::ERROR;
       }
 
-      auto [it, inserted] =
-          named_states_.emplace(entry.first, entry.second);
+      auto [it, inserted] = named_states_.emplace(entry.first, entry.second);
 
       if (!inserted) {
         RCLCPP_WARN(node_->get_logger(),
@@ -801,11 +779,7 @@ private:
   std::vector<ActuatorData> actuators_;
   std::vector<std::shared_ptr<transmission_interface::Transmission>>
       transmissions_;
-
-  std::vector<double *> pos_ptrs_;
-  std::vector<double *> vel_ptrs_;
-  std::vector<double *> eff_ptrs_;
-  std::vector<double *> cmd_ptrs_;
+  std::unordered_map<std::string, DevicePointers> device_states_;
 
   std::unordered_map<std::string, double *> named_states_;
   std::vector<HomingInstance> homing_instances_;

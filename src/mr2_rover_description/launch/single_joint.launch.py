@@ -42,6 +42,25 @@ def generate_launch_description():
         description="Start mock AK servo that emulates CAN feedback",
     )
 
+
+    limit_switch_trigger_position_rad = LaunchConfiguration(
+        "limit_switch_trigger_position_rad"
+    )
+    limit_switch_trigger_position_rad_arg = DeclareLaunchArgument(
+        "limit_switch_trigger_position_rad",
+        default_value="0.0",
+        description="Joint position (rad) that triggers the limit switch",
+    )
+
+    limit_switch_trigger_when_below = LaunchConfiguration(
+        "limit_switch_trigger_when_below"
+    )
+    limit_switch_trigger_when_below_arg = DeclareLaunchArgument(
+        "limit_switch_trigger_when_below",
+        default_value="true",
+        description="Trigger when position is below threshold (false means above)",
+    )
+
     robot_description = {
         "robot_description": Command([
             "xacro ",
@@ -73,10 +92,12 @@ def generate_launch_description():
         parameters=[{
             "can_iface": can_iface,
             "motor_id": ParameterValue(motor_id, value_type=int),
+            "initial_position_rad": 1.0,
             "limit_switch_enabled": True,
-            "limit_switch_can_id": ParameterValue(0x181, value_type=int),
-            "limit_switch_pressed": False,
-            "initial_position_rad": 0.0,
+            "limit_switch_trigger_position_rad": ParameterValue(
+                limit_switch_trigger_position_rad, value_type=float),
+            "limit_switch_trigger_when_below": ParameterValue(
+                limit_switch_trigger_when_below, value_type=bool),
         }],
         condition=IfCondition(use_mock_servo),
         output="screen",
@@ -99,6 +120,8 @@ def generate_launch_description():
             can_iface_arg,
             motor_id_arg,
             use_mock_servo_arg,
+            limit_switch_trigger_position_rad_arg,
+            limit_switch_trigger_when_below_arg,
             robot_state_publisher_node,
             mock_servo_node,
             ros2_control_node,

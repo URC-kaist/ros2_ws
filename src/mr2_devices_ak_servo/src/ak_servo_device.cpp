@@ -46,23 +46,20 @@ public:
     add_filter(bus_, canonical_feedback_id, 0x1FFFFFFF,
                [this](const can_frame &f) { on_status(f); });
 
-    pos_.push_back(std::numeric_limits<double>::quiet_NaN());
-    vel_.push_back(std::numeric_limits<double>::quiet_NaN());
-    eff_.push_back(std::numeric_limits<double>::quiet_NaN());
-    command_out_.push_back(std::numeric_limits<double>::quiet_NaN());
-    desired_cmd_.push_back(std::numeric_limits<double>::quiet_NaN());
+    position_rad_ = std::numeric_limits<double>::quiet_NaN();
+    velocity_rad_ = std::numeric_limits<double>::quiet_NaN();
+    effort_amp_ = std::numeric_limits<double>::quiet_NaN();
+    command_out_rad_ = std::numeric_limits<double>::quiet_NaN();
+    desired_command_rad_ = std::numeric_limits<double>::quiet_NaN();
     hold_position_.store(std::numeric_limits<double>::quiet_NaN(),
                          std::memory_order_relaxed);
 
     timed_out_.store(false, std::memory_order_relaxed);
     last_status_nanosec_.store(0, std::memory_order_relaxed);
-    configure_time_nanosec_.store(0, std::memory_order_relaxed);
+    configure_time_nanosec_ = 0;
+    configure_time_recorded_ = false;
     initial_command_synced_.store(false, std::memory_order_relaxed);
     controller_command_initialized_.store(false, std::memory_order_relaxed);
-    last_controller_command_.store(std::numeric_limits<double>::quiet_NaN(),
-                                   std::memory_order_relaxed);
-    initial_controller_command_.store(std::numeric_limits<double>::quiet_NaN(),
-                                      std::memory_order_relaxed);
     release_logged_.store(false, std::memory_order_relaxed);
   }
 
@@ -72,18 +69,16 @@ public:
     }
 
     const int64_t now_ns = clock_.now().nanoseconds();
-    int64_t expected = 0;
-    if (configure_time_nanosec_.compare_exchange_strong(expected, now_ns)) {
-      // captured first call time
+    if (!configure_time_recorded_) {
+      configure_time_nanosec_ = now_ns;
+      configure_time_recorded_ = true;
     }
 
     const int64_t last_status =
         last_status_nanosec_.load(std::memory_order_acquire);
     if (last_status <= 0) {
-      const int64_t configure_time =
-          configure_time_nanosec_.load(std::memory_order_acquire);
-      if (configure_time > 0 &&
-          now_ns - configure_time > kStatusTimeoutNanosec) {
+      if (configure_time_recorded_ &&
+          now_ns - configure_time_nanosec_ > kStatusTimeoutNanosec) {
         mark_timeout("no status frames received");
       }
       return;
@@ -94,29 +89,25 @@ public:
       return;
     }
 
-    const double position_rad = pos_[0];
+    const double position_rad = position_rad_;
     if (!std::isfinite(position_rad)) {
       return;
     }
 
-    if (!std::isfinite(command_out_[0])) {
+    if (!std::isfinite(command_out_rad_)) {
       return;
     }
 
-    double desired = desired_cmd_[0];
+    double desired = desired_command_rad_;
     if (std::isnan(desired)) {
       desired = position_rad;
-      desired_cmd_[0] = desired;
+      desired_command_rad_ = desired;
     }
 
     if (!controller_command_initialized_.load(std::memory_order_acquire)) {
       controller_command_initialized_.store(true, std::memory_order_release);
-      initial_controller_command_.store(desired, std::memory_order_release);
-      last_controller_command_.store(desired, std::memory_order_release);
       hold_position_.store(position_rad, std::memory_order_release);
       release_logged_.store(false, std::memory_order_release);
-    } else {
-      last_controller_command_.store(desired, std::memory_order_release);
     }
 
     double hold = hold_position_.load(std::memory_order_acquire);
@@ -131,7 +122,7 @@ public:
 
       if (std::fabs(desired - hold) <= kCommandReleaseThreshold) {
         initial_command_synced_.store(true, std::memory_order_release);
-        command_out_[0] = desired;
+        command_out_rad_ = desired;
         hold_position_.store(desired, std::memory_order_release);
         if (!release_logged_.exchange(true, std::memory_order_acq_rel) &&
             node_) {
@@ -140,37 +131,33 @@ public:
                       id_, desired);
         }
       } else {
-        command_out_[0] = hold;
+        command_out_rad_ = hold;
       }
     } else {
-      command_out_[0] = desired;
+      command_out_rad_ = desired;
       hold_position_.store(desired, std::memory_order_release);
     }
 
     struct can_frame fr {};
     fr.can_id = (0x00000400 | id_) | CAN_EFF_FLAG;
     fr.can_dlc = 4;
-    const int32_t p = std::lround(command_out_[0] * 180.0 / M_PI * 1e4);
+    const int32_t p = std::lround(command_out_rad_ * 180.0 / M_PI * 1e4);
     fr.data[0] = (p >> 24) & 0xFF;
     fr.data[1] = (p >> 16) & 0xFF;
     fr.data[2] = (p >> 8) & 0xFF;
     fr.data[3] = (p)&0xFF;
-    RCLCPP_INFO(logger_,
-                "AK servo %d command: %.6f rad (%.3f deg)",
-                id_, command_out_[0],
-                command_out_[0] * 180.0 / M_PI);
     send(fr, bus_);
   }
 
-  void export_state(std::vector<double *> &pos, std::vector<double *> &vel,
-                    std::vector<double *> &eff) override {
-    pos.push_back(&pos_[0]);
-    vel.push_back(&vel_[0]);
-    eff.push_back(&eff_[0]);
+  void export_state(double *&position, double *&velocity,
+                    double *&effort) override {
+    position = &position_rad_;
+    velocity = &velocity_rad_;
+    effort = &effort_amp_;
   }
 
-  void export_command(std::vector<double *> &cmd) override {
-    cmd.push_back(&desired_cmd_[0]);
+  void export_command(double *&command) override {
+    command = &desired_command_rad_;
   }
 
 private:
@@ -196,21 +183,21 @@ private:
   }
 
   void on_status(const can_frame &f) {
-    const int16_t p10 = static_cast<int16_t>(
-        (static_cast<uint16_t>(f.data[0]) << 8) |
-        static_cast<uint16_t>(f.data[1]));
-    const int16_t v10 = static_cast<int16_t>(
-        (static_cast<uint16_t>(f.data[2]) << 8) |
-        static_cast<uint16_t>(f.data[3]));
-    const int16_t c01 = static_cast<int16_t>(
-        (static_cast<uint16_t>(f.data[4]) << 8) |
-        static_cast<uint16_t>(f.data[5]));
+    const int16_t p10 =
+        static_cast<int16_t>((static_cast<uint16_t>(f.data[0]) << 8) |
+                             static_cast<uint16_t>(f.data[1]));
+    const int16_t v10 =
+        static_cast<int16_t>((static_cast<uint16_t>(f.data[2]) << 8) |
+                             static_cast<uint16_t>(f.data[3]));
+    const int16_t c01 =
+        static_cast<int16_t>((static_cast<uint16_t>(f.data[4]) << 8) |
+                             static_cast<uint16_t>(f.data[5]));
     const int8_t temp_c = static_cast<int8_t>(f.data[6]);
     const uint8_t error_code = f.data[7];
 
-    pos_[0] = (p10 / 10.0) * (M_PI / 180.0);
-    vel_[0] = (v10 * 10.0) * (M_PI / 30.0);
-    eff_[0] = c01 / 100.0;
+    position_rad_ = (p10 / 10.0) * (M_PI / 180.0);
+    velocity_rad_ = (v10 * 10.0) * (M_PI / 30.0);
+    effort_amp_ = c01 / 100.0;
     last_temperature_c_.store(temp_c, std::memory_order_release);
 
     const int64_t now_ns = clock_.now().nanoseconds();
@@ -221,9 +208,10 @@ private:
         try {
           msg.header.stamp = ros_clock_->now();
         } catch (const rclcpp::exceptions::RCLError &ex) {
-          RCLCPP_WARN_ONCE(logger_,
-                           "AK servo %d failed to query ROS clock during shutdown: %s",
-                           id_, ex.what());
+          RCLCPP_WARN_ONCE(
+              logger_,
+              "AK servo %d failed to query ROS clock during shutdown: %s", id_,
+              ex.what());
         }
       }
       msg.header.frame_id = temperature_frame_id_;
@@ -237,14 +225,12 @@ private:
     if (error_code != prev_error) {
       if (error_code == 0) {
         if (prev_error != 0) {
-          RCLCPP_INFO(logger_,
-                      "AK servo %d cleared error code %u (%s).", id_,
+          RCLCPP_INFO(logger_, "AK servo %d cleared error code %u (%s).", id_,
                       static_cast<unsigned int>(prev_error),
                       error_code_to_string(prev_error));
         }
       } else {
-        RCLCPP_ERROR(logger_,
-                     "AK servo %d reported error code %u (%s).", id_,
+        RCLCPP_ERROR(logger_, "AK servo %d reported error code %u (%s).", id_,
                      static_cast<unsigned int>(error_code),
                      error_code_to_string(error_code));
       }
@@ -252,30 +238,29 @@ private:
 
     last_status_nanosec_.store(now_ns, std::memory_order_release);
 
-    if (!std::isfinite(command_out_[0])) {
-      const double current = pos_[0];
-      command_out_[0] = current;
-      desired_cmd_[0] = current;
+    if (!std::isfinite(command_out_rad_)) {
+      const double current = position_rad_;
+      command_out_rad_ = current;
+      desired_command_rad_ = current;
       hold_position_.store(current, std::memory_order_release);
       initial_command_synced_.store(false, std::memory_order_release);
       controller_command_initialized_.store(false, std::memory_order_release);
-      last_controller_command_.store(current, std::memory_order_release);
-      initial_controller_command_.store(current, std::memory_order_release);
+      release_logged_.store(false, std::memory_order_release);
     }
 
     const bool was_timed_out =
         timed_out_.exchange(false, std::memory_order_acq_rel);
     if (was_timed_out &&
         !recovered_logged_.exchange(true, std::memory_order_acq_rel)) {
-      RCLCPP_WARN(logger_,
-                  "AK servo %d feedback recovered after timeout.", id_);
+      RCLCPP_WARN(logger_, "AK servo %d feedback recovered after timeout.",
+                  id_);
     }
 
     if (!initial_command_synced_.load(std::memory_order_acquire)) {
-      const double current = pos_[0];
+      const double current = position_rad_;
       hold_position_.store(current, std::memory_order_release);
-      if (std::isnan(desired_cmd_[0])) {
-        desired_cmd_[0] = current;
+      if (std::isnan(desired_command_rad_)) {
+        desired_command_rad_ = current;
       }
     }
   }
@@ -284,9 +269,8 @@ private:
     bool expected = false;
     if (timed_out_.compare_exchange_strong(expected, true,
                                            std::memory_order_acq_rel)) {
-      RCLCPP_ERROR(logger_,
-                   "AK servo %d timed out waiting for feedback (%s)", id_,
-                   reason);
+      RCLCPP_ERROR(logger_, "AK servo %d timed out waiting for feedback (%s)",
+                   id_, reason);
       recovered_logged_.store(false, std::memory_order_release);
     }
   }
@@ -303,22 +287,23 @@ private:
   int id_{0};
   std::atomic<bool> timed_out_{false};
   std::atomic<int64_t> last_status_nanosec_{0};
-  std::atomic<int64_t> configure_time_nanosec_{0};
+  bool configure_time_recorded_{false};
+  int64_t configure_time_nanosec_ = 0;
   std::atomic<bool> initial_command_synced_{false};
   std::atomic<bool> controller_command_initialized_{false};
-  std::atomic<double> last_controller_command_{0.0};
-  std::atomic<double> initial_controller_command_{0.0};
   std::atomic<bool> recovered_logged_{true};
   std::atomic<int8_t> last_temperature_c_{0};
   std::atomic<uint8_t> last_error_code_{0};
   std::atomic<bool> release_logged_{false};
 
-  std::vector<double> pos_, vel_, eff_;
-  std::vector<double> command_out_;
-  std::vector<double> desired_cmd_;
+  double position_rad_{std::numeric_limits<double>::quiet_NaN()};
+  double velocity_rad_{std::numeric_limits<double>::quiet_NaN()};
+  double effort_amp_{std::numeric_limits<double>::quiet_NaN()};
+  double command_out_rad_{std::numeric_limits<double>::quiet_NaN()};
+  double desired_command_rad_{std::numeric_limits<double>::quiet_NaN()};
   std::atomic<double> hold_position_{std::numeric_limits<double>::quiet_NaN()};
 
-  template<typename MsgT>
+  template <typename MsgT>
   void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
                     const MsgT &msg) {
     if (!pub || !can_publish()) {

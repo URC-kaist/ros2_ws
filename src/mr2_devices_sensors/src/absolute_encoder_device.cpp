@@ -10,12 +10,12 @@
 #include "rclcpp/utilities.hpp"
 #include "std_msgs/msg/float64.hpp"
 
-#include <cmath>
 #include <cstdint>
-#include <cctype>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 
 namespace mr2_devices_sensors {
@@ -33,6 +33,16 @@ inline int32_t unpack_s24_be(const can_frame &frame) {
   return raw;
 }
 
+inline std::string require_param(
+    const std::unordered_map<std::string, std::string> &params,
+    const std::string &key) {
+  auto it = params.find(key);
+  if (it == params.end()) {
+    throw std::runtime_error("Missing required parameter '" + key + "'");
+  }
+  return it->second;
+}
+
 inline uint32_t parse_can_id(const std::string &value) {
   std::size_t idx = 0;
   uint32_t id = 0;
@@ -47,37 +57,33 @@ inline uint32_t parse_can_id(const std::string &value) {
   return id;
 }
 
-inline double parse_double(const std::unordered_map<std::string, std::string> &params,
-                           const std::string &key, double def) {
+template <typename T>
+inline T parse_number(const std::unordered_map<std::string, std::string> &params,
+                      const std::string &key, T def) {
   auto it = params.find(key);
   if (it == params.end()) {
     return def;
   }
   try {
-    return std::stod(it->second);
+    if constexpr (std::is_integral_v<T>) {
+      return static_cast<T>(std::stoll(it->second));
+    } else {
+      return static_cast<T>(std::stod(it->second));
+    }
   } catch (const std::exception &) {
-    throw std::runtime_error("Invalid numeric value for " + key + ": " + it->second);
+    throw std::runtime_error("Invalid numeric value for " + key + ": " +
+                             it->second);
   }
 }
 
-inline std::string make_sensor_topic(const std::string &name) {
-  if (name.empty()) {
-    return {};
+inline std::string resolve_topic(
+    const std::unordered_map<std::string, std::string> &params,
+    const std::string &key, const std::string &fallback) {
+  auto it = params.find(key);
+  if (it != params.end()) {
+    return it->second;
   }
-  std::string sanitized;
-  sanitized.reserve(name.size());
-  for (char ch : name) {
-    unsigned char uc = static_cast<unsigned char>(ch);
-    if (std::isalnum(uc) || ch == '/' || ch == '_') {
-      sanitized.push_back(ch);
-    } else {
-      sanitized.push_back('_');
-    }
-  }
-  if (!sanitized.empty() && sanitized.front() == '/') {
-    return sanitized;
-  }
-  return std::string("can_sensors/") + sanitized;
+  return fallback;
 }
 
 } // namespace
@@ -89,14 +95,19 @@ public:
     node_ = node;
 
     iface_ = require_param(info.parameters, "can_iface");
-    bitrate_ = static_cast<int>(parse_double(info.parameters, "bitrate", 1'000'000));
+    bitrate_ = parse_number<int>(info.parameters, "bitrate", 1'000'000);
     can_id_ = parse_can_id(require_param(info.parameters, "can_id"));
-    ticks_per_rev_ = parse_double(info.parameters, "ticks_per_rev", 4096.0);
-    direction_ = parse_double(info.parameters, "direction", 1.0);
+    ticks_per_rev_ = parse_number<double>(info.parameters, "ticks_per_rev", 4096.0);
+    direction_ = parse_number<double>(info.parameters, "direction", 1.0);
+    if (ticks_per_rev_ <= 0.0) {
+      throw std::runtime_error("ticks_per_rev must be positive");
+    }
 
-    const double zero_deg = parse_double(info.parameters, "zero_offset_deg", 0.0);
-    const double zero_rad = parse_double(info.parameters, "zero_offset_rad", zero_deg * M_PI / 180.0);
-    zero_offset_rad_ = zero_rad;
+    const double zero_deg =
+        parse_number<double>(info.parameters, "zero_offset_deg", 0.0);
+    zero_offset_rad_ =
+        parse_number<double>(info.parameters, "zero_offset_rad",
+                             zero_deg * M_PI / 180.0);
 
     state_name_ = require_param(info.parameters, "state_name");
     auto raw_it = info.parameters.find("raw_name");
@@ -111,25 +122,25 @@ public:
     logger_ = node->get_logger();
     ros_clock_ = node->get_clock();
 
-    timeout_sec_ = parse_double(info.parameters, "timeout_sec", 0.5);
+    timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 0.5);
     last_frame_time_ = ros_clock_->now();
 
-    const std::string angle_topic = make_sensor_topic(state_name_);
-    angle_topic_ = angle_topic;
+    angle_topic_ = resolve_topic(info.parameters, "angle_topic",
+                                 "can_sensors/" + state_name_);
     angle_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-        angle_topic, rclcpp::SensorDataQoS());
+        angle_topic_, rclcpp::SensorDataQoS());
 
     if (!raw_name_.empty()) {
-      const std::string raw_topic = make_sensor_topic(raw_name_);
-      raw_topic_ = raw_topic;
+      raw_topic_ = resolve_topic(info.parameters, "raw_topic",
+                                 "can_sensors/" + raw_name_);
       raw_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-          raw_topic, rclcpp::SensorDataQoS());
+          raw_topic_, rclcpp::SensorDataQoS());
     }
     if (!flags_name_.empty()) {
-      const std::string flags_topic = make_sensor_topic(flags_name_);
-      flags_topic_ = flags_topic;
+      flags_topic_ = resolve_topic(info.parameters, "flags_topic",
+                                   "can_sensors/" + flags_name_);
       flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-          flags_topic, rclcpp::SensorDataQoS());
+          flags_topic_, rclcpp::SensorDataQoS());
     }
 
     watchdog_state_name_ = state_name_ + "_watchdog";
@@ -151,33 +162,26 @@ public:
 
     if (timed_out) {
       watchdog_state_ = 1.0;
-      if (!timeout_warned_) {
+      if (!timeout_logged_) {
         RCLCPP_ERROR(logger_,
                      "Absolute encoder 0x%03X timed out (%.3f s > %.3f s)",
                      can_id_, since_last, timeout_sec_);
-        timeout_warned_ = true;
+        timeout_logged_ = true;
       }
-      timeout_active_ = true;
     } else {
-      if (frame_received_) {
-        watchdog_state_ = 0.0;
-      } else {
-        watchdog_state_ = -1.0;
-      }
-      if (timeout_active_) {
+      watchdog_state_ = frame_received_ ? 0.0 : -1.0;
+      if (timeout_logged_) {
         RCLCPP_WARN(logger_,
                     "Absolute encoder 0x%03X feedback recovered after timeout.",
                     can_id_);
-        timeout_active_ = false;
+        timeout_logged_ = false;
       }
-      timeout_warned_ = false;
     }
   }
 
-  void export_state(std::vector<double *> &, std::vector<double *> &,
-                    std::vector<double *> &) override {}
+  void export_state(double *&, double *&, double *&) override {}
 
-  void export_command(std::vector<double *> &) override {}
+  void export_command(double *&) override {}
 
   void export_named_states(
       std::vector<std::pair<std::string, double *>> &states) override {
@@ -192,15 +196,6 @@ public:
   }
 
 private:
-  static std::string require_param(const std::unordered_map<std::string, std::string> &params,
-                                   const std::string &key) {
-    auto it = params.find(key);
-    if (it == params.end()) {
-      throw std::runtime_error("Missing required parameter '" + key + "'");
-    }
-    return it->second;
-  }
-
   void on_frame(const can_frame &frame) {
     const int32_t raw_q24 = unpack_s24_be(frame);
     const double counts = static_cast<double>(raw_q24) / static_cast<double>(1 << 12);
@@ -234,7 +229,7 @@ private:
     }
     frame_received_ = true;
     watchdog_state_ = 0.0;
-    timeout_warned_ = false;
+    timeout_logged_ = false;
   }
 
   rclcpp::Node *node_{nullptr};
@@ -263,8 +258,7 @@ private:
   double raw_counts_{0.0};
   double flags_{0.0};
   bool frame_received_{false};
-  bool timeout_warned_{false};
-  bool timeout_active_{false};
+  bool timeout_logged_{false};
   double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;
