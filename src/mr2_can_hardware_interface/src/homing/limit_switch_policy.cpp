@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <limits>
 #include <string>
 #include <utility>
@@ -78,8 +77,11 @@ public:
       try {
         return std::stod(it->second);
       } catch (const std::exception &ex) {
-        log_warn("failed to parse parameter '%s': %s (using %.3f)", key.c_str(),
-                 ex.what(), def);
+        if (node_) {
+          RCLCPP_WARN(node_->get_logger(),
+                      "failed to parse parameter '%s': %s (using %.3f)",
+                      key.c_str(), ex.what(), def);
+        }
         return def;
       }
     };
@@ -87,7 +89,10 @@ public:
     auto ensure_positive = [&](const std::string &name, double value,
                                double fallback) {
       if (!std::isfinite(value) || value <= 0.0) {
-        log_warn("parameter '%s' invalid, using %.3f", name.c_str(), fallback);
+        if (node_) {
+          RCLCPP_WARN(node_->get_logger(), "parameter '%s' invalid, using %.3f",
+                      name.c_str(), fallback);
+        }
         return fallback;
       }
       return value;
@@ -117,7 +122,10 @@ public:
     const double max_travel =
         get_double("max_search_travel_rad", kDefaultMaxTravel);
     if (std::isfinite(max_travel) && max_travel <= 0.0) {
-      log_warn("parameter '%s' invalid, ignoring", "max_search_travel_rad");
+      if (node_) {
+        RCLCPP_WARN(node_->get_logger(), "parameter '%s' invalid, ignoring",
+                    "max_search_travel_rad");
+      }
       max_search_travel_ = kDefaultMaxTravel;
     } else {
       max_search_travel_ = max_travel;
@@ -152,7 +160,10 @@ public:
       transition(Phase::FastSearch, "begin homing");
     } else {
       apply_target();
-      log_info("waiting for initial joint state before homing");
+      if (node_) {
+        RCLCPP_INFO(node_->get_logger(),
+                    "waiting for initial joint state before homing");
+      }
     }
   }
 
@@ -326,8 +337,12 @@ private:
     }
     const double raw_position = *joint_.state + *joint_.offset;
     *joint_.offset = raw_position - home_position_;
-    log_info("Homed joint '%s': offset=%.6f rad (raw=%.6f rad, home=%.6f rad)",
-             joint_.name.c_str(), *joint_.offset, raw_position, home_position_);
+    if (node_) {
+      RCLCPP_INFO(node_->get_logger(),
+                  "Homed joint '%s': offset=%.6f rad (raw=%.6f rad, home=%.6f rad)",
+                  joint_.name.c_str(), *joint_.offset, raw_position,
+                  home_position_);
+    }
   }
 
   void set_error(const std::string &message) {
@@ -336,15 +351,17 @@ private:
     if (phase_ != Phase::Error) {
       transition(Phase::Error, message.c_str(), true);
     } else {
-      log_error("%s", message.c_str());
+      if (node_) {
+        RCLCPP_ERROR(node_->get_logger(), "%s", message.c_str());
+      }
     }
   }
 
   void transition(Phase new_phase, const char *reason,
                   bool force_error_log = false) {
     if (phase_ == new_phase) {
-      if (force_error_log && reason) {
-        log_error("%s", reason);
+      if (force_error_log && reason && node_) {
+        RCLCPP_ERROR(node_->get_logger(), "%s", reason);
       }
       return;
     }
@@ -357,15 +374,20 @@ private:
     const char *new_name = phase_name(new_phase);
     if (new_phase == Phase::Error || force_error_log) {
       if (reason) {
-        log_error("LimitSwitchPolicy: %s -> %s (%s)", old_name, new_name,
-                  reason);
+        RCLCPP_ERROR(node_->get_logger(),
+                     "LimitSwitchPolicy: %s -> %s (%s)", old_name, new_name,
+                     reason);
       } else {
-        log_error("LimitSwitchPolicy: %s -> %s", old_name, new_name);
+        RCLCPP_ERROR(node_->get_logger(), "LimitSwitchPolicy: %s -> %s",
+                     old_name, new_name);
       }
     } else if (reason) {
-      log_info("LimitSwitchPolicy: %s -> %s (%s)", old_name, new_name, reason);
+      RCLCPP_INFO(node_->get_logger(),
+                  "LimitSwitchPolicy: %s -> %s (%s)", old_name, new_name,
+                  reason);
     } else {
-      log_info("LimitSwitchPolicy: %s -> %s", old_name, new_name);
+      RCLCPP_INFO(node_->get_logger(), "LimitSwitchPolicy: %s -> %s", old_name,
+                  new_name);
     }
   }
 
@@ -387,33 +409,6 @@ private:
       return "error";
     }
     return "unknown";
-  }
-
-  template <typename... Args>
-  void log_info(const char *fmt, Args &&...args) const {
-    if (!node_) {
-      return;
-    }
-    const auto message = format_message(fmt, std::forward<Args>(args)...);
-    RCLCPP_INFO(node_->get_logger(), "%s", message.c_str());
-  }
-
-  template <typename... Args>
-  void log_warn(const char *fmt, Args &&...args) const {
-    if (!node_) {
-      return;
-    }
-    const auto message = format_message(fmt, std::forward<Args>(args)...);
-    RCLCPP_WARN(node_->get_logger(), "%s", message.c_str());
-  }
-
-  template <typename... Args>
-  void log_error(const char *fmt, Args &&...args) const {
-    if (!node_) {
-      return;
-    }
-    const auto message = format_message(fmt, std::forward<Args>(args)...);
-    RCLCPP_ERROR(node_->get_logger(), "%s", message.c_str());
   }
 
   rclcpp::Node::SharedPtr node_;
@@ -441,19 +436,6 @@ private:
   double search_origin_{0.0};
   bool origin_set_{false};
 
-  template <typename... Args>
-  static std::string format_message(const char *fmt, Args &&...args) {
-    if (!fmt) {
-      return {};
-    }
-    const int size = std::snprintf(nullptr, 0, fmt, args...);
-    if (size <= 0) {
-      return std::string(fmt);
-    }
-    std::vector<char> buffer(static_cast<size_t>(size) + 1);
-    std::snprintf(buffer.data(), buffer.size(), fmt, args...);
-    return std::string(buffer.data());
-  }
 };
 
 } // namespace mr2_can_hardware_interface
