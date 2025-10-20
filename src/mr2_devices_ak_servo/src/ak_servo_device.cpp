@@ -54,24 +54,6 @@ public:
         (0x00002900U | (static_cast<uint32_t>(id_) & 0xFFU));
     add_filter(bus_, canonical_feedback_id, 0x1FFFFFFF,
                [this](const can_frame &f) { on_status(f); });
-
-    // Reset all runtime state so a freshly configured device starts in a safe
-    // "hold current position" posture until status frames arrive.
-    position_rad_ = std::numeric_limits<double>::quiet_NaN();
-    velocity_rad_ = std::numeric_limits<double>::quiet_NaN();
-    effort_amp_ = std::numeric_limits<double>::quiet_NaN();
-    command_out_rad_ = std::numeric_limits<double>::quiet_NaN();
-    desired_command_rad_ = std::numeric_limits<double>::quiet_NaN();
-
-    timed_out_.store(false, std::memory_order_relaxed);
-    last_status_nanosec_.store(0, std::memory_order_relaxed);
-    configure_time_recorded_ = false;
-    configure_time_nanosec_ = 0;
-    last_temperature_c_ = 0;
-    last_error_code_ = 0;
-
-    controller_initialized_.store(false, std::memory_order_relaxed);
-    recovered_logged_.store(true, std::memory_order_relaxed);
   }
 
   // Runs every control cycle; validates feedback health and pushes the next
@@ -98,15 +80,15 @@ public:
       return;
     }
 
-    if (!std::isfinite(command_out_rad_)) {
-      return;
-    }
-
     // Retrieve the latest desired command, else defaulting to "hold"
     double desired = desired_command_rad_;
     if (std::isnan(desired)) {
-      desired = position_rad;
-      desired_command_rad_ = desired;
+      if (hold_position_rad_ == std::numeric_limits<double>::quiet_NaN()) {
+        hold_position_rad_ = position_rad_;
+      }
+      desired = hold_position_rad_;
+    } else {
+      hold_position_rad_ = std::numeric_limits<double>::quiet_NaN();
     }
 
     // Initialize controller state
@@ -259,16 +241,6 @@ private:
     }
   }
 
-  void reset_command_tracking(double current_position) {
-    if (std::isfinite(command_out_rad_)) {
-      return;
-    }
-
-    command_out_rad_ = current_position;
-    desired_command_rad_ = current_position;
-    controller_initialized_.store(false, std::memory_order_relaxed);
-  }
-
   void note_feedback_recovery() {
     const bool was_timed_out =
         timed_out_.exchange(false, std::memory_order_acq_rel);
@@ -303,12 +275,7 @@ private:
 
     last_status_nanosec_.store(sample.timestamp_ns, std::memory_order_release);
 
-    reset_command_tracking(sample.position_rad);
     note_feedback_recovery();
-
-    if (std::isnan(desired_command_rad_)) {
-      desired_command_rad_ = sample.position_rad;
-    }
   }
 
   void mark_timeout(const char *reason) {
@@ -345,6 +312,7 @@ private:
   double effort_amp_{std::numeric_limits<double>::quiet_NaN()};
   double command_out_rad_{std::numeric_limits<double>::quiet_NaN()};
   double desired_command_rad_{std::numeric_limits<double>::quiet_NaN()};
+  double hold_position_rad_{std::numeric_limits<double>::quiet_NaN()};
 
   mutable std::mutex command_mutex_;
 

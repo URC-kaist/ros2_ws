@@ -10,8 +10,8 @@
  *   encoder_watchdog_state (string, optional)
  *     Name of the watchdog state to monitor encoder health.
  *   home_offset (double, optional, default 0.0)
- *     Additional offset in radians applied to the encoder angle before computing the
- *     joint offset.
+ *     Additional offset in radians applied to the encoder angle before
+ *     computing the joint offset.
  *   home_position (double, optional, default 0.0)
  *     Target joint angle in radians commanded once homing completes.
  *   encoder_direction (double, optional, default 1.0)
@@ -53,8 +53,8 @@ public:
 
     const auto ptr_it = named_states.find(state_it->second);
     if (ptr_it == named_states.end()) {
-      error_message_ =
-          "Named state '" + state_it->second + "' not found for absolute encoder.";
+      error_message_ = "Named state '" + state_it->second +
+                       "' not found for absolute encoder.";
       error_ = true;
       return;
     }
@@ -63,8 +63,7 @@ public:
 
     const auto watchdog_state_it = params.find("encoder_watchdog_state");
     if (watchdog_state_it != params.end()) {
-      const auto watchdog_ptr_it =
-          named_states.find(watchdog_state_it->second);
+      const auto watchdog_ptr_it = named_states.find(watchdog_state_it->second);
       if (watchdog_ptr_it == named_states.end()) {
         error_message_ = "Named state '" + watchdog_state_it->second +
                          "' not found for absolute encoder watchdog.";
@@ -83,8 +82,7 @@ public:
       try {
         target = std::stod(it->second);
       } catch (const std::exception &) {
-        error_message_ =
-            "Invalid numeric value for " + key + ": " + it->second;
+        error_message_ = "Invalid numeric value for " + key + ": " + it->second;
         error_ = true;
         return false;
       }

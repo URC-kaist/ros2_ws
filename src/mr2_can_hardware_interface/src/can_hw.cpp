@@ -659,8 +659,6 @@ public:
       joint.transmission_effort = 0.0;
     }
 
-    RCLCPP_INFO(node_->get_logger(), "joint command: %f", joints_[0].command);
-
     for (auto &transmission : transmissions_) {
       transmission->joint_to_actuator();
     }
@@ -671,9 +669,6 @@ public:
         *actuator.device->command_ptr = actuator.command;
       }
     }
-
-    RCLCPP_INFO(node_->get_logger(), "actuator command: %f",
-                actuators_[0].command);
 
     for (auto &dev : devs_) {
       dev->process(now);
