@@ -2,6 +2,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <rclcpp/logging.hpp>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -645,9 +646,6 @@ public:
         homed_ = true;
         RCLCPP_INFO(node_->get_logger(),
                     "Homing sequence completed successfully.");
-        for (auto &joint : joints_) {
-          RCLCPP_INFO(node_->get_logger(), "command: %f", joint.command);
-        }
       }
     } else if (!homed_) {
       for (auto &joint : joints_) {
@@ -661,6 +659,8 @@ public:
       joint.transmission_effort = 0.0;
     }
 
+    RCLCPP_INFO(node_->get_logger(), "joint command: %f", joints_[0].command);
+
     for (auto &transmission : transmissions_) {
       transmission->joint_to_actuator();
     }
@@ -671,6 +671,9 @@ public:
         *actuator.device->command_ptr = actuator.command;
       }
     }
+
+    RCLCPP_INFO(node_->get_logger(), "actuator command: %f",
+                actuators_[0].command);
 
     for (auto &dev : devs_) {
       dev->process(now);
