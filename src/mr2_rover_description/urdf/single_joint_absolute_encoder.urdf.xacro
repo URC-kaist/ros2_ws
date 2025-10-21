@@ -5,11 +5,9 @@
   <!-- Absolute encoder CAN ID provided in decimal to match mock node expectations -->
   <xacro:arg name="absolute_encoder_can_id" default="384"/>
   <xacro:arg name="absolute_encoder_ticks_per_rev" default="4096"/>
-  <!-- Absolute encoder zero offset (radians) -->
-  <xacro:arg name="absolute_encoder_zero_offset" default="0.0"/>
   <xacro:arg name="absolute_encoder_direction" default="1.0"/>
-  <xacro:arg name="homing_home_position" default="0.0"/>
   <xacro:arg name="homing_encoder_direction" default="1.0"/>
+  <xacro:arg name="homing_home_offset" default="0.0"/>
   <xacro:property name="actuator_name" value="motor$(arg motor_id)"/>
 
   <link name="base_link">
@@ -62,8 +60,7 @@
       <param name="homing_encoder_state">joint1/absolute_encoder</param>
       <param name="homing_encoder_watchdog_state">joint1/absolute_encoder_watchdog</param>
       <!-- AbsoluteEncoderPolicy specific parameters -->
-      <param name="homing_home_offset">0.0</param>
-      <param name="homing_home_position">$(arg homing_home_position)</param>
+      <param name="homing_home_offset">$(arg homing_home_offset)</param>
       <param name="homing_encoder_direction">$(arg homing_encoder_direction)</param>
     </joint>
 
@@ -74,7 +71,6 @@
       <param name="state_name">joint1/absolute_encoder</param>
       <param name="flags_name">joint1/absolute_encoder_flags</param>
       <param name="ticks_per_rev">$(arg absolute_encoder_ticks_per_rev)</param>
-      <param name="zero_offset_rad">$(arg absolute_encoder_zero_offset)</param>
       <param name="direction">$(arg absolute_encoder_direction)</param>
     </gpio>
 

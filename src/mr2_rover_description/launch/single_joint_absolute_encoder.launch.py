@@ -58,13 +58,6 @@ def generate_launch_description():
         description="Ticks per revolution reported by the absolute encoder",
     )
 
-    abs_zero_offset = LaunchConfiguration("absolute_encoder_zero_offset")
-    abs_zero_offset_arg = DeclareLaunchArgument(
-        "absolute_encoder_zero_offset",
-        default_value="0.0",
-        description="Mechanical zero offset (rad) applied to the encoder",
-    )
-
     abs_direction = LaunchConfiguration("absolute_encoder_direction")
     abs_direction_arg = DeclareLaunchArgument(
         "absolute_encoder_direction",
@@ -72,18 +65,18 @@ def generate_launch_description():
         description="Direction multiplier applied to the encoder (+1 or -1)",
     )
 
-    homing_home_position = LaunchConfiguration("homing_home_position")
-    homing_home_position_arg = DeclareLaunchArgument(
-        "homing_home_position",
-        default_value="0.0",
-        description="Joint position command (rad) after homing completes",
-    )
-
     homing_encoder_direction = LaunchConfiguration("homing_encoder_direction")
     homing_encoder_direction_arg = DeclareLaunchArgument(
         "homing_encoder_direction",
         default_value=abs_direction,
         description="Multiplier applied inside the homing policy (+1 or -1)",
+    )
+
+    homing_home_offset = LaunchConfiguration("homing_home_offset")
+    homing_home_offset_arg = DeclareLaunchArgument(
+        "homing_home_offset",
+        default_value="0.0",
+        description="Offset (rad) added to the encoder angle before computing the joint home",
     )
 
     robot_description = {
@@ -98,14 +91,12 @@ def generate_launch_description():
             abs_can_id,
             " absolute_encoder_ticks_per_rev:=",
             abs_ticks_per_rev,
-            " absolute_encoder_zero_offset:=",
-            abs_zero_offset,
             " absolute_encoder_direction:=",
             abs_direction,
-            " homing_home_position:=",
-            homing_home_position,
             " homing_encoder_direction:=",
             homing_encoder_direction,
+            " homing_home_offset:=",
+            homing_home_offset,
         ])
     }
 
@@ -138,8 +129,6 @@ def generate_launch_description():
                 abs_ticks_per_rev, value_type=float),
             "absolute_encoder_direction": ParameterValue(
                 abs_direction, value_type=float),
-            "absolute_encoder_zero_offset": ParameterValue(
-                abs_zero_offset, value_type=float),
         }],
         condition=IfCondition(use_mock_servo),
         output="screen",
@@ -164,10 +153,9 @@ def generate_launch_description():
             use_mock_servo_arg,
             abs_can_id_arg,
             abs_ticks_per_rev_arg,
-            abs_zero_offset_arg,
             abs_direction_arg,
-            homing_home_position_arg,
             homing_encoder_direction_arg,
+            homing_home_offset_arg,
             robot_state_publisher_node,
             mock_servo_node,
             ros2_control_node,

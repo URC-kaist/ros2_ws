@@ -10,7 +10,6 @@
   <xacro:arg name="homing_backoff_speed" default="0.60"/>
   <xacro:arg name="homing_fine_speed" default="0.03"/>
   <xacro:arg name="homing_backoff_distance" default="0.10"/>
-  <xacro:arg name="homing_home_position" default="0.0"/>
   <xacro:property name="actuator_name" value="motor$(arg motor_id)"/>
 
   <link name="base_link">
@@ -67,7 +66,6 @@
       <param name="homing_backoff_speed">$(arg homing_backoff_speed)</param>
       <param name="homing_fine_speed">$(arg homing_fine_speed)</param>
       <param name="homing_backoff_distance">$(arg homing_backoff_distance)</param>
-      <param name="homing_home_position">$(arg homing_home_position)</param>
     </joint>
 
     <gpio name="joint1_limit_switch">

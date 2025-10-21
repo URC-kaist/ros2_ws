@@ -12,8 +12,6 @@
  *   home_offset (double, optional, default 0.0)
  *     Additional offset in radians applied to the encoder angle before
  *     computing the joint offset.
- *   home_position (double, optional, default 0.0)
- *     Target joint angle in radians commanded once homing completes.
  *   encoder_direction (double, optional, default 1.0)
  *     Multiplier that allows correcting for an inverted encoder (+1 or -1).
  */
@@ -92,9 +90,6 @@ public:
     if (!parse_double("home_offset", home_offset_)) {
       return;
     }
-    if (!parse_double("home_position", home_position_)) {
-      return;
-    }
     if (!parse_double("encoder_direction", encoder_direction_)) {
       return;
     }
@@ -144,15 +139,12 @@ public:
       *joint_.offset = joint_angle - absolute_angle;
       computed_ = true;
       // Command the joint directly to the configured home position.
-      if (joint_.command) {
-        *joint_.command = home_position_;
-      }
       if (node_) {
         RCLCPP_INFO(node_->get_logger(),
                     "Homed joint '%s' via absolute encoder: offset=%.6f rad "
-                    "(encoder=%.6f rad, joint=%.6f rad, target=%.6f rad)",
+                    "(encoder=%.6f rad, joint=%.6f rad)",
                     joint_.name.c_str(), *joint_.offset, absolute_angle,
-                    joint_angle, home_position_);
+                    joint_angle);
       }
     }
 
@@ -163,11 +155,7 @@ public:
   bool has_error() const override { return error_; }
   std::string error_message() const override { return error_message_; }
 
-  void finalize(const rclcpp::Time &) override {
-    if (joint_.command) {
-      *joint_.command = home_position_;
-    }
-  }
+  void finalize(const rclcpp::Time &) override {}
 
   void reset() override {
     finished_ = false;
@@ -182,7 +170,6 @@ private:
   const double *encoder_state_{nullptr};
   const double *encoder_watchdog_state_{nullptr};
   double home_offset_{0.0};
-  double home_position_{0.0};
   double encoder_direction_{1.0};
 
   bool finished_{false};

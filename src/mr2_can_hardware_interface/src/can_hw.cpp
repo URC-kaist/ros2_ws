@@ -533,10 +533,6 @@ public:
     homing_failed_ = false;
     homing_error_message_.clear();
 
-    for (auto &joint : joints_) {
-      joint.command_seeded = false;
-    }
-
     if (homing_instances_.empty()) {
       homed_ = true;
       homing_active_ = false;
@@ -569,11 +565,15 @@ public:
   return_type read(const rclcpp::Time &, const rclcpp::Duration &) override {
     for (auto &actuator : actuators_) {
       const auto *device = actuator.device;
-      actuator.state = (device && device->state_ptr) ? *device->state_ptr : 0.0;
-      actuator.velocity =
-          (device && device->velocity_ptr) ? *device->velocity_ptr : 0.0;
-      actuator.effort =
-          (device && device->effort_ptr) ? *device->effort_ptr : 0.0;
+      actuator.state = (device && device->state_ptr)
+                           ? *device->state_ptr
+                           : std::numeric_limits<double>::quiet_NaN();
+      actuator.velocity = (device && device->velocity_ptr)
+                              ? *device->velocity_ptr
+                              : std::numeric_limits<double>::quiet_NaN();
+      actuator.effort = (device && device->effort_ptr)
+                            ? *device->effort_ptr
+                            : std::numeric_limits<double>::quiet_NaN();
 
       actuator.transmission_passthrough = actuator.state;
       actuator.transmission_velocity = actuator.velocity;
@@ -588,11 +588,6 @@ public:
       joint.state = joint.transmission_passthrough - joint.offset;
       joint.velocity = joint.transmission_velocity;
       joint.effort = joint.transmission_effort;
-
-      if (!joint.command_seeded && std::isfinite(joint.state)) {
-        joint.command = joint.state;
-        joint.command_seeded = true;
-      }
     }
 
     return return_type::OK;
@@ -605,10 +600,6 @@ public:
     }
 
     if (homing_active_) {
-      for (auto &joint : joints_) {
-        joint.command = joint.state;
-      }
-
       for (auto &instance : homing_instances_) {
         if (instance.policy) {
           instance.policy->update(now, period);
@@ -647,10 +638,6 @@ public:
         RCLCPP_INFO(node_->get_logger(),
                     "Homing sequence completed successfully.");
       }
-    } else if (!homed_) {
-      for (auto &joint : joints_) {
-        joint.command = joint.state;
-      }
     }
 
     for (auto &joint : joints_) {
@@ -682,7 +669,7 @@ private:
     explicit JointData(std::string name_in) : name(std::move(name_in)) {}
 
     std::string name;
-    double command{0.0};
+    double command{std::numeric_limits<double>::quiet_NaN()};
     double state{std::numeric_limits<double>::quiet_NaN()};
     double velocity{std::numeric_limits<double>::quiet_NaN()};
     double effort{std::numeric_limits<double>::quiet_NaN()};
@@ -693,7 +680,6 @@ private:
     std::string actuator_name;
     bool has_velocity_state{false};
     bool has_effort_state{false};
-    bool command_seeded{false};
   };
 
   struct DevicePointers {
@@ -707,7 +693,7 @@ private:
     explicit ActuatorData(std::string name_in) : name(std::move(name_in)) {}
 
     std::string name;
-    double command{0.0};
+    double command{std::numeric_limits<double>::quiet_NaN()};
     double state{std::numeric_limits<double>::quiet_NaN()};
     double velocity{std::numeric_limits<double>::quiet_NaN()};
     double effort{std::numeric_limits<double>::quiet_NaN()};

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <limits>
 #include <mutex>
+#include <rclcpp/logging.hpp>
 
 namespace mr2_devices_ak_servo {
 
@@ -76,14 +77,14 @@ public:
     }
 
     const double position_rad = position_rad_;
-    if (!std::isfinite(position_rad)) {
+    if (std::isnan(position_rad)) {
       return;
     }
 
     // Retrieve the latest desired command, else defaulting to "hold"
     double desired = desired_command_rad_;
     if (std::isnan(desired)) {
-      if (hold_position_rad_ == std::numeric_limits<double>::quiet_NaN()) {
+      if (std::isnan(hold_position_rad_)) {
         hold_position_rad_ = position_rad_;
       }
       desired = hold_position_rad_;
@@ -94,7 +95,8 @@ public:
     // Initialize controller state
     controller_initialized_.store(true, std::memory_order_relaxed);
 
-    command_out_rad_ = compute_target_command(position_rad, desired);
+    command_out_rad_ = compute_target_command(desired);
+
     transmit_command();
   }
 
@@ -140,9 +142,8 @@ private:
 
   // Decide which angle should be sent to the driver (initially the first
   // sampled position, then whatever the controller requests).
-  double compute_target_command(double position_rad, double desired) {
+  double compute_target_command(double desired) {
     std::lock_guard<std::mutex> lock(command_mutex_);
-    (void)position_rad;
     return desired;
   }
 

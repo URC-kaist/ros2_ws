@@ -69,8 +69,8 @@ constexpr uint32_t kMaxCanId = 0x1FFFFFFF;
 constexpr double kDirectionEpsilon = 1e-6;
 constexpr double kTwoPi = 6.28318530717958647692; // 2 * pi
 constexpr double kQ24Scale = static_cast<double>(1 << 12);
-constexpr double kMaxQ24 = static_cast<double>(0x7FFFFF);
-constexpr double kMinQ24 = static_cast<double>(-0x800000);
+constexpr double kMaxQ24 = static_cast<double>((1 << 23) - 1);
+constexpr double kMinQ24 = static_cast<double>(-(1 << 23));
 } // namespace
 
 class MockAkServoNode : public rclcpp::Node {
@@ -297,24 +297,39 @@ private:
     bus_->enqueue_tx(frame);
   }
 
-  void publish_absolute_encoder(double position) {
-    if (!absolute_encoder_enabled_) {
-      return;
-    }
+  inline double wrap_mod(double x, double mod) {
+    double y = std::fmod(x, mod);
+    if (y < 0)
+      y += mod;
+    return y;
+  }
 
-    const double counts = (position + absolute_encoder_zero_offset_) *
-                          absolute_encoder_ticks_per_rev_ /
-                          (kTwoPi * absolute_encoder_direction_);
-    const double raw_q24 = std::clamp(counts * kQ24Scale, kMinQ24, kMaxQ24);
-    const int32_t raw = static_cast<int32_t>(std::llround(raw_q24));
+  void publish_absolute_encoder(double position_rad) {
+    if (!absolute_encoder_enabled_)
+      return;
+
+    RCLCPP_INFO(get_logger(), "position: %f", position_rad);
+
+    // 1) Convert radians to 12-bit angle (0..4095)
+    // angle12 = round( (position / 2π) * ticks_per_rev ) mod 4096
+    const double angle12_unwrapped =
+        (position_rad / kTwoPi) * absolute_encoder_ticks_per_rev_;
+    const double angle12_wrapped =
+        wrap_mod(std::llround(angle12_unwrapped), 4096.0);
+    const double counts_centered = angle12_wrapped - 2048.0; // [-2048, 2047]
+
+    // 2) Convert to Q24 exactly like FW: (counts << 12)
+    const double q24_d =
+        std::clamp(counts_centered * kQ24Scale, kMinQ24, kMaxQ24);
+    const int32_t q24 = static_cast<int32_t>(std::llround(q24_d));
 
     struct can_frame frame {};
-    frame.can_id = absolute_encoder_can_id_;
+    frame.can_id = absolute_encoder_can_id_; // 11-bit std ID assumed
     frame.can_dlc = 4;
-    frame.data[0] = static_cast<uint8_t>((raw >> 16) & 0xFF);
-    frame.data[1] = static_cast<uint8_t>((raw >> 8) & 0xFF);
-    frame.data[2] = static_cast<uint8_t>(raw & 0xFF);
-    frame.data[3] = 0x00;
+    frame.data[0] = static_cast<uint8_t>((q24 >> 16) & 0xFF);
+    frame.data[1] = static_cast<uint8_t>((q24 >> 8) & 0xFF);
+    frame.data[2] = static_cast<uint8_t>(q24 & 0xFF);
+    frame.data[3] = 0x00; // flags byte
     bus_->enqueue_tx(frame);
   }
 

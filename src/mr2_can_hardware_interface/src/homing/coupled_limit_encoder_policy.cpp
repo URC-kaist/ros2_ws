@@ -11,11 +11,11 @@
 namespace mr2_can_hardware_interface {
 
 namespace {
-constexpr double kDefaultApproachSpeed = 0.3;     // rad/s
-constexpr double kDefaultFineSpeed = 0.05;        // rad/s
-constexpr double kDefaultBackoffDistance = 0.15;  // rad
-constexpr double kDefaultTimeout = 20.0;          // s
-constexpr double kReleaseThreshold = 0.5;         // boolean latch threshold
+constexpr double kDefaultApproachSpeed = 0.3;    // rad/s
+constexpr double kDefaultFineSpeed = 0.05;       // rad/s
+constexpr double kDefaultBackoffDistance = 0.15; // rad
+constexpr double kDefaultTimeout = 20.0;         // s
+constexpr double kReleaseThreshold = 0.5;        // boolean latch threshold
 
 double parse_double(const HomingPolicy::ParamMap &params,
                     const std::string &key, double def) {
@@ -31,8 +31,7 @@ double parse_double(const HomingPolicy::ParamMap &params,
 }
 
 std::string parse_string(const HomingPolicy::ParamMap &params,
-                         const std::string &key,
-                         const std::string &def = "") {
+                         const std::string &key, const std::string &def = "") {
   const auto it = params.find(key);
   return it == params.end() ? def : it->second;
 }
@@ -86,9 +85,8 @@ public:
     if (!limit_watchdog_key.empty()) {
       const auto limit_watchdog_it = named_states.find(limit_watchdog_key);
       if (limit_watchdog_it == named_states.end()) {
-        error_message_ =
-            "Named state '" + limit_watchdog_key +
-            "' not found for limit watchdog state.";
+        error_message_ = "Named state '" + limit_watchdog_key +
+                         "' not found for limit watchdog state.";
         error_ = true;
         return;
       }
@@ -98,12 +96,10 @@ public:
     const std::string encoder_watchdog_key =
         parse_string(params, "encoder_watchdog_state");
     if (!encoder_watchdog_key.empty()) {
-      const auto encoder_watchdog_it =
-          named_states.find(encoder_watchdog_key);
+      const auto encoder_watchdog_it = named_states.find(encoder_watchdog_key);
       if (encoder_watchdog_it == named_states.end()) {
-        error_message_ =
-            "Named state '" + encoder_watchdog_key +
-            "' not found for encoder watchdog state.";
+        error_message_ = "Named state '" + encoder_watchdog_key +
+                         "' not found for encoder watchdog state.";
         error_ = true;
         return;
       }
@@ -114,18 +110,15 @@ public:
         std::abs(parse_double(params, "approach_speed", kDefaultApproachSpeed));
     fine_speed_ =
         std::abs(parse_double(params, "fine_speed", kDefaultFineSpeed));
-    backoff_distance_ =
-        std::abs(parse_double(params, "backoff_distance", kDefaultBackoffDistance));
-    timeout_ = std::max(
-        1e-3, parse_double(params, "timeout", kDefaultTimeout));
+    backoff_distance_ = std::abs(
+        parse_double(params, "backoff_distance", kDefaultBackoffDistance));
+    timeout_ = std::max(1e-3, parse_double(params, "timeout", kDefaultTimeout));
     encoder_home_shift_ = parse_double(params, "encoder_home_shift", 0.0);
 
     const std::string dir =
         parse_string(params, "search_direction", "negative");
-    search_sign_ = (dir == "positive" || dir == "+1" || dir == "positive")
-                       ? 1.0
-                       : -1.0;
-
+    search_sign_ =
+        (dir == "positive" || dir == "+1" || dir == "positive") ? 1.0 : -1.0;
   }
 
   void begin(const rclcpp::Time &now) override {
@@ -228,14 +221,7 @@ public:
 
   std::string error_message() const override { return error_message_; }
 
-  void finalize(const rclcpp::Time &) override {
-    // Hold current positions to avoid sudden jump.
-    for (auto &joint : joints_) {
-      if (joint.command && joint.state) {
-        *joint.command = *joint.state;
-      }
-    }
-  }
+  void finalize(const rclcpp::Time &) override {}
 
   void reset() override {
     finished_ = false;
@@ -246,7 +232,15 @@ public:
   }
 
 private:
-  enum class Phase { Idle, SearchFast, Backoff, ApproachSlow, Capture, Done, Error };
+  enum class Phase {
+    Idle,
+    SearchFast,
+    Backoff,
+    ApproachSlow,
+    Capture,
+    Done,
+    Error
+  };
 
   void integrate_targets(double dt, double velocity) {
     for (auto &joint : joints_) {
@@ -293,12 +287,13 @@ private:
     if (node_ && joint0_valid && joint1_valid) {
       const double encoder_angle =
           encoder_state_ ? *encoder_state_ : joint1_position;
-      RCLCPP_INFO(node_->get_logger(),
-                  "Homed coupled joints '%s'/'%s': offsets=(%.6f, %.6f) rad "
-                  "(joint states=(%.6f, %.6f) rad, encoder=%.6f rad, shift=%.6f rad)",
-                  joints_[0].name.c_str(), joints_[1].name.c_str(),
-                  joint0_offset, joint1_offset, joint0_position, joint1_position,
-                  encoder_angle, encoder_home_shift_);
+      RCLCPP_INFO(
+          node_->get_logger(),
+          "Homed coupled joints '%s'/'%s': offsets=(%.6f, %.6f) rad "
+          "(joint states=(%.6f, %.6f) rad, encoder=%.6f rad, shift=%.6f rad)",
+          joints_[0].name.c_str(), joints_[1].name.c_str(), joint0_offset,
+          joint1_offset, joint0_position, joint1_position, encoder_angle,
+          encoder_home_shift_);
     }
   }
 
@@ -343,6 +338,5 @@ private:
 
 } // namespace mr2_can_hardware_interface
 
-PLUGINLIB_EXPORT_CLASS(
-    mr2_can_hardware_interface::CoupledLimitEncoderPolicy,
-    mr2_can_hardware_interface::HomingPolicy)
+PLUGINLIB_EXPORT_CLASS(mr2_can_hardware_interface::CoupledLimitEncoderPolicy,
+                       mr2_can_hardware_interface::HomingPolicy)

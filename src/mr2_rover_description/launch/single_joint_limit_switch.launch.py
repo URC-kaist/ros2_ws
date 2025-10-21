@@ -109,13 +109,6 @@ def generate_launch_description():
         description="Distance (rad) to back off once the switch is detected",
     )
 
-    homing_home_position = LaunchConfiguration("homing_home_position")
-    homing_home_position_arg = DeclareLaunchArgument(
-        "homing_home_position",
-        default_value="0.0",
-        description="Joint position command (rad) after homing completes",
-    )
-
     robot_description = {
         "robot_description": Command([
             "xacro ",
@@ -138,8 +131,6 @@ def generate_launch_description():
             homing_fine_speed,
             " homing_backoff_distance:=",
             homing_backoff_distance,
-            " homing_home_position:=",
-            homing_home_position,
         ])
     }
 
@@ -204,7 +195,6 @@ def generate_launch_description():
             homing_backoff_speed_arg,
             homing_fine_speed_arg,
             homing_backoff_distance_arg,
-            homing_home_position_arg,
             robot_state_publisher_node,
             mock_servo_node,
             ros2_control_node,

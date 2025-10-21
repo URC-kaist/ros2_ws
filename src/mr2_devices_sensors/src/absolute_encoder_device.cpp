@@ -103,11 +103,7 @@ public:
       throw std::runtime_error("ticks_per_rev must be positive");
     }
 
-    const double zero_deg =
-        parse_number<double>(info.parameters, "zero_offset_deg", 0.0);
-    zero_offset_rad_ =
-        parse_number<double>(info.parameters, "zero_offset_rad",
-                             zero_deg * M_PI / 180.0);
+    zero_offset_rad_ = -M_PI; // Fixed -180 degree offset
 
     state_name_ = require_param(info.parameters, "state_name");
     auto raw_it = info.parameters.find("raw_name");
