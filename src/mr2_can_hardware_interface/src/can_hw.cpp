@@ -78,9 +78,9 @@ public:
     struct HomingConfig {
       std::string plugin;
       HomingPolicy::ParamMap params;
-      std::vector<std::string> joints;
+      std::string joint_name;
     };
-    std::unordered_map<std::string, HomingConfig> homing_configs;
+    std::vector<HomingConfig> homing_configs;
 
     for (const auto &joint : info_.joints) {
       auto &joint_data = get_joint(joint.name);
@@ -181,29 +181,20 @@ public:
 
       const auto homing_plugin_it = joint.parameters.find("homing_plugin");
       if (homing_plugin_it != joint.parameters.end()) {
-        const std::string group = joint.parameters.count("homing_group")
-                                      ? joint.parameters.at("homing_group")
-                                      : joint.name;
-
-        auto &cfg = homing_configs[group];
-        if (!cfg.plugin.empty() && cfg.plugin != homing_plugin_it->second) {
-          RCLCPP_ERROR(node_->get_logger(),
-                       "Conflicting homing plugins declared for group '%s'",
-                       group.c_str());
-          return CallbackReturn::ERROR;
-        }
-
+        HomingConfig cfg;
         cfg.plugin = homing_plugin_it->second;
-        cfg.joints.push_back(joint.name);
+        cfg.joint_name = joint.name;
 
         for (const auto &param : joint.parameters) {
           if (param.first.rfind("homing_", 0) == 0 &&
-              param.first != "homing_plugin" && param.first != "homing_group") {
+              param.first != "homing_plugin") {
             const std::string key =
                 param.first.substr(std::string("homing_").size());
             cfg.params[key] = param.second;
           }
         }
+
+        homing_configs.push_back(std::move(cfg));
       }
     }
 
@@ -414,10 +405,11 @@ public:
                           static_cast<const double *>(entry.second));
       }
 
-      for (auto &[group, cfg] : homing_configs) {
+      for (const auto &cfg : homing_configs) {
         if (cfg.plugin.empty()) {
           RCLCPP_ERROR(node_->get_logger(),
-                       "Homing group '%s' missing plugin type", group.c_str());
+                       "Homing configuration for joint '%s' missing plugin.",
+                       cfg.joint_name.c_str());
           return CallbackReturn::ERROR;
         }
 
@@ -431,33 +423,31 @@ public:
           return CallbackReturn::ERROR;
         }
 
-        std::vector<HomingPolicy::JointHandle> handles;
-        handles.reserve(cfg.joints.size());
-        for (const auto &joint_name : cfg.joints) {
-          auto it = joint_index_.find(joint_name);
-          if (it == joint_index_.end()) {
-            RCLCPP_ERROR(node_->get_logger(),
-                         "Homing group '%s' references unknown joint '%s'",
-                         group.c_str(), joint_name.c_str());
-            return CallbackReturn::ERROR;
-          }
-
-          auto &joint = joints_[it->second];
-          handles.push_back(
-              {joint.name, &joint.command, &joint.state,
-               joint.has_velocity_state ? &joint.velocity : nullptr,
-               &joint.offset});
-        }
-
-        policy->configure(node_, handles, state_map, cfg.params);
-        if (policy->has_error()) {
+        auto it = joint_index_.find(cfg.joint_name);
+        if (it == joint_index_.end()) {
           RCLCPP_ERROR(node_->get_logger(),
-                       "Homing policy for group '%s' failed to configure: %s",
-                       group.c_str(), policy->error_message().c_str());
+                       "Homing configuration references unknown joint '%s'",
+                       cfg.joint_name.c_str());
           return CallbackReturn::ERROR;
         }
 
-        homing_instances_.push_back({group, policy, cfg.joints});
+        auto &joint = joints_[it->second];
+        HomingPolicy::JointHandle handle{
+            joint.name,
+            &joint.command,
+            &joint.state,
+            joint.has_velocity_state ? &joint.velocity : nullptr,
+            &joint.offset};
+
+        policy->configure(node_, handle, state_map, cfg.params);
+        if (policy->has_error()) {
+          RCLCPP_ERROR(node_->get_logger(),
+                       "Homing policy for joint '%s' failed to configure: %s",
+                       cfg.joint_name.c_str(), policy->error_message().c_str());
+          return CallbackReturn::ERROR;
+        }
+
+        homing_instances_.push_back({cfg.joint_name, policy});
       }
 
       RCLCPP_INFO(node_->get_logger(), "Configured %zu homing policy plugins.",
@@ -617,7 +607,8 @@ public:
           homing_error_message_ = instance.policy->error_message();
           RCLCPP_ERROR(node_->get_logger(),
                        "Homing policy '%s' reported error: %s",
-                       instance.group.c_str(), homing_error_message_.c_str());
+                       instance.joint_name.c_str(),
+                       homing_error_message_.c_str());
           homing_active_ = false;
           return return_type::ERROR;
         }
@@ -748,9 +739,8 @@ private:
   }
 
   struct HomingInstance {
-    std::string group;
+    std::string joint_name;
     std::shared_ptr<HomingPolicy> policy;
-    std::vector<std::string> joint_names;
   };
 
   std::shared_ptr<pluginlib::ClassLoader<CanDevice>> loader_;

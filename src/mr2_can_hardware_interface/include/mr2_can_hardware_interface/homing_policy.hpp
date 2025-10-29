@@ -6,7 +6,6 @@
 
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 namespace mr2_can_hardware_interface {
 
@@ -26,7 +25,7 @@ public:
   virtual ~HomingPolicy() = default;
 
   virtual void configure(const rclcpp::Node::SharedPtr &node,
-                         const std::vector<JointHandle> &joints,
+                         const JointHandle &joint,
                          const NamedStateMap &named_states,
                          const ParamMap &params) = 0;
 

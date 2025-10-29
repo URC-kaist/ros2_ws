@@ -30,16 +30,11 @@ namespace mr2_can_hardware_interface {
 class AbsoluteEncoderPolicy : public HomingPolicy {
 public:
   void configure(const rclcpp::Node::SharedPtr &node,
-                 const std::vector<JointHandle> &joints,
+                 const JointHandle &joint,
                  const NamedStateMap &named_states,
                  const ParamMap &params) override {
     node_ = node;
-    if (joints.size() != 1) {
-      error_message_ = "AbsoluteEncoderPolicy expects exactly one joint.";
-      error_ = true;
-      return;
-    }
-    joint_ = joints.front();
+    joint_ = joint;
 
     const auto state_it = params.find("encoder_state");
     if (state_it == params.end()) {
@@ -136,14 +131,14 @@ public:
       const double absolute_angle =
           encoder_direction_ * (*encoder_state_) + home_offset_;
       const double joint_angle = *joint_.state;
-      *joint_.offset = joint_angle - absolute_angle;
+      *joint_.command = joint_angle;
+      joint_offset_ = joint_angle - absolute_angle;
       computed_ = true;
-      // Command the joint directly to the configured home position.
       if (node_) {
         RCLCPP_INFO(node_->get_logger(),
                     "Homed joint '%s' via absolute encoder: offset=%.6f rad "
                     "(encoder=%.6f rad, joint=%.6f rad)",
-                    joint_.name.c_str(), *joint_.offset, absolute_angle,
+                    joint_.name.c_str(), joint_offset_, absolute_angle,
                     joint_angle);
       }
     }
@@ -155,7 +150,10 @@ public:
   bool has_error() const override { return error_; }
   std::string error_message() const override { return error_message_; }
 
-  void finalize(const rclcpp::Time &) override {}
+  void finalize(const rclcpp::Time &) override {
+    *joint_.offset += joint_offset_;
+    *joint_.command -= joint_offset_;
+  }
 
   void reset() override {
     finished_ = false;
@@ -175,6 +173,7 @@ private:
   bool finished_{false};
   bool computed_{false};
   bool error_{false};
+  double joint_offset_{0.0};
   std::string error_message_;
 };
 

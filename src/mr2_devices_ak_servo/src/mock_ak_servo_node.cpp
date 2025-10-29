@@ -308,8 +308,6 @@ private:
     if (!absolute_encoder_enabled_)
       return;
 
-    RCLCPP_INFO(get_logger(), "position: %f", position_rad);
-
     // 1) Convert radians to 12-bit angle (0..4095)
     // angle12 = round( (position / 2π) * ticks_per_rev ) mod 4096
     const double angle12_unwrapped =

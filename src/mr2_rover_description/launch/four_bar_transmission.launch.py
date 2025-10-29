@@ -80,6 +80,10 @@ def generate_launch_description():
         parameters=[{
             "can_iface": can_iface,
             "motor_id": ParameterValue(motor_a_id, value_type=int),
+            "limit_switch_enabled": True,
+            "limit_switch_trigger_position": -1.0,
+            "limit_switch_trigger_when_below": True,
+            "limit_switch_active_high": True,
         }],
         condition=IfCondition(use_mock_servos),
         output="screen",
@@ -91,6 +95,7 @@ def generate_launch_description():
         parameters=[{
             "can_iface": can_iface,
             "motor_id": ParameterValue(motor_b_id, value_type=int),
+            "absolute_encoder_enabled": True,
         }],
         condition=IfCondition(use_mock_servos),
         output="screen",

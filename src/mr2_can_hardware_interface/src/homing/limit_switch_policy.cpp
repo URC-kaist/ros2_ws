@@ -14,9 +14,10 @@
 namespace mr2_can_hardware_interface {
 
 namespace {
-constexpr double kDefaultApproachSpeed = 0.3;    // rad/s
-constexpr double kDefaultFineSpeed = 0.05;       // rad/s
-constexpr double kDefaultBackoffDistance = 0.15; // rad
+constexpr double kDefaultApproachSpeed = 0.3;         // rad/s
+constexpr double kDefaultFineSpeed = 0.05;            // rad/s
+constexpr double kDefaultBackoffDistance = 0.15;      // rad
+constexpr double kDefaultFinalBackoffDistance = 0.05; // rad
 constexpr double kDefaultMaxTravel = std::numeric_limits<double>::infinity();
 constexpr double kReleaseThreshold = 0.5; // boolean latch threshold
 
@@ -31,18 +32,14 @@ std::string parse_string(const HomingPolicy::ParamMap &params,
 class LimitSwitchPolicy : public HomingPolicy {
 public:
   void configure(const rclcpp::Node::SharedPtr &node,
-                 const std::vector<JointHandle> &joints,
+                 const JointHandle &joint,
                  const NamedStateMap &named_states,
                  const ParamMap &params) override {
     node_ = node;
     error_ = false;
     error_message_.clear();
 
-    if (joints.size() != 1) {
-      set_error("LimitSwitchPolicy expects exactly one joint.");
-      return;
-    }
-    joint_ = joints.front();
+    joint_ = joint;
 
     const std::string limit_key = parse_string(params, "limit_state");
     if (limit_key.empty()) {
@@ -118,6 +115,12 @@ public:
         "backoff_distance",
         std::abs(get_double("backoff_distance", kDefaultBackoffDistance)),
         kDefaultBackoffDistance);
+
+    final_backoff_distance_ =
+        ensure_positive("final_backoff_distance",
+                        std::abs(get_double("final_backoff_distance",
+                                            kDefaultFinalBackoffDistance)),
+                        kDefaultFinalBackoffDistance);
 
     const double max_travel =
         get_double("max_search_travel_rad", kDefaultMaxTravel);
@@ -236,15 +239,22 @@ public:
       if (limit_pressed && !limit_pressed_prev_) {
         finalize_offsets();
         if (!error_) {
-          finished_ = true;
-          target_ -= *joint_.offset;
-          transition(Phase::Done, "homing sequence complete");
+          final_backoff_remaining_ = final_backoff_distance_;
+          transition(Phase::PostBackoff, "homing done, final backoff");
         }
         break;
       }
       integrate_target(dt, search_sign_ * fine_speed_);
-      if (exceeded_travel_limit()) {
+      if (exceeded_travel_limit())
         break;
+      break;
+
+    case Phase::PostBackoff:
+      integrate_target(dt, -search_sign_ * fine_speed_);
+      final_backoff_remaining_ -= fine_speed_ * dt;
+      if (final_backoff_remaining_ <= 0.0) {
+        finished_ = true;
+        transition(Phase::Done, "final backoff complete");
       }
       break;
 
@@ -265,7 +275,10 @@ public:
 
   std::string error_message() const override { return error_message_; }
 
-  void finalize(const rclcpp::Time &) override {}
+  void finalize(const rclcpp::Time &) override {
+    *joint_.offset += joint_offset_;
+    *joint_.command -= joint_offset_;
+  }
 
   void reset() override {
     finished_ = false;
@@ -285,6 +298,7 @@ private:
     FastSearch,
     Backoff,
     SlowSearch,
+    PostBackoff,
     Done,
     Error
   };
@@ -336,12 +350,12 @@ private:
       return;
     }
     const double raw_position = *joint_.state + *joint_.offset;
-    *joint_.offset = raw_position - home_position_;
+    joint_offset_ = raw_position - home_position_;
     if (node_) {
-      RCLCPP_INFO(node_->get_logger(),
-                  "Homed joint '%s': offset=%.6f rad (raw=%.6f rad, home=%.6f rad)",
-                  joint_.name.c_str(), *joint_.offset, raw_position,
-                  home_position_);
+      RCLCPP_INFO(
+          node_->get_logger(),
+          "Homed joint '%s': offset=%.6f rad (raw=%.6f rad, home=%.6f rad)",
+          joint_.name.c_str(), joint_offset_, raw_position, home_position_);
     }
   }
 
@@ -374,17 +388,15 @@ private:
     const char *new_name = phase_name(new_phase);
     if (new_phase == Phase::Error || force_error_log) {
       if (reason) {
-        RCLCPP_ERROR(node_->get_logger(),
-                     "LimitSwitchPolicy: %s -> %s (%s)", old_name, new_name,
-                     reason);
+        RCLCPP_ERROR(node_->get_logger(), "LimitSwitchPolicy: %s -> %s (%s)",
+                     old_name, new_name, reason);
       } else {
         RCLCPP_ERROR(node_->get_logger(), "LimitSwitchPolicy: %s -> %s",
                      old_name, new_name);
       }
     } else if (reason) {
-      RCLCPP_INFO(node_->get_logger(),
-                  "LimitSwitchPolicy: %s -> %s (%s)", old_name, new_name,
-                  reason);
+      RCLCPP_INFO(node_->get_logger(), "LimitSwitchPolicy: %s -> %s (%s)",
+                  old_name, new_name, reason);
     } else {
       RCLCPP_INFO(node_->get_logger(), "LimitSwitchPolicy: %s -> %s", old_name,
                   new_name);
@@ -403,6 +415,8 @@ private:
       return "backoff";
     case Phase::SlowSearch:
       return "slow_search";
+    case Phase::PostBackoff:
+      return "pose backoff";
     case Phase::Done:
       return "done";
     case Phase::Error:
@@ -422,6 +436,8 @@ private:
   double fine_speed_{kDefaultFineSpeed};
   double backoff_distance_{kDefaultBackoffDistance};
   double backoff_remaining_{0.0};
+  double final_backoff_distance_{kDefaultFinalBackoffDistance};
+  double final_backoff_remaining_{0.0};
   double search_sign_{-1.0};
   double max_search_travel_{kDefaultMaxTravel};
   double home_position_{0.0};
@@ -435,7 +451,7 @@ private:
   bool limit_pressed_prev_{false};
   double search_origin_{0.0};
   bool origin_set_{false};
-
+  double joint_offset_{0.0};
 };
 
 } // namespace mr2_can_hardware_interface
