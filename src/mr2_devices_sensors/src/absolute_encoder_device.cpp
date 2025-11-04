@@ -23,6 +23,10 @@ namespace mr2_devices_sensors {
 namespace {
 constexpr uint32_t kStdIdMask = 0x7FFU;
 
+constexpr uint8_t kEncFlagIndexSeen = 0x1;
+constexpr uint8_t kEncFlagErrorLatched = 0x2;
+constexpr uint8_t kEncFlagSensorFault = 0x4;
+
 inline int32_t unpack_s24_be(const can_frame &frame) {
   int32_t raw = (static_cast<int32_t>(frame.data[0]) << 16) |
                 (static_cast<int32_t>(frame.data[1]) << 8) |
@@ -86,6 +90,16 @@ inline std::string resolve_topic(
   return fallback;
 }
 
+inline std::string resolve_string(
+    const std::unordered_map<std::string, std::string> &params,
+    const std::string &key, const std::string &fallback) {
+  auto it = params.find(key);
+  if (it != params.end()) {
+    return it->second;
+  }
+  return fallback;
+}
+
 } // namespace
 
 class AbsoluteEncoderDevice : public CanDevice {
@@ -115,6 +129,14 @@ public:
       flags_name_ = flags_it->second;
     }
 
+    index_state_name_ = resolve_string(info.parameters, "index_state_name",
+                                       state_name_ + "_index_seen");
+    error_state_name_ = resolve_string(info.parameters, "error_state_name",
+                                       state_name_ + "_error_latched");
+    sensor_fault_state_name_ =
+        resolve_string(info.parameters, "sensor_fault_state_name",
+                        state_name_ + "_sensor_fault");
+
     logger_ = node->get_logger();
     ros_clock_ = node->get_clock();
 
@@ -135,8 +157,8 @@ public:
     if (!flags_name_.empty()) {
       flags_topic_ = resolve_topic(info.parameters, "flags_topic",
                                    "can_sensors/" + flags_name_);
-      flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-          flags_topic_, rclcpp::SensorDataQoS());
+    flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+        flags_topic_, rclcpp::SensorDataQoS());
     }
 
     watchdog_state_name_ = state_name_ + "_watchdog";
@@ -153,6 +175,11 @@ public:
   }
 
   void process(const rclcpp::Time &now) override {
+    if (sensor_fault_state_ > 0.5) {
+      watchdog_state_ = 1.0;
+      return;
+    }
+
     const double since_last = (now - last_frame_time_).seconds();
     const bool timed_out = since_last > timeout_sec_;
 
@@ -188,32 +215,71 @@ public:
     if (!flags_name_.empty()) {
       states.emplace_back(flags_name_, &flags_);
     }
+    states.emplace_back(index_state_name_, &index_seen_state_);
+    states.emplace_back(error_state_name_, &error_latched_state_);
+    states.emplace_back(sensor_fault_state_name_, &sensor_fault_state_);
     states.emplace_back(watchdog_state_name_, &watchdog_state_);
   }
 
 private:
   void on_frame(const can_frame &frame) {
-    const int32_t raw_q24 = unpack_s24_be(frame);
-    const double counts = static_cast<double>(raw_q24) / static_cast<double>(1 << 12);
-    raw_counts_ = counts;
+    const uint8_t flags_byte = frame.data[3];
+    flags_ = static_cast<double>(flags_byte);
 
-    const double revolutions = counts / ticks_per_rev_;
-    angle_rad_ = direction_ * revolutions * 2.0 * M_PI - zero_offset_rad_;
+    const bool sensor_fault = (flags_byte & kEncFlagSensorFault) != 0;
+    const bool index_seen = (flags_byte & kEncFlagIndexSeen) != 0;
+    const bool error_latched = (flags_byte & kEncFlagErrorLatched) != 0;
 
-    if (!flags_name_.empty()) {
-      flags_ = static_cast<double>(frame.data[3]);
+    index_seen_state_ = index_seen ? 1.0 : 0.0;
+    error_latched_state_ = error_latched ? 1.0 : 0.0;
+    sensor_fault_state_ = sensor_fault ? 1.0 : 0.0;
+
+    if (index_seen && !index_seen_reported_) {
+      RCLCPP_INFO(logger_, "Encoder 0x%03X reported valid samples.", can_id_);
+      index_seen_reported_ = true;
     }
 
-    if (angle_pub_ && can_publish()) {
-      std_msgs::msg::Float64 msg;
-      msg.data = angle_rad_;
-      safe_publish(angle_pub_, msg);
+    if (error_latched && !error_latched_reported_) {
+      RCLCPP_ERROR(logger_,
+                   "Encoder 0x%03X latched a sensor error flag.", can_id_);
+      error_latched_reported_ = true;
     }
-    if (raw_pub_ && can_publish()) {
-      std_msgs::msg::Float64 msg;
-      msg.data = raw_counts_;
-      safe_publish(raw_pub_, msg);
+
+    if (sensor_fault) {
+      if (!sensor_fault_reported_) {
+        RCLCPP_WARN(logger_,
+                    "Encoder 0x%03X reported a sensor fault; ignoring samples "
+                    "until it clears.",
+                    can_id_);
+        sensor_fault_reported_ = true;
+      }
+    } else if (sensor_fault_reported_) {
+      RCLCPP_INFO(logger_,
+                  "Encoder 0x%03X sensor fault cleared.", can_id_);
+      sensor_fault_reported_ = false;
     }
+
+    if (!sensor_fault) {
+      const int32_t raw_q24 = unpack_s24_be(frame);
+      const double counts = static_cast<double>(raw_q24) /
+                            static_cast<double>(1 << 12);
+      raw_counts_ = counts;
+
+      const double revolutions = counts / ticks_per_rev_;
+      angle_rad_ = direction_ * revolutions * 2.0 * M_PI - zero_offset_rad_;
+
+      if (angle_pub_ && can_publish()) {
+        std_msgs::msg::Float64 msg;
+        msg.data = angle_rad_;
+        safe_publish(angle_pub_, msg);
+      }
+      if (raw_pub_ && can_publish()) {
+        std_msgs::msg::Float64 msg;
+        msg.data = raw_counts_;
+        safe_publish(raw_pub_, msg);
+      }
+    }
+
     if (flags_pub_ && can_publish()) {
       std_msgs::msg::Float64 msg;
       msg.data = flags_;
@@ -223,8 +289,8 @@ private:
     if (ros_clock_) {
       last_frame_time_ = ros_clock_->now();
     }
-    frame_received_ = true;
-    watchdog_state_ = 0.0;
+    frame_received_ = frame_received_ || index_seen;
+    watchdog_state_ = sensor_fault ? 1.0 : 0.0;
     timeout_logged_ = false;
   }
 
@@ -249,15 +315,24 @@ private:
   std::string raw_name_;
   std::string flags_name_;
   std::string watchdog_state_name_;
+  std::string index_state_name_;
+  std::string error_state_name_;
+  std::string sensor_fault_state_name_;
 
   double angle_rad_{0.0};
   double raw_counts_{0.0};
   double flags_{0.0};
+  double index_seen_state_{0.0};
+  double error_latched_state_{0.0};
+  double sensor_fault_state_{0.0};
   bool frame_received_{false};
   bool timeout_logged_{false};
   double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;
+  bool error_latched_reported_{false};
+  bool sensor_fault_reported_{false};
+  bool index_seen_reported_{false};
 
   template<typename MsgT>
   void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,

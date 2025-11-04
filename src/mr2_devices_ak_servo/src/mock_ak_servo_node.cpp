@@ -35,6 +35,8 @@
  *     Position threshold in radians that activates the switch (if enabled).
  *   limit_switch_trigger_when_below (bool, default true)
  *     Switch activates when position <= threshold (otherwise >= threshold).
+ *   limit_switch_force_fault (bool, default false)
+ *     When true, the mock emits the fault bit and freezes the reported state.
  *   absolute_encoder_enabled (bool, default false)
  *     Enable publication of absolute encoder frames.
  *   absolute_encoder_can_id (int, default 384 / 0x180)
@@ -45,7 +47,13 @@
  *     Multiplier (+1 or -1) that lets the encoder be flipped in software.
  *   absolute_encoder_zero_offset (double, default 0.0)
  *     Mechanical offset in radians that aligns the encoder with the desired
- * home.
+ *     home.
+ *   absolute_encoder_force_sensor_fault (bool, default false)
+ *     Emits the `sensor_fault` flag on every encoder frame when true.
+ *   absolute_encoder_force_error_latch (bool, default false)
+ *     Sets the latched error flag in the encoder frames when true.
+ *   absolute_encoder_index_delay_frames (int, default 0)
+ *     Number of published encoder frames before asserting the index flag.
  */
 
 #include <algorithm>
@@ -71,6 +79,10 @@ constexpr double kTwoPi = 6.28318530717958647692; // 2 * pi
 constexpr double kQ24Scale = static_cast<double>(1 << 12);
 constexpr double kMaxQ24 = static_cast<double>((1 << 23) - 1);
 constexpr double kMinQ24 = static_cast<double>(-(1 << 23));
+constexpr uint8_t kLimitSwitchFaultBit = 0x1;
+constexpr uint8_t kEncFlagIndexSeen = 0x1;
+constexpr uint8_t kEncFlagErrorLatched = 0x2;
+constexpr uint8_t kEncFlagSensorFault = 0x4;
 } // namespace
 
 class MockAkServoNode : public rclcpp::Node {
@@ -125,6 +137,15 @@ private:
     limit_switch_trigger_when_below_ =
         declare_parameter<bool>("limit_switch_trigger_when_below", true);
 
+    limit_switch_force_fault_ =
+        declare_parameter<bool>("limit_switch_force_fault", false);
+    if (limit_switch_force_fault_ && !limit_switch_enabled_) {
+      RCLCPP_WARN(
+          get_logger(),
+          "limit_switch_force_fault is true but limit_switch_enabled is false;"
+          " no limit switch frames will be emitted.");
+    }
+
     absolute_encoder_enabled_ =
         declare_parameter<bool>("absolute_encoder_enabled", false);
     absolute_encoder_can_id_ = static_cast<uint32_t>(
@@ -152,6 +173,19 @@ private:
 
     absolute_encoder_zero_offset_ =
         declare_parameter<double>("absolute_encoder_zero_offset", 0.0);
+
+    absolute_encoder_force_sensor_fault_ =
+        declare_parameter<bool>("absolute_encoder_force_sensor_fault", false);
+    absolute_encoder_force_error_latch_ =
+        declare_parameter<bool>("absolute_encoder_force_error_latch", false);
+    absolute_encoder_index_delay_frames_ =
+        declare_parameter<int>("absolute_encoder_index_delay_frames", 0);
+    if (absolute_encoder_index_delay_frames_ < 0) {
+      throw std::runtime_error(
+          "absolute_encoder_index_delay_frames must be non-negative");
+    }
+    absolute_encoder_index_counter_ = absolute_encoder_index_delay_frames_;
+    absolute_encoder_index_seen_ = (absolute_encoder_index_delay_frames_ == 0);
 
     if (servo_id_ < 0 || static_cast<uint32_t>(servo_id_) > kMaxCanId) {
       throw std::runtime_error("motor_id out of range (0..0x1FFFFFFF)");
@@ -290,10 +324,15 @@ private:
                                : position >= limit_switch_trigger_position_;
     const bool pressed = limit_switch_active_high_ ? triggered : !triggered;
 
+    if (!limit_switch_force_fault_) {
+      last_limit_switch_state_ = pressed;
+    }
+
     struct can_frame frame {};
     frame.can_id = static_cast<uint32_t>(limit_switch_can_id_) & kMaxCanId;
-    frame.can_dlc = 1;
-    frame.data[0] = pressed ? 0x1 : 0x0;
+    frame.can_dlc = 2;
+    frame.data[0] = last_limit_switch_state_ ? 0x1 : 0x0;
+    frame.data[1] = limit_switch_force_fault_ ? kLimitSwitchFaultBit : 0x0;
     bus_->enqueue_tx(frame);
   }
 
@@ -308,15 +347,36 @@ private:
     if (!absolute_encoder_enabled_)
       return;
 
-    // 1) Convert radians to 12-bit angle (0..4095)
-    // angle12 = round( (position / 2π) * ticks_per_rev ) mod 4096
-    const double angle12_unwrapped =
-        (position_rad / kTwoPi) * absolute_encoder_ticks_per_rev_;
-    const double angle12_wrapped =
-        wrap_mod(std::llround(angle12_unwrapped), 4096.0);
-    const double counts_centered = angle12_wrapped - 2048.0; // [-2048, 2047]
+    if (!absolute_encoder_index_seen_) {
+      if (absolute_encoder_index_counter_ > 0) {
+        --absolute_encoder_index_counter_;
+      } else {
+        absolute_encoder_index_seen_ = true;
+      }
+    }
 
-    // 2) Convert to Q24 exactly like FW: (counts << 12)
+    const double corrected_position =
+        absolute_encoder_direction_ * position_rad +
+        absolute_encoder_zero_offset_;
+
+    const double counts_per_rev = absolute_encoder_ticks_per_rev_;
+    const double angle_counts = (corrected_position / kTwoPi) * counts_per_rev;
+    const double counts_wrapped = wrap_mod(angle_counts, counts_per_rev);
+    int32_t counts_quantised =
+        static_cast<int32_t>(std::llround(counts_wrapped));
+    const int32_t counts_modulo = static_cast<int32_t>(
+        counts_per_rev > 0.0 ? std::llround(counts_per_rev) : 4096);
+    if (counts_modulo > 0) {
+      counts_quantised %= counts_modulo;
+      if (counts_quantised < 0) {
+        counts_quantised += counts_modulo;
+      }
+    }
+
+    const double half_counts = counts_per_rev * 0.5;
+    const double counts_centered =
+        static_cast<double>(counts_quantised) - half_counts;
+
     const double q24_d =
         std::clamp(counts_centered * kQ24Scale, kMinQ24, kMaxQ24);
     const int32_t q24 = static_cast<int32_t>(std::llround(q24_d));
@@ -327,7 +387,17 @@ private:
     frame.data[0] = static_cast<uint8_t>((q24 >> 16) & 0xFF);
     frame.data[1] = static_cast<uint8_t>((q24 >> 8) & 0xFF);
     frame.data[2] = static_cast<uint8_t>(q24 & 0xFF);
-    frame.data[3] = 0x00; // flags byte
+    uint8_t flags = 0x00;
+    if (absolute_encoder_index_seen_) {
+      flags |= kEncFlagIndexSeen;
+    }
+    if (absolute_encoder_force_error_latch_) {
+      flags |= kEncFlagErrorLatched;
+    }
+    if (absolute_encoder_force_sensor_fault_) {
+      flags |= kEncFlagSensorFault;
+    }
+    frame.data[3] = flags;
     bus_->enqueue_tx(frame);
   }
 
@@ -357,12 +427,19 @@ private:
   double limit_switch_trigger_position_{
       std::numeric_limits<double>::quiet_NaN()};
   bool limit_switch_trigger_when_below_{true};
+  bool limit_switch_force_fault_{false};
+  bool last_limit_switch_state_{false};
 
   bool absolute_encoder_enabled_{false};
   uint32_t absolute_encoder_can_id_{0x180};
   double absolute_encoder_ticks_per_rev_{4096.0};
   double absolute_encoder_direction_{1.0};
   double absolute_encoder_zero_offset_{0.0};
+  bool absolute_encoder_force_sensor_fault_{false};
+  bool absolute_encoder_force_error_latch_{false};
+  int absolute_encoder_index_delay_frames_{0};
+  int absolute_encoder_index_counter_{0};
+  bool absolute_encoder_index_seen_{false};
 
   std::mutex state_mtx_;
   double target_position_rad_{0.0};
