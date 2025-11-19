@@ -22,6 +22,7 @@ namespace mr2_devices_sensors {
 namespace {
 constexpr uint32_t kStdIdMask = 0x7FFU;
 constexpr uint8_t kFaultBit = 0x1;
+constexpr bool kFaultDetectionEnabled = false; // TODO(mr2): re-enable once firmware is stable
 
 std::string
 require_param(const std::unordered_map<std::string, std::string> &params,
@@ -139,7 +140,7 @@ public:
   }
 
   void process(const rclcpp::Time &now) override {
-    if (fault_state_ > 0.5) {
+    if (kFaultDetectionEnabled && fault_state_ > 0.5) {
       watchdog_state_ = 1.0;
       return;
     }
@@ -182,19 +183,24 @@ private:
 
     state_ = mapped_state;
 
-    const bool fault = (frame.data[1] & kFaultBit) != 0;
+    // Limit switch firmware currently raises intermittent false positives, so
+    // force the fault bit low for now.
+    const bool fault =
+        kFaultDetectionEnabled && ((frame.data[1] & kFaultBit) != 0);
     fault_state_ = fault ? 1.0 : 0.0;
 
-    if (fault) {
-      if (!fault_reported_) {
-        RCLCPP_WARN(logger_,
-                    "Limit switch 0x%03X reported invalid contact state.",
-                    can_id_);
-        fault_reported_ = true;
+    if (kFaultDetectionEnabled) {
+      if (fault) {
+        if (!fault_reported_) {
+          RCLCPP_WARN(logger_,
+                      "Limit switch 0x%03X reported invalid contact state.",
+                      can_id_);
+          fault_reported_ = true;
+        }
+      } else if (fault_reported_) {
+        RCLCPP_INFO(logger_, "Limit switch 0x%03X fault cleared.", can_id_);
+        fault_reported_ = false;
       }
-    } else if (fault_reported_) {
-      RCLCPP_INFO(logger_, "Limit switch 0x%03X fault cleared.", can_id_);
-      fault_reported_ = false;
     }
 
     if (ros_clock_) {

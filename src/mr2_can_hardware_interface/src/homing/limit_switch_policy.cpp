@@ -147,7 +147,7 @@ public:
 
   void begin(const rclcpp::Time &now) override {
     target_ = joint_.command && std::isfinite(*joint_.command) ? *joint_.command
-                                                               : 0.0;
+                                                               : std::numeric_limits<double>::quiet_NaN();
     phase_ = Phase::AwaitState;
     finished_ = false;
     error_ = false;

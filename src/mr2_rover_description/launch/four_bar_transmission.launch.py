@@ -32,15 +32,29 @@ def generate_launch_description():
     motor_a_id = LaunchConfiguration("motor_a_id")
     motor_a_arg = DeclareLaunchArgument(
         "motor_a_id",
-        default_value="2",
+        default_value="102",
         description="Motor ID assigned to the input joint actuator",
     )
 
     motor_b_id = LaunchConfiguration("motor_b_id")
     motor_b_arg = DeclareLaunchArgument(
         "motor_b_id",
-        default_value="3",
+        default_value="103",
         description="Motor ID assigned to the output joint actuator",
+    )
+
+    input_limit_can_id = LaunchConfiguration("input_limit_can_id")
+    input_limit_can_id_arg = DeclareLaunchArgument(
+        "input_limit_can_id",
+        default_value="0x183",
+        description="CAN ID of the limit switch sensor guarding the input joint",
+    )
+
+    output_abs_can_id = LaunchConfiguration("output_abs_can_id")
+    output_abs_can_id_arg = DeclareLaunchArgument(
+        "output_abs_can_id",
+        default_value="0x182",
+        description="CAN ID of the absolute encoder on the output joint",
     )
 
     use_mock_servos = LaunchConfiguration("use_mock_servos")
@@ -56,6 +70,14 @@ def generate_launch_description():
             xacro_file,
             " can_iface:=",
             can_iface,
+            " motor_a_id:=",
+            motor_a_id,
+            " motor_b_id:=",
+            motor_b_id,
+            " input_limit_can_id:=",
+            input_limit_can_id,
+            " output_abs_can_id:=",
+            output_abs_can_id,
         ])
     }
 
@@ -118,6 +140,8 @@ def generate_launch_description():
             can_iface_arg,
             motor_a_arg,
             motor_b_arg,
+            input_limit_can_id_arg,
+            output_abs_can_id_arg,
             use_mock_servos_arg,
             robot_state_publisher_node,
             ros2_control_node,
