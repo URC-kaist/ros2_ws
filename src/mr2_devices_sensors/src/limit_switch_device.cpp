@@ -3,24 +3,38 @@
 #include "pluginlib/class_list_macros.hpp"
 
 #include "rclcpp/clock.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/node.hpp"
 #include "rclcpp/qos.hpp"
+#include "rclcpp/utilities.hpp"
 #include "std_msgs/msg/bool.hpp"
-#include "std_msgs/msg/int8.hpp"
 
-#include <cctype>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 
 namespace mr2_devices_sensors {
 
 namespace {
 constexpr uint32_t kStdIdMask = 0x7FFU;
+constexpr uint8_t kFaultBit = 0x1;
+constexpr bool kFaultDetectionEnabled = false; // TODO(mr2): re-enable once firmware is stable
 
-inline uint32_t parse_can_id(const std::string &value) {
+std::string
+require_param(const std::unordered_map<std::string, std::string> &params,
+              const std::string &key) {
+  auto it = params.find(key);
+  if (it == params.end()) {
+    throw std::runtime_error("Missing required parameter '" + key + "'");
+  }
+  return it->second;
+}
+
+uint32_t parse_can_id(const std::string &value) {
   std::size_t idx = 0;
   uint32_t id = 0;
   try {
@@ -34,8 +48,8 @@ inline uint32_t parse_can_id(const std::string &value) {
   return id;
 }
 
-inline bool parse_bool(const std::unordered_map<std::string, std::string> &params,
-                       const std::string &key, bool def) {
+bool parse_bool(const std::unordered_map<std::string, std::string> &params,
+                const std::string &key, bool def) {
   auto it = params.find(key);
   if (it == params.end()) {
     return def;
@@ -50,51 +64,32 @@ inline bool parse_bool(const std::unordered_map<std::string, std::string> &param
   throw std::runtime_error("Invalid boolean for " + key + ": " + value);
 }
 
-inline int parse_int(const std::unordered_map<std::string, std::string> &params,
-                     const std::string &key, int def) {
+template <typename T>
+T parse_number(const std::unordered_map<std::string, std::string> &params,
+               const std::string &key, T def) {
   auto it = params.find(key);
   if (it == params.end()) {
     return def;
   }
   try {
-    return std::stoi(it->second);
-  } catch (const std::exception &) {
-    throw std::runtime_error("Invalid integer for " + key + ": " + it->second);
-  }
-}
-inline double parse_double(const std::unordered_map<std::string, std::string> &params,
-                           const std::string &key, double def) {
-  auto it = params.find(key);
-  if (it == params.end()) {
-    return def;
-  }
-  try {
-    return std::stod(it->second);
+    if constexpr (std::is_integral_v<T>) {
+      return static_cast<T>(std::stoll(it->second));
+    } else {
+      return static_cast<T>(std::stod(it->second));
+    }
   } catch (const std::exception &) {
     throw std::runtime_error("Invalid numeric for " + key + ": " + it->second);
   }
 }
 
-
-
-inline std::string make_sensor_topic(const std::string &name) {
-  if (name.empty()) {
-    return {};
+std::string
+resolve_topic(const std::unordered_map<std::string, std::string> &params,
+              const std::string &key, const std::string &default_topic) {
+  auto it = params.find(key);
+  if (it != params.end()) {
+    return it->second;
   }
-  std::string sanitized;
-  sanitized.reserve(name.size());
-  for (char ch : name) {
-    unsigned char uc = static_cast<unsigned char>(ch);
-    if (std::isalnum(uc) || ch == '/' || ch == '_') {
-      sanitized.push_back(ch);
-    } else {
-      sanitized.push_back('_');
-    }
-  }
-  if (!sanitized.empty() && sanitized.front() == '/') {
-    return sanitized;
-  }
-  return std::string("can_sensors/") + sanitized;
+  return default_topic;
 }
 
 } // namespace
@@ -106,28 +101,26 @@ public:
     node_ = node;
 
     iface_ = require_param(info.parameters, "can_iface");
-    bitrate_ = parse_int(info.parameters, "bitrate", 1'000'000);
+    bitrate_ = parse_number<int>(info.parameters, "bitrate", 1'000'000);
     can_id_ = parse_can_id(require_param(info.parameters, "can_id"));
     active_high_ = parse_bool(info.parameters, "active_high", true);
 
     state_name_ = require_param(info.parameters, "state_name");
-    auto edge_it = info.parameters.find("edge_name");
-    if (edge_it != info.parameters.end()) {
-      edge_name_ = edge_it->second;
-    }
+    fault_state_name_ = resolve_topic(info.parameters, "fault_state_name",
+                                      state_name_ + "_fault");
 
     logger_ = node->get_logger();
 
-    const std::string state_topic = make_sensor_topic(state_name_);
-    state_topic_ = state_topic;
+    state_topic_ = resolve_topic(info.parameters, "state_topic",
+                                 "can_sensors/" + state_name_);
     state_pub_ = node->create_publisher<std_msgs::msg::Bool>(
-        state_topic, rclcpp::SensorDataQoS());
+        state_topic_, rclcpp::SensorDataQoS());
 
-    if (!edge_name_.empty()) {
-      const std::string edge_topic = make_sensor_topic(edge_name_);
-      edge_topic_ = edge_topic;
-      edge_pub_ = node->create_publisher<std_msgs::msg::Int8>(
-          edge_topic, rclcpp::SensorDataQoS());
+    fault_topic_ = resolve_topic(info.parameters, "fault_topic",
+                                 "can_sensors/" + fault_state_name_);
+    if (!fault_topic_.empty()) {
+      fault_pub_ = node->create_publisher<std_msgs::msg::Bool>(
+          fault_topic_, rclcpp::SensorDataQoS());
     }
 
     bus_ = CanBusRegistry::get(iface_, bitrate_);
@@ -138,139 +131,150 @@ public:
     add_filter(bus_, can_id_, kStdIdMask,
                [this](const can_frame &frame) { on_frame(frame); });
 
-    timeout_sec_ = parse_double(info.parameters, "timeout_sec", 0.5);
+    timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 1.0);
     ros_clock_ = node->get_clock();
     last_frame_time_ = ros_clock_->now();
-    error_state_name_ = state_name_ + "_error";
+    watchdog_state_name_ = state_name_ + "_watchdog";
+    watchdog_state_ = -1.0;
+    frame_received_ = false;
   }
 
   void process(const rclcpp::Time &now) override {
+    if (kFaultDetectionEnabled && fault_state_ > 0.5) {
+      watchdog_state_ = 1.0;
+      return;
+    }
+
     const double since_last = (now - last_frame_time_).seconds();
     const bool timed_out = since_last > timeout_sec_;
 
     if (timed_out) {
-      error_ = 1.0;
-      if (!timeout_warned_) {
-        RCLCPP_ERROR(logger_,
-                     "Limit switch 0x%03X timed out (%.3f s > %.3f s)",
+      watchdog_state_ = 1.0;
+      if (!timeout_logged_) {
+        RCLCPP_ERROR(logger_, "Limit switch 0x%03X timed out (%.3f s > %.3f s)",
                      can_id_, since_last, timeout_sec_);
-        timeout_warned_ = true;
+        timeout_logged_ = true;
       }
-      timeout_active_ = true;
     } else {
-      error_ = 0.0;
-      if (timeout_active_) {
-        RCLCPP_WARN(logger_,
-                    "Limit switch 0x%03X recovered after timeout.",
+      watchdog_state_ = frame_received_ ? 0.0 : -1.0;
+      if (timeout_logged_) {
+        RCLCPP_WARN(logger_, "Limit switch 0x%03X recovered after timeout.",
                     can_id_);
-        timeout_active_ = false;
+        timeout_logged_ = false;
       }
-      timeout_warned_ = false;
     }
   }
-  void export_state(std::vector<double *> &, std::vector<double *> &,
-                    std::vector<double *> &) override {}
-  void export_command(std::vector<double *> &) override {}
+  void export_state(double *&, double *&, double *&) override {}
+  void export_command(double *&) override {}
 
   void export_named_states(
       std::vector<std::pair<std::string, double *>> &states) override {
     states.emplace_back(state_name_, &state_);
-    if (!edge_name_.empty()) {
-      states.emplace_back(edge_name_, &edge_);
-    }
-    states.emplace_back(error_state_name_, &error_);
+    states.emplace_back(fault_state_name_, &fault_state_);
+    states.emplace_back(watchdog_state_name_, &watchdog_state_);
   }
 
 private:
-  static std::string require_param(const std::unordered_map<std::string, std::string> &params,
-                                   const std::string &key) {
-    auto it = params.find(key);
-    if (it == params.end()) {
-      throw std::runtime_error("Missing required parameter '" + key + "'");
-    }
-    return it->second;
-  }
-
   void on_frame(const can_frame &frame) {
     const bool pressed = (frame.data[0] & 0x1) != 0;
     const double logical = pressed ? 1.0 : 0.0;
     const double mapped_state =
         active_high_ ? logical : (logical > 0.5 ? 0.0 : 1.0);
 
-    if (!reserved_warned_) {
-      for (int i = 1; i < 8; ++i) {
-        if (frame.data[i] != 0) {
-          reserved_warned_ = true;
-          RCLCPP_WARN(logger_,
-                      "Limit switch 0x%03X reserved byte %d non-zero (%u)",
-                      can_id_, i, static_cast<unsigned int>(frame.data[i]));
-          break;
-        }
-      }
-    }
-
-    double edge_value = 0.0;
-    if (last_state_valid_) {
-      if (mapped_state > 0.5 && last_state_ <= 0.5) {
-        edge_value = 1.0;
-      } else if (mapped_state <= 0.5 && last_state_ > 0.5) {
-        edge_value = -1.0;
-      }
-    } else {
-      last_state_valid_ = true;
-    }
-
     state_ = mapped_state;
-    last_state_ = mapped_state;
-    edge_ = edge_value;
+
+    // Limit switch firmware currently raises intermittent false positives, so
+    // force the fault bit low for now.
+    const bool fault =
+        kFaultDetectionEnabled && ((frame.data[1] & kFaultBit) != 0);
+    fault_state_ = fault ? 1.0 : 0.0;
+
+    if (kFaultDetectionEnabled) {
+      if (fault) {
+        if (!fault_reported_) {
+          RCLCPP_WARN(logger_,
+                      "Limit switch 0x%03X reported invalid contact state.",
+                      can_id_);
+          fault_reported_ = true;
+        }
+      } else if (fault_reported_) {
+        RCLCPP_INFO(logger_, "Limit switch 0x%03X fault cleared.", can_id_);
+        fault_reported_ = false;
+      }
+    }
 
     if (ros_clock_) {
       last_frame_time_ = ros_clock_->now();
     }
     frame_received_ = true;
-    error_ = 0.0;
-    timeout_warned_ = false;
+    watchdog_state_ = fault ? 1.0 : 0.0;
+    timeout_logged_ = false;
 
-    if (state_pub_) {
+    if (state_pub_ && can_publish()) {
       std_msgs::msg::Bool msg;
       msg.data = state_ > 0.5;
-      state_pub_->publish(msg);
+      safe_publish(state_pub_, msg);
     }
-    if (edge_pub_ && (edge_value != 0.0)) {
-      std_msgs::msg::Int8 msg;
-      msg.data = static_cast<int8_t>(edge_value > 0.0 ? 1 : -1);
-      edge_pub_->publish(msg);
+
+    if (fault_pub_ && can_publish()) {
+      std_msgs::msg::Bool msg;
+      msg.data = fault;
+      safe_publish(fault_pub_, msg);
     }
   }
 
   rclcpp::Node *node_{nullptr};
   std::shared_ptr<CanBusManager> bus_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr state_pub_;
-  rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr edge_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr fault_pub_;
   rclcpp::Logger logger_{rclcpp::get_logger("limit_switch_device")};
   rclcpp::Clock::SharedPtr ros_clock_;
   std::string state_topic_;
-  std::string edge_topic_;
+  std::string fault_topic_;
   std::string iface_;
   int bitrate_{1'000'000};
   uint32_t can_id_{0};
   bool active_high_{true};
 
   std::string state_name_;
-  std::string edge_name_;
-  std::string error_state_name_;
+  std::string fault_state_name_;
+  std::string watchdog_state_name_;
 
   double state_{0.0};
-  double edge_{0.0};
-  double last_state_{0.0};
-  bool last_state_valid_{false};
-  bool reserved_warned_{false};
+  double fault_state_{0.0};
   bool frame_received_{false};
-  bool timeout_warned_{false};
-  bool timeout_active_{false};
-  double error_{1.0};
-  double timeout_sec_{0.5};
+  bool timeout_logged_{false};
+  double watchdog_state_{-1.0};
+  double timeout_sec_{1.0};
   rclcpp::Time last_frame_time_;
+  bool fault_reported_{false};
+
+  template <typename MsgT>
+  void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
+                    const MsgT &msg) {
+    if (!pub || !can_publish()) {
+      return;
+    }
+    try {
+      pub->publish(msg);
+    } catch (const rclcpp::exceptions::RCLError &ex) {
+      RCLCPP_WARN_ONCE(logger_,
+                       "Limit switch publisher inactive during shutdown: %s",
+                       ex.what());
+    }
+  }
+
+  bool can_publish() const {
+    if (!node_) {
+      return false;
+    }
+    auto base = node_->get_node_base_interface();
+    if (!base) {
+      return false;
+    }
+    auto context = base->get_context();
+    return context && context->is_valid() && rclcpp::ok(context);
+  }
 };
 
 } // namespace mr2_devices_sensors

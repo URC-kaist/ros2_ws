@@ -31,14 +31,13 @@ public:
    * wire them into the hardware state interfaces (e.g. position/velocity/effort)
    * that controllers and broadcasters consume.
    */
-  virtual void export_state(std::vector<double *> &pos,
-                            std::vector<double *> &vel,
-                            std::vector<double *> &eff) = 0;
+  virtual void export_state(double *&position, double *&velocity,
+                            double *&effort) = 0;
 
   /**
    * Export command array pointers (usually position commands).
    */
-  virtual void export_command(std::vector<double *> &cmd) = 0;
+  virtual void export_command(double *&command) = 0;
 
   /**
    * Export additional named state scalars. These can represent auxiliary

@@ -1,7 +1,15 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="single_joint">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="single_joint_limit_switch">
+  <!-- Single-joint example that homes using a limit switch. -->
   <xacro:arg name="can_iface" default="can0"/>
   <xacro:arg name="motor_id" default="4"/>
+  <xacro:arg name="limit_switch_can_id" default="385"/>
+  <xacro:arg name="limit_switch_active_high" default="true"/>
+  <xacro:arg name="homing_search_direction" default="negative"/>
+  <xacro:arg name="homing_approach_speed" default="0.30"/>
+  <xacro:arg name="homing_backoff_speed" default="0.60"/>
+  <xacro:arg name="homing_fine_speed" default="0.03"/>
+  <xacro:arg name="homing_backoff_distance" default="0.10"/>
   <xacro:property name="actuator_name" value="motor$(arg motor_id)"/>
 
   <link name="base_link">
@@ -50,30 +58,24 @@
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
       <param name="motor_id">$(arg motor_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
+      <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
+      <param name="homing_limit_state">joint1/limit_switch_state</param>
+      <param name="homing_limit_watchdog_state">joint1/limit_switch_state_watchdog</param>
+      <param name="homing_search_direction">$(arg homing_search_direction)</param>
+      <param name="homing_approach_speed">$(arg homing_approach_speed)</param>
+      <param name="homing_backoff_speed">$(arg homing_backoff_speed)</param>
+      <param name="homing_fine_speed">$(arg homing_fine_speed)</param>
+      <param name="homing_backoff_distance">$(arg homing_backoff_distance)</param>
     </joint>
-
-
-
-    <gpio name="joint1_aux_encoder">
-      <param name="device_plugin">mr2_devices_sensors/AbsoluteEncoderDevice</param>
-      <param name="can_iface">$(arg can_iface)</param>
-      <param name="can_id">0x180</param>
-      <param name="ticks_per_rev">4096</param>
-      <param name="direction">1.0</param>
-      <param name="zero_offset_deg">0.0</param>
-      <param name="state_name">joint1/encoder_aux_angle</param>
-      <param name="raw_name">joint1/encoder_aux_raw</param>
-      <param name="flags_name">joint1/encoder_aux_flags</param>
-    </gpio>
-
 
     <gpio name="joint1_limit_switch">
       <param name="device_plugin">mr2_devices_sensors/LimitSwitchDevice</param>
       <param name="can_iface">$(arg can_iface)</param>
-      <param name="can_id">0x181</param>
+      <param name="can_id">$(arg limit_switch_can_id)</param>
       <param name="state_name">joint1/limit_switch_state</param>
-      <param name="active_high">true</param>
+      <param name="active_high">$(arg limit_switch_active_high)</param>
     </gpio>
+
     <transmission name="joint1_transmission">
       <plugin>transmission_interface/SimpleTransmission</plugin>
       <actuator name="${actuator_name}" role="${actuator_name}">
@@ -83,7 +85,7 @@
         <state_interface name="effort"/>
       </actuator>
       <joint name="joint1" role="joint1">
-        <mechanical_reduction>1.0</mechanical_reduction>
+        <mechanical_reduction>20.0</mechanical_reduction>
       </joint>
     </transmission>
   </ros2_control>

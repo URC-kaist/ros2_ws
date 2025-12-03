@@ -3,22 +3,29 @@
 #include "pluginlib/class_list_macros.hpp"
 
 #include "rclcpp/clock.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/node.hpp"
 #include "rclcpp/qos.hpp"
+#include "rclcpp/utilities.hpp"
 #include "std_msgs/msg/float64.hpp"
 
-#include <cmath>
 #include <cstdint>
-#include <cctype>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 
 namespace mr2_devices_sensors {
 
 namespace {
 constexpr uint32_t kStdIdMask = 0x7FFU;
+
+constexpr uint8_t kEncFlagIndexSeen = 0x1;
+constexpr uint8_t kEncFlagErrorLatched = 0x2;
+constexpr uint8_t kEncFlagSensorFault = 0x4;
 
 inline int32_t unpack_s24_be(const can_frame &frame) {
   int32_t raw = (static_cast<int32_t>(frame.data[0]) << 16) |
@@ -28,6 +35,16 @@ inline int32_t unpack_s24_be(const can_frame &frame) {
     raw |= ~0xFFFFFF;
   }
   return raw;
+}
+
+inline std::string require_param(
+    const std::unordered_map<std::string, std::string> &params,
+    const std::string &key) {
+  auto it = params.find(key);
+  if (it == params.end()) {
+    throw std::runtime_error("Missing required parameter '" + key + "'");
+  }
+  return it->second;
 }
 
 inline uint32_t parse_can_id(const std::string &value) {
@@ -44,37 +61,43 @@ inline uint32_t parse_can_id(const std::string &value) {
   return id;
 }
 
-inline double parse_double(const std::unordered_map<std::string, std::string> &params,
-                           const std::string &key, double def) {
+template <typename T>
+inline T parse_number(const std::unordered_map<std::string, std::string> &params,
+                      const std::string &key, T def) {
   auto it = params.find(key);
   if (it == params.end()) {
     return def;
   }
   try {
-    return std::stod(it->second);
+    if constexpr (std::is_integral_v<T>) {
+      return static_cast<T>(std::stoll(it->second));
+    } else {
+      return static_cast<T>(std::stod(it->second));
+    }
   } catch (const std::exception &) {
-    throw std::runtime_error("Invalid numeric value for " + key + ": " + it->second);
+    throw std::runtime_error("Invalid numeric value for " + key + ": " +
+                             it->second);
   }
 }
 
-inline std::string make_sensor_topic(const std::string &name) {
-  if (name.empty()) {
-    return {};
+inline std::string resolve_topic(
+    const std::unordered_map<std::string, std::string> &params,
+    const std::string &key, const std::string &fallback) {
+  auto it = params.find(key);
+  if (it != params.end()) {
+    return it->second;
   }
-  std::string sanitized;
-  sanitized.reserve(name.size());
-  for (char ch : name) {
-    unsigned char uc = static_cast<unsigned char>(ch);
-    if (std::isalnum(uc) || ch == '/' || ch == '_') {
-      sanitized.push_back(ch);
-    } else {
-      sanitized.push_back('_');
-    }
+  return fallback;
+}
+
+inline std::string resolve_string(
+    const std::unordered_map<std::string, std::string> &params,
+    const std::string &key, const std::string &fallback) {
+  auto it = params.find(key);
+  if (it != params.end()) {
+    return it->second;
   }
-  if (!sanitized.empty() && sanitized.front() == '/') {
-    return sanitized;
-  }
-  return std::string("can_sensors/") + sanitized;
+  return fallback;
 }
 
 } // namespace
@@ -86,17 +109,17 @@ public:
     node_ = node;
 
     iface_ = require_param(info.parameters, "can_iface");
-    bitrate_ = static_cast<int>(parse_double(info.parameters, "bitrate", 1'000'000));
+    bitrate_ = parse_number<int>(info.parameters, "bitrate", 1'000'000);
     can_id_ = parse_can_id(require_param(info.parameters, "can_id"));
-    ticks_per_rev_ = parse_double(info.parameters, "ticks_per_rev", 4096.0);
-    direction_ = parse_double(info.parameters, "direction", 1.0);
+    ticks_per_rev_ = parse_number<double>(info.parameters, "ticks_per_rev", 4096.0);
+    direction_ = parse_number<double>(info.parameters, "direction", 1.0);
+    if (ticks_per_rev_ <= 0.0) {
+      throw std::runtime_error("ticks_per_rev must be positive");
+    }
 
-    const double zero_deg = parse_double(info.parameters, "zero_offset_deg", 0.0);
-    const double zero_rad = parse_double(info.parameters, "zero_offset_rad", zero_deg * M_PI / 180.0);
-    zero_offset_rad_ = zero_rad;
+    zero_offset_rad_ = -M_PI; // Fixed -180 degree offset
 
     state_name_ = require_param(info.parameters, "state_name");
-    error_state_name_ = state_name_ + "_error";
     auto raw_it = info.parameters.find("raw_name");
     if (raw_it != info.parameters.end()) {
       raw_name_ = raw_it->second;
@@ -106,29 +129,41 @@ public:
       flags_name_ = flags_it->second;
     }
 
+    index_state_name_ = resolve_string(info.parameters, "index_state_name",
+                                       state_name_ + "_index_seen");
+    error_state_name_ = resolve_string(info.parameters, "error_state_name",
+                                       state_name_ + "_error_latched");
+    sensor_fault_state_name_ =
+        resolve_string(info.parameters, "sensor_fault_state_name",
+                        state_name_ + "_sensor_fault");
+
     logger_ = node->get_logger();
     ros_clock_ = node->get_clock();
 
-    timeout_sec_ = parse_double(info.parameters, "timeout_sec", 0.5);
+    timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 0.5);
     last_frame_time_ = ros_clock_->now();
 
-    const std::string angle_topic = make_sensor_topic(state_name_);
-    angle_topic_ = angle_topic;
+    angle_topic_ = resolve_topic(info.parameters, "angle_topic",
+                                 "can_sensors/" + state_name_);
     angle_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-        angle_topic, rclcpp::SensorDataQoS());
+        angle_topic_, rclcpp::SensorDataQoS());
 
     if (!raw_name_.empty()) {
-      const std::string raw_topic = make_sensor_topic(raw_name_);
-      raw_topic_ = raw_topic;
+      raw_topic_ = resolve_topic(info.parameters, "raw_topic",
+                                 "can_sensors/" + raw_name_);
       raw_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-          raw_topic, rclcpp::SensorDataQoS());
+          raw_topic_, rclcpp::SensorDataQoS());
     }
     if (!flags_name_.empty()) {
-      const std::string flags_topic = make_sensor_topic(flags_name_);
-      flags_topic_ = flags_topic;
-      flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-          flags_topic, rclcpp::SensorDataQoS());
+      flags_topic_ = resolve_topic(info.parameters, "flags_topic",
+                                   "can_sensors/" + flags_name_);
+    flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+        flags_topic_, rclcpp::SensorDataQoS());
     }
+
+    watchdog_state_name_ = state_name_ + "_watchdog";
+    watchdog_state_ = -1.0;
+    frame_received_ = false;
 
     bus_ = CanBusRegistry::get(iface_, bitrate_);
     if (!bus_) {
@@ -140,34 +175,36 @@ public:
   }
 
   void process(const rclcpp::Time &now) override {
+    if (sensor_fault_state_ > 0.5) {
+      watchdog_state_ = 1.0;
+      return;
+    }
+
     const double since_last = (now - last_frame_time_).seconds();
     const bool timed_out = since_last > timeout_sec_;
 
     if (timed_out) {
-      error_ = 1.0;
-      if (!timeout_warned_) {
+      watchdog_state_ = 1.0;
+      if (!timeout_logged_) {
         RCLCPP_ERROR(logger_,
                      "Absolute encoder 0x%03X timed out (%.3f s > %.3f s)",
                      can_id_, since_last, timeout_sec_);
-        timeout_warned_ = true;
+        timeout_logged_ = true;
       }
-      timeout_active_ = true;
     } else {
-      error_ = 0.0;
-      if (timeout_active_) {
+      watchdog_state_ = frame_received_ ? 0.0 : -1.0;
+      if (timeout_logged_) {
         RCLCPP_WARN(logger_,
                     "Absolute encoder 0x%03X feedback recovered after timeout.",
                     can_id_);
-        timeout_active_ = false;
+        timeout_logged_ = false;
       }
-      timeout_warned_ = false;
     }
   }
 
-  void export_state(std::vector<double *> &, std::vector<double *> &,
-                    std::vector<double *> &) override {}
+  void export_state(double *&, double *&, double *&) override {}
 
-  void export_command(std::vector<double *> &) override {}
+  void export_command(double *&) override {}
 
   void export_named_states(
       std::vector<std::pair<std::string, double *>> &states) override {
@@ -178,53 +215,83 @@ public:
     if (!flags_name_.empty()) {
       states.emplace_back(flags_name_, &flags_);
     }
-    states.emplace_back(error_state_name_, &error_);
+    states.emplace_back(index_state_name_, &index_seen_state_);
+    states.emplace_back(error_state_name_, &error_latched_state_);
+    states.emplace_back(sensor_fault_state_name_, &sensor_fault_state_);
+    states.emplace_back(watchdog_state_name_, &watchdog_state_);
   }
 
 private:
-  static std::string require_param(const std::unordered_map<std::string, std::string> &params,
-                                   const std::string &key) {
-    auto it = params.find(key);
-    if (it == params.end()) {
-      throw std::runtime_error("Missing required parameter '" + key + "'");
-    }
-    return it->second;
-  }
-
   void on_frame(const can_frame &frame) {
-    const int32_t raw_q24 = unpack_s24_be(frame);
-    const double counts = static_cast<double>(raw_q24) / static_cast<double>(1 << 12);
-    raw_counts_ = counts;
+    const uint8_t flags_byte = frame.data[3];
+    flags_ = static_cast<double>(flags_byte);
 
-    const double revolutions = counts / ticks_per_rev_;
-    angle_rad_ = direction_ * revolutions * 2.0 * M_PI - zero_offset_rad_;
+    const bool sensor_fault = (flags_byte & kEncFlagSensorFault) != 0;
+    const bool index_seen = (flags_byte & kEncFlagIndexSeen) != 0;
+    const bool error_latched = (flags_byte & kEncFlagErrorLatched) != 0;
 
-    if (!flags_name_.empty()) {
-      flags_ = static_cast<double>(frame.data[3]);
+    index_seen_state_ = index_seen ? 1.0 : 0.0;
+    error_latched_state_ = error_latched ? 1.0 : 0.0;
+    sensor_fault_state_ = sensor_fault ? 1.0 : 0.0;
+
+    if (index_seen && !index_seen_reported_) {
+      RCLCPP_INFO(logger_, "Encoder 0x%03X reported valid samples.", can_id_);
+      index_seen_reported_ = true;
     }
 
-    if (angle_pub_) {
-      std_msgs::msg::Float64 msg;
-      msg.data = angle_rad_;
-      angle_pub_->publish(msg);
+    if (error_latched && !error_latched_reported_) {
+      RCLCPP_ERROR(logger_,
+                   "Encoder 0x%03X latched a sensor error flag.", can_id_);
+      error_latched_reported_ = true;
     }
-    if (raw_pub_) {
-      std_msgs::msg::Float64 msg;
-      msg.data = raw_counts_;
-      raw_pub_->publish(msg);
+
+    if (sensor_fault) {
+      if (!sensor_fault_reported_) {
+        RCLCPP_WARN(logger_,
+                    "Encoder 0x%03X reported a sensor fault; ignoring samples "
+                    "until it clears.",
+                    can_id_);
+        sensor_fault_reported_ = true;
+      }
+    } else if (sensor_fault_reported_) {
+      RCLCPP_INFO(logger_,
+                  "Encoder 0x%03X sensor fault cleared.", can_id_);
+      sensor_fault_reported_ = false;
     }
-    if (flags_pub_) {
+
+    if (!sensor_fault) {
+      const int32_t raw_q24 = unpack_s24_be(frame);
+      const double counts = static_cast<double>(raw_q24) /
+                            static_cast<double>(1 << 12);
+      raw_counts_ = counts;
+
+      const double revolutions = counts / ticks_per_rev_;
+      angle_rad_ = direction_ * revolutions * 2.0 * M_PI - zero_offset_rad_;
+
+      if (angle_pub_ && can_publish()) {
+        std_msgs::msg::Float64 msg;
+        msg.data = angle_rad_;
+        safe_publish(angle_pub_, msg);
+      }
+      if (raw_pub_ && can_publish()) {
+        std_msgs::msg::Float64 msg;
+        msg.data = raw_counts_;
+        safe_publish(raw_pub_, msg);
+      }
+    }
+
+    if (flags_pub_ && can_publish()) {
       std_msgs::msg::Float64 msg;
       msg.data = flags_;
-      flags_pub_->publish(msg);
+      safe_publish(flags_pub_, msg);
     }
 
     if (ros_clock_) {
       last_frame_time_ = ros_clock_->now();
     }
-    frame_received_ = true;
-    error_ = 0.0;
-    timeout_warned_ = false;
+    frame_received_ = frame_received_ || index_seen;
+    watchdog_state_ = sensor_fault ? 1.0 : 0.0;
+    timeout_logged_ = false;
   }
 
   rclcpp::Node *node_{nullptr};
@@ -247,17 +314,52 @@ private:
   std::string state_name_;
   std::string raw_name_;
   std::string flags_name_;
+  std::string watchdog_state_name_;
+  std::string index_state_name_;
   std::string error_state_name_;
+  std::string sensor_fault_state_name_;
 
   double angle_rad_{0.0};
   double raw_counts_{0.0};
   double flags_{0.0};
+  double index_seen_state_{0.0};
+  double error_latched_state_{0.0};
+  double sensor_fault_state_{0.0};
   bool frame_received_{false};
-  bool timeout_warned_{false};
-  bool timeout_active_{false};
-  double error_{1.0};
+  bool timeout_logged_{false};
+  double watchdog_state_{-1.0};
   double timeout_sec_{0.5};
   rclcpp::Time last_frame_time_;
+  bool error_latched_reported_{false};
+  bool sensor_fault_reported_{false};
+  bool index_seen_reported_{false};
+
+  template<typename MsgT>
+  void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
+                    const MsgT &msg) {
+    if (!pub || !can_publish()) {
+      return;
+    }
+    try {
+      pub->publish(msg);
+    } catch (const rclcpp::exceptions::RCLError &ex) {
+      RCLCPP_WARN_ONCE(logger_,
+                       "Absolute encoder publisher inactive during shutdown: %s",
+                       ex.what());
+    }
+  }
+
+  bool can_publish() const {
+    if (!node_) {
+      return false;
+    }
+    auto base = node_->get_node_base_interface();
+    if (!base) {
+      return false;
+    }
+    auto context = base->get_context();
+    return context && context->is_valid() && rclcpp::ok(context);
+  }
 };
 
 } // namespace mr2_devices_sensors

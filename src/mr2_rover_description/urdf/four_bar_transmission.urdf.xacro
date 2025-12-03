@@ -1,6 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="four_bar_transmission">
   <xacro:arg name="can_iface" default="can0"/>
+  <xacro:arg name="motor_a_id" default="102"/>
+  <xacro:arg name="motor_b_id" default="103"/>
+  <xacro:arg name="input_limit_can_id" default="183"/>
+  <xacro:arg name="output_abs_can_id" default="0x182"/>
 
   <link name="base_link">
     <visual>
@@ -64,12 +68,19 @@
     <joint name="input_joint">
       <command_interface name="position"/>
       <state_interface name="position"/>
-      <state_interface name="velocity"/>ㅏ
+      <state_interface name="velocity"/>
       <state_interface name="effort"/>
       <param name="actuator">motor2</param>
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-      <param name="motor_id">2</param>
+      <param name="motor_id">$(arg motor_a_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
+      <!-- <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
+      <!-- <param name="homing_limit_state">input_joint_limit_switch</param> -->
+      <!-- <param name="homing_limit_watchdog_state">input_joint_limit_switch_watchdog</param> -->
+      <!-- <param name="homing_search_direction">negative</param> -->
+      <!-- <param name="homing_approach_speed">0.35</param> -->
+      <!-- <param name="homing_fine_speed">0.05</param> -->
+      <!-- <param name="homing_backoff_distance">0.12</param> -->
     </joint>
 
     <joint name="output_joint">
@@ -79,9 +90,30 @@
       <state_interface name="effort"/>
       <param name="actuator">motor3</param>
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-      <param name="motor_id">3</param>
+      <param name="motor_id">$(arg motor_b_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
+      <!-- <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+      <!-- <param name="homing_encoder_state">output_joint_abs</param> -->
+      <!-- <param name="homing_encoder_watchdog_state">output_joint_abs_watchdog</param> -->
     </joint>
+
+    <gpio name="input_joint_limit_sensor">
+      <param name="device_plugin">mr2_devices_sensors/LimitSwitchDevice</param>
+      <param name="can_iface">$(arg can_iface)</param>
+      <param name="can_id">$(arg input_limit_can_id)</param>
+      <param name="state_name">input_joint_limit_switch</param>
+      <param name="edge_name">input_joint_limit_edge</param>
+      <param name="active_high">true</param>
+    </gpio>
+
+    <gpio name="output_joint_abs_encoder">
+      <param name="device_plugin">mr2_devices_sensors/AbsoluteEncoderDevice</param>
+      <param name="can_iface">$(arg can_iface)</param>
+      <param name="can_id">$(arg output_abs_can_id)</param>
+      <param name="state_name">output_joint_abs</param>
+      <param name="flags_name">output_joint_abs_flags</param>
+      <param name="ticks_per_rev">4096</param>
+    </gpio>
 
     <transmission name="four_bar_transmission">
       <plugin>transmission_interface/FourBarLinkageTransmission</plugin>
@@ -90,14 +122,14 @@
         <state_interface name="position"/>
         <state_interface name="velocity"/>
         <state_interface name="effort"/>
-        <mechanical_reduction>40.0</mechanical_reduction>
+        <mechanical_reduction>1.0</mechanical_reduction>
       </actuator>
       <actuator name="motor3" role="motor3">
         <command_interface name="position"/>
         <state_interface name="position"/>
         <state_interface name="velocity"/>
         <state_interface name="effort"/>
-        <mechanical_reduction>40.0</mechanical_reduction>
+        <mechanical_reduction>1.0</mechanical_reduction>
       </actuator>
       <joint name="input_joint" role="input_joint">
         <mechanical_reduction>1.0</mechanical_reduction>
