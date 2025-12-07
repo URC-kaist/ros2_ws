@@ -1,6 +1,9 @@
 grid_map_filters:
   ros__parameters:
 
+    algorithm: area
+    parallelization_enabled: false
+
     # ───── I/O 토픽 ───────────────────────────
     input_topic:  /height_gridmap
     output_topic: /traversibility_gridmap
@@ -98,4 +101,3 @@ grid_map_filters:
           layer:           traversability
           upper_threshold: 1.0
           set_to:          1.0
-

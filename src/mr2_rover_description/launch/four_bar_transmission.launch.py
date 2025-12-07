@@ -1,10 +1,18 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+
+from mr2_rover_description.launch_common import (
+    controller_spawners,
+    declare_can_iface,
+    declare_use_mock_servos,
+    robot_state_publisher_node as make_rsp_node,
+    ros2_control_node as make_ros2_control_node,
+)
 
 
 def generate_launch_description():
@@ -22,10 +30,14 @@ def generate_launch_description():
         "four_bar_transmission.yaml",
     ])
 
-    can_iface = LaunchConfiguration("can_iface")
-    can_iface_arg = DeclareLaunchArgument(
-        "can_iface",
-        default_value="can0",
+    use_sim_time = LaunchConfiguration("use_sim_time")
+    use_sim_time_arg = DeclareLaunchArgument(
+        "use_sim_time",
+        default_value="false",
+        description="Use simulation time; set true when replaying bag files",
+    )
+
+    can_iface, can_iface_arg = declare_can_iface(
         description="CAN interface used by the AK servo hardware",
     )
 
@@ -57,10 +69,8 @@ def generate_launch_description():
         description="CAN ID of the absolute encoder on the output joint",
     )
 
-    use_mock_servos = LaunchConfiguration("use_mock_servos")
-    use_mock_servos_arg = DeclareLaunchArgument(
-        "use_mock_servos",
-        default_value="true",
+    use_mock_servos, use_mock_servos_arg = declare_use_mock_servos(
+        default="true",
         description="Start mock AK servo nodes that emulate the two CAN motors",
     )
 
@@ -81,19 +91,13 @@ def generate_launch_description():
         ])
     }
 
-    robot_state_publisher_node = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        parameters=[robot_description],
-        output="screen",
-    )
+    robot_state_publisher_node = make_rsp_node(robot_description, use_sim_time)
 
-    ros2_control_node = Node(
-        package="controller_manager",
-        executable="ros2_control_node",
-        parameters=[controller_yaml],
+    ros2_control_node = make_ros2_control_node(
+        controller_yaml,
+        robot_description,
+        use_sim_time,
         remappings=[("/controller_manager/robot_description", "/robot_description")],
-        output="screen",
     )
 
     mock_servo_motor_a = Node(
@@ -123,20 +127,15 @@ def generate_launch_description():
         output="screen",
     )
 
-    jsb_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["joint_state_broadcaster"],
-    )
-
-    controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["four_bar_position_controller"],
+    spawners = controller_spawners(
+        ["joint_state_broadcaster", "four_bar_position_controller"],
+        start_after=2.0,
+        interval=1.0,
     )
 
     return LaunchDescription(
         [
+            use_sim_time_arg,
             can_iface_arg,
             motor_a_arg,
             motor_b_arg,
@@ -147,7 +146,6 @@ def generate_launch_description():
             ros2_control_node,
             mock_servo_motor_a,
             mock_servo_motor_b,
-            TimerAction(period=2.0, actions=[jsb_spawner]),
-            TimerAction(period=3.0, actions=[controller_spawner]),
+            *spawners,
         ]
     )

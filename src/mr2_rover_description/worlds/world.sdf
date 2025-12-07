@@ -62,14 +62,14 @@
             <collision name="collision">
                 <geometry>
 			<mesh>
-		        <uri>mdrs.stl</uri>
+		        <uri>mdrs_cropped.stl</uri>
           </mesh>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
 			<mesh>
-		        <uri>mdrs.stl</uri>
+		        <uri>mdrs_cropped.stl</uri>
           </mesh>
                 </geometry>
 		<cast_shadows>false</cast_shadows>
@@ -83,4 +83,3 @@
     </model>
   </world>
 </sdf>
-

@@ -18,15 +18,22 @@ def generate_launch_description():
         "rviz",
         "sim.rviz",
     ])
-    rviz_arg = DeclareLaunchArgument(
-        "rviz_config",
-        default_value=default_rviz,
-        description="Full path to RViz2 config file",
-    )
     mode_arg = DeclareLaunchArgument(
         "mode",
         default_value="sim",
         description="Operating mode: 'sim' for Gazebo or 'real' for CAN hardware",
+    )
+    use_sim_time_arg = DeclareLaunchArgument(
+        "use_sim_time",
+        default_value=PythonExpression(
+            ["'", LaunchConfiguration("mode"), "' == 'sim'"]
+        ),
+        description="Use simulation time; defaults to true in sim mode and false in real",
+    )
+    rviz_arg = DeclareLaunchArgument(
+        "rviz_config",
+        default_value=default_rviz,
+        description="Full path to RViz2 config file",
     )
     headless_arg = DeclareLaunchArgument(
         "headless",
@@ -45,6 +52,11 @@ def generate_launch_description():
         ),
         description="Controller manager YAML shared by sim and hardware",
     )
+    use_mock_servos_arg = DeclareLaunchArgument(
+        "use_mock_servos",
+        default_value="false",
+        description="Start mock AK servo nodes instead of hardware interfaces (real mode)",
+    )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
     sim_condition = IfCondition(
@@ -53,12 +65,8 @@ def generate_launch_description():
     real_condition = IfCondition(
         PythonExpression(["'", LaunchConfiguration("mode"), "' == 'real'"])
     )
-
-    use_sim_time_true = SetParameter(
-        name="use_sim_time", value=True, condition=sim_condition
-    )
-    use_sim_time_false = SetParameter(
-        name="use_sim_time", value=False, condition=real_condition
+    use_sim_time_param = SetParameter(
+        name="use_sim_time", value=LaunchConfiguration("use_sim_time")
     )
 
     pc2_to_heightmap = Node(
@@ -78,6 +86,7 @@ def generate_launch_description():
             "headless": LaunchConfiguration("headless"),
             "can_iface": LaunchConfiguration("can_iface"),
             "controller_config": LaunchConfiguration("controller_config"),
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
         }.items(),
         condition=sim_condition,
     )
@@ -91,6 +100,8 @@ def generate_launch_description():
         launch_arguments={
             "can_iface": LaunchConfiguration("can_iface"),
             "controller_config": LaunchConfiguration("controller_config"),
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
+            "use_mock_servos": LaunchConfiguration("use_mock_servos"),
         }.items(),
         condition=real_condition,
     )
@@ -128,11 +139,12 @@ def generate_launch_description():
     return LaunchDescription([
         rviz_arg,
         mode_arg,
+        use_sim_time_arg,
         headless_arg,
         can_iface_arg,
         controller_config_arg,
-        use_sim_time_true,
-        use_sim_time_false,
+        use_mock_servos_arg,
+        use_sim_time_param,
         rover_launch,
         rover_real_launch,
         pc2_to_heightmap,

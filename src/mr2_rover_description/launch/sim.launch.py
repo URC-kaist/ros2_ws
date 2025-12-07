@@ -1,15 +1,27 @@
+import os
+
+import yaml
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
-from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
     LaunchConfiguration,
     PathJoinSubstitution,
     TextSubstitution,
+    PythonExpression,
 )
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+from mr2_rover_description.launch_common import (
+    controller_spawners,
+    declare_can_iface,
+    declare_controller_config,
+    robot_description_from_xacro,
+    robot_state_publisher_node,
+)
 
 
 def generate_launch_description():
@@ -18,35 +30,32 @@ def generate_launch_description():
     xacro_file = PathJoinSubstitution([desc_pkg, "urdf", "rover.urdf.xacro"])
     world_file = PathJoinSubstitution([desc_pkg, "worlds", "world.sdf"])
 
-    can_iface = LaunchConfiguration("can_iface")
-    can_iface_arg = DeclareLaunchArgument(
-        "can_iface",
-        default_value="can0",
+    use_sim_time = LaunchConfiguration("use_sim_time")
+    use_sim_time_arg = DeclareLaunchArgument(
+        "use_sim_time",
+        default_value="true",
+        description="Use simulation time; normally true for Gazebo workflows",
+    )
+
+    can_iface, can_iface_arg = declare_can_iface(
         description="CAN interface used by the AK servo hardware",
     )
 
-    controller_config = LaunchConfiguration("controller_config")
-    controller_config_arg = DeclareLaunchArgument(
-        "controller_config",
+    controller_config, controller_config_arg = declare_controller_config(
         default_value=PathJoinSubstitution(
             [desc_pkg, "config", "controllers", "rover_controllers.yaml"]
         ),
         description="YAML file with controller manager configuration",
     )
 
-    robot_description = {
-        "robot_description": Command(
-            [
-                "xacro ",
-                xacro_file,
-                " ros2_control_mode:=gazebo",
-                " can_iface:=",
-                can_iface,
-                " ros2_control_config:=",
-                controller_config,
-            ]
-        )
-    }
+    robot_description = robot_description_from_xacro(
+        xacro_file,
+        {
+            "ros2_control_mode": TextSubstitution(text="gazebo"),
+            "can_iface": can_iface,
+            "ros2_control_config": controller_config,
+        },
+    )
 
     headless = LaunchConfiguration("headless")
     headless_arg = DeclareLaunchArgument(
@@ -56,91 +65,77 @@ def generate_launch_description():
     )
 
     # ───── Gazebo (use ros_gz_sim launcher) ──────────────────────────────
+    gz_args = [
+        PythonExpression(
+            [
+                "'-r --headless-rendering -s ' if '",
+                headless,
+                "' == 'true' else '-r '",
+            ]
+        ),
+        world_file,
+    ]
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [FindPackageShare("ros_gz_sim"), "launch", "gz_sim.launch.py"]
             )
         ),
-        launch_arguments={
-            "gz_args": [TextSubstitution(text="-r "), world_file]
-        }.items(),
-        condition=UnlessCondition(headless),
-    )
-    gz_sim_headless = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("ros_gz_sim"), "launch", "gz_sim.launch.py"]
-            )
-        ),
-        launch_arguments={
-            "gz_args": [
-                TextSubstitution(text="-r --headless-rendering -s "),
-                world_file,
-            ]
-        }.items(),
-        condition=IfCondition(headless),
+        launch_arguments={"gz_args": gz_args}.items(),
     )
 
     # ───── robot_state_publisher & ros2_control_node ────────────────────
-    rsp = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        parameters=[robot_description],
-    )
+    rsp = robot_state_publisher_node(robot_description, use_sim_time)
 
     # ───── spawn the robot into Gazebo ───────────────────────────────────
-    spawn = Node(
-        package="ros_gz_sim",
-        executable="create",
-        arguments=["-topic", "robot_description", "-name", "rover", "-z", "-10.0"],
+    spawn = TimerAction(
+        period=2.0,
+        actions=[
+            Node(
+                package="ros_gz_sim",
+                executable="create",
+                arguments=["-topic", "robot_description", "-name", "rover", "-z", "-10.0"],
+            )
+        ],
     )
+
+    bridge_config_path = os.path.join(
+        get_package_share_directory("mr2_rover_description"),
+        "config",
+        "gz_bridge_topics.yaml",
+    )
+    with open(bridge_config_path, "r", encoding="utf-8") as bridge_config:
+        bridge_topics = yaml.safe_load(bridge_config).get("topics", [])
+    bridge_args = [
+        f"{topic['name']}@{topic['ros_type']}@{topic['gz_type']}"
+        for topic in bridge_topics
+    ]
 
     gz_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        arguments=[
-            "/left_gnss/navsat@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat",
-            "/right_gnss/navsat@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat",
-            "/rgbd_camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo",
-            "/rgbd_camera/depth_image@sensor_msgs/msg/Image@gz.msgs.Image",
-            "/rgbd_camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
-            "/rgbd_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked",
-            "/imu@sensor_msgs/msg/Imu@gz.msgs.IMU",
-        ],
+        arguments=bridge_args,
+        parameters=[{"use_sim_time": use_sim_time}],
         output="screen",
     )
 
     # ───── load controllers (after ros2_control is running) ─────────────
-    jsb_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["joint_state_broadcaster"],
-    )
-    rover_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["rover_controller"],
-    )
-    manipulator_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["manipulator_controller"],
+    spawners = controller_spawners(
+        ["joint_state_broadcaster", "rover_controller", "manipulator_controller"],
+        start_after=2.0,
+        interval=2.0,
     )
 
     return LaunchDescription(
         [
             headless_arg,
+            use_sim_time_arg,
             can_iface_arg,
             controller_config_arg,
             gz_sim,
-            gz_sim_headless,
             rsp,
-            TimerAction(period=2.0, actions=[spawn]),
-            TimerAction(
-                period=6.0,
-                actions=[jsb_spawner, rover_controller_spawner, manipulator_controller_spawner],
-            ),
+            spawn,
+            *spawners,
             gz_bridge,
         ]
     )
