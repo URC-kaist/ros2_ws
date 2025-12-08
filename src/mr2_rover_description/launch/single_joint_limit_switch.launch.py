@@ -83,6 +83,20 @@ def generate_launch_description():
         description="Trigger when position is below threshold (false means above)",
     )
 
+    joint_lower_limit = LaunchConfiguration("joint_lower_limit")
+    joint_lower_limit_arg = DeclareLaunchArgument(
+        "joint_lower_limit",
+        default_value="-3.14",
+        description="Lower joint limit in radians",
+    )
+
+    joint_upper_limit = LaunchConfiguration("joint_upper_limit")
+    joint_upper_limit_arg = DeclareLaunchArgument(
+        "joint_upper_limit",
+        default_value="3.14",
+        description="Upper joint limit in radians",
+    )
+
     homing_search_direction = LaunchConfiguration("homing_search_direction")
     homing_search_direction_arg = DeclareLaunchArgument(
         "homing_search_direction",
@@ -130,6 +144,10 @@ def generate_launch_description():
             limit_switch_can_id,
             " limit_switch_active_high:=",
             limit_switch_active_high,
+            " joint_lower_limit:=",
+            joint_lower_limit,
+            " joint_upper_limit:=",
+            joint_upper_limit,
             " homing_search_direction:=",
             homing_search_direction,
             " homing_approach_speed:=",
@@ -188,6 +206,8 @@ def generate_launch_description():
             limit_switch_active_high_arg,
             limit_switch_trigger_position_arg,
             limit_switch_trigger_when_below_arg,
+            joint_lower_limit_arg,
+            joint_upper_limit_arg,
             homing_search_direction_arg,
             homing_approach_speed_arg,
             homing_backoff_speed_arg,

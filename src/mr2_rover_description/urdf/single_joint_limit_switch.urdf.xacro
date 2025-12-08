@@ -5,6 +5,8 @@
   <xacro:arg name="motor_id" default="4"/>
   <xacro:arg name="limit_switch_can_id" default="385"/>
   <xacro:arg name="limit_switch_active_high" default="true"/>
+  <xacro:arg name="joint_lower_limit" default="-3.14"/>
+  <xacro:arg name="joint_upper_limit" default="3.14"/>
   <xacro:arg name="homing_search_direction" default="negative"/>
   <xacro:arg name="homing_approach_speed" default="0.30"/>
   <xacro:arg name="homing_backoff_speed" default="0.60"/>
@@ -41,7 +43,7 @@
     <child link="link1"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-3.14" upper="3.14" effort="10" velocity="1"/>
+    <limit lower="$(arg joint_lower_limit)" upper="$(arg joint_upper_limit)" effort="10" velocity="1"/>
   </joint>
 
   <ros2_control name="CanSystem" type="system">
@@ -58,6 +60,8 @@
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
       <param name="motor_id">$(arg motor_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
+      <param name="joint_lower_limit">$(arg joint_lower_limit)</param>
+      <param name="joint_upper_limit">$(arg joint_upper_limit)</param>
       <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
       <param name="homing_limit_state">joint1/limit_switch_state</param>
       <param name="homing_limit_watchdog_state">joint1/limit_switch_state_watchdog</param>

@@ -131,6 +131,23 @@ public:
       joint_data.actuator_name = actuator_it != joint.parameters.end()
                                      ? actuator_it->second
                                      : joint.name;
+      const auto lower_limit_it = joint.parameters.find("joint_lower_limit");
+      if (lower_limit_it != joint.parameters.end()) {
+        joint_data.lower_limit = std::stod(lower_limit_it->second);
+      }
+      const auto upper_limit_it = joint.parameters.find("joint_upper_limit");
+      if (upper_limit_it != joint.parameters.end()) {
+        joint_data.upper_limit = std::stod(upper_limit_it->second);
+      }
+      if (std::isfinite(joint_data.lower_limit) &&
+          std::isfinite(joint_data.upper_limit) &&
+          joint_data.lower_limit > joint_data.upper_limit) {
+        RCLCPP_ERROR(
+            node_->get_logger(),
+            "Joint %s lower limit (%.6f) exceeds upper limit (%.6f)",
+            joint.name.c_str(), joint_data.lower_limit, joint_data.upper_limit);
+        return CallbackReturn::ERROR;
+      }
 
       auto &actuator = get_actuator(joint_data.actuator_name);
 
@@ -632,6 +649,17 @@ public:
     }
 
     for (auto &joint : joints_) {
+      double limited_command = joint.command;
+      if (std::isfinite(limited_command)) {
+        if (std::isfinite(joint.lower_limit)) {
+          limited_command = std::max(limited_command, joint.lower_limit);
+        }
+        if (std::isfinite(joint.upper_limit)) {
+          limited_command = std::min(limited_command, joint.upper_limit);
+        }
+        joint.command = limited_command;
+      }
+
       joint.transmission_passthrough = joint.command + joint.offset;
       joint.transmission_velocity = 0.0;
       joint.transmission_effort = 0.0;
@@ -664,6 +692,8 @@ private:
     double state{std::numeric_limits<double>::quiet_NaN()};
     double velocity{std::numeric_limits<double>::quiet_NaN()};
     double effort{std::numeric_limits<double>::quiet_NaN()};
+    double lower_limit{-std::numeric_limits<double>::infinity()};
+    double upper_limit{std::numeric_limits<double>::infinity()};
     double offset{0.0};
     double transmission_passthrough{std::numeric_limits<double>::quiet_NaN()};
     double transmission_velocity{std::numeric_limits<double>::quiet_NaN()};
