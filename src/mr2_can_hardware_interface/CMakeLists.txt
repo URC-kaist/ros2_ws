@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(ament_cmake REQUIRED)
 find_package(mr2_can_bus_core REQUIRED)
+find_package(mr2_devices_sensors REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -24,10 +25,13 @@ target_include_directories(${PROJECT_NAME}
 
 ament_target_dependencies(${PROJECT_NAME}
   mr2_can_bus_core
+  mr2_devices_sensors
   hardware_interface
   pluginlib
   rclcpp
   transmission_interface)
+target_link_libraries(${PROJECT_NAME}
+  ${mr2_devices_sensors_LIBRARIES})
 
 pluginlib_export_plugin_description_file(hardware_interface plugin.xml)
 pluginlib_export_plugin_description_file(mr2_can_hardware_interface plugin.xml)

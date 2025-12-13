@@ -5,10 +5,16 @@
  * joint offset. The plugin expects the following ROS parameters (prefixed
  * with `homing_` in the URDF/ros2_control description):
  *
- *   encoder_state (string, required)
- *     Name of the shared state exported by the absolute encoder device.
- *   encoder_watchdog_state (string, optional)
- *     Name of the watchdog state to monitor encoder health.
+ *   device_plugin (string, required)
+ *     Name of the CAN device plugin that provides the encoder reading.
+ *   device_* (various, forwarded)
+ *     Any parameters prefixed with `homing_device_` are forwarded (prefix
+ *     stripped) to the encoder device. Common ones are:
+ *       - device_can_iface
+ *       - device_can_id
+ *       - device_ticks_per_rev
+ *       - device_state_name (defaults to <joint>/absolute_encoder)
+ *       - device_direction
  *   home_offset (double, optional, default 0.0)
  *     Additional offset in radians applied to the encoder angle before
  *     computing the joint offset.
@@ -18,12 +24,18 @@
 
 #include "mr2_can_hardware_interface/homing_policy.hpp"
 
+#include "mr2_devices_sensors/absolute_encoder_device.hpp"
+#include "mr2_devices_sensors/homing_sensors.hpp"
+
 #include "pluginlib/class_list_macros.hpp"
 
 #include "rclcpp/logging.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <memory>
+#include <unordered_map>
 
 namespace mr2_can_hardware_interface {
 
@@ -31,39 +43,49 @@ class AbsoluteEncoderPolicy : public HomingPolicy {
 public:
   void configure(const rclcpp::Node::SharedPtr &node,
                  const JointHandle &joint,
-                 const NamedStateMap &named_states,
                  const ParamMap &params) override {
     node_ = node;
     joint_ = joint;
 
-    const auto state_it = params.find("encoder_state");
-    if (state_it == params.end()) {
-      error_message_ =
-          "AbsoluteEncoderPolicy requires 'encoder_state' parameter.";
-      error_ = true;
-      return;
-    }
-
-    const auto ptr_it = named_states.find(state_it->second);
-    if (ptr_it == named_states.end()) {
-      error_message_ = "Named state '" + state_it->second +
-                       "' not found for absolute encoder.";
-      error_ = true;
-      return;
-    }
-
-    encoder_state_ = ptr_it->second;
-
-    const auto watchdog_state_it = params.find("encoder_watchdog_state");
-    if (watchdog_state_it != params.end()) {
-      const auto watchdog_ptr_it = named_states.find(watchdog_state_it->second);
-      if (watchdog_ptr_it == named_states.end()) {
-        error_message_ = "Named state '" + watchdog_state_it->second +
-                         "' not found for absolute encoder watchdog.";
-        error_ = true;
-        return;
+    // Split parameters into device_* (forwarded to device) and policy params.
+    std::unordered_map<std::string, std::string> device_params;
+    for (const auto &param : params) {
+      if (param.first.rfind("device_", 0) == 0) {
+        device_params.emplace(param.first.substr(std::string("device_").size()),
+                              param.second);
       }
-      encoder_watchdog_state_ = watchdog_ptr_it->second;
+    }
+
+    const std::string state_name =
+        device_params.count("state_name")
+            ? device_params["state_name"]
+            : joint.name + "/absolute_encoder";
+    device_params.emplace("state_name", state_name);
+
+    // Build a minimal ComponentInfo for the device.
+    hardware_interface::ComponentInfo component;
+    component.name =
+        device_params.count("name") ? device_params["name"] : state_name;
+    component.type = "sensor";
+    component.parameters = device_params;
+
+    auto device = std::make_shared<mr2_devices_sensors::AbsoluteEncoderDevice>();
+    try {
+      device->configure(component, node_.get());
+    } catch (const std::exception &ex) {
+      error_message_ = std::string("Failed to configure absolute encoder: ") +
+                       ex.what();
+      error_ = true;
+      return;
+    }
+
+    device_ = device;
+    encoder_state_ = device_->angle_ptr();
+    encoder_watchdog_state_ = device_->watchdog_ptr();
+    if (!encoder_state_) {
+      error_message_ = "Absolute encoder state pointer missing from device.";
+      error_ = true;
+      return;
     }
 
     // Helper used for optional numeric parameters.
@@ -162,9 +184,14 @@ public:
     error_message_.clear();
   }
 
+  std::shared_ptr<CanDevice> homing_device() const override {
+    return std::static_pointer_cast<CanDevice>(device_);
+  }
+
 private:
   rclcpp::Node::SharedPtr node_;
   JointHandle joint_;
+  std::shared_ptr<mr2_devices_sensors::AbsoluteEncoderDriver> device_;
   const double *encoder_state_{nullptr};
   const double *encoder_watchdog_state_{nullptr};
   double home_offset_{0.0};

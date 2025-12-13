@@ -65,7 +65,6 @@ public:
     transmissions_.clear();
     device_states_.clear();
     devs_.clear();
-    named_states_.clear();
     homing_instances_.clear();
     homing_active_ = false;
     homed_ = false;
@@ -186,10 +185,6 @@ public:
         }
 
         std::vector<std::pair<std::string, double *>> named_entries;
-        dev->export_named_states(named_entries);
-        if (register_named_states(named_entries) != CallbackReturn::SUCCESS) {
-          return CallbackReturn::ERROR;
-        }
 
         actuator.configured = true;
         actuator.device = &device_state;
@@ -213,51 +208,6 @@ public:
 
         homing_configs.push_back(std::move(cfg));
       }
-    }
-
-    for (const auto &gpio : info_.gpios) {
-      const auto plugin_it = gpio.parameters.find("device_plugin");
-      if (plugin_it == gpio.parameters.end()) {
-        RCLCPP_ERROR(node_->get_logger(),
-                     "GPIO component %s missing <param name=\"device_plugin\">",
-                     gpio.name.c_str());
-        return CallbackReturn::ERROR;
-      }
-
-      std::shared_ptr<CanDevice> dev;
-      try {
-        dev = loader_->createSharedInstance(plugin_it->second);
-      } catch (const pluginlib::PluginlibException &ex) {
-        RCLCPP_ERROR(node_->get_logger(),
-                     "Failed to load GPIO device plugin %s: %s",
-                     plugin_it->second.c_str(), ex.what());
-        return CallbackReturn::ERROR;
-      }
-
-      try {
-        dev->configure(gpio, node_.get());
-      } catch (const std::exception &ex) {
-        RCLCPP_ERROR(node_->get_logger(),
-                     "GPIO device %s configure() threw: %s", gpio.name.c_str(),
-                     ex.what());
-        return CallbackReturn::ERROR;
-      }
-
-      std::vector<std::pair<std::string, double *>> named_entries;
-      dev->export_named_states(named_entries);
-      if (register_named_states(named_entries) != CallbackReturn::SUCCESS) {
-        return CallbackReturn::ERROR;
-      }
-
-      // Allow devices to export state/command buffers if they choose to.
-      double *state_ptr = nullptr;
-      double *velocity_ptr = nullptr;
-      double *effort_ptr = nullptr;
-      double *command_ptr = nullptr;
-      dev->export_state(state_ptr, velocity_ptr, effort_ptr);
-      dev->export_command(command_ptr);
-
-      devs_.push_back(std::move(dev));
     }
 
     for (const auto &transmission_info : info_.transmissions) {
@@ -415,13 +365,6 @@ public:
     }
 
     if (!homing_configs.empty()) {
-      HomingPolicy::NamedStateMap state_map;
-      state_map.reserve(named_states_.size());
-      for (const auto &entry : named_states_) {
-        state_map.emplace(entry.first,
-                          static_cast<const double *>(entry.second));
-      }
-
       for (const auto &cfg : homing_configs) {
         if (cfg.plugin.empty()) {
           RCLCPP_ERROR(node_->get_logger(),
@@ -456,12 +399,16 @@ public:
             joint.has_velocity_state ? &joint.velocity : nullptr,
             &joint.offset};
 
-        policy->configure(node_, handle, state_map, cfg.params);
+        policy->configure(node_, handle, cfg.params);
         if (policy->has_error()) {
           RCLCPP_ERROR(node_->get_logger(),
                        "Homing policy for joint '%s' failed to configure: %s",
                        cfg.joint_name.c_str(), policy->error_message().c_str());
           return CallbackReturn::ERROR;
+        }
+
+        if (auto dev = policy->homing_device()) {
+          devs_.push_back(std::move(dev));
         }
 
         homing_instances_.push_back({cfg.joint_name, policy});
@@ -748,25 +695,7 @@ private:
   }
 
   CallbackReturn register_named_states(
-      const std::vector<std::pair<std::string, double *>> &states) {
-    for (const auto &entry : states) {
-      if (!entry.second) {
-        RCLCPP_ERROR(node_->get_logger(), "Named state '%s' has null pointer.",
-                     entry.first.c_str());
-        return CallbackReturn::ERROR;
-      }
-
-      auto [it, inserted] = named_states_.emplace(entry.first, entry.second);
-
-      if (!inserted) {
-        RCLCPP_WARN(node_->get_logger(),
-                    "Named state '%s' already registered. Overwriting pointer.",
-                    entry.first.c_str());
-        it->second = entry.second;
-      }
-    }
-    return CallbackReturn::SUCCESS;
-  }
+      const std::vector<std::pair<std::string, double *>> &) = delete;
 
   struct HomingInstance {
     std::string joint_name;
@@ -785,7 +714,6 @@ private:
       transmissions_;
   std::unordered_map<std::string, DevicePointers> device_states_;
 
-  std::unordered_map<std::string, double *> named_states_;
   std::vector<HomingInstance> homing_instances_;
   bool homing_active_{false};
   bool homed_{false};

@@ -4,9 +4,13 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/time.hpp>
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
+#include "hardware_interface/hardware_info.hpp"
+#include "mr2_can_bus_core/can_device.hpp"
 namespace mr2_can_hardware_interface {
 
 class HomingPolicy {
@@ -19,14 +23,12 @@ public:
     double *offset{nullptr};
   };
 
-  using NamedStateMap = std::unordered_map<std::string, const double *>;
   using ParamMap = std::unordered_map<std::string, std::string>;
 
   virtual ~HomingPolicy() = default;
 
   virtual void configure(const rclcpp::Node::SharedPtr &node,
                          const JointHandle &joint,
-                         const NamedStateMap &named_states,
                          const ParamMap &params) = 0;
 
   virtual void begin(const rclcpp::Time &now) = 0;
@@ -39,6 +41,10 @@ public:
 
   virtual void finalize(const rclcpp::Time &now) = 0;
   virtual void reset() = 0;
+
+  // Optional access to the underlying device so the hardware interface can
+  // include it in its process() loop (e.g., watchdog updates).
+  virtual std::shared_ptr<CanDevice> homing_device() const { return nullptr; }
 };
 
 } // namespace mr2_can_hardware_interface

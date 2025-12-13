@@ -63,22 +63,16 @@
       <param name="joint_lower_limit">$(arg joint_lower_limit)</param>
       <param name="joint_upper_limit">$(arg joint_upper_limit)</param>
       <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
-      <param name="homing_limit_state">joint1/limit_switch_state</param>
-      <param name="homing_limit_watchdog_state">joint1/limit_switch_state_watchdog</param>
+      <param name="homing_device_can_iface">$(arg can_iface)</param>
+      <param name="homing_device_can_id">$(arg limit_switch_can_id)</param>
+      <param name="homing_device_state_name">joint1/limit_switch_state</param>
+      <param name="homing_device_active_high">$(arg limit_switch_active_high)</param>
       <param name="homing_search_direction">$(arg homing_search_direction)</param>
       <param name="homing_approach_speed">$(arg homing_approach_speed)</param>
       <param name="homing_backoff_speed">$(arg homing_backoff_speed)</param>
       <param name="homing_fine_speed">$(arg homing_fine_speed)</param>
       <param name="homing_backoff_distance">$(arg homing_backoff_distance)</param>
     </joint>
-
-    <gpio name="joint1_limit_switch">
-      <param name="device_plugin">mr2_devices_sensors/LimitSwitchDevice</param>
-      <param name="can_iface">$(arg can_iface)</param>
-      <param name="can_id">$(arg limit_switch_can_id)</param>
-      <param name="state_name">joint1/limit_switch_state</param>
-      <param name="active_high">$(arg limit_switch_active_high)</param>
-    </gpio>
 
     <transmission name="joint1_transmission">
       <plugin>transmission_interface/SimpleTransmission</plugin>

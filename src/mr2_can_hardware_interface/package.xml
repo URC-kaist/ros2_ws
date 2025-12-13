@@ -12,6 +12,7 @@
 
   <!-- Run-time / build dependencies -->
   <depend>mr2_can_bus_core</depend>          <!-- header-only bus framework -->
+  <depend>mr2_devices_sensors</depend>
   <depend>hardware_interface</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>

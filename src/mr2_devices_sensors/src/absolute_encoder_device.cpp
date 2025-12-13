@@ -1,4 +1,5 @@
-#include "mr2_can_bus_core/can_device.hpp"
+#include "mr2_devices_sensors/absolute_encoder_device.hpp"
+#include "mr2_devices_sensors/homing_sensors.hpp"
 
 #include "pluginlib/class_list_macros.hpp"
 
@@ -102,265 +103,211 @@ inline std::string resolve_string(
 
 } // namespace
 
-class AbsoluteEncoderDevice : public CanDevice {
-public:
-  void configure(const hardware_interface::ComponentInfo &info,
-                 rclcpp::Node *node) override {
-    node_ = node;
+void AbsoluteEncoderDevice::configure(const hardware_interface::ComponentInfo &info,
+                                       rclcpp::Node *node) {
+  node_ = node;
 
-    iface_ = require_param(info.parameters, "can_iface");
-    bitrate_ = parse_number<int>(info.parameters, "bitrate", 1'000'000);
-    can_id_ = parse_can_id(require_param(info.parameters, "can_id"));
-    ticks_per_rev_ = parse_number<double>(info.parameters, "ticks_per_rev", 4096.0);
-    direction_ = parse_number<double>(info.parameters, "direction", 1.0);
-    if (ticks_per_rev_ <= 0.0) {
-      throw std::runtime_error("ticks_per_rev must be positive");
-    }
+  iface_ = require_param(info.parameters, "can_iface");
+  bitrate_ = parse_number<int>(info.parameters, "bitrate", 1'000'000);
+  can_id_ = parse_can_id(require_param(info.parameters, "can_id"));
+  ticks_per_rev_ = parse_number<double>(info.parameters, "ticks_per_rev", 4096.0);
+  direction_ = parse_number<double>(info.parameters, "direction", 1.0);
+  if (ticks_per_rev_ <= 0.0) {
+    throw std::runtime_error("ticks_per_rev must be positive");
+  }
 
-    zero_offset_rad_ = -M_PI; // Fixed -180 degree offset
+  zero_offset_rad_ = -M_PI; // Fixed -180 degree offset
 
-    state_name_ = require_param(info.parameters, "state_name");
-    auto raw_it = info.parameters.find("raw_name");
-    if (raw_it != info.parameters.end()) {
-      raw_name_ = raw_it->second;
-    }
-    auto flags_it = info.parameters.find("flags_name");
-    if (flags_it != info.parameters.end()) {
-      flags_name_ = flags_it->second;
-    }
+  state_name_ = require_param(info.parameters, "state_name");
+  auto raw_it = info.parameters.find("raw_name");
+  if (raw_it != info.parameters.end()) {
+    raw_name_ = raw_it->second;
+  }
+  auto flags_it = info.parameters.find("flags_name");
+  if (flags_it != info.parameters.end()) {
+    flags_name_ = flags_it->second;
+  }
 
-    index_state_name_ = resolve_string(info.parameters, "index_state_name",
-                                       state_name_ + "_index_seen");
-    error_state_name_ = resolve_string(info.parameters, "error_state_name",
-                                       state_name_ + "_error_latched");
-    sensor_fault_state_name_ =
-        resolve_string(info.parameters, "sensor_fault_state_name",
-                        state_name_ + "_sensor_fault");
+  index_state_name_ = resolve_string(info.parameters, "index_state_name",
+                                     state_name_ + "_index_seen");
+  error_state_name_ = resolve_string(info.parameters, "error_state_name",
+                                     state_name_ + "_error_latched");
+  sensor_fault_state_name_ =
+      resolve_string(info.parameters, "sensor_fault_state_name",
+                     state_name_ + "_sensor_fault");
 
-    logger_ = node->get_logger();
-    ros_clock_ = node->get_clock();
+  logger_ = node->get_logger();
+  ros_clock_ = node->get_clock();
 
-    timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 0.5);
-    last_frame_time_ = ros_clock_->now();
+  timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 0.5);
+  last_frame_time_ = ros_clock_->now();
 
-    angle_topic_ = resolve_topic(info.parameters, "angle_topic",
-                                 "can_sensors/" + state_name_);
-    angle_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-        angle_topic_, rclcpp::SensorDataQoS());
+  angle_topic_ = resolve_topic(info.parameters, "angle_topic",
+                               "can_sensors/" + state_name_);
+  angle_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+      angle_topic_, rclcpp::SensorDataQoS());
 
-    if (!raw_name_.empty()) {
-      raw_topic_ = resolve_topic(info.parameters, "raw_topic",
-                                 "can_sensors/" + raw_name_);
-      raw_pub_ = node->create_publisher<std_msgs::msg::Float64>(
-          raw_topic_, rclcpp::SensorDataQoS());
-    }
-    if (!flags_name_.empty()) {
-      flags_topic_ = resolve_topic(info.parameters, "flags_topic",
-                                   "can_sensors/" + flags_name_);
+  if (!raw_name_.empty()) {
+    raw_topic_ = resolve_topic(info.parameters, "raw_topic",
+                               "can_sensors/" + raw_name_);
+    raw_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+        raw_topic_, rclcpp::SensorDataQoS());
+  }
+  if (!flags_name_.empty()) {
+    flags_topic_ = resolve_topic(info.parameters, "flags_topic",
+                                 "can_sensors/" + flags_name_);
     flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
         flags_topic_, rclcpp::SensorDataQoS());
-    }
-
-    watchdog_state_name_ = state_name_ + "_watchdog";
-    watchdog_state_ = -1.0;
-    frame_received_ = false;
-
-    bus_ = CanBusRegistry::get(iface_, bitrate_);
-    if (!bus_) {
-      throw std::runtime_error("Cannot open CAN bus: " + iface_);
-    }
-
-    add_filter(bus_, can_id_, kStdIdMask,
-               [this](const can_frame &frame) { on_frame(frame); });
   }
 
-  void process(const rclcpp::Time &now) override {
-    if (sensor_fault_state_ > 0.5) {
-      watchdog_state_ = 1.0;
-      return;
-    }
+  watchdog_state_name_ = state_name_ + "_watchdog";
+  watchdog_state_ = -1.0;
+  frame_received_ = false;
 
-    const double since_last = (now - last_frame_time_).seconds();
-    const bool timed_out = since_last > timeout_sec_;
-
-    if (timed_out) {
-      watchdog_state_ = 1.0;
-      if (!timeout_logged_) {
-        RCLCPP_ERROR(logger_,
-                     "Absolute encoder 0x%03X timed out (%.3f s > %.3f s)",
-                     can_id_, since_last, timeout_sec_);
-        timeout_logged_ = true;
-      }
-    } else {
-      watchdog_state_ = frame_received_ ? 0.0 : -1.0;
-      if (timeout_logged_) {
-        RCLCPP_WARN(logger_,
-                    "Absolute encoder 0x%03X feedback recovered after timeout.",
-                    can_id_);
-        timeout_logged_ = false;
-      }
-    }
+  bus_ = CanBusRegistry::get(iface_, bitrate_);
+  if (!bus_) {
+    throw std::runtime_error("Cannot open CAN bus: " + iface_);
   }
 
-  void export_state(double *&, double *&, double *&) override {}
+  add_filter(bus_, can_id_, kStdIdMask,
+             [this](const can_frame &frame) { on_frame(frame); });
+}
 
-  void export_command(double *&) override {}
-
-  void export_named_states(
-      std::vector<std::pair<std::string, double *>> &states) override {
-    states.emplace_back(state_name_, &angle_rad_);
-    if (!raw_name_.empty()) {
-      states.emplace_back(raw_name_, &raw_counts_);
-    }
-    if (!flags_name_.empty()) {
-      states.emplace_back(flags_name_, &flags_);
-    }
-    states.emplace_back(index_state_name_, &index_seen_state_);
-    states.emplace_back(error_state_name_, &error_latched_state_);
-    states.emplace_back(sensor_fault_state_name_, &sensor_fault_state_);
-    states.emplace_back(watchdog_state_name_, &watchdog_state_);
+void AbsoluteEncoderDevice::process(const rclcpp::Time &now) {
+  if (sensor_fault_state_ > 0.5) {
+    watchdog_state_ = 1.0;
+    return;
   }
 
-private:
-  void on_frame(const can_frame &frame) {
-    const uint8_t flags_byte = frame.data[3];
-    flags_ = static_cast<double>(flags_byte);
+  const double since_last = (now - last_frame_time_).seconds();
+  const bool timed_out = since_last > timeout_sec_;
 
-    const bool sensor_fault = (flags_byte & kEncFlagSensorFault) != 0;
-    const bool index_seen = (flags_byte & kEncFlagIndexSeen) != 0;
-    const bool error_latched = (flags_byte & kEncFlagErrorLatched) != 0;
-
-    index_seen_state_ = index_seen ? 1.0 : 0.0;
-    error_latched_state_ = error_latched ? 1.0 : 0.0;
-    sensor_fault_state_ = sensor_fault ? 1.0 : 0.0;
-
-    if (index_seen && !index_seen_reported_) {
-      RCLCPP_INFO(logger_, "Encoder 0x%03X reported valid samples.", can_id_);
-      index_seen_reported_ = true;
-    }
-
-    if (error_latched && !error_latched_reported_) {
+  if (timed_out) {
+    watchdog_state_ = 1.0;
+    if (!timeout_logged_) {
       RCLCPP_ERROR(logger_,
-                   "Encoder 0x%03X latched a sensor error flag.", can_id_);
-      error_latched_reported_ = true;
+                   "Absolute encoder 0x%03X timed out (%.3f s > %.3f s)",
+                   can_id_, since_last, timeout_sec_);
+      timeout_logged_ = true;
     }
-
-    if (sensor_fault) {
-      if (!sensor_fault_reported_) {
-        RCLCPP_WARN(logger_,
-                    "Encoder 0x%03X reported a sensor fault; ignoring samples "
-                    "until it clears.",
-                    can_id_);
-        sensor_fault_reported_ = true;
-      }
-    } else if (sensor_fault_reported_) {
-      RCLCPP_INFO(logger_,
-                  "Encoder 0x%03X sensor fault cleared.", can_id_);
-      sensor_fault_reported_ = false;
+  } else {
+    watchdog_state_ = frame_received_ ? 0.0 : -1.0;
+    if (timeout_logged_) {
+      RCLCPP_WARN(logger_,
+                  "Absolute encoder 0x%03X feedback recovered after timeout.",
+                  can_id_);
+      timeout_logged_ = false;
     }
+  }
+}
 
-    if (!sensor_fault) {
-      const int32_t raw_q24 = unpack_s24_be(frame);
-      const double counts = static_cast<double>(raw_q24) /
-                            static_cast<double>(1 << 12);
-      raw_counts_ = counts;
+void AbsoluteEncoderDevice::export_state(double *&, double *&, double *&) {}
 
-      const double revolutions = counts / ticks_per_rev_;
-      angle_rad_ = direction_ * revolutions * 2.0 * M_PI - zero_offset_rad_;
+void AbsoluteEncoderDevice::export_command(double *&) {}
 
-      if (angle_pub_ && can_publish()) {
-        std_msgs::msg::Float64 msg;
-        msg.data = angle_rad_;
-        safe_publish(angle_pub_, msg);
-      }
-      if (raw_pub_ && can_publish()) {
-        std_msgs::msg::Float64 msg;
-        msg.data = raw_counts_;
-        safe_publish(raw_pub_, msg);
-      }
+void AbsoluteEncoderDevice::get_state(const double *&angle, const double *&watchdog) {
+  angle = &angle_rad_;
+  watchdog = &watchdog_state_;
+}
+
+void AbsoluteEncoderDevice::on_frame(const can_frame &frame) {
+  const uint8_t flags_byte = frame.data[3];
+  flags_ = static_cast<double>(flags_byte);
+
+  const bool sensor_fault = (flags_byte & kEncFlagSensorFault) != 0;
+  const bool index_seen = (flags_byte & kEncFlagIndexSeen) != 0;
+  const bool error_latched = (flags_byte & kEncFlagErrorLatched) != 0;
+
+  index_seen_state_ = index_seen ? 1.0 : 0.0;
+  error_latched_state_ = error_latched ? 1.0 : 0.0;
+  sensor_fault_state_ = sensor_fault ? 1.0 : 0.0;
+
+  if (index_seen && !index_seen_reported_) {
+    RCLCPP_INFO(logger_, "Encoder 0x%03X reported valid samples.", can_id_);
+    index_seen_reported_ = true;
+  }
+
+  if (error_latched && !error_latched_reported_) {
+    RCLCPP_ERROR(logger_,
+                 "Encoder 0x%03X latched a sensor error flag.", can_id_);
+    error_latched_reported_ = true;
+  }
+
+  if (sensor_fault) {
+    if (!sensor_fault_reported_) {
+      RCLCPP_WARN(logger_,
+                  "Encoder 0x%03X reported a sensor fault; ignoring samples "
+                  "until it clears.",
+                  can_id_);
+      sensor_fault_reported_ = true;
     }
+  } else if (sensor_fault_reported_) {
+    RCLCPP_INFO(logger_, "Encoder 0x%03X sensor fault cleared.", can_id_);
+    sensor_fault_reported_ = false;
+  }
 
-    if (flags_pub_ && can_publish()) {
+  if (!sensor_fault) {
+    const int32_t raw_q24 = unpack_s24_be(frame);
+    const double counts = static_cast<double>(raw_q24) /
+                          static_cast<double>(1 << 12);
+    raw_counts_ = counts;
+
+    const double revolutions = counts / ticks_per_rev_;
+    angle_rad_ = direction_ * revolutions * 2.0 * M_PI - zero_offset_rad_;
+
+    if (angle_pub_ && can_publish()) {
       std_msgs::msg::Float64 msg;
-      msg.data = flags_;
-      safe_publish(flags_pub_, msg);
+      msg.data = angle_rad_;
+      safe_publish(angle_pub_, msg);
     }
-
-    if (ros_clock_) {
-      last_frame_time_ = ros_clock_->now();
-    }
-    frame_received_ = frame_received_ || index_seen;
-    watchdog_state_ = sensor_fault ? 1.0 : 0.0;
-    timeout_logged_ = false;
-  }
-
-  rclcpp::Node *node_{nullptr};
-  std::shared_ptr<CanBusManager> bus_;
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr angle_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr raw_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr flags_pub_;
-  rclcpp::Logger logger_{rclcpp::get_logger("absolute_encoder_device")};
-  rclcpp::Clock::SharedPtr ros_clock_;
-  std::string angle_topic_;
-  std::string raw_topic_;
-  std::string flags_topic_;
-  std::string iface_;
-  int bitrate_{1'000'000};
-  uint32_t can_id_{0};
-  double ticks_per_rev_{4096.0};
-  double direction_{1.0};
-  double zero_offset_rad_{0.0};
-
-  std::string state_name_;
-  std::string raw_name_;
-  std::string flags_name_;
-  std::string watchdog_state_name_;
-  std::string index_state_name_;
-  std::string error_state_name_;
-  std::string sensor_fault_state_name_;
-
-  double angle_rad_{0.0};
-  double raw_counts_{0.0};
-  double flags_{0.0};
-  double index_seen_state_{0.0};
-  double error_latched_state_{0.0};
-  double sensor_fault_state_{0.0};
-  bool frame_received_{false};
-  bool timeout_logged_{false};
-  double watchdog_state_{-1.0};
-  double timeout_sec_{0.5};
-  rclcpp::Time last_frame_time_;
-  bool error_latched_reported_{false};
-  bool sensor_fault_reported_{false};
-  bool index_seen_reported_{false};
-
-  template<typename MsgT>
-  void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
-                    const MsgT &msg) {
-    if (!pub || !can_publish()) {
-      return;
-    }
-    try {
-      pub->publish(msg);
-    } catch (const rclcpp::exceptions::RCLError &ex) {
-      RCLCPP_WARN_ONCE(logger_,
-                       "Absolute encoder publisher inactive during shutdown: %s",
-                       ex.what());
+    if (raw_pub_ && can_publish()) {
+      std_msgs::msg::Float64 msg;
+      msg.data = raw_counts_;
+      safe_publish(raw_pub_, msg);
     }
   }
 
-  bool can_publish() const {
-    if (!node_) {
-      return false;
-    }
-    auto base = node_->get_node_base_interface();
-    if (!base) {
-      return false;
-    }
-    auto context = base->get_context();
-    return context && context->is_valid() && rclcpp::ok(context);
+  if (flags_pub_ && can_publish()) {
+    std_msgs::msg::Float64 msg;
+    msg.data = flags_;
+    safe_publish(flags_pub_, msg);
   }
-};
+
+  if (ros_clock_) {
+    last_frame_time_ = ros_clock_->now();
+  }
+  frame_received_ = frame_received_ || index_seen;
+  watchdog_state_ = sensor_fault ? 1.0 : 0.0;
+  timeout_logged_ = false;
+}
+
+template<typename MsgT>
+void AbsoluteEncoderDevice::safe_publish(
+    const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
+    const MsgT &msg) {
+  if (!pub || !can_publish()) {
+    return;
+  }
+  try {
+    pub->publish(msg);
+  } catch (const rclcpp::exceptions::RCLError &ex) {
+    RCLCPP_WARN_ONCE(logger_,
+                     "Absolute encoder publisher inactive during shutdown: %s",
+                     ex.what());
+  }
+}
+
+bool AbsoluteEncoderDevice::can_publish() const {
+  if (!node_) {
+    return false;
+  }
+  auto base = node_->get_node_base_interface();
+  if (!base) {
+    return false;
+  }
+  auto context = base->get_context();
+  return context && context->is_valid() && rclcpp::ok(context);
+}
 
 } // namespace mr2_devices_sensors
 

@@ -39,14 +39,6 @@ public:
    */
   virtual void export_command(double *&command) = 0;
 
-  /**
-   * Export additional named state scalars. These can represent auxiliary
-   * sensors such as limit switches or absolute encoders that do not map to a
-   * joint directly. The default implementation does nothing.
-   */
-  virtual void export_named_states(
-      std::vector<std::pair<std::string, double *>> &) {}
-
 protected:
   /** Shorthand for sending on the appropriate bus */
   void send(const struct can_frame &f,

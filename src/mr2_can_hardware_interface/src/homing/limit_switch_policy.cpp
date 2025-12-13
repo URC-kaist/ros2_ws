@@ -1,5 +1,8 @@
 #include "mr2_can_hardware_interface/homing_policy.hpp"
 
+#include "mr2_devices_sensors/limit_switch_device.hpp"
+#include "mr2_devices_sensors/homing_sensors.hpp"
+
 #include "pluginlib/class_list_macros.hpp"
 
 #include "rclcpp/logging.hpp"
@@ -7,9 +10,11 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+#include <unordered_map>
 
 namespace mr2_can_hardware_interface {
 
@@ -33,7 +38,6 @@ class LimitSwitchPolicy : public HomingPolicy {
 public:
   void configure(const rclcpp::Node::SharedPtr &node,
                  const JointHandle &joint,
-                 const NamedStateMap &named_states,
                  const ParamMap &params) override {
     node_ = node;
     error_ = false;
@@ -41,30 +45,37 @@ public:
 
     joint_ = joint;
 
-    const std::string limit_key = parse_string(params, "limit_state");
-    if (limit_key.empty()) {
-      set_error("Parameter 'limit_state' must be provided.");
-      return;
-    }
-
-    const auto limit_it = named_states.find(limit_key);
-    if (limit_it == named_states.end()) {
-      set_error("Named state '" + limit_key + "' not found.");
-      return;
-    }
-    limit_state_ = limit_it->second;
-
-    const std::string watchdog_key =
-        parse_string(params, "limit_watchdog_state");
-    if (!watchdog_key.empty()) {
-      const auto watchdog_it = named_states.find(watchdog_key);
-      if (watchdog_it == named_states.end()) {
-        set_error("Named state '" + watchdog_key +
-                  "' not found for limit watchdog state.");
-        return;
+    std::unordered_map<std::string, std::string> device_params;
+    for (const auto &param : params) {
+      if (param.first.rfind("device_", 0) == 0) {
+        device_params.emplace(param.first.substr(std::string("device_").size()),
+                              param.second);
       }
-      limit_watchdog_state_ = watchdog_it->second;
     }
+
+    const std::string state_name =
+        device_params.count("state_name")
+            ? device_params["state_name"]
+            : joint.name + "/limit_switch_state";
+    device_params.emplace("state_name", state_name);
+
+    hardware_interface::ComponentInfo component;
+    component.name =
+        device_params.count("name") ? device_params["name"] : state_name;
+    component.type = "sensor";
+    component.parameters = device_params;
+
+    auto device = std::make_shared<mr2_devices_sensors::LimitSwitchDevice>();
+    try {
+      device->configure(component, node_.get());
+    } catch (const std::exception &ex) {
+      set_error(std::string("Failed to configure limit switch: ") + ex.what());
+      return;
+    }
+
+    device_ = device;
+    limit_state_ = device_->state_ptr();
+    limit_watchdog_state_ = device_->watchdog_ptr();
 
     auto get_double = [&](const std::string &key, double def) {
       const auto it = params.find(key);
@@ -291,6 +302,10 @@ public:
     origin_set_ = false;
   }
 
+  std::shared_ptr<CanDevice> homing_device() const override {
+    return std::static_pointer_cast<CanDevice>(device_);
+  }
+
 private:
   enum class Phase {
     Idle,
@@ -427,6 +442,7 @@ private:
 
   rclcpp::Node::SharedPtr node_;
   JointHandle joint_;
+  std::shared_ptr<mr2_devices_sensors::LimitSwitchDriver> device_;
 
   const double *limit_state_{nullptr};
   const double *limit_watchdog_state_{nullptr};

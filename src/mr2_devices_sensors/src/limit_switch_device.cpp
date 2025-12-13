@@ -1,4 +1,4 @@
-#include "mr2_can_bus_core/can_device.hpp"
+#include "mr2_devices_sensors/limit_switch_device.hpp"
 
 #include "pluginlib/class_list_macros.hpp"
 
@@ -24,9 +24,8 @@ constexpr uint32_t kStdIdMask = 0x7FFU;
 constexpr uint8_t kFaultBit = 0x1;
 constexpr bool kFaultDetectionEnabled = false; // TODO(mr2): re-enable once firmware is stable
 
-std::string
-require_param(const std::unordered_map<std::string, std::string> &params,
-              const std::string &key) {
+std::string require_param(const std::unordered_map<std::string, std::string> &params,
+                          const std::string &key) {
   auto it = params.find(key);
   if (it == params.end()) {
     throw std::runtime_error("Missing required parameter '" + key + "'");
@@ -82,9 +81,8 @@ T parse_number(const std::unordered_map<std::string, std::string> &params,
   }
 }
 
-std::string
-resolve_topic(const std::unordered_map<std::string, std::string> &params,
-              const std::string &key, const std::string &default_topic) {
+std::string resolve_topic(const std::unordered_map<std::string, std::string> &params,
+                          const std::string &key, const std::string &default_topic) {
   auto it = params.find(key);
   if (it != params.end()) {
     return it->second;
@@ -94,188 +92,156 @@ resolve_topic(const std::unordered_map<std::string, std::string> &params,
 
 } // namespace
 
-class LimitSwitchDevice : public CanDevice {
-public:
-  void configure(const hardware_interface::ComponentInfo &info,
-                 rclcpp::Node *node) override {
-    node_ = node;
+void LimitSwitchDevice::configure(const hardware_interface::ComponentInfo &info,
+                                  rclcpp::Node *node) {
+  node_ = node;
 
-    iface_ = require_param(info.parameters, "can_iface");
-    bitrate_ = parse_number<int>(info.parameters, "bitrate", 1'000'000);
-    can_id_ = parse_can_id(require_param(info.parameters, "can_id"));
-    active_high_ = parse_bool(info.parameters, "active_high", true);
+  iface_ = require_param(info.parameters, "can_iface");
+  bitrate_ = parse_number<int>(info.parameters, "bitrate", 1'000'000);
+  can_id_ = parse_can_id(require_param(info.parameters, "can_id"));
+  active_high_ = parse_bool(info.parameters, "active_high", true);
 
-    state_name_ = require_param(info.parameters, "state_name");
-    fault_state_name_ = resolve_topic(info.parameters, "fault_state_name",
-                                      state_name_ + "_fault");
+  state_name_ = require_param(info.parameters, "state_name");
+  fault_state_name_ = resolve_topic(info.parameters, "fault_state_name",
+                                    state_name_ + "_fault");
 
-    logger_ = node->get_logger();
+  logger_ = node->get_logger();
 
-    state_topic_ = resolve_topic(info.parameters, "state_topic",
-                                 "can_sensors/" + state_name_);
-    state_pub_ = node->create_publisher<std_msgs::msg::Bool>(
-        state_topic_, rclcpp::SensorDataQoS());
+  state_topic_ = resolve_topic(info.parameters, "state_topic",
+                               "can_sensors/" + state_name_);
+  state_pub_ = node->create_publisher<std_msgs::msg::Bool>(
+      state_topic_, rclcpp::SensorDataQoS());
 
-    fault_topic_ = resolve_topic(info.parameters, "fault_topic",
-                                 "can_sensors/" + fault_state_name_);
-    if (!fault_topic_.empty()) {
-      fault_pub_ = node->create_publisher<std_msgs::msg::Bool>(
-          fault_topic_, rclcpp::SensorDataQoS());
-    }
-
-    bus_ = CanBusRegistry::get(iface_, bitrate_);
-    if (!bus_) {
-      throw std::runtime_error("Cannot open CAN bus: " + iface_);
-    }
-
-    add_filter(bus_, can_id_, kStdIdMask,
-               [this](const can_frame &frame) { on_frame(frame); });
-
-    timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 1.0);
-    ros_clock_ = node->get_clock();
-    last_frame_time_ = ros_clock_->now();
-    watchdog_state_name_ = state_name_ + "_watchdog";
-    watchdog_state_ = -1.0;
-    frame_received_ = false;
+  fault_topic_ = resolve_topic(info.parameters, "fault_topic",
+                               "can_sensors/" + fault_state_name_);
+  if (!fault_topic_.empty()) {
+    fault_pub_ = node->create_publisher<std_msgs::msg::Bool>(
+        fault_topic_, rclcpp::SensorDataQoS());
   }
 
-  void process(const rclcpp::Time &now) override {
-    if (kFaultDetectionEnabled && fault_state_ > 0.5) {
-      watchdog_state_ = 1.0;
-      return;
+  bus_ = CanBusRegistry::get(iface_, bitrate_);
+  if (!bus_) {
+    throw std::runtime_error("Cannot open CAN bus: " + iface_);
+  }
+
+  add_filter(bus_, can_id_, kStdIdMask,
+             [this](const can_frame &frame) { on_frame(frame); });
+
+  timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 1.0);
+  ros_clock_ = node->get_clock();
+  last_frame_time_ = ros_clock_->now();
+  watchdog_state_name_ = state_name_ + "_watchdog";
+  watchdog_state_ = -1.0;
+  frame_received_ = false;
+}
+
+void LimitSwitchDevice::process(const rclcpp::Time &now) {
+  if (kFaultDetectionEnabled && fault_state_ > 0.5) {
+    watchdog_state_ = 1.0;
+    return;
+  }
+
+  const double since_last = (now - last_frame_time_).seconds();
+  const bool timed_out = since_last > timeout_sec_;
+
+  if (timed_out) {
+    watchdog_state_ = 1.0;
+    if (!timeout_logged_) {
+      RCLCPP_ERROR(logger_, "Limit switch 0x%03X timed out (%.3f s > %.3f s)",
+                   can_id_, since_last, timeout_sec_);
+      timeout_logged_ = true;
     }
+  } else {
+    watchdog_state_ = frame_received_ ? 0.0 : -1.0;
+    if (timeout_logged_) {
+      RCLCPP_WARN(logger_, "Limit switch 0x%03X recovered after timeout.",
+                  can_id_);
+      timeout_logged_ = false;
+    }
+  }
+}
 
-    const double since_last = (now - last_frame_time_).seconds();
-    const bool timed_out = since_last > timeout_sec_;
+void LimitSwitchDevice::export_state(double *&, double *&, double *&) {}
 
-    if (timed_out) {
-      watchdog_state_ = 1.0;
-      if (!timeout_logged_) {
-        RCLCPP_ERROR(logger_, "Limit switch 0x%03X timed out (%.3f s > %.3f s)",
-                     can_id_, since_last, timeout_sec_);
-        timeout_logged_ = true;
-      }
-    } else {
-      watchdog_state_ = frame_received_ ? 0.0 : -1.0;
-      if (timeout_logged_) {
-        RCLCPP_WARN(logger_, "Limit switch 0x%03X recovered after timeout.",
+void LimitSwitchDevice::export_command(double *&) {}
+
+void LimitSwitchDevice::get_state(const double *&state, const double *&watchdog) {
+  state = &state_;
+  watchdog = &watchdog_state_;
+}
+
+void LimitSwitchDevice::on_frame(const can_frame &frame) {
+  const bool pressed = (frame.data[0] & 0x1) != 0;
+  const double logical = pressed ? 1.0 : 0.0;
+  const double mapped_state =
+      active_high_ ? logical : (logical > 0.5 ? 0.0 : 1.0);
+
+  state_ = mapped_state;
+
+  const bool fault =
+      kFaultDetectionEnabled && ((frame.data[1] & kFaultBit) != 0);
+  fault_state_ = fault ? 1.0 : 0.0;
+
+  if (kFaultDetectionEnabled) {
+    if (fault) {
+      if (!fault_reported_) {
+        RCLCPP_WARN(logger_,
+                    "Limit switch 0x%03X reported invalid contact state.",
                     can_id_);
-        timeout_logged_ = false;
+        fault_reported_ = true;
       }
-    }
-  }
-  void export_state(double *&, double *&, double *&) override {}
-  void export_command(double *&) override {}
-
-  void export_named_states(
-      std::vector<std::pair<std::string, double *>> &states) override {
-    states.emplace_back(state_name_, &state_);
-    states.emplace_back(fault_state_name_, &fault_state_);
-    states.emplace_back(watchdog_state_name_, &watchdog_state_);
-  }
-
-private:
-  void on_frame(const can_frame &frame) {
-    const bool pressed = (frame.data[0] & 0x1) != 0;
-    const double logical = pressed ? 1.0 : 0.0;
-    const double mapped_state =
-        active_high_ ? logical : (logical > 0.5 ? 0.0 : 1.0);
-
-    state_ = mapped_state;
-
-    // Limit switch firmware currently raises intermittent false positives, so
-    // force the fault bit low for now.
-    const bool fault =
-        kFaultDetectionEnabled && ((frame.data[1] & kFaultBit) != 0);
-    fault_state_ = fault ? 1.0 : 0.0;
-
-    if (kFaultDetectionEnabled) {
-      if (fault) {
-        if (!fault_reported_) {
-          RCLCPP_WARN(logger_,
-                      "Limit switch 0x%03X reported invalid contact state.",
-                      can_id_);
-          fault_reported_ = true;
-        }
-      } else if (fault_reported_) {
-        RCLCPP_INFO(logger_, "Limit switch 0x%03X fault cleared.", can_id_);
-        fault_reported_ = false;
-      }
-    }
-
-    if (ros_clock_) {
-      last_frame_time_ = ros_clock_->now();
-    }
-    frame_received_ = true;
-    watchdog_state_ = fault ? 1.0 : 0.0;
-    timeout_logged_ = false;
-
-    if (state_pub_ && can_publish()) {
-      std_msgs::msg::Bool msg;
-      msg.data = state_ > 0.5;
-      safe_publish(state_pub_, msg);
-    }
-
-    if (fault_pub_ && can_publish()) {
-      std_msgs::msg::Bool msg;
-      msg.data = fault;
-      safe_publish(fault_pub_, msg);
+    } else if (fault_reported_) {
+      RCLCPP_INFO(logger_, "Limit switch 0x%03X fault cleared.", can_id_);
+      fault_reported_ = false;
     }
   }
 
-  rclcpp::Node *node_{nullptr};
-  std::shared_ptr<CanBusManager> bus_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr state_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr fault_pub_;
-  rclcpp::Logger logger_{rclcpp::get_logger("limit_switch_device")};
-  rclcpp::Clock::SharedPtr ros_clock_;
-  std::string state_topic_;
-  std::string fault_topic_;
-  std::string iface_;
-  int bitrate_{1'000'000};
-  uint32_t can_id_{0};
-  bool active_high_{true};
+  if (ros_clock_) {
+    last_frame_time_ = ros_clock_->now();
+  }
+  frame_received_ = true;
+  watchdog_state_ = fault ? 1.0 : 0.0;
+  timeout_logged_ = false;
 
-  std::string state_name_;
-  std::string fault_state_name_;
-  std::string watchdog_state_name_;
-
-  double state_{0.0};
-  double fault_state_{0.0};
-  bool frame_received_{false};
-  bool timeout_logged_{false};
-  double watchdog_state_{-1.0};
-  double timeout_sec_{1.0};
-  rclcpp::Time last_frame_time_;
-  bool fault_reported_{false};
-
-  template <typename MsgT>
-  void safe_publish(const typename rclcpp::Publisher<MsgT>::SharedPtr &pub,
-                    const MsgT &msg) {
-    if (!pub || !can_publish()) {
-      return;
-    }
-    try {
-      pub->publish(msg);
-    } catch (const rclcpp::exceptions::RCLError &ex) {
-      RCLCPP_WARN_ONCE(logger_,
-                       "Limit switch publisher inactive during shutdown: %s",
-                       ex.what());
-    }
+  if (state_pub_ && can_publish()) {
+    std_msgs::msg::Bool msg;
+    msg.data = state_ > 0.5;
+    safe_publish(state_pub_, msg);
   }
 
-  bool can_publish() const {
-    if (!node_) {
-      return false;
-    }
-    auto base = node_->get_node_base_interface();
-    if (!base) {
-      return false;
-    }
-    auto context = base->get_context();
-    return context && context->is_valid() && rclcpp::ok(context);
+  if (fault_pub_ && can_publish()) {
+    std_msgs::msg::Bool msg;
+    msg.data = fault;
+    safe_publish(fault_pub_, msg);
   }
-};
+}
+
+template <typename MsgT>
+void LimitSwitchDevice::safe_publish(
+    const typename rclcpp::Publisher<MsgT>::SharedPtr &pub, const MsgT &msg) {
+  if (!pub || !can_publish()) {
+    return;
+  }
+  try {
+    pub->publish(msg);
+  } catch (const rclcpp::exceptions::RCLError &ex) {
+    RCLCPP_WARN_ONCE(logger_,
+                     "Limit switch publisher inactive during shutdown: %s",
+                     ex.what());
+  }
+}
+
+bool LimitSwitchDevice::can_publish() const {
+  if (!node_) {
+    return false;
+  }
+  auto base = node_->get_node_base_interface();
+  if (!base) {
+    return false;
+  }
+  auto context = base->get_context();
+  return context && context->is_valid() && rclcpp::ok(context);
+}
 
 } // namespace mr2_devices_sensors
 

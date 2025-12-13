@@ -57,22 +57,16 @@
       <param name="motor_id">$(arg motor_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
       <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-      <param name="homing_encoder_state">joint1/absolute_encoder</param>
-      <param name="homing_encoder_watchdog_state">joint1/absolute_encoder_watchdog</param>
+      <param name="homing_device_can_iface">$(arg can_iface)</param>
+      <param name="homing_device_can_id">$(arg absolute_encoder_can_id)</param>
+      <param name="homing_device_state_name">joint1/absolute_encoder</param>
+      <param name="homing_device_flags_name">joint1/absolute_encoder_flags</param>
+      <param name="homing_device_ticks_per_rev">$(arg absolute_encoder_ticks_per_rev)</param>
+      <param name="homing_device_direction">$(arg absolute_encoder_direction)</param>
       <!-- AbsoluteEncoderPolicy specific parameters -->
       <param name="homing_home_offset">$(arg homing_home_offset)</param>
       <param name="homing_encoder_direction">$(arg homing_encoder_direction)</param>
     </joint>
-
-    <gpio name="joint1_absolute_encoder">
-      <param name="device_plugin">mr2_devices_sensors/AbsoluteEncoderDevice</param>
-      <param name="can_iface">$(arg can_iface)</param>
-      <param name="can_id">$(arg absolute_encoder_can_id)</param>
-      <param name="state_name">joint1/absolute_encoder</param>
-      <param name="flags_name">joint1/absolute_encoder_flags</param>
-      <param name="ticks_per_rev">$(arg absolute_encoder_ticks_per_rev)</param>
-      <param name="direction">$(arg absolute_encoder_direction)</param>
-    </gpio>
 
     <transmission name="joint1_transmission">
       <plugin>transmission_interface/SimpleTransmission</plugin>
