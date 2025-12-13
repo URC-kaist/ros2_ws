@@ -1,7 +1,7 @@
 #include "mr2_can_hardware_interface/homing_policy.hpp"
 
-#include "mr2_devices_sensors/limit_switch_device.hpp"
-#include "mr2_devices_sensors/homing_sensors.hpp"
+#include "mr2_can_hardware_interface/homing_sensors/limit_switch_device.hpp"
+#include "mr2_can_hardware_interface/homing_sensors/homing_sensors.hpp"
 
 #include "pluginlib/class_list_macros.hpp"
 
@@ -65,7 +65,7 @@ public:
     component.type = "sensor";
     component.parameters = device_params;
 
-    auto device = std::make_shared<mr2_devices_sensors::LimitSwitchDevice>();
+    auto device = std::make_shared<sensors::LimitSwitchDevice>();
     try {
       device->configure(component, node_.get());
     } catch (const std::exception &ex) {
@@ -442,7 +442,7 @@ private:
 
   rclcpp::Node::SharedPtr node_;
   JointHandle joint_;
-  std::shared_ptr<mr2_devices_sensors::LimitSwitchDriver> device_;
+  std::shared_ptr<sensors::LimitSwitchDriver> device_;
 
   const double *limit_state_{nullptr};
   const double *limit_watchdog_state_{nullptr};

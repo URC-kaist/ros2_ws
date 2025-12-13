@@ -1,5 +1,4 @@
-#include "mr2_devices_sensors/absolute_encoder_device.hpp"
-#include "mr2_devices_sensors/homing_sensors.hpp"
+#include "mr2_can_hardware_interface/homing_sensors/absolute_encoder_device.hpp"
 
 #include "pluginlib/class_list_macros.hpp"
 
@@ -19,7 +18,7 @@
 #include <type_traits>
 #include <unordered_map>
 
-namespace mr2_devices_sensors {
+namespace mr2_can_hardware_interface::sensors {
 
 namespace {
 constexpr uint32_t kStdIdMask = 0x7FFU;
@@ -309,6 +308,7 @@ bool AbsoluteEncoderDevice::can_publish() const {
   return context && context->is_valid() && rclcpp::ok(context);
 }
 
-} // namespace mr2_devices_sensors
+} // namespace mr2_can_hardware_interface::sensors
 
-PLUGINLIB_EXPORT_CLASS(mr2_devices_sensors::AbsoluteEncoderDevice, CanDevice)
+PLUGINLIB_EXPORT_CLASS(mr2_can_hardware_interface::sensors::AbsoluteEncoderDevice,
+                       CanDevice)

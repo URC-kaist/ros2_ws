@@ -24,8 +24,8 @@
 
 #include "mr2_can_hardware_interface/homing_policy.hpp"
 
-#include "mr2_devices_sensors/absolute_encoder_device.hpp"
-#include "mr2_devices_sensors/homing_sensors.hpp"
+#include "mr2_can_hardware_interface/homing_sensors/absolute_encoder_device.hpp"
+#include "mr2_can_hardware_interface/homing_sensors/homing_sensors.hpp"
 
 #include "pluginlib/class_list_macros.hpp"
 
@@ -69,7 +69,7 @@ public:
     component.type = "sensor";
     component.parameters = device_params;
 
-    auto device = std::make_shared<mr2_devices_sensors::AbsoluteEncoderDevice>();
+    auto device = std::make_shared<sensors::AbsoluteEncoderDevice>();
     try {
       device->configure(component, node_.get());
     } catch (const std::exception &ex) {
@@ -191,7 +191,7 @@ public:
 private:
   rclcpp::Node::SharedPtr node_;
   JointHandle joint_;
-  std::shared_ptr<mr2_devices_sensors::AbsoluteEncoderDriver> device_;
+  std::shared_ptr<sensors::AbsoluteEncoderDriver> device_;
   const double *encoder_state_{nullptr};
   const double *encoder_watchdog_state_{nullptr};
   double home_offset_{0.0};

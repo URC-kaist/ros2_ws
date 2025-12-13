@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mr2_devices_sensors/homing_sensors.hpp"
+#include "mr2_can_hardware_interface/homing_sensors/homing_sensors.hpp"
 
 #include <rclcpp/clock.hpp>
 #include <rclcpp/logger.hpp>
@@ -12,7 +12,7 @@
 #include <memory>
 #include <string>
 
-namespace mr2_devices_sensors {
+namespace mr2_can_hardware_interface::sensors {
 
 class AbsoluteEncoderDevice : public AbsoluteEncoderDriver {
 public:
@@ -24,9 +24,8 @@ public:
   void export_state(double *&, double *&, double *&) override;
   void export_command(double *&) override;
   void get_state(const double *&angle, const double *&watchdog) override;
-
-  const double *angle_ptr() const { return &angle_rad_; }
-  const double *watchdog_ptr() const { return &watchdog_state_; }
+  const double *angle_ptr() const override { return &angle_rad_; }
+  const double *watchdog_ptr() const override { return &watchdog_state_; }
 
 private:
   void on_frame(const can_frame &frame);
@@ -77,4 +76,4 @@ private:
   bool can_publish() const;
 };
 
-} // namespace mr2_devices_sensors
+} // namespace mr2_can_hardware_interface::sensors

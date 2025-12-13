@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--This does not replace URDF, and is not an extension of URDF.
+    This is a format for representing semantic information about the robot structure.
+    A URDF file must exist for this robot as well, where the joints and the links that are referenced are defined
+-->
+<robot name="rover">
+    <!--GROUPS: Representation of a set of joints and links. This can be useful for specifying DOF to plan for, defining arms, end effectors, etc-->
+    <!--LINKS: When a link is specified, the parent joint of that link (if it exists) is automatically included-->
+    <!--JOINTS: When a joint is specified, the child link of that joint (which will always exist) is automatically included-->
+    <!--CHAINS: When a chain is specified, all the links along the chain (including endpoints) are included in the group. Additionally, all the joints that are parents to included links are also included. This means that joints along the chain and the parent joint of the base link are included in the group-->
+    <!--SUBGROUPS: Groups can also be formed by referencing to already defined group names-->
+    <group name="manipulator">
+        <chain base_link="base_link" tip_link="arm_l6"/>
+    </group>
+    <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
+    <end_effector name="EEF" parent_link="arm_l6" group="manipulator"/>
+    <!--VIRTUAL JOINT: Purpose: this element defines a virtual joint between a robot link and an external frame of reference (considered fixed with respect to the robot)-->
+    <virtual_joint name="world_to_base" type="fixed" parent_frame="map" child_link="base_link"/>
+    <!--PASSIVE JOINT: Purpose: this element is used to mark joints that are not actuated-->
+    <passive_joint name="rr_wheel_joint"/>
+    <passive_joint name="rr_steering_joint"/>
+    <passive_joint name="fr_wheel_joint"/>
+    <passive_joint name="fr_steering_joint"/>
+    <passive_joint name="right_rocker_joint"/>
+    <passive_joint name="rl_wheel_joint"/>
+    <passive_joint name="rl_steering_joint"/>
+    <passive_joint name="fl_wheel_joint"/>
+    <passive_joint name="left_rocker_joint"/>
+    <passive_joint name="fl_steering_joint"/>
+    <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
+    <disable_collisions link1="arm_l1" link2="arm_l2" reason="Adjacent"/>
+    <disable_collisions link1="arm_l1" link2="arm_l3" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="arm_l4" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="base_chassis" reason="Adjacent"/>
+    <disable_collisions link1="arm_l1" link2="fl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="fl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="fr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="fr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l1" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="arm_l3" reason="Adjacent"/>
+    <disable_collisions link1="arm_l2" link2="base_chassis" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="fl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="fl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="fr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="fr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l2" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="arm_l4" reason="Adjacent"/>
+    <disable_collisions link1="arm_l3" link2="arm_l5" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="arm_l6" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="base_chassis" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="fl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="fl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="fr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="fr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l3" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="arm_l5" reason="Adjacent"/>
+    <disable_collisions link1="arm_l4" link2="base_chassis" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="fl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="fl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="fr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l4" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l5" link2="arm_l6" reason="Adjacent"/>
+    <disable_collisions link1="arm_l5" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l5" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l5" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l5" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l5" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l5" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l6" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l6" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="arm_l6" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="arm_l6" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="arm_l6" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="arm_l6" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="fl_mount" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="fl_wheel" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="fr_mount" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="fr_wheel" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="left_rocker" reason="Adjacent"/>
+    <disable_collisions link1="base_chassis" link2="right_rocker" reason="Adjacent"/>
+    <disable_collisions link1="base_chassis" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="base_chassis" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="fl_mount" link2="fl_wheel" reason="Adjacent"/>
+    <disable_collisions link1="fl_mount" link2="fr_mount" reason="Never"/>
+    <disable_collisions link1="fl_mount" link2="fr_wheel" reason="Never"/>
+    <disable_collisions link1="fl_mount" link2="left_rocker" reason="Adjacent"/>
+    <disable_collisions link1="fl_mount" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="fl_mount" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="fl_mount" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="fl_mount" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="fl_mount" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="fr_mount" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="fr_wheel" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="fl_wheel" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="fr_mount" link2="fr_wheel" reason="Adjacent"/>
+    <disable_collisions link1="fr_mount" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="fr_mount" link2="right_rocker" reason="Adjacent"/>
+    <disable_collisions link1="fr_mount" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="fr_mount" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="fr_mount" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="fr_mount" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="fr_wheel" link2="left_rocker" reason="Never"/>
+    <disable_collisions link1="fr_wheel" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="fr_wheel" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="fr_wheel" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="fr_wheel" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="fr_wheel" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="left_rocker" link2="right_rocker" reason="Never"/>
+    <disable_collisions link1="left_rocker" link2="rl_mount" reason="Adjacent"/>
+    <disable_collisions link1="left_rocker" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="left_rocker" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="left_rocker" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="right_rocker" link2="rl_mount" reason="Never"/>
+    <disable_collisions link1="right_rocker" link2="rl_wheel" reason="Never"/>
+    <disable_collisions link1="right_rocker" link2="rr_mount" reason="Adjacent"/>
+    <disable_collisions link1="right_rocker" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="rl_mount" link2="rl_wheel" reason="Adjacent"/>
+    <disable_collisions link1="rl_mount" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="rl_mount" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="rl_wheel" link2="rr_mount" reason="Never"/>
+    <disable_collisions link1="rl_wheel" link2="rr_wheel" reason="Never"/>
+    <disable_collisions link1="rr_mount" link2="rr_wheel" reason="Adjacent"/>
+</robot>

@@ -1,4 +1,4 @@
-#include "mr2_devices_sensors/limit_switch_device.hpp"
+#include "mr2_can_hardware_interface/homing_sensors/limit_switch_device.hpp"
 
 #include "pluginlib/class_list_macros.hpp"
 
@@ -17,12 +17,12 @@
 #include <type_traits>
 #include <unordered_map>
 
-namespace mr2_devices_sensors {
+namespace mr2_can_hardware_interface::sensors {
 
 namespace {
 constexpr uint32_t kStdIdMask = 0x7FFU;
 constexpr uint8_t kFaultBit = 0x1;
-constexpr bool kFaultDetectionEnabled = false; // TODO(mr2): re-enable once firmware is stable
+constexpr bool kFaultDetectionEnabled = false; // TODO: re-enable once firmware is stable
 
 std::string require_param(const std::unordered_map<std::string, std::string> &params,
                           const std::string &key) {
@@ -243,6 +243,7 @@ bool LimitSwitchDevice::can_publish() const {
   return context && context->is_valid() && rclcpp::ok(context);
 }
 
-} // namespace mr2_devices_sensors
+} // namespace mr2_can_hardware_interface::sensors
 
-PLUGINLIB_EXPORT_CLASS(mr2_devices_sensors::LimitSwitchDevice, CanDevice)
+PLUGINLIB_EXPORT_CLASS(mr2_can_hardware_interface::sensors::LimitSwitchDevice,
+                       CanDevice)
