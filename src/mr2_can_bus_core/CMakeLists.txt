@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(mr2_can_bus_core LANGUAGES CXX)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # --- compiler flags / C++17 --------------------------------------------------
 if(NOT CMAKE_CXX_STANDARD)
