@@ -3,7 +3,12 @@ import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
+    TimerAction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
@@ -26,6 +31,7 @@ from mr2_rover_description.launch_common import (
 
 def generate_launch_description():
     desc_pkg = FindPackageShare("mr2_rover_description")
+    desc_share_dir = get_package_share_directory("mr2_rover_description")
 
     xacro_file = PathJoinSubstitution([desc_pkg, "urdf", "rover.urdf.xacro"])
     world_file = PathJoinSubstitution([desc_pkg, "worlds", "world.sdf"])
@@ -111,6 +117,16 @@ def generate_launch_description():
         for topic in bridge_topics
     ]
 
+    # Make Gazebo/Ignition able to resolve package assets (meshes/textures/etc.)
+    existing_gz_path = os.environ.get("GZ_SIM_RESOURCE_PATH", "")
+    gz_resource_path = (
+        f"{existing_gz_path}:{desc_share_dir}" if existing_gz_path else desc_share_dir
+    )
+    existing_ign_path = os.environ.get("IGN_GAZEBO_RESOURCE_PATH", "")
+    ign_resource_path = (
+        f"{existing_ign_path}:{desc_share_dir}" if existing_ign_path else desc_share_dir
+    )
+
     gz_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -132,6 +148,8 @@ def generate_launch_description():
             use_sim_time_arg,
             can_iface_arg,
             controller_config_arg,
+            SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", gz_resource_path),
+            SetEnvironmentVariable("IGN_GAZEBO_RESOURCE_PATH", ign_resource_path),
             gz_sim,
             rsp,
             spawn,

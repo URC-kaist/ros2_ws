@@ -43,7 +43,8 @@ def robot_description_from_xacro(xacro_file, mappings: Mapping[str, LaunchConfig
     cmd_parts: List[object] = ["xacro ", xacro_file]
     for key, value in mappings.items():
         cmd_parts.extend([" ", key, ":=", value])
-    return {"robot_description": Command(cmd_parts)}
+    # Wrap Command in ParameterValue to keep it a plain string (avoid YAML parsing errors)
+    return {"robot_description": ParameterValue(Command(cmd_parts), value_type=str)}
 
 
 def robot_state_publisher_node(robot_description, use_sim_time):

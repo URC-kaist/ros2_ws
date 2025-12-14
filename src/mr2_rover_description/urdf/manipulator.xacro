@@ -13,6 +13,13 @@
   <xacro:property name="arm_j5_upper_limit" value="1"/>
   <xacro:property name="arm_j6_lower_limit" value="-1"/>
   <xacro:property name="arm_j6_upper_limit" value="1"/>
+  <!-- Shared shaded material for STL visuals (prevents unlit white appearance) -->
+  <material name="ArmGrey">
+    <color rgba="0.6 0.6 0.6 1.0"/>
+  </material>
+  <!-- Use file:// URI for meshes so both RViz (resource_retriever) and Gazebo resolve correctly -->
+  <xacro:property name="manipulator_mesh_prefix" value="file://$(find mr2_rover_description)/meshes/manipulator"/>
+  <xacro:property name="manipulator_mesh_scale" value="0.001"/>
 
   <xacro:macro name="manipulator" params="length:=0.73 width:=0.49 height:=0.19">
     <link name="arm_l1">
@@ -22,9 +29,11 @@
       </inertial>
       <visual>
         <geometry>
-          <cylinder radius="0.15" length="0.1"/>
+          <mesh filename="${manipulator_mesh_prefix}/rover_manipulator_link1.stl"
+                scale="${manipulator_mesh_scale} ${manipulator_mesh_scale} ${manipulator_mesh_scale}"/>
         </geometry>
-        <origin xyz="0 0 0.05"/>
+        <origin xyz="0 0 0.032" rpy="0 0 3.1415926536"/>
+        <material name="ArmGrey"/>
       </visual>
       <collision>
         <geometry>
@@ -40,9 +49,11 @@
       </inertial>
       <visual>
         <geometry>
-          <cylinder radius="0.02" length="0.4"/>
+          <mesh filename="${manipulator_mesh_prefix}/rover_manipulator_link2.stl"
+                scale="${manipulator_mesh_scale} ${manipulator_mesh_scale} ${manipulator_mesh_scale}"/>
         </geometry>
-        <origin xyz="0 0 0.2"/>
+        <origin xyz="-0.070 0 -0.104" rpy="0 0 3.1415926536"/>
+        <material name="ArmGrey"/>
       </visual>
       <collision>
         <geometry>
@@ -58,9 +69,11 @@
       </inertial>
       <visual>
         <geometry>
-          <cylinder radius="0.05" length="0.05"/>
+          <mesh filename="${manipulator_mesh_prefix}/rover_manipulator_link3.stl"
+                scale="${manipulator_mesh_scale} ${manipulator_mesh_scale} ${manipulator_mesh_scale}"/>
         </geometry>
-        <origin xyz="0.025 0 0" rpy="0 -1.571 0"/>
+        <origin xyz="-0.070 0.0001 -0.599" rpy="0 0 3.1415926536"/>
+        <material name="ArmGrey"/>
       </visual>
       <collision>
         <geometry>
@@ -76,9 +89,11 @@
       </inertial>
       <visual>
         <geometry>
-          <cylinder radius="0.02" length="0.2"/>
+          <mesh filename="${manipulator_mesh_prefix}/rover_manipulator_link4.stl"
+                scale="${manipulator_mesh_scale} ${manipulator_mesh_scale} ${manipulator_mesh_scale}"/>
         </geometry>
-        <origin xyz="0 0 -0.1"/>
+        <origin xyz="-0.140 0.000 -0.461" rpy="0 0 3.1415926536"/>
+        <material name="ArmGrey"/>
       </visual>
       <collision>
         <geometry>
@@ -94,9 +109,11 @@
       </inertial>
       <visual>
         <geometry>
-          <cylinder radius="0.05" length="0.1"/>
+          <mesh filename="${manipulator_mesh_prefix}/rover_manipulator_link5.stl"
+                scale="${manipulator_mesh_scale} ${manipulator_mesh_scale} ${manipulator_mesh_scale}"/>
         </geometry>
-        <origin xyz="0.05 0 0" rpy="0 -1.571 0"/>
+        <origin xyz="-0.140 0.000 -0.201" rpy="0 0 3.1415926536"/>
+        <material name="ArmGrey"/>
       </visual>
       <collision>
         <geometry>
@@ -115,6 +132,7 @@
           <box size="0.1 0.1 0.1"/>
         </geometry>
         <origin xyz="0.05 0 0" rpy="0 0 0"/>
+        <material name="ArmGrey"/>
       </visual>
       <collision>
         <geometry>

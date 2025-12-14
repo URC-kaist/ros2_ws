@@ -12,6 +12,14 @@ for root, _, files in os.walk("config"):
             (dest, [os.path.join(root, f) for f in files])
         )
 
+mesh_data_files = []
+for root, _, files in os.walk("meshes"):
+    if files:
+        dest = os.path.join("share", package_name, root)
+        mesh_data_files.append(
+            (dest, [os.path.join(root, f) for f in files])
+        )
+
 setup(
     name=package_name,
     version="0.0.0",
@@ -22,8 +30,9 @@ setup(
         (f"share/{package_name}/urdf", glob("urdf/*.xacro")),
         (f"share/{package_name}/ros2_control", glob("ros2_control/*.xacro")),
         (f"share/{package_name}/worlds", glob("worlds/*")),
-        (f"share/{package_name}", ["package.xml"]),
+        (f"share/{package_name}", ["package.xml", "model.config"]),
         *config_data_files,
+        *mesh_data_files,
     ],
     install_requires=["setuptools"],
     zip_safe=True,
