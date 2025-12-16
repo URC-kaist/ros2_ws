@@ -1,10 +1,8 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.substitutions import (
-    LaunchConfiguration,
-    PathJoinSubstitution,
-)
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 from mr2_rover_description.launch_common import (
@@ -71,6 +69,14 @@ def generate_launch_description():
         interval=2.0,
     )
 
+    battery_monitor = Node(
+        package="mr2_battery_monitor",
+        executable="battery_monitor_node",
+        name="battery_monitor",
+        output="screen",
+        parameters=[{"can_iface": can_iface}],
+    )
+
     return LaunchDescription(
         [
             use_sim_time_arg,
@@ -81,5 +87,6 @@ def generate_launch_description():
             *mock_servos,
             ros2_control,
             *spawners,
+            battery_monitor,
         ]
     )
