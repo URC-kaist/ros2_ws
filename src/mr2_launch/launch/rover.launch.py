@@ -57,6 +57,11 @@ def generate_launch_description():
         default_value="false",
         description="Start mock AK servo nodes instead of hardware interfaces (real mode)",
     )
+    use_servo_arg = DeclareLaunchArgument(
+        "use_servo",
+        default_value="false",
+        description="If true, launch MoveIt Servo instead of move_group",
+    )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
     sim_condition = IfCondition(
@@ -123,7 +128,23 @@ def generate_launch_description():
             PathJoinSubstitution(
                 [FindPackageShare("mr2_moveit"), "launch", "move_group.launch.py"]
             )
-        )
+        ),
+        launch_arguments={
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
+        }.items(),
+        condition=UnlessCondition(LaunchConfiguration("use_servo")),
+    )
+
+    servo_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_moveit"), "launch", "realtime_servo.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration("use_servo")),
     )
 
     rviz2 = Node(
@@ -144,11 +165,13 @@ def generate_launch_description():
         can_iface_arg,
         controller_config_arg,
         use_mock_servos_arg,
+        use_servo_arg,
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
         pc2_to_heightmap,
         traversibility_map_launch,
         move_group_launch,
+        servo_launch,
         rviz2,
     ])

@@ -1,10 +1,13 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="rover_gazebo_ros2_control" params="name">
+  <xacro:macro name="rover_gazebo_ros2_control" params="name ros2_control_config">
     <ros2_control name="${name}" type="system">
       <hardware>
         <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+        <param name="parameters">${ros2_control_config}</param>
+        <!-- Increase position loop gain so simulated joints actually chase commanded setpoints -->
+        <param name="position_proportional_gain">50.0</param>
       </hardware>
 
       <!-- Mimic Joint -->

@@ -132,6 +132,7 @@ def generate_launch_description():
         executable="parameter_bridge",
         arguments=bridge_args,
         parameters=[{"use_sim_time": use_sim_time}],
+        remappings=[("/world/empty_world/clock", "/clock")],
         output="screen",
     )
 

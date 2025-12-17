@@ -29,7 +29,7 @@
 
   <xacro:if value="${ros2_control_mode_value == 'gazebo'}">
     <xacro:rover_gazebo_sensors ros2_control_config="${ros2_control_config_value}"/>
-    <xacro:rover_gazebo_ros2_control name="GazeboSimSystem"/>
+    <xacro:rover_gazebo_ros2_control name="GazeboSimSystem" ros2_control_config="${ros2_control_config_value}"/>
   </xacro:if>
   <xacro:if value="${ros2_control_mode_value == 'real_hardware'}">
     <xacro:rover_can_ros2_control name="RoverCanSystem" can_iface="${can_iface_value}"/>

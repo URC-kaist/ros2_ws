@@ -1,10 +1,18 @@
 topics:
+  # Bridge Gazebo world clock; remap to /clock in launch
+  # Force QoS to best effort to match gz clock publishing
+  - name: /world/empty_world/clock
+    ros_type: rosgraph_msgs/msg/Clock
+    gz_type: gz.msgs.Clock
+    qos:
+      reliability: best_effort
+      durability: volatile
   - name: /left_gnss/navsat
     ros_type: sensor_msgs/msg/NavSatFix
-    gz_type: ignition.msgs.NavSat
+    gz_type: gz.msgs.NavSat
   - name: /right_gnss/navsat
     ros_type: sensor_msgs/msg/NavSatFix
-    gz_type: ignition.msgs.NavSat
+    gz_type: gz.msgs.NavSat
   - name: /rgbd_camera/camera_info
     ros_type: sensor_msgs/msg/CameraInfo
     gz_type: gz.msgs.CameraInfo
