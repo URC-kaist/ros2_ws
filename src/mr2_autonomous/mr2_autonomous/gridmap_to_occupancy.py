@@ -7,6 +7,9 @@ from grid_map_msgs.msg import GridMap
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Pose
 
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
+
+
 def quat_to_rot(x, y, z, w):
     xx, yy, zz = x*x, y*y, z*z
     xy, xz, yz = x*y, x*z, y*z
@@ -37,8 +40,14 @@ class GridMapToOcc(Node):
         self.invert       = bool(self.get_parameter("invert").value)
         self.occ_unknown  = int(self.get_parameter("unknown_value").value)
 
+        # For Nav2 compatibility, use TRANSIENT_LOCAL QoS
+        # This allows the OccupancyGrid to be used as a static layer in Nav2.
+        qos = QoSProfile(depth=1)
+        qos.reliability = QoSReliabilityPolicy.RELIABLE
+        qos.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
+
         self.sub = self.create_subscription(GridMap, self.input_topic, self.cb, 1)
-        self.pub = self.create_publisher(OccupancyGrid, self.output_topic, 1)
+        self.pub = self.create_publisher(OccupancyGrid, self.output_topic, qos)
         self.get_logger().info(
             f"GridMap({self.layer}) → OccupancyGrid on {self.output_topic} | "
             f"range=[{self.min_v},{self.max_v}], invert={self.invert}"

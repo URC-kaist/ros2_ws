@@ -13,7 +13,7 @@ navsat_transform:
     publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: false # use fresh imu/data yaw
     wait_for_datum: true
-    datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)
+    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
 
 ekf_filter_node:
   ros__parameters:
@@ -88,4 +88,4 @@ navsat_transform_query: # copied configuration from navsat_transform
     publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: false # use fresh imu/data yaw
     wait_for_datum: true
-    datum: [38.4065, -110.7919, 0.0]  # ex: MDRS; ROS2 style (lat, long, alt)
+    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns

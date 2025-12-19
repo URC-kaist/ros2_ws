@@ -12,12 +12,14 @@ def generate_launch_description():
     pkg_share = get_package_share_directory("mr2_rover_auto")
     params_file = os.path.join(pkg_share, "config", "nav2_params.yaml")
 
+    """
+    ros2 action send_goal /gnss_only mr2_action_interface/action/GnssOnly "{target_latitude: 38.4065, target_longitude: -110.7919}" --feedback
+    """
+
     return LaunchDescription([
         # For Gazebo, set to true. For field test, set to false.
         DeclareLaunchArgument('use_sim_time', default_value='true'),
 
-        # ros2 action send_goal /gnss_only mr2_action_interface/action/GnssOnly \
-        # "{target_latitude: 38.4065, target_longitude: -110.7919}" --feedback
         Node(
             package='mr2_rover_auto',
             executable='gnss_only_server',

@@ -41,7 +41,7 @@ def generate_launch_description():
     # Our directories
     pkg_share = get_package_share_directory("mr2_rover_auto")
     default_params = os.path.join(pkg_share, "config", "nav2_params.yaml")
-    default_map = os.path.join(pkg_share, "maps", "my_map.yaml")
+    default_map = os.path.join(pkg_share, "maps", "map.yaml")
 
     # Create the launch configuration variables
     namespace = LaunchConfiguration('namespace')
@@ -147,7 +147,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(pkg_share, # our launch
-                                                       'map.launch.py')),
+                                                       'launch', 'map.launch.py')),
             launch_arguments={'namespace': namespace,
                               'map': map_yaml_file,
                               'use_sim_time': use_sim_time,

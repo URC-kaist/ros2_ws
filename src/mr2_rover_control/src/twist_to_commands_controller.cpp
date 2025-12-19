@@ -9,7 +9,7 @@ namespace mr2_rover_control
 {
 
 controller_interface::CallbackReturn TwistToCommandsController::on_init()
-{
+{ //TODO: follow actual dimension
   auto_declare<std::vector<std::string>>("wheel_joints", {});
   auto_declare<std::vector<std::string>>("steering_joints", {});
   auto_declare<double>("wheel_base", 0.94);
