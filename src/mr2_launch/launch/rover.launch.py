@@ -81,6 +81,13 @@ def generate_launch_description():
         output="screen",
     )
 
+    system_status = Node(
+        package="mr2_system_status",
+        executable="system_status",
+        name="system_status",
+        output="screen",
+    )
+
     rover_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -169,6 +176,7 @@ def generate_launch_description():
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
+        system_status,
         pc2_to_heightmap,
         traversibility_map_launch,
         move_group_launch,

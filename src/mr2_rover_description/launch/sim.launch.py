@@ -93,6 +93,14 @@ def generate_launch_description():
     # ───── robot_state_publisher & ros2_control_node ────────────────────
     rsp = robot_state_publisher_node(robot_description, use_sim_time)
 
+    battery_emulator = Node(
+        package="mr2_battery_monitor",
+        executable="battery_emulator_node",
+        name="battery_emulator",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
+
     # ───── spawn the robot into Gazebo ───────────────────────────────────
     spawn = TimerAction(
         period=2.0,
@@ -153,6 +161,7 @@ def generate_launch_description():
             SetEnvironmentVariable("IGN_GAZEBO_RESOURCE_PATH", ign_resource_path),
             gz_sim,
             rsp,
+            battery_emulator,
             spawn,
             *spawners,
             gz_bridge,

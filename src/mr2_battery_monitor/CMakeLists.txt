@@ -25,14 +25,23 @@ ament_target_dependencies(battery_monitor_node
   std_msgs
   mr2_can_bus_core)
 
+add_executable(battery_emulator_node src/battery_emulator_node.cpp)
+ament_target_dependencies(battery_emulator_node
+  rclcpp
+  sensor_msgs
+  std_msgs)
+
 rosidl_get_typesupport_target(typesupport_target
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
 if(typesupport_target)
   target_link_libraries(battery_monitor_node ${typesupport_target})
+  target_link_libraries(battery_emulator_node ${typesupport_target})
 endif()
 add_dependencies(battery_monitor_node ${PROJECT_NAME}__rosidl_generator_cpp)
+add_dependencies(battery_emulator_node ${PROJECT_NAME}__rosidl_generator_cpp)
 
 install(TARGETS battery_monitor_node
+               battery_emulator_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY msg
