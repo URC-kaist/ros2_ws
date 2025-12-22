@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3">
+  <BehaviorTree ID="GnssOnly">
+    <NavigateToPose goal="{goal}"
+                    server_name="{navtopose_server}"
+                    server_timeout="{server_timeout}"
+                    behavior_tree="{navtopose_bt}"/>
+  </BehaviorTree>
+
+  <!-- Description of Node Models (used by Groot) -->
+  <TreeNodesModel>
+    <Action ID="NavigateToPose">
+      <input_port name="goal">Goal</input_port>
+      <input_port name="server_name">Server name</input_port>
+      <input_port name="server_timeout">Server timeout</input_port>
+      <input_port name="behavior_tree">Behavior tree to run</input_port>
+    </Action>
+  </TreeNodesModel>
+
+</root>

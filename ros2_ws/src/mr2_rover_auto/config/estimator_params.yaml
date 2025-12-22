@@ -1,0 +1,91 @@
+# yaml parameters for estimator.launch.py
+
+navsat_transform:
+  ros__parameters:
+    frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
+    delay: 3.0 # seconds to wait before anything for ekf or GPS to settle
+    map_frame: map
+    base_link_frame: base_link
+    magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
+    yaw_offset: 0.0
+    zero_altitude: false # false to respect z-axis data
+    broadcast_cartesian_transform: false # we do not use UTM
+    publish_filtered_gps: true # publish estimation back to WGS84
+    use_odometry_yaw: false # use fresh imu/data yaw
+    wait_for_datum: true
+    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
+
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0 # filter Hz
+    two_d_mode: false  # false to respect z-axis data
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: map # publish tf: map -> odom
+
+    imu0: imu/data
+    imu0_config: [false, false, false, true, true, true, # global orientation
+                  false, false, false, true, true, true, # local gyro
+                  true, true, true] # local acceleration
+    imu0_queue_size: 30 # ~ 1k Hz
+    imu0_differential: false # do not get velocities from integrating accel
+    imu0_relative: false # use absolute measurement for state
+    imu0_remove_gravitational_acceleration: true
+    gravitational_acceleration: 9.80665 # G_ACC; Value depends on where you are
+
+    odom0: odometry/gps
+    odom0_config: [true, true, true, false, false, false, # ENU position
+                  false, false, false, false, false, false,
+                  false, false, false]
+    odom0_queue_size: 3 # GNSS is slower but set 3 for backup
+    odom0_differential: false # do not get velocities from integrating accel
+    odom0_relative: false # use absolute measurement for state
+
+    publish_tf: true
+    permit_corrected_publication: true # compensate delayed GNSS data
+    print_diagnostics: true # true for debugging with /diagnostics topic
+    debug: false
+
+    use_control: false # /cmd_vel is not reliable for estimation
+
+    # Recall: What are covariances in KF?
+    # P: the estimation of state variance (how reliable is my prediction?)
+    # Q: the estimation of process variance (outside noise modelled as Gaussian)
+    # R: the inherent sensor noise (Written in /imu/data and /fix)
+    
+    # Then why "co"variance? Because there are correlations everywhere. -> matrix
+
+    # Here we set Q, the metric of "how noizy the environment is"
+    # Position, velocity, acceleration: high Q for rough terrain
+    process_noise_covariance: [ # XXX This has to be tuned properly.
+      1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
+      0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
+      0.0,  0.0,  5e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
+      0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
+      0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
+      0.0,  0.0,  0.0,  0.0,  0.0,  1e-5, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # y; relatively smooth
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vx (m^2/s^2)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vy
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  5e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vz
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  # wr (rad^2/s^2)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  # wp
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  # wy
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  # Ax (m^2/s^4)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  # Ay
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3] # Az
+
+navsat_transform_query: # copied configuration from navsat_transform
+  ros__parameters:
+    frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
+    delay: 3.0 # seconds to wait before anything for ekf or GPS to settle
+    map_frame: map
+    base_link_frame: base_link
+    magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
+    yaw_offset: 0.0
+    zero_altitude: false # false to respect z-axis data
+    broadcast_cartesian_transform: false # we do not use UTM
+    publish_filtered_gps: true # publish estimation back to WGS84
+    use_odometry_yaw: false # use fresh imu/data yaw
+    wait_for_datum: true
+    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns

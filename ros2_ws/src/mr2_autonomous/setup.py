@@ -23,6 +23,7 @@ setup(
     entry_points={
         "console_scripts": [
             "pc2_to_heightmap = mr2_autonomous.pc2_to_heightmap:main",
+            "gridmap_to_occupancy = mr2_autonomous.gridmap_to_occupancy:main",
         ],
     },
 )

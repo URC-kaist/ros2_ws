@@ -1,0 +1,15 @@
+# CoverVision.action definitions
+# Goal - GPS coordinate, radius, object type
+float64 target_latitude
+float64 target_longitude
+float64 target_radius       # in meters
+int32 object_type          # 0 = AR tag, 1 = mallet, 2 = bottle 
+---
+# Result - Final outcome with waypoint completion info
+int32 mission_result        # 1 = SUCCESS, 0 = FAILURE
+int32 waypoints_completed    # How many waypoints were successfully visited
+---
+# Feedback - Coverage mission progress
+int32 bt_status             # 1 = RUNNING, 0 = NOT_RUNNING
+int32 total_waypoints       # Total waypoints generated
+int32 current_waypoint_index # Current waypoint being navigated to
