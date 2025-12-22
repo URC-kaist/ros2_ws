@@ -1,0 +1,159 @@
+.panel-section {
+  background: rgba(12, 18, 28, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: var(--radius);
+  box-shadow: 0 12px 30px var(--shadow);
+}
+
+.control-visual {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.vector-plot {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.axis-markers {
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.axis-markers::before,
+.axis-markers::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.axis-markers::before {
+  left: 50%;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.axis-markers::after {
+  top: 50%;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.axis-label {
+  position: absolute;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.axis-label.top {
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.axis-label.bottom {
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.axis-label.left {
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.axis-label.right {
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.vector-arrow {
+  position: absolute;
+  width: calc(50% - 12px);
+  height: 10px;
+  left: 50%;
+  top: 50%;
+  transform-origin: left center;
+  transform: translateY(-50%);
+}
+
+.vector-arrow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 25%, 78% 25%, 78% 0, 100% 50%, 78% 100%, 78% 75%, 0 75%);
+  background: linear-gradient(90deg, rgba(53, 211, 195, 0.2), rgba(53, 211, 195, 0.95));
+  border-radius: 999px;
+}
+
+.angvel-overlay {
+  position: absolute;
+  inset: 16px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.angvel-arc {
+  width: 91px;
+  height: 91px;
+  overflow: visible;
+}
+
+.angvel-arc-track {
+  fill: none;
+  stroke: rgba(247, 178, 77, 0.15);
+  stroke-width: 4;
+}
+
+.angvel-arc-sweep {
+  fill: none;
+  stroke: var(--accent-2);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transform-origin: 30px 30px;
+  filter: drop-shadow(0 0 6px rgba(247, 178, 77, 0.5));
+}
+
+.center-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--accent-2);
+  border-radius: 999px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 12px rgba(247, 178, 77, 0.6);
+}
+
+.vector-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.vector-value {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
