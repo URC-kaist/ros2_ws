@@ -1,0 +1,92 @@
+.tab-panels {
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: linear-gradient(160deg, rgba(24, 36, 56, 0.9), rgba(15, 23, 36, 0.85));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius);
+  padding: 12px;
+  box-shadow: 0 20px 40px var(--shadow);
+  min-height: 140px;
+  position: relative;
+}
+
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.card p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  background: rgba(53, 211, 195, 0.15);
+  color: var(--accent);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.sparkline,
+.heatmap,
+.map,
+.terrain {
+  border-radius: 14px;
+  height: 70px;
+  background: linear-gradient(120deg, rgba(53, 211, 195, 0.2), rgba(247, 178, 77, 0.2));
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.pose-grid {
+  display: grid;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.pose-grid span {
+  color: var(--muted);
+}
+
+.status-list {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+}
+
+.status-warn {
+  color: var(--accent-2);
+}
