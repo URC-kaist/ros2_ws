@@ -32,14 +32,16 @@ Notes:
 ## Payloads (ROS-aligned units)
 
 ### CMD_DRIVE (msg_id 0x01)
-Payload size: 12 bytes
+Payload size: 16 bytes
 
 - `uint32 timestamp_ms`
 - `float32 linear_x_m_s`
+- `float32 linear_y_m_s`
 - `float32 angular_z_rad_s`
 
 ROS mapping: `geometry_msgs/Twist`
 - `linear.x = linear_x_m_s`
+- `linear.y = linear_y_m_s`
 - `angular.z = angular_z_rad_s`
 
 Suggested rate: 20–50 Hz

@@ -126,10 +126,11 @@ uint16_t crc16_ccitt_false(const uint8_t *data, size_t length) {
 
 std::vector<uint8_t> encode_cmd_drive(uint8_t seq, const CmdDrive &cmd) {
   std::vector<uint8_t> payload;
-  payload.reserve(12);
+  payload.reserve(16);
   ByteWriter writer(&payload);
   writer.write_u32(cmd.timestamp_ms);
   writer.write_f32(cmd.linear_x_m_s);
+  writer.write_f32(cmd.linear_y_m_s);
   writer.write_f32(cmd.angular_z_rad_s);
 
   Header header;
@@ -234,15 +235,27 @@ std::optional<Frame> decode_frame(const uint8_t *data, size_t length) {
 }
 
 std::optional<CmdDrive> decode_cmd_drive(const Frame &frame) {
-  if (frame.header.msg_id != MsgId::kCmdDrive || frame.payload.size() != 12) {
+  if (frame.header.msg_id != MsgId::kCmdDrive) {
+    return std::nullopt;
+  }
+  if (frame.payload.size() != 12 && frame.payload.size() != 16) {
     return std::nullopt;
   }
 
   ByteReader reader(frame.payload.data(), frame.payload.size());
   CmdDrive cmd;
   if (!reader.read_u32(&cmd.timestamp_ms) ||
-      !reader.read_f32(&cmd.linear_x_m_s) ||
-      !reader.read_f32(&cmd.angular_z_rad_s)) {
+      !reader.read_f32(&cmd.linear_x_m_s)) {
+    return std::nullopt;
+  }
+  if (frame.payload.size() == 16) {
+    if (!reader.read_f32(&cmd.linear_y_m_s)) {
+      return std::nullopt;
+    }
+  } else {
+    cmd.linear_y_m_s = 0.0f;
+  }
+  if (!reader.read_f32(&cmd.angular_z_rad_s)) {
     return std::nullopt;
   }
   return cmd;

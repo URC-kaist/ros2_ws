@@ -44,7 +44,8 @@ class SikBridgeNode : public rclcpp::Node {
             declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel")),
         arm_twist_topic_(declare_parameter<std::string>(
             "arm_twist_topic", "/moveit_servo/delta_twist_cmds")),
-        arm_frame_id_(declare_parameter<std::string>("arm_frame_id", "base_link")) {
+        arm_frame_id_(declare_parameter<std::string>("arm_frame_id", "base_link")),
+        log_frames_(declare_parameter<bool>("log_frames", false)) {
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
     arm_twist_pub_ =
         create_publisher<geometry_msgs::msg::TwistStamped>(arm_twist_topic_, 10);
@@ -173,6 +174,10 @@ class SikBridgeNode : public rclcpp::Node {
 
       auto frame = mr2_sik_bridge::decode_frame(buffer.data(), frame_size);
       if (!frame) {
+        if (log_frames_) {
+          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                               "Invalid SiK frame dropped");
+        }
         buffer.erase(buffer.begin());
         continue;
       }
@@ -213,8 +218,15 @@ class SikBridgeNode : public rclcpp::Node {
   void handle_cmd_drive_(const CmdDrive &cmd) {
     geometry_msgs::msg::Twist msg;
     msg.linear.x = cmd.linear_x_m_s;
+    msg.linear.y = cmd.linear_y_m_s;
     msg.angular.z = cmd.angular_z_rad_s;
     cmd_vel_pub_->publish(msg);
+    if (log_frames_) {
+      RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+                           "CMD_DRIVE x=%.3f y=%.3f yaw=%.3f",
+                           cmd.linear_x_m_s, cmd.linear_y_m_s,
+                           cmd.angular_z_rad_s);
+    }
   }
 
   void handle_cmd_arm_(const CmdArmTwist &cmd) {
@@ -228,6 +240,12 @@ class SikBridgeNode : public rclcpp::Node {
     msg.twist.angular.y = cmd.ang_y_rad_s;
     msg.twist.angular.z = cmd.ang_z_rad_s;
     arm_twist_pub_->publish(msg);
+    if (log_frames_) {
+      RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+                           "CMD_ARM_TWIST lin=(%.3f, %.3f, %.3f) ang=(%.3f, %.3f, %.3f)",
+                           cmd.lin_x_m_s, cmd.lin_y_m_s, cmd.lin_z_m_s,
+                           cmd.ang_x_rad_s, cmd.ang_y_rad_s, cmd.ang_z_rad_s);
+    }
   }
 
   void zero_check() {
@@ -305,6 +323,7 @@ class SikBridgeNode : public rclcpp::Node {
   std::string cmd_vel_topic_;
   std::string arm_twist_topic_;
   std::string arm_frame_id_;
+  bool log_frames_;
 
   // ROS interfaces
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;

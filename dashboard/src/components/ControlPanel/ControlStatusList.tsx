@@ -1,7 +1,35 @@
+import { useEffect, useState } from 'react'
+import { type LinkStatus, type TelemBattery, getSikGatewayClient } from '../../lib/sikGateway'
 import './ControlStatusList.css'
 
 const ControlStatusList = () => {
   const isNormal = true
+  const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
+  const [battery, setBattery] = useState<TelemBattery | null>(null)
+
+  useEffect(() => {
+    const gateway = getSikGatewayClient()
+    gateway.connect()
+    const offLink = gateway.onLinkStatus(setLinkStatus)
+    const offBattery = gateway.onTelemBattery(setBattery)
+    return () => {
+      offLink()
+      offBattery()
+    }
+  }, [])
+
+  const batteryPercent =
+    battery && battery.total_capacity_mah > 0
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            (battery.available_capacity_mah / battery.total_capacity_mah) * 100
+          )
+        )
+      : 0
+  const linkLabel = linkStatus?.connected ? 'Stable' : 'Offline'
+
   return (
     <>
       <section className="panel-section">
@@ -12,7 +40,7 @@ const ControlStatusList = () => {
             Link
           </span>
           <div className="status-pill">
-            <strong>Stable</strong>
+            <strong>{linkLabel}</strong>
           </div>
         </div>
         <div className="status-item status-softstop">
@@ -31,15 +59,19 @@ const ControlStatusList = () => {
           <div className="status-item battery">
             <div className="metric-label">
               <span>Battery</span>
-              <strong>78%</strong>
+              <strong>{battery ? `${batteryPercent.toFixed(0)}%` : '---'}</strong>
             </div>
             <div className="meter">
-              <div className="meter-fill good" style={{ width: '78%' }} />
+              <div className="meter-fill good" style={{ width: `${batteryPercent}%` }} />
             </div>
             <div className="battery-meta">
-              <span>Temp 32°C</span>
-              <span>Voltage 24.1V</span>
-              <span>Capacity 5.6Ah</span>
+              <span>
+                Temp {battery ? `${battery.temperature_c.toFixed(1)}°C` : '--'}
+              </span>
+              <span>Voltage --</span>
+              <span>
+                Capacity {battery ? `${(battery.total_capacity_mah / 1000).toFixed(1)}Ah` : '--'}
+              </span>
             </div>
           </div>
         </div>

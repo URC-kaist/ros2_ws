@@ -7,6 +7,7 @@ const DEFAULT_DEVICE = '/dev/ttyUSB0'
 const DEFAULT_BAUD = 57600
 const DEFAULT_PORT = 8081
 const DEFAULT_HEARTBEAT_HZ = 2
+const DEFAULT_CMD_HZ = 10
 
 const args = process.argv.slice(2)
 const config = {
@@ -16,6 +17,7 @@ const config = {
   heartbeatHz: toFloat(
     getArg('--heartbeat-hz') || process.env.SIK_HEARTBEAT_HZ || DEFAULT_HEARTBEAT_HZ
   ),
+  cmdHz: toFloat(getArg('--cmd-hz') || process.env.SIK_CMD_HZ || DEFAULT_CMD_HZ),
 }
 
 function getArg(name) {
@@ -49,6 +51,8 @@ let seq = 0
 let serialReady = false
 let lastRxMs = 0
 let lastTxMs = 0
+let latestCmdDrive = null
+let latestCmdArmTwist = null
 
 const port = new SerialPort({
   path: config.device,
@@ -149,10 +153,11 @@ function encodeFrame(msgId, seqValue, payload) {
 }
 
 function encodeCmdDrive(cmd) {
-  const payload = Buffer.alloc(12)
+  const payload = Buffer.alloc(16)
   payload.writeUInt32LE(cmd.timestamp_ms >>> 0, 0)
   payload.writeFloatLE(cmd.linear_x_m_s, 4)
-  payload.writeFloatLE(cmd.angular_z_rad_s, 8)
+  payload.writeFloatLE(cmd.linear_y_m_s, 8)
+  payload.writeFloatLE(cmd.angular_z_rad_s, 12)
   return encodeFrame(MsgId.CMD_DRIVE, nextSeq(), payload)
 }
 
@@ -202,18 +207,20 @@ function handleDashboardMessage(msg) {
 
   if (type === 'cmd_drive') {
     const linear = coerceNumber(msg.linear_x_m_s ?? msg.linear_x ?? msg.x)
+    const lateral = coerceNumber(msg.linear_y_m_s ?? msg.linear_y ?? msg.y)
     const angular = coerceNumber(msg.angular_z_rad_s ?? msg.angular_z ?? msg.yaw)
-    const frame = encodeCmdDrive({
+    log(`cmd_drive rx x=${linear} y=${lateral} yaw=${angular}`)
+    latestCmdDrive = {
       timestamp_ms: Date.now() >>> 0,
       linear_x_m_s: linear,
+      linear_y_m_s: lateral,
       angular_z_rad_s: angular,
-    })
-    writeFrame(frame)
+    }
     return
   }
 
   if (type === 'cmd_arm_twist') {
-    const frame = encodeCmdArmTwist({
+    latestCmdArmTwist = {
       timestamp_ms: Date.now() >>> 0,
       lin_x_m_s: coerceNumber(msg.lin_x_m_s ?? msg.lin_x ?? msg.linear_x ?? msg.x),
       lin_y_m_s: coerceNumber(msg.lin_y_m_s ?? msg.lin_y ?? msg.linear_y ?? msg.y),
@@ -221,8 +228,7 @@ function handleDashboardMessage(msg) {
       ang_x_rad_s: coerceNumber(msg.ang_x_rad_s ?? msg.ang_x ?? msg.angular_x),
       ang_y_rad_s: coerceNumber(msg.ang_y_rad_s ?? msg.ang_y ?? msg.angular_y),
       ang_z_rad_s: coerceNumber(msg.ang_z_rad_s ?? msg.ang_z ?? msg.angular_z ?? msg.yaw),
-    })
-    writeFrame(frame)
+    }
     return
   }
 
@@ -290,5 +296,25 @@ if (config.heartbeatHz > 0) {
       last_rx_ms: lastRxMs,
       last_tx_ms: lastTxMs,
     })
+  }, periodMs)
+}
+
+if (config.cmdHz > 0) {
+  const periodMs = Math.max(1000 / config.cmdHz, 50)
+  setInterval(() => {
+    if (latestCmdDrive) {
+      const frame = encodeCmdDrive({
+        ...latestCmdDrive,
+        timestamp_ms: Date.now() >>> 0,
+      })
+      writeFrame(frame)
+    }
+    if (latestCmdArmTwist) {
+      const frame = encodeCmdArmTwist({
+        ...latestCmdArmTwist,
+        timestamp_ms: Date.now() >>> 0,
+      })
+      writeFrame(frame)
+    }
   }, periodMs)
 }

@@ -26,6 +26,7 @@ struct Header {
 struct CmdDrive {
   uint32_t timestamp_ms{0};
   float linear_x_m_s{0.0f};
+  float linear_y_m_s{0.0f};
   float angular_z_rad_s{0.0f};
 };
 

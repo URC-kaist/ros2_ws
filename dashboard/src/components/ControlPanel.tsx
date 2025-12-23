@@ -4,13 +4,12 @@ import ControlPanelHeader from './ControlPanel/ControlPanelHeader'
 import ControlSettings from './ControlPanel/ControlSettings'
 import ControlStatusList from './ControlPanel/ControlStatusList'
 import ControlVectorPlot, { type CmdVel } from './ControlPanel/ControlVectorPlot'
+import { getSikGatewayClient } from '../lib/sikGateway'
 import './ControlPanel/ControlPanel.css'
 
-const sendCommandPlaceholder = (_cmdVel: CmdVel) => {
-  // TODO: wire this to the command publisher.
-}
-
 const ControlPanel = () => {
+  const gatewayRef = useRef(getSikGatewayClient())
+  const cmdVelRef = useRef<CmdVel>({ x: 0, y: 0, yaw: 0 })
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sensitivity, setSensitivity] = useState<'low' | 'med' | 'high'>('med')
   const [cmdVel, setCmdVel] = useState<CmdVel>({ x: 0, y: 0, yaw: 0 })
@@ -21,8 +20,39 @@ const ControlPanel = () => {
   const gamepadIndexRef = useRef<number | null>(null)
 
   useEffect(() => {
+    gatewayRef.current.connect()
+  }, [])
+
+  useEffect(() => {
     gamepadIndexRef.current = gamepadIndex
   }, [gamepadIndex])
+
+  useEffect(() => {
+    cmdVelRef.current = cmdVel
+  }, [cmdVel])
+
+  useEffect(() => {
+    const heartbeatId = window.setInterval(() => {
+      gatewayRef.current.sendHeartbeat()
+    }, 500)
+    return () => window.clearInterval(heartbeatId)
+  }, [])
+
+  useEffect(() => {
+    const cmdRateMs = 50
+    const cmdId = window.setInterval(() => {
+      if (!gamepadConnected) {
+        return
+      }
+      const latest = cmdVelRef.current
+      gatewayRef.current.sendCmdDrive({
+        linear_x_m_s: latest.y,
+        linear_y_m_s: latest.x,
+        angular_z_rad_s: latest.yaw,
+      })
+    }, cmdRateMs)
+    return () => window.clearInterval(cmdId)
+  }, [gamepadConnected])
 
   useEffect(() => {
     const updateGamepads = () => {
@@ -82,7 +112,6 @@ const ControlPanel = () => {
         }
 
         setCmdVel(next)
-        sendCommandPlaceholder(next)
       } else if (gamepadConnectedRef.current) {
         gamepadConnectedRef.current = false
         setGamepadConnected(false)
