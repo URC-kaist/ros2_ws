@@ -1,0 +1,15 @@
+{
+  "name": "mr2-sik-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Headless SiK serial <-> dashboard WebSocket gateway",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "serialport": "^12.0.0",
+    "ws": "^8.16.0"
+  }
+}
