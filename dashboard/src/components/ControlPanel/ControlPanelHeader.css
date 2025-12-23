@@ -1,6 +1,11 @@
 .panel-header {
   display: flex;
   align-items: center;
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
@@ -17,23 +22,4 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-}
-
-.settings-button {
-  margin-left: auto;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: transparent;
-  color: var(--text);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.settings-button svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
 }

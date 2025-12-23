@@ -1,13 +1,15 @@
+import Modal from '../ui/Modal'
 import './ControlSettings.css'
 
 type ControlSettingsProps = {
   sensitivity: 'low' | 'med' | 'high'
   onSelect: (level: 'low' | 'med' | 'high') => void
+  onClose: () => void
 }
 
-const ControlSettings = ({ sensitivity, onSelect }: ControlSettingsProps) => {
+const ControlSettings = ({ sensitivity, onSelect, onClose }: ControlSettingsProps) => {
   return (
-    <section className="settings-panel" role="dialog" aria-label="Control settings">
+    <Modal ariaLabel="Control settings" onClose={onClose} panelClassName="settings-panel">
       <div className="settings-title">Sensitivity</div>
       <div className="settings-options" role="group" aria-label="Sensitivity presets">
         {(['low', 'med', 'high'] as const).map((level) => (
@@ -21,7 +23,7 @@ const ControlSettings = ({ sensitivity, onSelect }: ControlSettingsProps) => {
           </button>
         ))}
       </div>
-    </section>
+    </Modal>
   )
 }
 

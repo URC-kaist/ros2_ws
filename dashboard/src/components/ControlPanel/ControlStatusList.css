@@ -18,6 +18,12 @@
   font-size: 0.95rem;
 }
 
+.status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -32,6 +38,10 @@
   box-shadow: 0 0 8px rgba(93, 224, 137, 0.6);
 }
 
+.status-dot-error {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(242, 95, 92, 0.6);
+}
 .status-item.battery {
   display: grid;
   gap: 8px;
@@ -48,6 +58,10 @@
 
 .status-good {
   color: var(--accent);
+}
+
+.status-warn {
+  color: var(--accent-2);
 }
 
 .meter {

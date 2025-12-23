@@ -12,6 +12,42 @@
   width: 100%;
 }
 
+.gamepad-picker {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.gamepad-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gamepad-picker select {
+  background: rgba(8, 12, 18, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gamepad-picker select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-button {
+  flex-shrink: 0;
+}
+
 .vector-plot {
   position: relative;
   width: 100%;
@@ -147,13 +183,42 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  font-size: 0.85rem;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.75rem;
   color: var(--muted);
+  width: 100%;
+  min-width: 0;
 }
 
 .vector-value {
   font-size: 0.75rem;
   color: var(--muted);
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.vector-value-muted {
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+}
+
+.vector-plot-disconnected .vector-arrow::before {
+  background: rgba(142, 163, 184, 0.35);
+}
+
+.vector-plot-disconnected .angvel-arc-sweep {
+  stroke: rgba(142, 163, 184, 0.5);
+  filter: none;
+}
+
+.vector-plot-disconnected {
+  background: rgba(142, 163, 184, 0.08);
+  border-color: rgba(142, 163, 184, 0.2);
+}
+
+.vector-plot-disconnected .center-dot {
+  background: rgba(142, 163, 184, 0.5);
+  box-shadow: none;
 }

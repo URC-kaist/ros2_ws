@@ -1,19 +1,31 @@
 import './ControlStatusList.css'
 
 const ControlStatusList = () => {
+  const isNormal = true
   return (
     <>
       <section className="panel-section">
         <div className="status-list">
-          <div className="status-item status-link">
-            <span>Link</span>
-            <div className="status-pill">
-              <span className="status-dot" aria-hidden="true" />
-              <strong className="status-good">Stable</strong>
-            </div>
+        <div className="status-item status-link">
+          <span className="status-label">
+            <span className="status-dot" aria-hidden="true" />
+            Link
+          </span>
+          <div className="status-pill">
+            <strong>Stable</strong>
           </div>
         </div>
-      </section>
+        <div className="status-item status-softstop">
+          <span className="status-label">
+            <span className={`status-dot ${isNormal ? '' : 'status-dot-error'}`} aria-hidden="true" />
+            Status
+          </span>
+          <div className="status-pill">
+            <strong>{isNormal ? 'Normal' : 'E-Stop'}</strong>
+          </div>
+        </div>
+      </div>
+    </section>
       <section className="panel-section">
         <div className="status-list">
           <div className="status-item battery">
