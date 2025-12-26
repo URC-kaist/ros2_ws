@@ -8,6 +8,7 @@ const DEFAULT_BAUD = 57600
 const DEFAULT_PORT = 8081
 const DEFAULT_HEARTBEAT_HZ = 2
 const DEFAULT_CMD_HZ = 10
+const DEFAULT_CMD_TIMEOUT_MS = 500
 
 const args = process.argv.slice(2)
 const config = {
@@ -18,6 +19,9 @@ const config = {
     getArg('--heartbeat-hz') || process.env.SIK_HEARTBEAT_HZ || DEFAULT_HEARTBEAT_HZ
   ),
   cmdHz: toFloat(getArg('--cmd-hz') || process.env.SIK_CMD_HZ || DEFAULT_CMD_HZ),
+  cmdTimeoutMs: toInt(
+    getArg('--cmd-timeout-ms') || process.env.SIK_CMD_TIMEOUT_MS || DEFAULT_CMD_TIMEOUT_MS
+  ),
 }
 
 function getArg(name) {
@@ -53,6 +57,8 @@ let lastRxMs = 0
 let lastTxMs = 0
 let latestCmdDrive = null
 let latestCmdArmTwist = null
+let lastCmdDriveRxMs = 0
+let lastCmdArmTwistRxMs = 0
 
 const port = new SerialPort({
   path: config.device,
@@ -216,6 +222,7 @@ function handleDashboardMessage(msg) {
       linear_y_m_s: lateral,
       angular_z_rad_s: angular,
     }
+    lastCmdDriveRxMs = Date.now()
     return
   }
 
@@ -229,6 +236,7 @@ function handleDashboardMessage(msg) {
       ang_y_rad_s: coerceNumber(msg.ang_y_rad_s ?? msg.ang_y ?? msg.angular_y),
       ang_z_rad_s: coerceNumber(msg.ang_z_rad_s ?? msg.ang_z ?? msg.angular_z ?? msg.yaw),
     }
+    lastCmdArmTwistRxMs = Date.now()
     return
   }
 
@@ -302,17 +310,28 @@ if (config.heartbeatHz > 0) {
 if (config.cmdHz > 0) {
   const periodMs = Math.max(1000 / config.cmdHz, 50)
   setInterval(() => {
+    const nowMs = Date.now()
+    const timeoutMs = config.cmdTimeoutMs > 0 ? config.cmdTimeoutMs : Number.POSITIVE_INFINITY
     if (latestCmdDrive) {
+      const isStale = nowMs - lastCmdDriveRxMs > timeoutMs
       const frame = encodeCmdDrive({
-        ...latestCmdDrive,
-        timestamp_ms: Date.now() >>> 0,
+        timestamp_ms: nowMs >>> 0,
+        linear_x_m_s: isStale ? 0 : latestCmdDrive.linear_x_m_s,
+        linear_y_m_s: isStale ? 0 : latestCmdDrive.linear_y_m_s,
+        angular_z_rad_s: isStale ? 0 : latestCmdDrive.angular_z_rad_s,
       })
       writeFrame(frame)
     }
     if (latestCmdArmTwist) {
+      const isStale = nowMs - lastCmdArmTwistRxMs > timeoutMs
       const frame = encodeCmdArmTwist({
-        ...latestCmdArmTwist,
-        timestamp_ms: Date.now() >>> 0,
+        timestamp_ms: nowMs >>> 0,
+        lin_x_m_s: isStale ? 0 : latestCmdArmTwist.lin_x_m_s,
+        lin_y_m_s: isStale ? 0 : latestCmdArmTwist.lin_y_m_s,
+        lin_z_m_s: isStale ? 0 : latestCmdArmTwist.lin_z_m_s,
+        ang_x_rad_s: isStale ? 0 : latestCmdArmTwist.ang_x_rad_s,
+        ang_y_rad_s: isStale ? 0 : latestCmdArmTwist.ang_y_rad_s,
+        ang_z_rad_s: isStale ? 0 : latestCmdArmTwist.ang_z_rad_s,
       })
       writeFrame(frame)
     }

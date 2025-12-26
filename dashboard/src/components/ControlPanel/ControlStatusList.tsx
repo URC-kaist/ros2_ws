@@ -5,15 +5,18 @@ import './ControlStatusList.css'
 const ControlStatusList = () => {
   const isNormal = true
   const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
+  const [wsConnected, setWsConnected] = useState(false)
   const [battery, setBattery] = useState<TelemBattery | null>(null)
 
   useEffect(() => {
     const gateway = getSikGatewayClient()
     gateway.connect()
     const offLink = gateway.onLinkStatus(setLinkStatus)
+    const offConnection = gateway.onConnectionStatus(setWsConnected)
     const offBattery = gateway.onTelemBattery(setBattery)
     return () => {
       offLink()
+      offConnection()
       offBattery()
     }
   }, [])
@@ -28,7 +31,17 @@ const ControlStatusList = () => {
           )
         )
       : 0
-  const linkLabel = linkStatus?.connected ? 'Stable' : 'Offline'
+  let linkState = 'Down'
+  let linkDotClass = 'status-dot-error'
+  if (wsConnected) {
+    if (linkStatus?.connected) {
+      linkState = 'Up'
+      linkDotClass = ''
+    } else {
+      linkState = 'Lost'
+      linkDotClass = 'status-dot-warn'
+    }
+  }
 
   return (
     <>
@@ -36,11 +49,11 @@ const ControlStatusList = () => {
         <div className="status-list">
         <div className="status-item status-link">
           <span className="status-label">
-            <span className="status-dot" aria-hidden="true" />
-            Link
+            <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
+            SiK Link
           </span>
           <div className="status-pill">
-            <strong>{linkLabel}</strong>
+            <strong>{linkState}</strong>
           </div>
         </div>
         <div className="status-item status-softstop">

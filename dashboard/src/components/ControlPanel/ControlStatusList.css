@@ -42,6 +42,11 @@
   background: var(--danger);
   box-shadow: 0 0 8px rgba(242, 95, 92, 0.6);
 }
+
+.status-dot-warn {
+  background: var(--accent-2);
+  box-shadow: 0 0 8px rgba(247, 178, 77, 0.6);
+}
 .status-item.battery {
   display: grid;
   gap: 8px;

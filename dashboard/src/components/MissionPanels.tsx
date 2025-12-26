@@ -1,3 +1,4 @@
+import MapPreview from './MapPreview'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -33,10 +34,8 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
 
       {activeTab === 'autonomous' && (
         <div className="panel-grid" role="tabpanel">
-          <article className="card">
-            <h3>Route Planner</h3>
-            <p>Waypoint edits, hazard avoidance, and ETA.</p>
-            <div className="map" />
+          <article className="card card--span-2 card--map">
+            <MapPreview />
           </article>
           <article className="card">
             <h3>Autonomy Health</h3>

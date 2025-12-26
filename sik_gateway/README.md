@@ -13,7 +13,7 @@ npm install
 ## Run
 
 ```bash
-npm start -- --device /dev/ttyUSB0 --baud 57600 --port 8081 --heartbeat-hz 2
+npm start -- --device /dev/ttyUSB0 --baud 57600 --port 8081 --heartbeat-hz 2 --cmd-timeout-ms 500
 ```
 
 You can also configure with environment variables:
@@ -22,6 +22,8 @@ You can also configure with environment variables:
 - `SIK_BAUD`
 - `SIK_WS_PORT`
 - `SIK_HEARTBEAT_HZ`
+- `SIK_CMD_HZ`
+- `SIK_CMD_TIMEOUT_MS`
 
 ## WebSocket API
 
