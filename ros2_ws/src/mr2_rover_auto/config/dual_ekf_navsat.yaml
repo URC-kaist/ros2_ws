@@ -20,7 +20,7 @@ ekf_local:
     gravitational_acceleration: 9.80665 # G_ACC; Value depends on where you are
 
     # Wheel odometry
-    odom0: odom0/wheel_encoder/odometry
+    odom0: /wheel_encoder/odometry
     odom0_config: [false, false, false, false, false, false,
                    true,  true, false, false, false, true, # vX, vY and w_yaw
                    false, false, false]

@@ -21,6 +21,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
@@ -30,6 +31,12 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(gps_heading_imu_node src/gps_heading_imu_node.cpp)
 ament_target_dependencies(gps_heading_imu_node
   rclcpp sensor_msgs
+  tf2 tf2_geometry_msgs Eigen3
+)
+
+add_executable(gps_heading_gps_node src/gps_heading_gps_node.cpp)
+ament_target_dependencies(gps_heading_gps_node
+  rclcpp sensor_msgs nav_msgs
   tf2 tf2_geometry_msgs Eigen3
 )
 
@@ -57,6 +64,7 @@ rclcpp rclcpp_action mr2_action_interface
 
 install(TARGETS
   gps_heading_imu_node
+  gps_heading_gps_node
   gnss_only_server
   cover_vision_server
   gnss_only_client
