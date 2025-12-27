@@ -1,0 +1,28 @@
+.app {
+  display: block;
+  height: 100vh;
+  background: radial-gradient(circle at top, #1b2a40 0%, #0b0f14 52%, #07090d 100%);
+}
+
+.main {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100vh;
+  overflow-y: auto;
+  margin-left: 20%;
+  width: 80%;
+}
+
+@media (max-width: 960px) {
+  .app {
+    height: auto;
+  }
+
+  .main {
+    margin-left: 0;
+    width: 100%;
+    height: auto;
+  }
+}

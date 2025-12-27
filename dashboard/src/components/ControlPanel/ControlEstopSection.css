@@ -1,0 +1,45 @@
+.panel-section {
+  background: rgba(12, 18, 28, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: var(--radius);
+  box-shadow: 0 12px 30px var(--shadow);
+}
+
+.panel-section.estop-section {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.btn {
+  background: var(--card-strong);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  background: #223454;
+}
+
+.btn.danger {
+  background: var(--danger);
+  border: none;
+  color: #120202;
+}
+
+.btn.estop {
+  width: 100%;
+  padding: 16px;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 12px 30px rgba(242, 95, 92, 0.35);
+}

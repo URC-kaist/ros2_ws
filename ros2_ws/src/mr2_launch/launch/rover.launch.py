@@ -62,6 +62,11 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
+    use_sik_bridge_sim_arg = DeclareLaunchArgument(
+        "use_sik_bridge_sim",
+        default_value="false",
+        description="If true, launch the SiK bridge node in sim mode using /dev/pts/6",
+    )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
     sim_condition = IfCondition(
@@ -69,6 +74,17 @@ def generate_launch_description():
     )
     real_condition = IfCondition(
         PythonExpression(["'", LaunchConfiguration("mode"), "' == 'real'"])
+    )
+    sik_sim_condition = IfCondition(
+        PythonExpression(
+            [
+                "'",
+                LaunchConfiguration("mode"),
+                "' == 'sim' and '",
+                LaunchConfiguration("use_sik_bridge_sim"),
+                "' == 'true'",
+            ]
+        )
     )
     use_sim_time_param = SetParameter(
         name="use_sim_time", value=LaunchConfiguration("use_sim_time")
@@ -163,6 +179,32 @@ def generate_launch_description():
         condition=UnlessCondition(LaunchConfiguration("headless")),
     )
 
+    sik_bridge = Node(
+        package="mr2_sik_bridge",
+        executable="sik_bridge_node",
+        name="sik_bridge",
+        output="screen",
+        parameters=[
+            {"device": "/dev/ttyUSB0"},
+            {"baud": 57600},
+            {"heartbeat_timeout_ms": 500},
+        ],
+        condition=real_condition,
+    )
+    sik_bridge_sim = Node(
+        package="mr2_sik_bridge",
+        executable="sik_bridge_node",
+        name="sik_bridge_sim",
+        output="screen",
+        parameters=[
+            {"device": "/dev/pts/3"},
+            {"baud": 57600},
+            {"heartbeat_timeout_ms": 500},
+            {"log_frames": True},
+        ],
+        condition=sik_sim_condition,
+    )
+
     # ─── LaunchDescription ───────────────────────────────────────────────────────
     return LaunchDescription([
         rviz_arg,
@@ -173,6 +215,7 @@ def generate_launch_description():
         controller_config_arg,
         use_mock_servos_arg,
         use_servo_arg,
+        use_sik_bridge_sim_arg,
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
@@ -181,5 +224,7 @@ def generate_launch_description():
         traversibility_map_launch,
         move_group_launch,
         servo_launch,
+        sik_bridge,
+        sik_bridge_sim,
         rviz2,
     ])

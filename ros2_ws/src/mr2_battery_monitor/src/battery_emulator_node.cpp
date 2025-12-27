@@ -35,6 +35,7 @@
 
 #include "mr2_battery_monitor/msg/pack_telemetry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rcl_interfaces/msg/parameter_descriptor.hpp"
 #include "sensor_msgs/msg/battery_state.hpp"
 
 using namespace std::chrono_literals;
@@ -69,8 +70,8 @@ public:
       cell_count_ = 10;
     }
 
-    auto cell_voltage_param =
-        declare_parameter<std::vector<double>>("cell_voltage_mv", {});
+    auto cell_voltage_param = declare_parameter<std::vector<double>>(
+        "cell_voltage_mv", {}, rcl_interfaces::msg::ParameterDescriptor{});
     build_cell_voltage_(cell_voltage_param);
 
     publish_battery_state_ =
