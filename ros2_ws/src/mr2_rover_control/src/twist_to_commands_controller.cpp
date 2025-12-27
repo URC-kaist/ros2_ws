@@ -126,12 +126,24 @@ TwistToCommandsController::update(const rclcpp::Time &,
     const auto &w = wheels[i];
     const double vx_i = vx - wz * w.y;
     const double vy_i = vy + wz * w.x;
-    double ang = std::atan2(vy_i, vx_i);
     double v_lin = std::hypot(vx_i, vy_i);
-    double w_ang = (wheel_radius_ > 1e-9) ? (v_lin / wheel_radius_) : 0.0;
-    if (std::abs(ang) > M_PI_2) {
-      ang = ang > 0 ? ang - M_PI : ang + M_PI;
-      w_ang = -w_ang;
+
+    const double VEL_STOP = 1e-4;
+    if (v_lin < VEL_STOP) { // Preserve steer even if the rover is stop.
+      speed[i] = 0.0;
+      continue;
+    }
+
+    double ang = std::atan2(vy_i, vx_i);
+    double w_ang = v_lin / wheel_radius_;
+    
+    if (std::abs(ang) > M_PI_2) { // Modified: choose shortest yaw path
+      if (ang > 0) {
+        ang -= M_PI;
+      } else {
+        ang += M_PI;
+      }
+      w_ang *= -1.0;
     }
     steer[i] = std::clamp(ang, -max_steer_, max_steer_);
     speed[i] = w_ang;
