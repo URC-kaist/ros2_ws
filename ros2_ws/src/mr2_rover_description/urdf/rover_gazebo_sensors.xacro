@@ -63,6 +63,7 @@
           <image>
             <width>320</width>
             <height>240</height>
+	    <anti_aliasing>4</anti_aliasing>
             <format>R8G8B8</format>
           </image>
           <clip>
