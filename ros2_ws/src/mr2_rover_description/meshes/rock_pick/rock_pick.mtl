@@ -1,0 +1,8 @@
+newmtl rock_pick
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ns 10.000000
+map_Kd rock_pick_diffuse.png
+map_Ks rock_pick_metallic.png
+map_Bump rock_pick_normal.png
+map_Ns rock_pick_roughness.png

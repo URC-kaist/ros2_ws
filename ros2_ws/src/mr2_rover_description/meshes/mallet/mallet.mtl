@@ -1,0 +1,8 @@
+newmtl mallet
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ns 10.000000
+map_Kd mallet_diffuse.png
+map_Ks mallet_metallic.png
+map_Bump mallet_normal.png
+map_Ns mallet_roughness.png

@@ -1,0 +1,8 @@
+newmtl bottle
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ns 10.000000
+map_Kd bottle_diffuse.png
+map_Ks bottle_metallic.png
+map_Bump bottle_normal.png
+map_Ns bottle_roughness.png

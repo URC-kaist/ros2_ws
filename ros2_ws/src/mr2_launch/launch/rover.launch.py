@@ -197,7 +197,7 @@ def generate_launch_description():
         name="sik_bridge_sim",
         output="screen",
         parameters=[
-            {"device": "/dev/pts/10"},
+            {"device": "/dev/pts/2"},
             {"baud": 57600},
             {"heartbeat_timeout_ms": 500},
             {"log_frames": True},
