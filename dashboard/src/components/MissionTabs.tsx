@@ -1,6 +1,8 @@
 import './MissionTabs.css'
 
 const TABS = [
+  { id: 'status', label: 'Status' },
+  { id: 'delivery', label: 'Delivery' },
   { id: 'science', label: 'Science' },
   { id: 'autonomous', label: 'Autonomous' },
   { id: 'manipulation', label: 'Manipulation' },

@@ -1,14 +1,16 @@
 {
-  "name": "mr2-sik-gateway",
+  "name": "base-gateway",
   "version": "0.1.0",
   "private": true,
-  "description": "Headless SiK serial <-> dashboard WebSocket gateway",
+  "description": "Headless MR2 serial <-> dashboard WebSocket gateway",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2",
     "serialport": "^12.0.0",
     "ws": "^8.16.0"
   }

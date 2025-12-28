@@ -106,9 +106,9 @@ const ControlPanel = () => {
         const baseY = (rightTrigger - leftTrigger) * yScale
         const addY = -rightY * yScale
         const next = {
-          x: rightX * xScale,
+          x: -rightX * xScale,
           y: baseY + addY,
-          yaw: leftX * yawScale,
+          yaw: -leftX * yawScale,
         }
 
         setCmdVel(next)

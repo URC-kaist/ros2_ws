@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getRosBridgeClient } from '../../lib/rosBridge'
 import { type LinkStatus, type TelemBattery, getSikGatewayClient } from '../../lib/sikGateway'
 import './ControlStatusList.css'
 
@@ -6,6 +7,7 @@ const ControlStatusList = () => {
   const isNormal = true
   const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
   const [wsConnected, setWsConnected] = useState(false)
+  const [rosConnected, setRosConnected] = useState(false)
   const [battery, setBattery] = useState<TelemBattery | null>(null)
 
   useEffect(() => {
@@ -18,6 +20,15 @@ const ControlStatusList = () => {
       offLink()
       offConnection()
       offBattery()
+    }
+  }, [])
+
+  useEffect(() => {
+    const rosBridge = getRosBridgeClient()
+    rosBridge.connect()
+    const offRosConnection = rosBridge.onConnectionStatus(setRosConnected)
+    return () => {
+      offRosConnection()
     }
   }, [])
 
@@ -42,6 +53,8 @@ const ControlStatusList = () => {
       linkDotClass = 'status-dot-warn'
     }
   }
+  const rosState = rosConnected ? 'Up' : 'Down'
+  const rosDotClass = rosConnected ? '' : 'status-dot-error'
 
   return (
     <>
@@ -54,6 +67,15 @@ const ControlStatusList = () => {
           </span>
           <div className="status-pill">
             <strong>{linkState}</strong>
+          </div>
+        </div>
+        <div className="status-item status-link">
+          <span className="status-label">
+            <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />
+            ROS Bridge
+          </span>
+          <div className="status-pill">
+            <strong>{rosState}</strong>
           </div>
         </div>
         <div className="status-item status-softstop">

@@ -1,5 +1,19 @@
 'use strict'
 
+const fs = require('fs')
+const path = require('path')
+const dotenv = require('dotenv')
+
+const envLocalPath = path.join(__dirname, '.env.local')
+const envPath = path.join(__dirname, '.env')
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath })
+} else if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath })
+}
+
+const http = require('http')
+const jwt = require('jsonwebtoken')
 const { SerialPort } = require('serialport')
 const { WebSocketServer } = require('ws')
 
@@ -9,6 +23,7 @@ const DEFAULT_PORT = 8081
 const DEFAULT_HEARTBEAT_HZ = 2
 const DEFAULT_CMD_HZ = 10
 const DEFAULT_CMD_TIMEOUT_MS = 500
+const DEFAULT_LINK_TIMEOUT_MS = 2000
 
 const args = process.argv.slice(2)
 const config = {
@@ -21,6 +36,9 @@ const config = {
   cmdHz: toFloat(getArg('--cmd-hz') || process.env.SIK_CMD_HZ || DEFAULT_CMD_HZ),
   cmdTimeoutMs: toInt(
     getArg('--cmd-timeout-ms') || process.env.SIK_CMD_TIMEOUT_MS || DEFAULT_CMD_TIMEOUT_MS
+  ),
+  linkTimeoutMs: toInt(
+    getArg('--link-timeout-ms') || process.env.SIK_LINK_TIMEOUT_MS || DEFAULT_LINK_TIMEOUT_MS
   ),
 }
 
@@ -55,6 +73,7 @@ let seq = 0
 let serialReady = false
 let lastRxMs = 0
 let lastTxMs = 0
+let lastHeartbeatRxMs = 0
 let latestCmdDrive = null
 let latestCmdArmTwist = null
 let lastCmdDriveRxMs = 0
@@ -81,10 +100,19 @@ port.on('close', () => {
   log('Serial closed')
 })
 
-const wss = new WebSocketServer({ port: config.port })
+const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url && req.url.startsWith('/transitive/token')) {
+    handleTransitiveToken(req, res)
+    return
+  }
+  res.writeHead(404)
+  res.end()
+})
 
-wss.on('listening', () => {
-  log(`WebSocket listening on ${config.port}`)
+const wss = new WebSocketServer({ server })
+
+server.listen(config.port, () => {
+  log(`HTTP/WebSocket listening on ${config.port}`)
 })
 
 wss.on('connection', (ws) => {
@@ -102,7 +130,7 @@ wss.on('connection', (ws) => {
   ws.send(
     JSON.stringify({
       type: 'link_status',
-      connected: serialReady,
+      connected: isLinkAlive(),
       last_rx_ms: lastRxMs,
       last_tx_ms: lastTxMs,
     })
@@ -120,7 +148,7 @@ function broadcast(obj) {
 
 function log(message) {
   // eslint-disable-next-line no-console
-  console.log(`[sik_gateway] ${message}`)
+  console.log(`[base_gateway] ${message}`)
 }
 
 function nextSeq() {
@@ -285,11 +313,73 @@ function parseFrames() {
 function handleFrame(msgId, payload) {
   lastRxMs = Date.now()
 
+  if (msgId === MsgId.HEARTBEAT) {
+    lastHeartbeatRxMs = Date.now()
+  }
+
   if (msgId === MsgId.TELEM_BATTERY) {
     const telem = decodeTelemBattery(payload)
     if (!telem) return
     broadcast({ type: 'telem_battery', ...telem })
   }
+}
+
+function isLinkAlive() {
+  if (!serialReady) return false
+  if (lastHeartbeatRxMs === 0) return false
+  return Date.now() - lastHeartbeatRxMs <= config.linkTimeoutMs
+}
+
+function handleTransitiveToken(req, res) {
+  log(`Transitive token request from ${req.socket.remoteAddress || 'unknown'}`)
+  const secret = process.env.TRANSITIVE_JWT_SECRET
+  if (!secret) {
+    log('TRANSITIVE_JWT_SECRET not set')
+    res.writeHead(500, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'TRANSITIVE_JWT_SECRET not set' }))
+    return
+  }
+
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`)
+  const id = url.searchParams.get('id') || process.env.TRANSITIVE_ID || 'unknown'
+  const device = url.searchParams.get('device') || process.env.TRANSITIVE_DEVICE || 'unknown'
+  const capability =
+    url.searchParams.get('capability') ||
+    process.env.TRANSITIVE_CAPABILITY ||
+    '@transitive-robotics/webrtc-video'
+  const userId = url.searchParams.get('userId') || process.env.TRANSITIVE_USER_ID || 'operator'
+  const validity = toInt(
+    url.searchParams.get('validity') || process.env.TRANSITIVE_VALIDITY || 86400
+  )
+
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const payload = {
+    id,
+    device,
+    capability,
+    userId,
+    validity,
+    iat: issuedAt,
+  }
+
+  let token
+  try {
+    token = jwt.sign(payload, secret)
+  } catch (err) {
+    log(`Failed to sign token: ${err.message || err}`)
+    res.writeHead(500, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Failed to sign token' }))
+    return
+  }
+
+  res.writeHead(200, { 'Content-Type': 'application/json' })
+  res.end(
+    JSON.stringify({
+      token,
+      issued_at: issuedAt,
+      validity_sec: validity,
+    })
+  )
 }
 
 if (config.heartbeatHz > 0) {
@@ -301,7 +391,7 @@ if (config.heartbeatHz > 0) {
     writeFrame(frame)
     broadcast({
       type: 'link_status',
-      connected: serialReady,
+      connected: isLinkAlive(),
       last_rx_ms: lastRxMs,
       last_tx_ms: lastTxMs,
     })

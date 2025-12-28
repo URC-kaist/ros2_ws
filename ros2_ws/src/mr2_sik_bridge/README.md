@@ -71,8 +71,10 @@ Payload size: 4 bytes
 
 Suggested rate: 2–5 Hz
 Expected behavior in higher-level code:
-- If heartbeats stop for the deadman timeout window, publish zero drive and
-  arm twist commands continuously until heartbeats resume.
+- Dashboard sends heartbeats to the bridge; if they stop for the deadman timeout
+  window, publish zero drive and arm twist commands continuously until they resume.
+- The ROS bridge also emits heartbeats back over the SiK link to indicate the
+  bridge is alive (used by the gateway/UI link status).
 
 ### TELEM_BATTERY (msg_id 0x10)
 Payload size: 16 bytes

@@ -47,17 +47,20 @@ const ControlVectorPlot = ({
 }: ControlVectorPlotProps) => {
   const axisRange = 1 * sensitivityScale[sensitivity]
   const yawRange = 1 * sensitivityScale[sensitivity]
-  const magnitude = Math.hypot(cmdVel.x, cmdVel.y)
+  const displayX = -cmdVel.x
+  const displayY = cmdVel.y
+  const displayYaw = -cmdVel.yaw
+  const magnitude = Math.hypot(displayX, displayY)
   const arrowScale = Math.min(1, magnitude / axisRange)
-  const arrowAngle = Math.atan2(-cmdVel.y, cmdVel.x) * (180 / Math.PI)
-  const yawMagnitude = Math.min(1, Math.abs(cmdVel.yaw) / yawRange)
+  const arrowAngle = Math.atan2(-displayY, displayX) * (180 / Math.PI)
+  const yawMagnitude = Math.min(1, Math.abs(displayYaw) / yawRange)
   const yawSweep = yawMagnitude * 0.75
   const yawRadius = 26
   const yawAngle = yawSweep * 360
   const yawStartAngle = -90
-  const yawEndAngle = yawStartAngle + (cmdVel.yaw >= 0 ? yawAngle : -yawAngle)
+  const yawEndAngle = yawStartAngle + (displayYaw >= 0 ? yawAngle : -yawAngle)
   const yawLargeArc = yawAngle > 180 ? 1 : 0
-  const yawSweepFlag = cmdVel.yaw >= 0 ? 1 : 0
+  const yawSweepFlag = displayYaw >= 0 ? 1 : 0
   const yawStartPoint = polarPoint(yawRadius, yawStartAngle)
   const yawEndPoint = polarPoint(yawRadius, yawEndAngle)
   const yawPath =
@@ -101,8 +104,8 @@ const ControlVectorPlot = ({
           <div className="axis-markers">
             <span className="axis-label top">+{axisRange.toFixed(1)}</span>
             <span className="axis-label bottom">-{axisRange.toFixed(1)}</span>
-            <span className="axis-label left">-{axisRange.toFixed(1)}</span>
-            <span className="axis-label right">+{axisRange.toFixed(1)}</span>
+            <span className="axis-label left">+{axisRange.toFixed(1)}</span>
+            <span className="axis-label right">-{axisRange.toFixed(1)}</span>
           </div>
           <div className="angvel-overlay">
             <svg viewBox="0 0 60 60" className="angvel-arc">
@@ -121,8 +124,8 @@ const ControlVectorPlot = ({
         <div className="vector-labels">
           {isConnected ? (
             <>
-              <span className="vector-value">x {formatSigned(cmdVel.x)} m/s</span>
-              <span className="vector-value">y {formatSigned(cmdVel.y)} m/s</span>
+              <span className="vector-value">x {formatSigned(cmdVel.y)} m/s</span>
+              <span className="vector-value">y {formatSigned(cmdVel.x)} m/s</span>
               <span className="vector-value">ω {formatSigned(cmdVel.yaw)} rad/s</span>
             </>
           ) : (

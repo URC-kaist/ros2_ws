@@ -11,15 +11,19 @@
     "typecheck": "tsc -p tsconfig.app.json"
   },
   "dependencies": {
+    "@transitive-sdk/utils-web": "^0.14.6",
     "maplibre-gl": "^4.7.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-icons": "^5.5.0"
+    "react": "^18.3.1",
+    "react-bootstrap": "^2.10.10",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.5.0",
+    "roslib": "^1.4.0",
+    "bootstrap": "^5.3.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
     "@vitejs/plugin-react": "^5.1.1",

@@ -1,4 +1,6 @@
+import DeliveryPanel from './DeliveryPanel'
 import MapPreview from './MapPreview'
+import SystemStatusPanel from './SystemStatusPanel'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -8,6 +10,8 @@ type MissionPanelsProps = {
 const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
   return (
     <section className="tab-panels">
+      {activeTab === 'status' && <SystemStatusPanel />}
+      {activeTab === 'delivery' && <DeliveryPanel />}
       {activeTab === 'science' && (
         <div className="panel-grid" role="tabpanel">
           <article className="card">

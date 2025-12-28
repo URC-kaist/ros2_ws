@@ -205,6 +205,19 @@ def generate_launch_description():
         condition=sik_sim_condition,
     )
 
+    rosbridge_ws = Node(
+        package="rosbridge_server",
+        executable="rosbridge_websocket",
+        name="rosbridge_websocket",
+        output="screen",
+        parameters=[
+            {"port": 9090},
+            {"default_call_service_timeout": 0.0},
+            {"call_services_in_new_thread": False},
+            {"send_action_goals_in_new_thread": False},
+        ],
+    )
+
     # ─── LaunchDescription ───────────────────────────────────────────────────────
     return LaunchDescription([
         rviz_arg,
@@ -226,5 +239,6 @@ def generate_launch_description():
         servo_launch,
         sik_bridge,
         sik_bridge_sim,
+        rosbridge_ws,
         rviz2,
     ])

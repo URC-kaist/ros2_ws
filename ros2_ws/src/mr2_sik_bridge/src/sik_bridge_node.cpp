@@ -40,6 +40,8 @@ class SikBridgeNode : public rclcpp::Node {
             declare_parameter<double>("zero_publish_rate_hz", 20.0)),
         battery_tx_rate_hz_(
             declare_parameter<double>("battery_tx_rate_hz", 1.0)),
+        heartbeat_tx_rate_hz_(
+            declare_parameter<double>("heartbeat_tx_rate_hz", 2.0)),
         cmd_vel_topic_(
             declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel")),
         arm_twist_topic_(declare_parameter<std::string>(
@@ -62,6 +64,14 @@ class SikBridgeNode : public rclcpp::Node {
     zero_timer_ = create_wall_timer(
         std::chrono::duration_cast<std::chrono::nanoseconds>(zero_period),
         std::bind(&SikBridgeNode::zero_check, this));
+
+    if (heartbeat_tx_rate_hz_ > 0.0) {
+      const auto heartbeat_period = std::chrono::duration<double>(
+          1.0 / std::max(heartbeat_tx_rate_hz_, 0.1));
+      heartbeat_tx_timer_ = create_wall_timer(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(heartbeat_period),
+          std::bind(&SikBridgeNode::send_heartbeat_, this));
+    }
 
     last_heartbeat_ = now();
     last_battery_tx_ = now() - rclcpp::Duration::from_seconds(10.0);
@@ -264,6 +274,14 @@ class SikBridgeNode : public rclcpp::Node {
     arm_twist_pub_->publish(zero_arm);
   }
 
+  void send_heartbeat_() {
+    Heartbeat hb;
+    hb.timestamp_ms =
+        static_cast<uint32_t>(now().nanoseconds() / 1000000);
+    auto frame = mr2_sik_bridge::encode_heartbeat(next_seq_(), hb);
+    write_frame_(frame);
+  }
+
   void battery_cb(const mr2_battery_monitor::msg::PackTelemetry::SharedPtr msg) {
     if (battery_tx_rate_hz_ <= 0.0) {
       return;
@@ -322,6 +340,7 @@ class SikBridgeNode : public rclcpp::Node {
   int heartbeat_timeout_ms_;
   double zero_publish_rate_hz_;
   double battery_tx_rate_hz_;
+  double heartbeat_tx_rate_hz_;
   std::string cmd_vel_topic_;
   std::string arm_twist_topic_;
   std::string arm_frame_id_;
@@ -333,6 +352,7 @@ class SikBridgeNode : public rclcpp::Node {
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
       battery_sub_;
   rclcpp::TimerBase::SharedPtr zero_timer_;
+  rclcpp::TimerBase::SharedPtr heartbeat_tx_timer_;
 
   // Serial
   int fd_{-1};

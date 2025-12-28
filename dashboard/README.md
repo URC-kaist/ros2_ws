@@ -15,23 +15,11 @@ The React Compiler is not enabled on this template because of its impact on dev 
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 
-## Hosting with nginx (same domain as SiK gateway)
+## ROS Bridge (roslibjs)
 
-1) Build and deploy the dashboard:
+The dashboard loads `roslib.min.js` from `dashboard/public/roslib.min.js` (included in this repo) and expects the global `window.ROSLIB` object to be available at runtime. If you update roslib, replace that file and rebuild the dashboard.
 
-```bash
-./scripts/deploy_dashboard.bash
-```
+## Transitive token
 
-2) Install nginx and enable the site config:
-
-```bash
-sudo apt update
-sudo apt install nginx
-sudo cp ./scripts/nginx/mr2-dashboard.conf /etc/nginx/sites-available/mr2
-sudo ln -s /etc/nginx/sites-available/mr2 /etc/nginx/sites-enabled/mr2
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-By default, the dashboard is served from `/var/www/mr2-dashboard` and the WebSocket proxy is `/sik-ws` to `http://127.0.0.1:8081`. Adjust `server_name` in `./scripts/nginx/mr2-dashboard.conf` as needed.
+The dashboard requests a token from `/transitive/token`. You can override the
+endpoint with `VITE_TRANSITIVE_TOKEN_URL`.

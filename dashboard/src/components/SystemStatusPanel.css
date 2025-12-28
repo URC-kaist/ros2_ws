@@ -1,0 +1,37 @@
+.status-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.status-kv-grid {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.status-kv-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.status-kv-key {
+  text-transform: none;
+}
+
+.status-kv-value {
+  color: #e8f4ff;
+  font-weight: 600;
+}
+
+.status-updated {
+  margin-top: 10px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.status-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
