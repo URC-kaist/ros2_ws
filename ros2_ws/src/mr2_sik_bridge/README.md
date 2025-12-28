@@ -75,16 +75,18 @@ Expected behavior in higher-level code:
   arm twist commands continuously until heartbeats resume.
 
 ### TELEM_BATTERY (msg_id 0x10)
-Payload size: 12 bytes
+Payload size: 16 bytes
 
 - `float32 total_capacity_mah`
 - `float32 available_capacity_mah`
 - `float32 temperature_c`
+- `float32 pack_voltage_v`
 
 Derived from existing telemetry:
 - `total_capacity_mah = nominal_cell_capacity_mah * parallel_group_count`
 - `available_capacity_mah = total_capacity_mah * state_of_charge_pct / 100`
 - `temperature_c` rounded or passed through as whole degrees
+- `pack_voltage_v = pack_voltage_v`
 
 Suggested rate: 1–2 Hz or on change.
 

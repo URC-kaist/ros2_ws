@@ -281,11 +281,13 @@ class SikBridgeNode : public rclcpp::Node {
     const float available_capacity =
         total_capacity * (msg->state_of_charge_pct / 100.0f);
     const float temperature_c = std::round(msg->temperature_c);
+    const float pack_voltage_v = msg->pack_voltage_v;
 
     TelemBattery telem;
     telem.total_capacity_mah = total_capacity;
     telem.available_capacity_mah = available_capacity;
     telem.temperature_c = temperature_c;
+    telem.pack_voltage_v = pack_voltage_v;
 
     auto frame = mr2_sik_bridge::encode_telem_battery(next_seq_(), telem);
     write_frame_(frame);

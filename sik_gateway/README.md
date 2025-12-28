@@ -33,5 +33,5 @@ Incoming (dashboard -> gateway):
 - `heartbeat` { }
 
 Outgoing (gateway -> dashboard):
-- `telem_battery` { `total_capacity_mah`, `available_capacity_mah`, `temperature_c` }
+- `telem_battery` { `total_capacity_mah`, `available_capacity_mah`, `temperature_c`, `pack_voltage_v` }
 - `link_status` { `connected`, `last_rx_ms`, `last_tx_ms` }

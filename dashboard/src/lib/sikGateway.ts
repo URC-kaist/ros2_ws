@@ -17,6 +17,7 @@ export type TelemBattery = {
   total_capacity_mah: number
   available_capacity_mah: number
   temperature_c: number
+  pack_voltage_v: number
 }
 
 export type LinkStatus = {

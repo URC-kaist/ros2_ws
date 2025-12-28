@@ -186,11 +186,12 @@ function encodeHeartbeat(cmd) {
 }
 
 function decodeTelemBattery(payload) {
-  if (payload.length < 12) return null
+  if (payload.length < 16) return null
   return {
     total_capacity_mah: payload.readFloatLE(0),
     available_capacity_mah: payload.readFloatLE(4),
     temperature_c: payload.readFloatLE(8),
+    pack_voltage_v: payload.readFloatLE(12),
   }
 }
 

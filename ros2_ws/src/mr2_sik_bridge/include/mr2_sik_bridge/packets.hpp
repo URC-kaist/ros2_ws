@@ -48,6 +48,7 @@ struct TelemBattery {
   float total_capacity_mah{0.0f};
   float available_capacity_mah{0.0f};
   float temperature_c{0.0f};
+  float pack_voltage_v{0.0f};
 };
 
 struct Frame {

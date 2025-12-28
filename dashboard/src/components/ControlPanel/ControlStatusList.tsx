@@ -81,7 +81,9 @@ const ControlStatusList = () => {
               <span>
                 Temp {battery ? `${battery.temperature_c.toFixed(1)}°C` : '--'}
               </span>
-              <span>Voltage --</span>
+              <span>
+                Voltage {battery ? `${battery.pack_voltage_v.toFixed(1)}V` : '--'}
+              </span>
               <span>
                 Capacity {battery ? `${(battery.total_capacity_mah / 1000).toFixed(1)}Ah` : '--'}
               </span>
