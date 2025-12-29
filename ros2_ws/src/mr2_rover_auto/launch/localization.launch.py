@@ -52,6 +52,20 @@ def generate_launch_description():
                        'base_link', 'gps_north_link']
         ),
 
+        # Wheel encoder odometry from ros2_control joint_states
+        Node(
+            package='mr2_rover_auto',
+            executable='wheel_encoder_odom_node',
+            name='wheel_encoder_odom_node',
+            output='screen',
+            parameters=[
+                {"use_sim_time": LaunchConfiguration("use_sim_time")},
+                # Force absolute topics so remapping/namespace does not break inputs
+                {"joint_state_topic": "/joint_states"},
+                {"wheel_odom_topic": "/wheel_encoder/odometry"},
+            ],
+        ),
+
         # Please consult the graph:
         # https://docs.ros.org/en/noetic/api/robot_localization/html/integrating_gps.html
         # 3) GPS -> odometry/gps/raw (navsat_transform output)

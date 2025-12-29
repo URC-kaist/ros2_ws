@@ -24,17 +24,21 @@ public:
     publish_rate_hz_ = declare_parameter<double>("publish_rate_hz", 30.0);
     odom_frame_id_ = declare_parameter<std::string>("odom_frame_id", "odom");
     base_frame_id_ = declare_parameter<std::string>("base_frame_id", "base_link");
+    const auto odom_topic =
+        declare_parameter<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
 
     if (wheel_joints_.size() != 4 || steering_joints_.size() != 4) {
       RCLCPP_FATAL(get_logger(), "Expected 4 wheel_joints and 4 steering_joints");
       throw std::runtime_error("Invalid joint list size");
     }
 
+    const auto js_topic = declare_parameter<std::string>("joint_state_topic", "/joint_states");
+
     js_sub_ = create_subscription<sensor_msgs::msg::JointState>(
-        "joint_states", rclcpp::SensorDataQoS(),
+        js_topic, rclcpp::SensorDataQoS(),
         std::bind(&WheelEncoderOdomNode::jointStateCb, this, std::placeholders::_1));
 
-    odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("wheel_encoder/odometry", 10);
+    odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odom_topic, 10);
 
     const auto period = rclcpp::Rate(publish_rate_hz_).period();
     timer_ = create_wall_timer(period, std::bind(&WheelEncoderOdomNode::publishOdom, this));
@@ -43,13 +47,13 @@ public:
 private:
   void jointStateCb(const sensor_msgs::msg::JointState::SharedPtr msg)
   {
-    last_joint_state_ = msg;
+    last_joint_state_ = msg; // keep a strong ref; weak_ptr would expire immediately
   }
 
   bool fillWheelStates(std::array<double, 4> &wheel_ang_vel,
                        std::array<double, 4> &steer_angle)
   {
-    auto js = last_joint_state_.lock();
+    auto js = last_joint_state_;
     if (!js) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "No joint_states received yet");
       return false;
@@ -79,6 +83,18 @@ private:
       }
       wheel_ang_vel[i] = js->velocity[idx_w];
       steer_angle[i] = js->position[idx_s];
+      if (!std::isfinite(wheel_ang_vel[i])) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                             "Wheel joint %s velocity is NaN/inf; treating as 0",
+                             wheel_joints_[i].c_str());
+        wheel_ang_vel[i] = 0.0;
+      }
+      if (!std::isfinite(steer_angle[i])) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                             "Steering joint %s position is NaN/inf; treating as 0",
+                             steering_joints_[i].c_str());
+        steer_angle[i] = 0.0;
+      }
     }
     return true;
   }
@@ -167,7 +183,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr js_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
-  std::weak_ptr<sensor_msgs::msg::JointState> last_joint_state_;
+  sensor_msgs::msg::JointState::SharedPtr last_joint_state_;
 };
 
 int main(int argc, char **argv)
