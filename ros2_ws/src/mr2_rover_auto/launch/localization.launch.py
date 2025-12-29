@@ -51,14 +51,6 @@ def generate_launch_description():
                        # left of robot center
                        'base_link', 'gps_north_link']
         ),
-        Node( # Describe tf: odom -> base_link (Dummy identity tf for Nav2!)
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_odom_base_link',
-            arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0',
-                       # Equivalent
-                       'odom', 'base_link']
-        ), # XXX DO NOT USE odom frame for localization!
 
         # Please consult the graph:
         # https://docs.ros.org/en/noetic/api/robot_localization/html/integrating_gps.html
