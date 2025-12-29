@@ -150,13 +150,13 @@ def generate_launch_description():
         ],
     )
 
-    traversibility_map_launch = IncludeLaunchDescription(
+    traversability_map_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [
                     FindPackageShare("mr2_autonomous"),
                     "launch",
-                    "traversibility_map.launch.py",
+                    "traversability_map.launch.py",
                 ]
             )
         )
@@ -251,7 +251,7 @@ def generate_launch_description():
         localization_launch,
         system_status,
         pc2_to_heightmap,
-        traversibility_map_launch,
+        traversability_map_launch,
         move_group_launch,
         servo_launch,
         sik_bridge,
