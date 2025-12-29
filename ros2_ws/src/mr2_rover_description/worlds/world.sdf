@@ -58,7 +58,7 @@
     </include>
     <model name="mdrs_dem">
         <static>true</static>
-        <pose>0 0 -1385 0 0 0</pose>
+        <pose>0 0 -1363 0 0 0</pose>
     	<link name="link">
             <collision name="collision">
                 <geometry>
@@ -84,7 +84,7 @@
     </model>
     <model name="mallet">
         <static>true</static>
-        <pose>5 0 -12.45 0 0 0</pose>
+        <pose>5 0 0.1 0 0 0</pose>
         <link name="link">
             <visual name="visual">
                 <geometry>
@@ -98,7 +98,7 @@
     </model>
     <model name="rock_pick">
         <static>true</static>
-        <pose>5 0.5 -12.3 0 0 0</pose>
+        <pose>5 0.5 0.1 0 0 0</pose>
         <link name="link">
             <visual name="visual">
                 <geometry>
@@ -112,7 +112,7 @@
     </model>
     <model name="bottle">
         <static>true</static>
-        <pose>5.5 0.5 -12.3 0 0 0</pose>
+        <pose>5.5 0.5 0.1 0 0 0</pose>
         <link name="link">
             <visual name="visual">
                 <geometry>
