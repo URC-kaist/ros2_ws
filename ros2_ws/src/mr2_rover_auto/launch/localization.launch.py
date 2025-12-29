@@ -24,7 +24,9 @@ def generate_launch_description():
             name='gps_heading_gps_node',
             output='screen',
             parameters=[
-                {"use_sim_time": LaunchConfiguration("use_sim_time")}
+                {"use_sim_time": LaunchConfiguration("use_sim_time")},
+                # Flip baseline direction to correct 180° heading inversion (north/south swap)
+                {"baseline_direction": -1},
             ],
             remappings=[('rover_north/fix', '/left_gnss/navsat'),
                         ('rover_south/fix', '/right_gnss/navsat'),
