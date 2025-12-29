@@ -62,6 +62,11 @@ ament_target_dependencies(cover_vision_client
 rclcpp rclcpp_action mr2_action_interface
 )
 
+add_executable(wheel_encoder_odom_node src/wheel_encoder_odom_node.cpp)
+ament_target_dependencies(wheel_encoder_odom_node
+  rclcpp sensor_msgs nav_msgs Eigen3
+)
+
 install(TARGETS
   gps_heading_imu_node
   gps_heading_gps_node
@@ -69,6 +74,7 @@ install(TARGETS
   cover_vision_server
   gnss_only_client
   cover_vision_client
+  wheel_encoder_odom_node
   DESTINATION lib/${PROJECT_NAME}/
 )
 

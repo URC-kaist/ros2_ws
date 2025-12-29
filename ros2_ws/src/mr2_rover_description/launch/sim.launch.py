@@ -108,7 +108,7 @@ def generate_launch_description():
             Node(
                 package="ros_gz_sim",
                 executable="create",
-                arguments=["-topic", "robot_description", "-name", "rover", "-z", "-10.0"],
+                arguments=["-topic", "robot_description", "-name", "rover", "-z", "0.3"],
             )
         ],
     )
@@ -140,7 +140,10 @@ def generate_launch_description():
         executable="parameter_bridge",
         arguments=bridge_args,
         parameters=[{"use_sim_time": use_sim_time}],
-        remappings=[("/world/empty_world/clock", "/clock")],
+        remappings=[
+            ("/world/empty_world/clock", "/clock"),
+            ("/imu", "/imu/data"),  # align Gazebo IMU topic with robot_localization expectations
+        ],
         output="screen",
     )
 

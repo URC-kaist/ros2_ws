@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -134,13 +134,29 @@ def generate_launch_description():
         condition=real_condition,
     )
 
-    traversibility_map_launch = IncludeLaunchDescription(
+    localization_launch = TimerAction(
+        period=2.0,
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [FindPackageShare("mr2_rover_auto"), "launch", "localization.launch.py"]
+                    )
+                ),
+                launch_arguments={
+                    "use_sim_time": LaunchConfiguration("use_sim_time"),
+                }.items(),
+            )
+        ],
+    )
+
+    traversability_map_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [
                     FindPackageShare("mr2_autonomous"),
                     "launch",
-                    "traversibility_map.launch.py",
+                    "traversability_map.launch.py",
                 ]
             )
         )
@@ -232,9 +248,10 @@ def generate_launch_description():
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
+        localization_launch,
         system_status,
         pc2_to_heightmap,
-        traversibility_map_launch,
+        traversability_map_launch,
         move_group_launch,
         servo_launch,
         sik_bridge,

@@ -24,7 +24,9 @@ def generate_launch_description():
             name='gps_heading_gps_node',
             output='screen',
             parameters=[
-                {"use_sim_time": LaunchConfiguration("use_sim_time")}
+                {"use_sim_time": LaunchConfiguration("use_sim_time")},
+                # Flip baseline direction to correct 180° heading inversion (north/south swap)
+                {"baseline_direction": -1},
             ],
             remappings=[('rover_north/fix', '/left_gnss/navsat'),
                         ('rover_south/fix', '/right_gnss/navsat'),
@@ -51,14 +53,28 @@ def generate_launch_description():
                        # left of robot center
                        'base_link', 'gps_north_link']
         ),
-        Node( # Describe tf: odom -> base_link (Dummy identity tf for Nav2!)
+        Node( # Describe Southern GPS mount
             package='tf2_ros',
             executable='static_transform_publisher',
-            name='static_tf_odom_base_link',
-            arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0',
-                       # Equivalent
-                       'odom', 'base_link']
-        ), # XXX DO NOT USE odom frame for localization!
+            name='static_tf_gps_south',
+            arguments=['0.0', '-0.245', '0.0', '0.0', '0.0', '0.0',
+                       # left of robot center
+                       'base_link', 'gps_south_link']
+        ),
+
+        # Wheel encoder odometry from ros2_control joint_states
+        Node(
+            package='mr2_rover_auto',
+            executable='wheel_encoder_odom_node',
+            name='wheel_encoder_odom_node',
+            output='screen',
+            parameters=[
+                {"use_sim_time": LaunchConfiguration("use_sim_time")},
+                # Force absolute topics so remapping/namespace does not break inputs
+                {"joint_state_topic": "/joint_states"},
+                {"wheel_odom_topic": "/wheel_encoder/odometry"},
+            ],
+        ),
 
         # Please consult the graph:
         # https://docs.ros.org/en/noetic/api/robot_localization/html/integrating_gps.html
@@ -74,10 +90,10 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=[
-                # ("gps/fix", "rover_north/fix"),
-                ("gps/fix", "/right_gnss/navsat"),
+                ("gps/fix", "/left_gnss/navsat"),
                 ("imu/data", "/imu/data"),
                 ("odometry/gps", "/odometry/gps/raw"),
+                ('odometry/filtered', '/odometry/filtered/global')
             ],
         ),
 
@@ -93,6 +109,7 @@ def generate_launch_description():
             ],
             remappings=[
                 ("imu/data", "/imu/data"),
+                ('odometry/filtered', '/odometry/filtered/local')
             ],
         ),
 
@@ -109,6 +126,7 @@ def generate_launch_description():
             remappings=[
                 ("imu/data", "/imu/data"),
                 ("odometry/gps", "/odometry/gps"),
+                ('odometry/filtered', '/odometry/filtered/global')
             ],
         ),
 
@@ -128,6 +146,7 @@ def generate_launch_description():
                 ("gps/fix", "query/fix"),
                 ("odometry/gps", "query/gps"),
                 ("imu/data", "/imu/data"),
+                ('odometry/filtered', '/odometry/filtered/global')
             ],
         )
         ]),

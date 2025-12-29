@@ -19,12 +19,15 @@ public:
     clk_ = this->get_clock();
 
     last_gps_time_ = rclcpp::Time(0, 0, clk_->get_clock_type());
+    last_north_recv_time_ = rclcpp::Time(0, 0, clk_->get_clock_type());
+    last_south_recv_time_ = rclcpp::Time(0, 0, clk_->get_clock_type());
+    last_north_time_used_ = rclcpp::Time(0, 0, clk_->get_clock_type());
+    last_south_time_used_ = rclcpp::Time(0, 0, clk_->get_clock_type());
 
     // ROS Parameters (can be tuned at runtime)
     yaw_offset_rad_      = declare_parameter<double>("yaw_offset_rad", -M_PI_2); // 90° left-mount (north-south = north)
     max_gps_age_         = declare_parameter<double>("max_gps_age", 1.0);     // [s] Ignore old GNSS yaw
     max_pair_skew_       = declare_parameter<double>("max_pair_skew", 0.2);   // [s] Threshold of simultaneity
-    max_odom_skew_       = declare_parameter<double>("max_odom_skew", 0.2);   // [s] Acceptable skew between GNSS yaw and GPS odom
     min_baseline_xy_     = declare_parameter<double>("min_baseline_xy", 0.4); // [m] Minimum allowed distance between GPS RX to reject huge error
     zero_alt_for_heading_= declare_parameter<bool>("zero_alt_for_heading", true); // True to ignore altitude difference / altitude noise; Earth is too big for this
     baseline_direction_  = declare_parameter<int>("baseline_direction", +1);  // +1: (north - south), -1 flips
@@ -63,12 +66,15 @@ private:
   // GNSS yaw cache
   double last_gps_yaw_ = std::numeric_limits<double>::quiet_NaN();
   rclcpp::Time last_gps_time_; // default to zero
+  rclcpp::Time last_north_recv_time_;
+  rclcpp::Time last_south_recv_time_;
+  rclcpp::Time last_north_time_used_;
+  rclcpp::Time last_south_time_used_;
 
   // ROS Parameters
   double yaw_offset_rad_;
   double max_gps_age_;
   double max_pair_skew_;
-  double max_odom_skew_;
   double min_baseline_xy_;
   bool   zero_alt_for_heading_;
   int    baseline_direction_; // +1/-1
@@ -79,27 +85,23 @@ private:
 
   // Callbacks
   void northCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
-    last_north_fix_ = msg; tryUpdateGpsYaw();
+    last_north_fix_ = msg;
+    last_north_recv_time_ = clk_->now();
+    tryUpdateGpsYaw();
   }
 
   void southCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
-    last_south_fix_ = msg; tryUpdateGpsYaw();
+    last_south_fix_ = msg;
+    last_south_recv_time_ = clk_->now();
+    tryUpdateGpsYaw();
   }
 
   void gpsOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
   {
-    const rclcpp::Time tO(msg->header.stamp, RCL_ROS_TIME);
-    const rclcpp::Time zero(0, 0, RCL_ROS_TIME);
-    if (tO <= zero || !std::isfinite(last_gps_yaw_)) {
-      gps_odom_pub_->publish(*msg);
-      return;
-    }
-
-    const double skew = std::abs((tO - last_gps_time_).seconds());
-    if (skew > max_odom_skew_ || skew > max_gps_age_) {
-      gps_odom_pub_->publish(*msg);
-      return;
-    }
+    if (!std::isfinite(last_gps_yaw_)) return;
+    const rclcpp::Time now = clk_->now();
+    const double age = (now - last_gps_time_).seconds();
+    if (age > max_gps_age_) return;
 
     double roll = 0.0, pitch = 0.0, yaw_unused = 0.0;
     tf2::Quaternion q_in;
@@ -121,9 +123,9 @@ private:
     if (!last_north_fix_ || !last_south_fix_) return;
     const auto &N = *last_north_fix_;
     const auto &S = *last_south_fix_;
-    const rclcpp::Time tN(N.header.stamp, RCL_ROS_TIME);
-    const rclcpp::Time tS(S.header.stamp, RCL_ROS_TIME);
-    const rclcpp::Time zero(0, 0, RCL_ROS_TIME);
+    const rclcpp::Time tN = last_north_recv_time_;
+    const rclcpp::Time tS = last_south_recv_time_;
+    const rclcpp::Time zero(0, 0, clk_->get_clock_type());
     if (tN <= zero || tS <= zero) return;
 
     // 0.a Basic validity (finite lat/lon; optional: check status/covariance type)
@@ -132,6 +134,7 @@ private:
 
     // 0.b Enforce small pair skew (they should be nearly simultaneous)
     if (std::abs((tN - tS).seconds()) > max_pair_skew_) return;
+    if (tN <= last_north_time_used_ || tS <= last_south_time_used_) return;
 
     // 1. Convert geodetic to ECEF (optionally zero altitude to reduce vertical noise)
     const double altN = zero_alt_for_heading_ ? 0.0 : N.altitude;
@@ -161,6 +164,8 @@ private:
     // 5. Store (do not publish here). Use the more recent of the two GPS times.
     last_gps_yaw_  = yaw_body;
     last_gps_time_ = (tN > tS) ? tN : tS;
+    last_north_time_used_ = tN;
+    last_south_time_used_ = tS;
   }
 
   // Math helper functions:
