@@ -58,7 +58,7 @@
     </include>
     <model name="mdrs_dem">
         <static>true</static>
-        <pose>0 0 -1363 0 0 0</pose>
+        <pose>0 0 -1373 0 0 0</pose>
     	<link name="link">
             <collision name="collision">
                 <geometry>
