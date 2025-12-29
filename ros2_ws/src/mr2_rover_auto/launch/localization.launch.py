@@ -94,6 +94,7 @@ def generate_launch_description():
                 ("gps/fix", "/right_gnss/navsat"),
                 ("imu/data", "/imu/data"),
                 ("odometry/gps", "/odometry/gps/raw"),
+                # ('odometry/filtered', '/odometry/filtered/global') # NOTE ?
             ],
         ),
 
@@ -109,6 +110,7 @@ def generate_launch_description():
             ],
             remappings=[
                 ("imu/data", "/imu/data"),
+                ('odometry/filtered', '/odometry/filtered/local')
             ],
         ),
 
@@ -125,6 +127,7 @@ def generate_launch_description():
             remappings=[
                 ("imu/data", "/imu/data"),
                 ("odometry/gps", "/odometry/gps"),
+                ('odometry/filtered', '/odometry/filtered/global')
             ],
         ),
 
@@ -144,6 +147,7 @@ def generate_launch_description():
                 ("gps/fix", "query/fix"),
                 ("odometry/gps", "query/gps"),
                 ("imu/data", "/imu/data"),
+                ('odometry/filtered', '/odometry/filtered/global')
             ],
         )
         ]),

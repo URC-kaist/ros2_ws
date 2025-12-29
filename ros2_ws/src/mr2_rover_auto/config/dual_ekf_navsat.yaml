@@ -10,10 +10,10 @@ ekf_local:
 
     # IMU
     imu0: /imu/data
-    imu0_config: [false, false, false, true, true, false, # unreliable maget
+    imu0_config: [false, false, false, true, true, false, # unreliable magnet
                   false, false, false, true, true, true, # local gyro
                   true, true, true] # local acceleration
-    imu0_queue_size: 30 # <= 900 Hz
+    imu0_queue_size: 32 # <= 960 Hz
     imu0_differential: false # using navsat
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
@@ -117,8 +117,8 @@ ekf_global: # with navsat gps
     # Here we set Q, the metric of "how noizy the environment is"
     # Position, velocity, acceleration: high Q for rough terrain
     process_noise_covariance: [ # XXX This has to be tuned properly.
-      10.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
-      0.0,  10.0, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
+      1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
+      0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
       0.0,  0.0,  100.0,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
       0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
       0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
@@ -129,9 +129,9 @@ ekf_global: # with navsat gps
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  # wr (rad^2/s^2)
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  # wp
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  # wy
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  # Ax (m^2/s^4)
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  # Ay
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3] # Az
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  0.0,  # Ax (m^2/s^4)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  # Ay
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1] # Az
 
 navsat_transform: # gps.fix, /imu/data, odometry/filtered
   ros__parameters:
@@ -145,7 +145,7 @@ navsat_transform: # gps.fix, /imu/data, odometry/filtered
     yaw_offset: 0.0 # 0 for north
     broadcast_cartesian_transform: false # we do not use UTM
     publish_filtered_gps: true # publish estimation back to WGS84
-    use_odometry_yaw: true
+    use_odometry_yaw: false
     wait_for_datum: true
     datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
 
@@ -161,6 +161,6 @@ navsat_transform_query: # copied configuration from navsat_transform
     yaw_offset: 0.0
     broadcast_cartesian_transform: false # we do not use UTM
     publish_filtered_gps: true # publish estimation back to WGS84
-    use_odometry_yaw: true
+    use_odometry_yaw: false
     wait_for_datum: true
     datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
