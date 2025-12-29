@@ -45,8 +45,8 @@ ekf_local:
     # Here we set Q, the metric of "how noizy the environment is"
     # Position, velocity, acceleration: high Q for rough terrain
     process_noise_covariance: [ # XXX This has to be tuned properly.
-      1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
-      0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
+      1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
+      0.0,  1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
       0.0,  0.0,  100.0,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
       0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
       0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
@@ -117,8 +117,8 @@ ekf_global: # with navsat gps
     # Here we set Q, the metric of "how noizy the environment is"
     # Position, velocity, acceleration: high Q for rough terrain
     process_noise_covariance: [ # XXX This has to be tuned properly.
-      1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
-      0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
+      1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
+      0.0,  1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
       0.0,  0.0,  100.0,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
       0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
       0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
@@ -138,14 +138,14 @@ navsat_transform: # gps.fix, /imu/data, odometry/filtered
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
-    world_frame: odom
+    world_frame: map
     frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
-    delay: 2.0 # seconds to wait before anything for ekf or GPS to settle
+    delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0 # 0 for north
     broadcast_cartesian_transform: false # we do not use UTM
     publish_filtered_gps: true # publish estimation back to WGS84
-    use_odometry_yaw: false
+    use_odometry_yaw: true
     wait_for_datum: true
     datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
 
@@ -154,13 +154,13 @@ navsat_transform_query: # copied configuration from navsat_transform
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
-    world_frame: odom
+    world_frame: map # Purposed for query
     frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
-    delay: 2.0 # seconds to wait before anything for ekf or GPS to settle
+    delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0
     broadcast_cartesian_transform: false # we do not use UTM
     publish_filtered_gps: true # publish estimation back to WGS84
-    use_odometry_yaw: false
+    use_odometry_yaw: true
     wait_for_datum: true
     datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns

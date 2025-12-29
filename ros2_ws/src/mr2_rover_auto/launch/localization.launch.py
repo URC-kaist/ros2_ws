@@ -90,11 +90,10 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=[
-                # ("gps/fix", "rover_north/fix"),
-                ("gps/fix", "/right_gnss/navsat"),
+                ("gps/fix", "/left_gnss/navsat"),
                 ("imu/data", "/imu/data"),
                 ("odometry/gps", "/odometry/gps/raw"),
-                # ('odometry/filtered', '/odometry/filtered/global') # NOTE ?
+                ('odometry/filtered', '/odometry/filtered/global')
             ],
         ),
 
