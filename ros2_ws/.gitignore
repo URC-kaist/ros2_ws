@@ -6,3 +6,6 @@ src/.cache/
 **/__pycache__/
 .roslog
 .vscode
+
+frames_*.gv
+frames_*.pdf
