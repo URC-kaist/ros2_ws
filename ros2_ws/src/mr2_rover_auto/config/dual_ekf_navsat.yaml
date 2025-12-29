@@ -2,7 +2,7 @@ ekf_local:
   ros__parameters:
     frequency: 30.0 # filter Hz
     sensor_timeout: 2.0
-    two_d_mode: false # consider in 3d; ex: earth's curvature
+    two_d_mode: true # Do not consider in 3D
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
@@ -27,6 +27,15 @@ ekf_local:
     odom0_queue_size: 30 # <= 900 Hz
     odom0_differential: false # using navsat
     odom0_relative: false
+
+    # GPS heading (yaw only) to keep local yaw aligned with global filter and navsat
+    odom1: /odometry/gps
+    odom1_config: [false, false, false, false, false, true,
+                   false, false, false, false, false, false,
+                   false, false, false]
+    odom1_queue_size: 30 # <= 900 Hz
+    odom1_differential: false
+    odom1_relative: false
 
     publish_tf: true # ekf_local tf: odom -> base_link
     permit_corrected_publication: true # compensate delayed GNSS data
@@ -65,7 +74,7 @@ ekf_global: # with navsat gps
   ros__parameters:
     frequency: 30.0 # filter Hz
     sensor_timeout: 2.0
-    two_d_mode: false # consider in 3d; ex: earth's curvature
+    two_d_mode: true # Do not consider in 3d
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
@@ -135,24 +144,32 @@ ekf_global: # with navsat gps
 
 navsat_transform: # gps.fix, /imu/data, odometry/filtered
   ros__parameters:
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
     frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
     delay: 2.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0 # 0 for north
     broadcast_cartesian_transform: false # we do not use UTM
     publish_filtered_gps: true # publish estimation back to WGS84
-    use_odometry_yaw: false
+    use_odometry_yaw: true
     wait_for_datum: true
     datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
 
 navsat_transform_query: # copied configuration from navsat_transform
   ros__parameters:
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
     frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
     delay: 2.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0
     broadcast_cartesian_transform: false # we do not use UTM
     publish_filtered_gps: true # publish estimation back to WGS84
-    use_odometry_yaw: false
+    use_odometry_yaw: true
     wait_for_datum: true
     datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns

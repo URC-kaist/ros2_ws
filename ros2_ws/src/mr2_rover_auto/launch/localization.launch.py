@@ -51,6 +51,14 @@ def generate_launch_description():
                        # left of robot center
                        'base_link', 'gps_north_link']
         ),
+        Node( # Describe Southern GPS mount
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='static_tf_gps_south',
+            arguments=['0.0', '-0.245', '0.0', '0.0', '0.0', '0.0',
+                       # left of robot center
+                       'base_link', 'gps_south_link']
+        ),
 
         # Wheel encoder odometry from ros2_control joint_states
         Node(
