@@ -104,7 +104,7 @@ public:
       return true;
     };
 
-    if (!parse_double("home_offset", home_offset_)) {
+    if (!parse_double("offset", offset_)) {
       return;
     }
     if (!parse_double("encoder_direction", encoder_direction_)) {
@@ -151,7 +151,7 @@ public:
 
     if (!computed_) {
       const double absolute_angle =
-          encoder_direction_ * (*encoder_state_) + home_offset_;
+          encoder_direction_ * (*encoder_state_) + offset_;
       const double joint_angle = *joint_.state;
       *joint_.command = joint_angle;
       joint_offset_ = joint_angle - absolute_angle;
@@ -194,7 +194,7 @@ private:
   std::shared_ptr<sensors::AbsoluteEncoderDriver> device_;
   const double *encoder_state_{nullptr};
   const double *encoder_watchdog_state_{nullptr};
-  double home_offset_{0.0};
+  double offset_{0.0};
   double encoder_direction_{1.0};
 
   bool finished_{false};

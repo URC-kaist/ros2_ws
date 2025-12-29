@@ -132,7 +132,7 @@ public:
                         std::abs(get_double("final_backoff_distance",
                                             kDefaultFinalBackoffDistance)),
                         kDefaultFinalBackoffDistance);
-
+    
     const double max_travel =
         get_double("max_search_travel_rad", kDefaultMaxTravel);
     if (std::isfinite(max_travel) && max_travel <= 0.0) {
@@ -145,7 +145,7 @@ public:
       max_search_travel_ = max_travel;
     }
 
-    home_position_ = get_double("home_position", 0.0);
+    home_position_ = get_double("position", 0.0);
 
     const std::string direction =
         parse_string(params, "search_direction", "negative");

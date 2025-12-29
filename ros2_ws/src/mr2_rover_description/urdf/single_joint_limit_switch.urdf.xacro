@@ -5,13 +5,14 @@
   <xacro:arg name="motor_id" default="4"/>
   <xacro:arg name="limit_switch_can_id" default="385"/>
   <xacro:arg name="limit_switch_active_high" default="true"/>
-  <xacro:arg name="joint_lower_limit" default="-3.14"/>
-  <xacro:arg name="joint_upper_limit" default="3.14"/>
+  <xacro:arg name="joint_lower_limit" default="-100"/>
+  <xacro:arg name="joint_upper_limit" default="100"/>
   <xacro:arg name="homing_search_direction" default="negative"/>
-  <xacro:arg name="homing_approach_speed" default="0.30"/>
-  <xacro:arg name="homing_backoff_speed" default="0.60"/>
-  <xacro:arg name="homing_fine_speed" default="0.03"/>
-  <xacro:arg name="homing_backoff_distance" default="0.10"/>
+  <xacro:arg name="homing_position" default="0.5"/>
+  <xacro:arg name="homing_approach_speed" default="0.05"/>
+  <xacro:arg name="homing_backoff_speed" default="0.05"/>
+  <xacro:arg name="homing_fine_speed" default="0.01"/>
+  <xacro:arg name="homing_backoff_distance" default="0.05"/>
   <xacro:property name="actuator_name" value="motor$(arg motor_id)"/>
 
   <link name="base_link">
@@ -67,7 +68,9 @@
       <param name="homing_device_can_id">$(arg limit_switch_can_id)</param>
       <param name="homing_device_state_name">joint1/limit_switch_state</param>
       <param name="homing_device_active_high">$(arg limit_switch_active_high)</param>
+      <param name="homing_device_active_high">$(arg limit_switch_active_high)</param>
       <param name="homing_search_direction">$(arg homing_search_direction)</param>
+      <param name="homing_position">$(arg homing_position)</param>
       <param name="homing_approach_speed">$(arg homing_approach_speed)</param>
       <param name="homing_backoff_speed">$(arg homing_backoff_speed)</param>
       <param name="homing_fine_speed">$(arg homing_fine_speed)</param>
@@ -83,7 +86,7 @@
         <state_interface name="effort"/>
       </actuator>
       <joint name="joint1" role="joint1">
-        <mechanical_reduction>20.0</mechanical_reduction>
+        <mechanical_reduction>1.0</mechanical_reduction>
       </joint>
     </transmission>
   </ros2_control>

@@ -8,19 +8,28 @@ controller_manager:
       publish_rate: 50
 
     manipulator_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+      # type: joint_trajectory_controller/JointTrajectoryController
+      type: position_controllers/JointGroupPositionController
 
 manipulator_controller:
+  # ros__parameters:
+  #   joints:
+  #     - arm_j1
+  #     - arm_j2
+  #     - arm_j3
+  #     - arm_j4
+  #     - arm_j5
+  #     - arm_j6
+  #   command_interfaces:
+  #     - position
+  #   state_interfaces:
+  #     - position
+  #     - velocity
   ros__parameters:
     joints:
-      - arm_j1
       - arm_j2
       - arm_j3
       - arm_j4
       - arm_j5
       - arm_j6
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
+    interface_name: position
