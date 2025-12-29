@@ -25,6 +25,6 @@ topics:
   - name: /rgbd_camera/points
     ros_type: sensor_msgs/msg/PointCloud2
     gz_type: gz.msgs.PointCloudPacked
-  - name: /imu/data
+  - name: /imu
     ros_type: sensor_msgs/msg/Imu
     gz_type: gz.msgs.IMU
