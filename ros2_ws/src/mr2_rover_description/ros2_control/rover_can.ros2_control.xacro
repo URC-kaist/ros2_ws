@@ -39,6 +39,7 @@
         <param name="joint_lower_limit">${arm_j2_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j2_upper_limit}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
+        <param name="homing_position">-0.69</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">202</param>
         <param name="homing_device_state_name">arm_j2_limit_switch</param>
@@ -61,7 +62,9 @@
         <param name="joint_lower_limit">${arm_j3_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j3_upper_limit}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-        <param name="homing_offset">-5.6</param>
+        <param name="homing_offset">5.05</param>
+        <param name="homing_split_angle">2.7</param>
+        <param name="homing_encoder_direction">-1.0</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">203</param>
         <param name="homing_device_state_name">arm_j3_abs</param>
@@ -105,6 +108,7 @@
         <param name="joint_upper_limit">${arm_j5_upper_limit}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
         <param name="homing_offset">2.53</param>
+        <param name="homing_split_angle">0.98</param>
         <param name="homing_encoder_direction">-1.0</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">205</param>

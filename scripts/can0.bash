@@ -9,7 +9,7 @@ sudo modprobe mttcan
 sudo ip link set can0 down || true
 
 # Configure bitrate
-sudo ip link set can0 type can bitrate 1000000 restart-ms 5
+sudo ip link set can0 type can bitrate 1000000 restart-ms 10 sample-point 0.875
 
 # Bring it up
 sudo ip link set can0 up
