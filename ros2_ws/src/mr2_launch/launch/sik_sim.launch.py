@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition
 
 
@@ -13,8 +13,12 @@ def generate_launch_description():
             "socat",
             "-d",
             "-d",
-            "pty,raw,echo=0,link=" + LaunchConfiguration("sik_sim_device"),
-            "pty,raw,echo=0,link=" + LaunchConfiguration("sik_sim_peer"),
+            PythonExpression(
+                ["'pty,raw,echo=0,link=' + '", LaunchConfiguration("sik_sim_device"), "'"]
+            ),
+            PythonExpression(
+                ["'pty,raw,echo=0,link=' + '", LaunchConfiguration("sik_sim_peer"), "'"]
+            ),
         ],
         output="screen",
         condition=condition,

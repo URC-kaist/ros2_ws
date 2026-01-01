@@ -28,6 +28,7 @@ find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
 find_package(grid_map_ros REQUIRED)
+find_package(grid_map_core REQUIRED)
 find_package(grid_map_msgs REQUIRED)
 find_package(grid_map_filters REQUIRED)
 find_package(filters REQUIRED)
@@ -79,18 +80,18 @@ ament_target_dependencies(wheel_encoder_odom_node
 
 add_executable(pc2_to_heightmap_node src/pc2_to_heightmap_node.cpp)
 ament_target_dependencies(pc2_to_heightmap_node
-  rclcpp sensor_msgs grid_map_msgs tf2 tf2_ros tf2_eigen pcl_conversions Eigen3
+  rclcpp sensor_msgs grid_map_msgs grid_map_core tf2 tf2_ros tf2_eigen pcl_conversions Eigen3
 )
 target_link_libraries(pc2_to_heightmap_node ${PCL_LIBRARIES})
 
 add_executable(traversability_filter_node src/traversability_filter_node.cpp)
 ament_target_dependencies(traversability_filter_node
-  rclcpp grid_map_ros grid_map_filters filters pluginlib
+  rclcpp grid_map_ros grid_map_core grid_map_filters filters pluginlib
 )
 
 add_executable(gridmap_to_occupancy_node src/gridmap_to_occupancy_node.cpp)
 ament_target_dependencies(gridmap_to_occupancy_node
-  rclcpp grid_map_msgs nav_msgs tf2 tf2_ros
+  rclcpp grid_map_msgs grid_map_core nav_msgs tf2 tf2_ros tf2_geometry_msgs
 )
 
 install(TARGETS

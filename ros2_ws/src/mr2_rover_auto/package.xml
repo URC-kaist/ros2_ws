@@ -33,6 +33,7 @@
   <exec_depend>behaviortree_cpp_v3</exec_depend>
   <exec_depend>nav2_behavior_tree</exec_depend>
   <exec_depend>grid_map_ros</exec_depend>
+  <exec_depend>grid_map_core</exec_depend>
   <exec_depend>grid_map_msgs</exec_depend>
   <exec_depend>grid_map_filters</exec_depend>
   <exec_depend>filters</exec_depend>
