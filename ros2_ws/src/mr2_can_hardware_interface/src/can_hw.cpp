@@ -595,16 +595,23 @@ public:
       }
     }
 
+    // Avoid clamping homing motions by joint limits; some homing policies
+    // intentionally drive past the nominal window. Apply limits only when
+    // homing is inactive or has completed.
+    const bool apply_joint_limits = !homing_active_ || homed_;
+
     for (auto &joint : joints_) {
-      double limited_command = joint.command;
-      if (std::isfinite(limited_command)) {
-        if (std::isfinite(joint.lower_limit)) {
-          limited_command = std::max(limited_command, joint.lower_limit);
+      if (apply_joint_limits) {
+        double limited_command = joint.command;
+        if (std::isfinite(limited_command)) {
+          if (std::isfinite(joint.lower_limit)) {
+            limited_command = std::max(limited_command, joint.lower_limit);
+          }
+          if (std::isfinite(joint.upper_limit)) {
+            limited_command = std::min(limited_command, joint.upper_limit);
+          }
+          joint.command = limited_command;
         }
-        if (std::isfinite(joint.upper_limit)) {
-          limited_command = std::min(limited_command, joint.upper_limit);
-        }
-        joint.command = limited_command;
       }
 
       joint.transmission_passthrough = joint.command + joint.offset;
