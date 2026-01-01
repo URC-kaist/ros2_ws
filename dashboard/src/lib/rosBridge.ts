@@ -85,9 +85,9 @@ class RosBridgeClient {
     }
     return () => {
       entry.handlers.delete(handler)
-      entry.topic.unsubscribe(handler)
+      this.safeTopicUnsubscribe(entry, handler)
       if (entry.handlers.size === 0) {
-        entry.topic.unsubscribe()
+        this.safeTopicUnsubscribe(entry)
         this.topics.delete(this.topicKey(name, messageType, options))
       }
     }
@@ -150,10 +150,29 @@ class RosBridgeClient {
 
   private resubscribeAll() {
     for (const entry of this.topics.values()) {
-      entry.topic.unsubscribe()
+      this.safeTopicUnsubscribe(entry)
       for (const handler of entry.handlers) {
         entry.topic.subscribe(handler)
       }
+    }
+  }
+
+  /**
+   * roslib's Topic.unsubscribe expects its internal EventEmitter
+   * state (`_events`) to exist. If we call it before any subscribe()
+   * was made (e.g., when ROS is offline and we clean up), it throws.
+   */
+  private safeTopicUnsubscribe(
+    entry: TopicEntry<unknown>,
+    handler?: MessageHandler<unknown>
+  ) {
+    const topicAny = entry.topic as any
+    const hasEvents = !!topicAny?._events
+    if (!hasEvents) return
+    if (handler) {
+      entry.topic.unsubscribe(handler)
+    } else {
+      entry.topic.unsubscribe()
     }
   }
 
