@@ -37,6 +37,17 @@
 #include <memory>
 #include <unordered_map>
 
+static inline double wrap_with_split(double angle, double split_angle) {
+  constexpr double TWO_PI = 2.0 * M_PI;
+
+  angle = std::fmod(angle, TWO_PI);
+  if (angle < 0.0) angle += TWO_PI;
+
+  if (angle < split_angle) angle += TWO_PI;
+
+  return angle; // range: [split_angle, 2π + split_angle)
+}
+
 namespace mr2_can_hardware_interface {
 
 class AbsoluteEncoderPolicy : public HomingPolicy {
@@ -104,7 +115,10 @@ public:
       return true;
     };
 
-    if (!parse_double("home_offset", home_offset_)) {
+    if (!parse_double("offset", offset_)) {
+      return;
+    }
+    if (!parse_double("split_angle", split_angle_)) {
       return;
     }
     if (!parse_double("encoder_direction", encoder_direction_)) {
@@ -150,8 +164,8 @@ public:
     }
 
     if (!computed_) {
-      const double absolute_angle =
-          encoder_direction_ * (*encoder_state_) + home_offset_;
+      double absolute_angle = wrap_with_split(*encoder_state_, split_angle_);
+      absolute_angle = encoder_direction_ * (absolute_angle) + offset_;
       const double joint_angle = *joint_.state;
       *joint_.command = joint_angle;
       joint_offset_ = joint_angle - absolute_angle;
@@ -194,7 +208,8 @@ private:
   std::shared_ptr<sensors::AbsoluteEncoderDriver> device_;
   const double *encoder_state_{nullptr};
   const double *encoder_watchdog_state_{nullptr};
-  double home_offset_{0.0};
+  double offset_{0.0};
+  double split_angle_{0.0};
   double encoder_direction_{1.0};
 
   bool finished_{false};

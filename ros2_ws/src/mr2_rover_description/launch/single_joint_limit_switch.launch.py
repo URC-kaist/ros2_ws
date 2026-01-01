@@ -104,17 +104,24 @@ def generate_launch_description():
         description="Direction to move during the initial homing search",
     )
 
+    homing_position = LaunchConfiguration("homing_position")
+    homing_position_arg = DeclareLaunchArgument(
+        "homing_position",
+        default_value="0.0",
+        description="Homing position",
+    )
+
     homing_approach_speed = LaunchConfiguration("homing_approach_speed")
     homing_approach_speed_arg = DeclareLaunchArgument(
         "homing_approach_speed",
-        default_value="0.30",
+        default_value="0.10",
         description="Approach speed (rad/s) used when driving towards the limit",
     )
 
     homing_backoff_speed = LaunchConfiguration("homing_backoff_speed")
     homing_backoff_speed_arg = DeclareLaunchArgument(
         "homing_backoff_speed",
-        default_value="0.60",
+        default_value="0.20",
         description="Backoff speed (rad/s) used after the switch trips",
     )
 
@@ -150,6 +157,8 @@ def generate_launch_description():
             joint_upper_limit,
             " homing_search_direction:=",
             homing_search_direction,
+            " homing_position:=",
+            homing_position,
             " homing_approach_speed:=",
             homing_approach_speed,
             " homing_backoff_speed:=",
@@ -209,6 +218,7 @@ def generate_launch_description():
             joint_lower_limit_arg,
             joint_upper_limit_arg,
             homing_search_direction_arg,
+            homing_position_arg,
             homing_approach_speed_arg,
             homing_backoff_speed_arg,
             homing_fine_speed_arg,

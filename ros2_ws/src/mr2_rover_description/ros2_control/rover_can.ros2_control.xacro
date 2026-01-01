@@ -8,25 +8,25 @@
         <plugin>mr2_can_hardware_interface/CanHW</plugin>
       </hardware>
 
-      <joint name="arm_j1">
-        <command_interface name="position"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-        <state_interface name="effort"/>
-        <param name="actuator">motor1</param>
-        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-        <param name="motor_id">1</param>
-        <param name="can_iface">${can_iface}</param>
-        <param name="joint_lower_limit">${arm_j1_lower_limit}</param>
-        <param name="joint_upper_limit">${arm_j1_upper_limit}</param>
-        <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">0x180</param>
-        <param name="homing_device_state_name">arm_j1_abs</param>
-        <param name="homing_device_flags_name">arm_j1_abs_flags</param>
-        <param name="homing_device_ticks_per_rev">4096</param>
-      </joint>
-
+      <!-- <joint name="arm_j1"> -->
+      <!--   <command_interface name="position"/> -->
+      <!--   <state_interface name="position"/> -->
+      <!--   <state_interface name="velocity"/> -->
+      <!--   <state_interface name="effort"/> -->
+      <!--   <param name="actuator">motor1</param> -->
+      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
+      <!--   <param name="motor_id">101</param> -->
+      <!--   <param name="can_iface">${can_iface}</param> -->
+      <!--   <param name="joint_lower_limit">${arm_j1_lower_limit}</param> -->
+      <!--   <param name="joint_upper_limit">${arm_j1_upper_limit}</param> -->
+      <!--   <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_device_can_id">201</param> -->
+      <!--   <param name="homing_device_state_name">arm_j1_abs</param> -->
+      <!--   <param name="homing_device_flags_name">arm_j1_abs_flags</param> -->
+      <!--   <param name="homing_device_ticks_per_rev">4096</param> -->
+      <!-- </joint> -->
+      <!---->
       <joint name="arm_j2">
         <command_interface name="position"/>
         <state_interface name="position"/>
@@ -34,19 +34,20 @@
         <state_interface name="effort"/>
         <param name="actuator">motor2</param>
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-        <param name="motor_id">2</param>
+        <param name="motor_id">102</param>
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j2_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j2_upper_limit}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
+        <param name="homing_position">-0.69</param>
         <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">0x181</param>
+        <param name="homing_device_can_id">202</param>
         <param name="homing_device_state_name">arm_j2_limit_switch</param>
         <param name="homing_device_active_high">true</param>
         <param name="homing_search_direction">negative</param>
-        <param name="homing_approach_speed">0.35</param>
-        <param name="homing_fine_speed">0.05</param>
-        <param name="homing_backoff_distance">0.12</param>
+        <param name="homing_approach_speed">0.1</param>
+        <param name="homing_fine_speed">0.02</param>
+        <param name="homing_backoff_distance">0.05</param>
       </joint>
 
       <joint name="arm_j3">
@@ -56,13 +57,16 @@
         <state_interface name="effort"/>
         <param name="actuator">motor3</param>
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-        <param name="motor_id">3</param>
+        <param name="motor_id">103</param>
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j3_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j3_upper_limit}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
+        <param name="homing_offset">5.05</param>
+        <param name="homing_split_angle">2.7</param>
+        <param name="homing_encoder_direction">-1.0</param>
         <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">0x182</param>
+        <param name="homing_device_can_id">203</param>
         <param name="homing_device_state_name">arm_j3_abs</param>
         <param name="homing_device_flags_name">arm_j3_abs_flags</param>
         <param name="homing_device_ticks_per_rev">4096</param>
@@ -75,10 +79,20 @@
         <state_interface name="effort"/>
         <param name="actuator">motor4</param>
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-        <param name="motor_id">4</param>
+        <param name="motor_id">104</param>
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j4_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j4_upper_limit}</param>
+        <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
+        <param name="homing_position">-2.55</param>
+        <param name="homing_device_can_iface">${can_iface}</param>
+        <param name="homing_device_can_id">204</param>
+        <param name="homing_device_state_name">arm_j4_limit_switch</param>
+        <param name="homing_device_active_high">true</param>
+        <param name="homing_search_direction">negative</param>
+        <param name="homing_approach_speed">0.35</param>
+        <param name="homing_fine_speed">0.05</param>
+        <param name="homing_backoff_distance">0.12</param>
       </joint>
 
       <joint name="arm_j5">
@@ -88,10 +102,19 @@
         <state_interface name="effort"/>
         <param name="actuator">motor5</param>
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-        <param name="motor_id">5</param>
+        <param name="motor_id">105</param>
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j5_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j5_upper_limit}</param>
+        <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
+        <param name="homing_offset">2.53</param>
+        <param name="homing_split_angle">0.98</param>
+        <param name="homing_encoder_direction">-1.0</param>
+        <param name="homing_device_can_iface">${can_iface}</param>
+        <param name="homing_device_can_id">205</param>
+        <param name="homing_device_state_name">arm_j5_abs</param>
+        <param name="homing_device_flags_name">arm_j5_abs_flags</param>
+        <param name="homing_device_ticks_per_rev">4096</param>
       </joint>
 
       <joint name="arm_j6">
@@ -101,24 +124,34 @@
         <state_interface name="effort"/>
         <param name="actuator">motor6</param>
         <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
-        <param name="motor_id">6</param>
+        <param name="motor_id">106</param>
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j6_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j6_upper_limit}</param>
+        <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
+        <param name="homing_device_can_id">206</param>
+        <param name="homing_device_can_iface">${can_iface}</param>
+        <param name="homing_position">-3.03</param>
+        <param name="homing_device_state_name">arm_j6_limit_switch</param>
+        <param name="homing_device_active_high">true</param>
+        <param name="homing_search_direction">negative</param>
+        <param name="homing_approach_speed">0.35</param>
+        <param name="homing_fine_speed">0.05</param>
+        <param name="homing_backoff_distance">0.12</param>
       </joint>
 
-      <transmission name="arm_j1_transmission">
-        <plugin>transmission_interface/SimpleTransmission</plugin>
-        <actuator name="motor1" role="motor1">
-          <command_interface name="position"/>
-          <state_interface name="position"/>
-          <state_interface name="velocity"/>
-          <state_interface name="effort"/>
-        </actuator>
-        <joint name="arm_j1" role="arm_j1">
-          <mechanical_reduction>3.0</mechanical_reduction>
-        </joint>
-      </transmission>
+      <!-- <transmission name="arm_j1_transmission"> -->
+      <!--   <plugin>transmission_interface/SimpleTransmission</plugin> -->
+      <!--   <actuator name="motor1" role="motor1"> -->
+      <!--     <command_interface name="position"/> -->
+      <!--     <state_interface name="position"/> -->
+      <!--     <state_interface name="velocity"/> -->
+      <!--     <state_interface name="effort"/> -->
+      <!--   </actuator> -->
+      <!--   <joint name="arm_j1" role="arm_j1"> -->
+      <!--     <mechanical_reduction>3.0</mechanical_reduction> -->
+      <!--   </joint> -->
+      <!-- </transmission> -->
 
       <transmission name="arm_j2_j3_transmission">
         <plugin>transmission_interface/FourBarLinkageTransmission</plugin>
@@ -137,7 +170,7 @@
           <mechanical_reduction>50.0</mechanical_reduction>
         </actuator>
         <joint name="arm_j2" role="arm_j2">
-          <mechanical_reduction>1.0</mechanical_reduction>
+          <mechanical_reduction>-1.0</mechanical_reduction>
           <offset>0.0</offset>
         </joint>
         <joint name="arm_j3" role="arm_j3">
