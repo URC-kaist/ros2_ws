@@ -181,5 +181,26 @@
             </visual>
         </link>
     </model>
+    <model name="aruco_prism_home">
+        <static>true</static>
+        <pose>7 0 0 0 0 0</pose>
+        <link name="body">
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>../meshes/aruco_prism_external/aruco_3sided_marker.obj</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+            <collision name="collision">
+                <geometry>
+                    <cylinder>
+                        <radius>0.1</radius>
+                        <length>0.2</length>
+                    </cylinder>
+                </geometry>
+            </collision>
+        </link>
+    </model>
   </world>
 </sdf>

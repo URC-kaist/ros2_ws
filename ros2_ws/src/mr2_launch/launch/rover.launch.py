@@ -86,6 +86,11 @@ def generate_launch_description():
         default_value="57600",
         description="Baud rate for the simulated SiK link",
     )
+    aruco_cam_topic_arg = DeclareLaunchArgument(
+        "aruco_cam_topic",
+        default_value="/rgbd_camera/image",
+        description="Base image topic for aruco_opencv (must have matching /camera_info; default is Gazebo RGBD camera)",
+    )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
     sim_condition = IfCondition(
@@ -182,6 +187,32 @@ def generate_launch_description():
                 ]
             )
         )
+    )
+
+    aruco_tracker = Node(
+        package="aruco_opencv",
+        executable="aruco_tracker_autostart",
+        name="aruco_tracker",
+        output="screen",
+        parameters=[
+            PathJoinSubstitution(
+                [FindPackageShare("aruco_opencv"), "config", "aruco_tracker.yaml"]
+            ),
+            {
+                "board_descriptions_path": PathJoinSubstitution(
+                    [
+                        FindPackageShare("mr2_launch"),
+                        "config",
+                        "board_descriptions.yaml",
+                    ]
+                ),
+                "cam_base_topic": LaunchConfiguration("aruco_cam_topic"),
+                "marker_size": 0.20,  # 20 cm face as observed on the post
+                "image_is_rectified": False,
+                "aruco.detectInvertedMarker": True,
+                "use_sim_time": LaunchConfiguration("use_sim_time"),
+            },
+        ],
     )
 
     move_group_launch = IncludeLaunchDescription(
@@ -286,6 +317,7 @@ def generate_launch_description():
         sik_sim_device_arg,
         sik_sim_peer_arg,
         sik_sim_baud_arg,
+        aruco_cam_topic_arg,
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
@@ -293,6 +325,7 @@ def generate_launch_description():
         system_status,
         pc2_to_heightmap,
         traversability_map_launch,
+        aruco_tracker,
         move_group_launch,
         servo_launch,
         sik_sim_launch,
