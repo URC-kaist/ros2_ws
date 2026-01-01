@@ -90,7 +90,7 @@ private:
     }
 
     // ROI filter in camera frame + finite filter.
-    std::vector<pcl::PointXYZ> filtered;
+    std::vector<pcl::PointXYZ, Eigen::aligned_allocator<pcl::PointXYZ>> filtered;
     filtered.reserve(cloud.size());
     for (const auto & p : cloud.points) {
       if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) {

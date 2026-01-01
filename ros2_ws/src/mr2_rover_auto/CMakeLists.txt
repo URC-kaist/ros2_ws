@@ -37,6 +37,9 @@ find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common filters)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${PCL_INCLUDE_DIRS})
+# Grid map eigen plugin headers live in include/grid_map_core/eigen_plugins
+# Ensure all targets see the grid_map_core include directory.
+include_directories(${grid_map_core_INCLUDE_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 add_executable(gps_heading_imu_node src/gps_heading_imu_node.cpp)
