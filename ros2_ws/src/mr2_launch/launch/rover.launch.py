@@ -1,5 +1,10 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    TimerAction,
+    ExecuteProcess,
+)
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -62,10 +67,20 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
-    use_sik_bridge_sim_arg = DeclareLaunchArgument(
-        "use_sik_bridge_sim",
-        default_value="false",
-        description="If true, launch the SiK bridge node in sim mode using /dev/pts/6",
+    sik_sim_device_arg = DeclareLaunchArgument(
+        "sik_sim_device",
+        default_value="/tmp/sik_sim0",
+        description="Path to the PTY device that the SiK bridge will open in sim mode",
+    )
+    sik_sim_peer_arg = DeclareLaunchArgument(
+        "sik_sim_peer",
+        default_value="/tmp/sik_sim1",
+        description="Path to the peer PTY that external tools can attach to",
+    )
+    sik_sim_baud_arg = DeclareLaunchArgument(
+        "sik_sim_baud",
+        default_value="57600",
+        description="Baud rate for the simulated SiK link",
     )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
@@ -75,17 +90,7 @@ def generate_launch_description():
     real_condition = IfCondition(
         PythonExpression(["'", LaunchConfiguration("mode"), "' == 'real'"])
     )
-    sik_sim_condition = IfCondition(
-        PythonExpression(
-            [
-                "'",
-                LaunchConfiguration("mode"),
-                "' == 'sim' and '",
-                LaunchConfiguration("use_sik_bridge_sim"),
-                "' == 'true'",
-            ]
-        )
-    )
+    sik_sim_condition = sim_condition
     use_sim_time_param = SetParameter(
         name="use_sim_time", value=LaunchConfiguration("use_sim_time")
     )
@@ -102,6 +107,20 @@ def generate_launch_description():
         executable="system_status",
         name="system_status",
         output="screen",
+    )
+
+    # Create paired PTYs for the simulated SiK link. The bridge opens sik_sim_device;
+    # external tools can connect to sik_sim_peer.
+    socat_pty = ExecuteProcess(
+        cmd=[
+            "socat",
+            "-d",
+            "-d",
+            "pty,raw,echo=0,link=" + LaunchConfiguration("sik_sim_device"),
+            "pty,raw,echo=0,link=" + LaunchConfiguration("sik_sim_peer"),
+        ],
+        output="screen",
+        condition=sik_sim_condition,
     )
 
     rover_launch = IncludeLaunchDescription(
@@ -213,8 +232,8 @@ def generate_launch_description():
         name="sik_bridge_sim",
         output="screen",
         parameters=[
-            {"device": "/dev/pts/2"},
-            {"baud": 57600},
+            {"device": LaunchConfiguration("sik_sim_device")},
+            {"baud": LaunchConfiguration("sik_sim_baud")},
             {"heartbeat_timeout_ms": 500},
             {"log_frames": True},
         ],
@@ -244,7 +263,9 @@ def generate_launch_description():
         controller_config_arg,
         use_mock_servos_arg,
         use_servo_arg,
-        use_sik_bridge_sim_arg,
+        sik_sim_device_arg,
+        sik_sim_peer_arg,
+        sik_sim_baud_arg,
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
@@ -254,6 +275,7 @@ def generate_launch_description():
         traversability_map_launch,
         move_group_launch,
         servo_launch,
+        socat_pty,
         sik_bridge,
         sik_bridge_sim,
         rosbridge_ws,
