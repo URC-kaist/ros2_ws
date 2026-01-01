@@ -3,7 +3,6 @@ from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     TimerAction,
-    ExecuteProcess,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -109,17 +108,16 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Create paired PTYs for the simulated SiK link. The bridge opens sik_sim_device;
-    # external tools can connect to sik_sim_peer.
-    socat_pty = ExecuteProcess(
-        cmd=[
-            "socat",
-            "-d",
-            "-d",
-            "pty,raw,echo=0,link=" + LaunchConfiguration("sik_sim_device"),
-            "pty,raw,echo=0,link=" + LaunchConfiguration("sik_sim_peer"),
-        ],
-        output="screen",
+    sik_sim_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_launch"), "launch", "sik_sim.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "sik_sim_device": LaunchConfiguration("sik_sim_device"),
+            "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
+        }.items(),
         condition=sik_sim_condition,
     )
 
@@ -275,7 +273,7 @@ def generate_launch_description():
         traversability_map_launch,
         move_group_launch,
         servo_launch,
-        socat_pty,
+        sik_sim_launch,
         sik_bridge,
         sik_bridge_sim,
         rosbridge_ws,
