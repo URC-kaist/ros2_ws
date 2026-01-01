@@ -26,6 +26,7 @@ const MapPreview = () => {
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
   const [mapReady, setMapReady] = useState(false)
+  const [followRover, setFollowRover] = useState(true)
   const [fix, setFix] = useState<[number, number] | null>(null) // [lng, lat]
   const [headingDeg, setHeadingDeg] = useState<number | null>(null)
   const [cov, setCov] = useState<{ xVar: number; yVar: number; yawVar: number } | null>(null)
@@ -83,6 +84,9 @@ const MapPreview = () => {
       })
       setMapReady(true)
     })
+
+    map.on('dragstart', () => setFollowRover(false))
+    map.on('zoomstart', () => setFollowRover(false))
 
     mapInstanceRef.current = map
 
@@ -170,8 +174,10 @@ const MapPreview = () => {
       markerRef.current.setLngLat(lngLat)
     }
 
-    map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 17), duration: 600 })
-  }, [fix, mapReady])
+    if (followRover) {
+      map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 17), duration: 600 })
+    }
+  }, [fix, mapReady, followRover])
 
   // Rotate marker when heading updates
   useEffect(() => {
@@ -211,6 +217,32 @@ const MapPreview = () => {
 
   return (
     <div className="map" ref={mapRef}>
+      <button
+        type="button"
+        onClick={() => {
+          setFollowRover(true)
+          const map = mapInstanceRef.current
+          if (map && fix) {
+            map.easeTo({ center: fix, zoom: Math.max(map.getZoom(), 17), duration: 300 })
+          }
+        }}
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          zIndex: 2,
+          background: followRover ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
+          color: followRover ? '#0b1220' : '#cdd6f4',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 10,
+          padding: '8px 12px',
+          fontSize: '12px',
+          cursor: 'pointer',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+        }}
+      >
+        {followRover ? 'Following rover' : 'Follow rover'}
+      </button>
       <div
         style={{
           position: 'absolute',
