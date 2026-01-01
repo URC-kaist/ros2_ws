@@ -74,31 +74,59 @@ let serialReady = false
 let lastRxMs = 0
 let lastTxMs = 0
 let lastHeartbeatRxMs = 0
-let latestCmdDrive = null
-let latestCmdArmTwist = null
-let lastCmdDriveRxMs = 0
-let lastCmdArmTwistRxMs = 0
+let port = null
+let portReconnectTimer = null
 
-const port = new SerialPort({
-  path: config.device,
-  baudRate: config.baud,
-  autoOpen: true,
-})
+function schedulePortReconnect() {
+  if (portReconnectTimer) return
+  portReconnectTimer = setTimeout(() => {
+    portReconnectTimer = null
+    setupPort()
+  }, 1000)
+}
 
-port.on('open', () => {
-  serialReady = true
-  log(`Serial open ${config.device} @ ${config.baud}`)
-})
+function setupPort() {
+  if (port) {
+    try {
+      port.removeAllListeners()
+      port.destroy()
+    } catch (_) {
+      /* ignore */
+    }
+    port = null
+  }
 
-port.on('error', (err) => {
-  serialReady = false
-  log(`Serial error: ${err.message}`)
-})
+  port = new SerialPort({
+    path: config.device,
+    baudRate: config.baud,
+    autoOpen: true,
+  })
 
-port.on('close', () => {
-  serialReady = false
-  log('Serial closed')
-})
+  port.on('open', () => {
+    serialReady = true
+    rxBuffer = Buffer.alloc(0)
+    log(`Serial open ${config.device} @ ${config.baud}`)
+  })
+
+  port.on('error', (err) => {
+    serialReady = false
+    log(`Serial error: ${err.message}`)
+    schedulePortReconnect()
+  })
+
+  port.on('close', () => {
+    serialReady = false
+    log('Serial closed')
+    schedulePortReconnect()
+  })
+
+  port.on('data', (data) => {
+    rxBuffer = Buffer.concat([rxBuffer, data])
+    parseFrames()
+  })
+}
+
+setupPort()
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url && req.url.startsWith('/transitive/token')) {
@@ -224,7 +252,7 @@ function decodeTelemBattery(payload) {
 }
 
 function writeFrame(frame) {
-  if (!serialReady) return
+  if (!serialReady || !port) return
   port.write(frame)
   lastTxMs = Date.now()
 }
@@ -241,31 +269,38 @@ function handleDashboardMessage(msg) {
   if (!type) return
 
   if (type === 'cmd_drive') {
-    const linear = coerceNumber(msg.linear_x_m_s ?? msg.linear_x ?? msg.x)
-    const lateral = coerceNumber(msg.linear_y_m_s ?? msg.linear_y ?? msg.y)
-    const angular = coerceNumber(msg.angular_z_rad_s ?? msg.angular_z ?? msg.yaw)
+    const linear = coerceNumber(msg.linear_x_m_s)
+    const lateral = coerceNumber(msg.linear_y_m_s)
+    const angular = coerceNumber(msg.angular_z_rad_s)
     log(`cmd_drive rx x=${linear} y=${lateral} yaw=${angular}`)
-    latestCmdDrive = {
+    const frame = encodeCmdDrive({
       timestamp_ms: Date.now() >>> 0,
       linear_x_m_s: linear,
       linear_y_m_s: lateral,
       angular_z_rad_s: angular,
-    }
-    lastCmdDriveRxMs = Date.now()
+    })
+    writeFrame(frame)
     return
   }
 
   if (type === 'cmd_arm_twist') {
-    latestCmdArmTwist = {
+    log(
+      `cmd_arm_twist rx lin=(${coerceNumber(msg.lin_x_m_s)}, ${coerceNumber(
+        msg.lin_y_m_s
+      )}, ${coerceNumber(msg.lin_z_m_s)}) ang=(${coerceNumber(
+        msg.ang_x_rad_s
+      )}, ${coerceNumber(msg.ang_y_rad_s)}, ${coerceNumber(msg.ang_z_rad_s)})`
+    )
+    const frame = encodeCmdArmTwist({
       timestamp_ms: Date.now() >>> 0,
-      lin_x_m_s: coerceNumber(msg.lin_x_m_s ?? msg.lin_x ?? msg.linear_x ?? msg.x),
-      lin_y_m_s: coerceNumber(msg.lin_y_m_s ?? msg.lin_y ?? msg.linear_y ?? msg.y),
-      lin_z_m_s: coerceNumber(msg.lin_z_m_s ?? msg.lin_z ?? msg.linear_z ?? msg.z),
-      ang_x_rad_s: coerceNumber(msg.ang_x_rad_s ?? msg.ang_x ?? msg.angular_x),
-      ang_y_rad_s: coerceNumber(msg.ang_y_rad_s ?? msg.ang_y ?? msg.angular_y),
-      ang_z_rad_s: coerceNumber(msg.ang_z_rad_s ?? msg.ang_z ?? msg.angular_z ?? msg.yaw),
-    }
-    lastCmdArmTwistRxMs = Date.now()
+      lin_x_m_s: coerceNumber(msg.lin_x_m_s),
+      lin_y_m_s: coerceNumber(msg.lin_y_m_s),
+      lin_z_m_s: coerceNumber(msg.lin_z_m_s),
+      ang_x_rad_s: coerceNumber(msg.ang_x_rad_s),
+      ang_y_rad_s: coerceNumber(msg.ang_y_rad_s),
+      ang_z_rad_s: coerceNumber(msg.ang_z_rad_s),
+    })
+    writeFrame(frame)
     return
   }
 
@@ -278,11 +313,6 @@ function handleDashboardMessage(msg) {
 }
 
 let rxBuffer = Buffer.alloc(0)
-
-port.on('data', (data) => {
-  rxBuffer = Buffer.concat([rxBuffer, data])
-  parseFrames()
-})
 
 function parseFrames() {
   while (rxBuffer.length >= 4) {
@@ -395,36 +425,5 @@ if (config.heartbeatHz > 0) {
       last_rx_ms: lastRxMs,
       last_tx_ms: lastTxMs,
     })
-  }, periodMs)
-}
-
-if (config.cmdHz > 0) {
-  const periodMs = Math.max(1000 / config.cmdHz, 50)
-  setInterval(() => {
-    const nowMs = Date.now()
-    const timeoutMs = config.cmdTimeoutMs > 0 ? config.cmdTimeoutMs : Number.POSITIVE_INFINITY
-    if (latestCmdDrive) {
-      const isStale = nowMs - lastCmdDriveRxMs > timeoutMs
-      const frame = encodeCmdDrive({
-        timestamp_ms: nowMs >>> 0,
-        linear_x_m_s: isStale ? 0 : latestCmdDrive.linear_x_m_s,
-        linear_y_m_s: isStale ? 0 : latestCmdDrive.linear_y_m_s,
-        angular_z_rad_s: isStale ? 0 : latestCmdDrive.angular_z_rad_s,
-      })
-      writeFrame(frame)
-    }
-    if (latestCmdArmTwist) {
-      const isStale = nowMs - lastCmdArmTwistRxMs > timeoutMs
-      const frame = encodeCmdArmTwist({
-        timestamp_ms: nowMs >>> 0,
-        lin_x_m_s: isStale ? 0 : latestCmdArmTwist.lin_x_m_s,
-        lin_y_m_s: isStale ? 0 : latestCmdArmTwist.lin_y_m_s,
-        lin_z_m_s: isStale ? 0 : latestCmdArmTwist.lin_z_m_s,
-        ang_x_rad_s: isStale ? 0 : latestCmdArmTwist.ang_x_rad_s,
-        ang_y_rad_s: isStale ? 0 : latestCmdArmTwist.ang_y_rad_s,
-        ang_z_rad_s: isStale ? 0 : latestCmdArmTwist.ang_z_rad_s,
-      })
-      writeFrame(frame)
-    }
   }, periodMs)
 }

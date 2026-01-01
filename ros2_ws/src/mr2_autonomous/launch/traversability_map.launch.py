@@ -14,7 +14,8 @@ def generate_launch_description():
             executable='filters_demo',
             name='grid_map_filters',
             output='screen',
-            parameters=[config_file]
+            parameters=[config_file],
+            arguments=['--ros-args', '--log-level', 'grid_map_filters:=warn'],
         ),
 
         Node(
@@ -32,4 +33,3 @@ def generate_launch_description():
             }],
         )
     ])
-

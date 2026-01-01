@@ -14,7 +14,7 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init()
   auto_declare<double>("wheel_base", 0.94);
   auto_declare<double>("track_width", 0.65);
   auto_declare<double>("wheel_radius", 0.11);
-  auto_declare<double>("max_steer", 0.6);
+  auto_declare<double>("max_steer", 1.5708); // +/- 90 degrees
   auto_declare<double>("twist_timeout", 0.5);
   auto_declare<std::string>("cmd_vel_topic", "/cmd_vel");
   return controller_interface::CallbackReturn::SUCCESS;

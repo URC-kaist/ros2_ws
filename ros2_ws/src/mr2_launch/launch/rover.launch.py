@@ -233,7 +233,7 @@ def generate_launch_description():
             {"device": LaunchConfiguration("sik_sim_device")},
             {"baud": LaunchConfiguration("sik_sim_baud")},
             {"heartbeat_timeout_ms": 500},
-            {"log_frames": True},
+            {"log_frames": False},
         ],
         condition=sik_sim_condition,
     )

@@ -1,4 +1,5 @@
 import TransitiveVideoCard from './TransitiveVideoCard'
+import MapPreview from './MapPreview'
 
 const DeliveryPanel = () => {
   return (
@@ -6,6 +7,10 @@ const DeliveryPanel = () => {
       <TransitiveVideoCard
         source="/rgbd_camera/image"
       />
+      <div className="card card--span-2 card--map">
+        <h3>Rover Position</h3>
+        <MapPreview />
+      </div>
     </div>
   )
 }

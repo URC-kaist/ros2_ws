@@ -23,6 +23,11 @@ const ControlStatusList = () => {
     }
   }, [])
 
+  // Clear stale link status whenever the websocket reconnects/disconnects
+  useEffect(() => {
+    setLinkStatus(null)
+  }, [wsConnected])
+
   useEffect(() => {
     const rosBridge = getRosBridgeClient()
     rosBridge.connect()
@@ -48,9 +53,13 @@ const ControlStatusList = () => {
     if (linkStatus?.connected) {
       linkState = 'Up'
       linkDotClass = ''
-    } else {
+    } else if (linkStatus && linkStatus.connected === false) {
       linkState = 'Lost'
       linkDotClass = 'status-dot-warn'
+    } else {
+      // WebSocket is up but no link_status message yet (e.g., node just restarted)
+      linkState = 'Down'
+      linkDotClass = 'status-dot-error'
     }
   }
   const rosState = rosConnected ? 'Up' : 'Down'

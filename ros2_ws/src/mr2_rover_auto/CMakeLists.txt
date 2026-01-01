@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.8)
 project(mr2_rover_auto)
 
+# Honor *_ROOT variables (suppresses CMP0074 dev warning)
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -40,6 +45,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${PCL_INCLUDE_DIRS})
 # Grid map eigen plugin headers live in include/grid_map_core/eigen_plugins
 # Ensure all targets see the grid_map_core include directory.
 include_directories(${grid_map_core_INCLUDE_DIRS})
+# The Functors/DenseBase plugins are under <prefix>/include/grid_map_core/grid_map_core/…
+# grid_map_core currently only exports Eigen3 include dirs, so derive the prefix from grid_map_core_DIR.
+get_filename_component(grid_map_core_PREFIX "${grid_map_core_DIR}/../../.." ABSOLUTE)
+include_directories(${grid_map_core_PREFIX}/include/grid_map_core)
 add_definitions(${PCL_DEFINITIONS})
 
 add_executable(gps_heading_imu_node src/gps_heading_imu_node.cpp)
