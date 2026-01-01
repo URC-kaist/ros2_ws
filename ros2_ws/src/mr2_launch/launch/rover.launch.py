@@ -5,7 +5,7 @@ from launch.actions import (
     TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
 from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
@@ -43,6 +43,11 @@ def generate_launch_description():
         "headless",
         default_value="false",
         description="Run without GUI components",
+    )
+    foxglove_port_arg = DeclareLaunchArgument(
+        "foxglove_port",
+        default_value="8765",
+        description="WebSocket port for the Foxglove Bridge",
     )
     can_iface_arg = DeclareLaunchArgument(
         "can_iface",
@@ -238,6 +243,22 @@ def generate_launch_description():
         condition=sik_sim_condition,
     )
 
+    foxglove_bridge = IncludeLaunchDescription(
+        AnyLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("foxglove_bridge"),
+                    "launch",
+                    "foxglove_bridge_launch.xml",
+                ]
+            )
+        ),
+        launch_arguments={
+            "port": LaunchConfiguration("foxglove_port"),
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
+        }.items(),
+    )
+
     rosbridge_ws = Node(
         package="rosbridge_server",
         executable="rosbridge_websocket",
@@ -257,6 +278,7 @@ def generate_launch_description():
         mode_arg,
         use_sim_time_arg,
         headless_arg,
+        foxglove_port_arg,
         can_iface_arg,
         controller_config_arg,
         use_mock_servos_arg,
@@ -276,6 +298,7 @@ def generate_launch_description():
         sik_sim_launch,
         sik_bridge,
         sik_bridge_sim,
+        foxglove_bridge,
         rosbridge_ws,
         rviz2,
     ])
