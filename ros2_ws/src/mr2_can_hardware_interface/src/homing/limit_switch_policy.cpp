@@ -53,11 +53,9 @@ public:
       }
     }
 
-    const std::string state_name =
-        device_params.count("state_name")
-            ? device_params["state_name"]
-            : joint.name + "/limit_switch_state";
-    device_params.emplace("state_name", state_name);
+    // Force deterministic topic naming based on joint name; ignore overrides.
+    const std::string state_name = joint.name + "/limit_switch_state";
+    device_params["state_name"] = state_name;
 
     hardware_interface::ComponentInfo component;
     component.name =

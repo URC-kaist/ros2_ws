@@ -17,7 +17,9 @@ find_package(nav2_bringup REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_behavior_tree REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_eigen REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -25,8 +27,16 @@ find_package(nav_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
+find_package(grid_map_ros REQUIRED)
+find_package(grid_map_msgs REQUIRED)
+find_package(grid_map_filters REQUIRED)
+find_package(filters REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common filters)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${PCL_INCLUDE_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
 add_executable(gps_heading_imu_node src/gps_heading_imu_node.cpp)
 ament_target_dependencies(gps_heading_imu_node
@@ -67,6 +77,22 @@ ament_target_dependencies(wheel_encoder_odom_node
   rclcpp sensor_msgs nav_msgs Eigen3
 )
 
+add_executable(pc2_to_heightmap_node src/pc2_to_heightmap_node.cpp)
+ament_target_dependencies(pc2_to_heightmap_node
+  rclcpp sensor_msgs grid_map_msgs tf2 tf2_ros tf2_eigen pcl_conversions Eigen3
+)
+target_link_libraries(pc2_to_heightmap_node ${PCL_LIBRARIES})
+
+add_executable(traversability_filter_node src/traversability_filter_node.cpp)
+ament_target_dependencies(traversability_filter_node
+  rclcpp grid_map_ros grid_map_filters filters pluginlib
+)
+
+add_executable(gridmap_to_occupancy_node src/gridmap_to_occupancy_node.cpp)
+ament_target_dependencies(gridmap_to_occupancy_node
+  rclcpp grid_map_msgs nav_msgs tf2 tf2_ros
+)
+
 install(TARGETS
   gps_heading_imu_node
   gps_heading_gps_node
@@ -75,6 +101,9 @@ install(TARGETS
   gnss_only_client
   cover_vision_client
   wheel_encoder_odom_node
+  pc2_to_heightmap_node
+  traversability_filter_node
+  gridmap_to_occupancy_node
   DESTINATION lib/${PROJECT_NAME}/
 )
 

@@ -59,8 +59,6 @@
       <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
       <param name="homing_device_can_iface">$(arg can_iface)</param>
       <param name="homing_device_can_id">$(arg absolute_encoder_can_id)</param>
-      <param name="homing_device_state_name">joint1/absolute_encoder</param>
-      <param name="homing_device_flags_name">joint1/absolute_encoder_flags</param>
       <param name="homing_device_ticks_per_rev">$(arg absolute_encoder_ticks_per_rev)</param>
       <param name="homing_device_direction">$(arg absolute_encoder_direction)</param>
       <!-- AbsoluteEncoderPolicy specific parameters -->

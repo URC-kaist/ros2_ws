@@ -22,8 +22,6 @@
       <!--   <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
       <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
       <!--   <param name="homing_device_can_id">201</param> -->
-      <!--   <param name="homing_device_state_name">arm_j1_abs</param> -->
-      <!--   <param name="homing_device_flags_name">arm_j1_abs_flags</param> -->
       <!--   <param name="homing_device_ticks_per_rev">4096</param> -->
       <!-- </joint> -->
       <!---->
@@ -42,7 +40,6 @@
         <param name="homing_position">-0.69</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">202</param>
-        <param name="homing_device_state_name">arm_j2_limit_switch</param>
         <param name="homing_device_active_high">true</param>
         <param name="homing_search_direction">negative</param>
         <param name="homing_approach_speed">0.1</param>
@@ -67,8 +64,6 @@
         <param name="homing_encoder_direction">-1.0</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">203</param>
-        <param name="homing_device_state_name">arm_j3_abs</param>
-        <param name="homing_device_flags_name">arm_j3_abs_flags</param>
         <param name="homing_device_ticks_per_rev">4096</param>
       </joint>
 
@@ -87,7 +82,6 @@
         <param name="homing_position">-2.55</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">204</param>
-        <param name="homing_device_state_name">arm_j4_limit_switch</param>
         <param name="homing_device_active_high">true</param>
         <param name="homing_search_direction">negative</param>
         <param name="homing_approach_speed">0.35</param>
@@ -112,8 +106,6 @@
         <param name="homing_encoder_direction">-1.0</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">205</param>
-        <param name="homing_device_state_name">arm_j5_abs</param>
-        <param name="homing_device_flags_name">arm_j5_abs_flags</param>
         <param name="homing_device_ticks_per_rev">4096</param>
       </joint>
 
@@ -132,7 +124,6 @@
         <param name="homing_device_can_id">206</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_position">-3.03</param>
-        <param name="homing_device_state_name">arm_j6_limit_switch</param>
         <param name="homing_device_active_high">true</param>
         <param name="homing_search_direction">negative</param>
         <param name="homing_approach_speed">0.35</param>

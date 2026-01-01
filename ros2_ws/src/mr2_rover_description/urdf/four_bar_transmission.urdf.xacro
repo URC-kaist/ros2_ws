@@ -77,7 +77,6 @@
       <!-- <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
       <!-- <param name="homing_device_can_iface">$(arg can_iface)</param> -->
       <!-- <param name="homing_device_can_id">$(arg input_limit_can_id)</param> -->
-      <!-- <param name="homing_device_state_name">input_joint_limit_switch</param> -->
       <!-- <param name="homing_device_active_high">true</param> -->
       <!-- <param name="homing_search_direction">negative</param> -->
       <!-- <param name="homing_approach_speed">0.35</param> -->
@@ -97,8 +96,6 @@
       <!-- <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
       <!-- <param name="homing_device_can_iface">$(arg can_iface)</param> -->
       <!-- <param name="homing_device_can_id">$(arg output_abs_can_id)</param> -->
-      <!-- <param name="homing_device_state_name">output_joint_abs</param> -->
-      <!-- <param name="homing_device_flags_name">output_joint_abs_flags</param> -->
       <!-- <param name="homing_device_ticks_per_rev">4096</param> -->
     </joint>
 

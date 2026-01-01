@@ -13,7 +13,6 @@
  *       - device_can_iface
  *       - device_can_id
  *       - device_ticks_per_rev
- *       - device_state_name (defaults to <joint>/absolute_encoder)
  *       - device_direction
  *   home_offset (double, optional, default 0.0)
  *     Additional offset in radians applied to the encoder angle before
@@ -67,11 +66,9 @@ public:
       }
     }
 
-    const std::string state_name =
-        device_params.count("state_name")
-            ? device_params["state_name"]
-            : joint.name + "/absolute_encoder";
-    device_params.emplace("state_name", state_name);
+    // Enforce fixed topic naming derived from the joint name.
+    const std::string state_name = joint.name + "/absolute_encoder";
+    device_params["state_name"] = state_name;
 
     // Build a minimal ComponentInfo for the device.
     hardware_interface::ComponentInfo component;
