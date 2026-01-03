@@ -59,26 +59,22 @@
     <model name="mdrs_dem">
         <static>true</static>
         <pose>0 0 -1373 0 0 0</pose>
-    	<link name="link">
+        <link name="link">
             <collision name="collision">
                 <geometry>
-			<mesh>
-		        <uri>mdrs.stl</uri>
-          </mesh>
+                    <mesh>
+                        <!-- Keep STL for collision to avoid loading the large textured mesh in physics -->
+                        <uri>mdrs.stl</uri>
+                    </mesh>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-			<mesh>
-		        <uri>mdrs.stl</uri>
-          </mesh>
+                    <mesh>
+                        <!-- UV-mapped mesh with satellite texture -->
+                        <uri>mdrs_textured.obj</uri>
+                    </mesh>
                 </geometry>
-		<material>
-      <ambient>0.80 0.72 0.52 1</ambient>
-      <diffuse>0.85 0.76 0.54 1</diffuse>
-      <specular>0.05 0.05 0.05 1</specular>
-      <shininess>2</shininess>
-		</material>
             </visual>
         </link>
     </model>
