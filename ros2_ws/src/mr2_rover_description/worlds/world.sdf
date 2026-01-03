@@ -9,6 +9,18 @@
       <real_time_factor>1</real_time_factor>
     </physics>
 
+    <scene>
+      <!-- Clear sky blue background -->
+      <background>0.529 0.808 0.922 1</background>
+      <sky>
+        <clouds>
+          <speed>0</speed>
+          <direction>0 0 0</direction>
+          <mean_size>0</mean_size>
+        </clouds>
+      </sky>
+    </scene>
+
     <plugin
       filename="ignition-gazebo-navsat-system"
       name="ignition::gazebo::systems::NavSat">
