@@ -85,11 +85,6 @@ ament_target_dependencies(cover_vision_client
 rclcpp rclcpp_action mr2_action_interface
 )
 
-add_executable(wheel_encoder_odom_node src/wheel_encoder_odom_node.cpp)
-ament_target_dependencies(wheel_encoder_odom_node
-  rclcpp sensor_msgs nav_msgs Eigen3
-)
-
 add_executable(pc2_to_heightmap_node src/pc2_to_heightmap_node.cpp)
 ament_target_dependencies(pc2_to_heightmap_node
   rclcpp sensor_msgs grid_map_msgs grid_map_core tf2 tf2_ros tf2_eigen pcl_conversions Eigen3
@@ -113,7 +108,6 @@ install(TARGETS
   cover_vision_server
   gnss_only_client
   cover_vision_client
-  wheel_encoder_odom_node
   pc2_to_heightmap_node
   traversability_filter_node
   gridmap_to_occupancy_node

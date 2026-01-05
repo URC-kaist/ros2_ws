@@ -15,17 +15,20 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(controller_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/twist_to_commands_controller.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME}
-  rclcpp rclcpp_lifecycle controller_interface pluginlib geometry_msgs)
+  rclcpp rclcpp_lifecycle controller_interface pluginlib geometry_msgs
+  nav_msgs)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
   include
 )
+
 
 pluginlib_export_plugin_description_file(controller_interface plugin.xml)
 

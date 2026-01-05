@@ -29,6 +29,10 @@ rover_controller:
     wheel_radius: 0.11
     max_steer: 1.5708  # +/- 90 degrees
     twist_timeout: 0.5
+    odom_publish_rate_hz: 30.0
+    wheel_odom_topic: /wheel_encoder/odometry
+    odom_frame_id: odom
+    base_frame_id: base_link
     cmd_vel_topic: /cmd_vel
 
 manipulator_controller:
