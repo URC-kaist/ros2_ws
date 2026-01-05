@@ -6,6 +6,8 @@
   <xacro:property name="ros2_control_mode_value" value="$(arg ros2_control_mode)"/>
   <xacro:property name="ros2_control_config_value" value="$(arg ros2_control_config)"/>
   <xacro:property name="can_iface_value" value="$(arg can_iface)"/>
+  <xacro:property name="rover_mesh_prefix" value="file://$(find mr2_rover_description)/meshes/rover"/>
+  <xacro:property name="rover_mesh_scale" value="0.01"/>
   <material name="Rubber">
     <color rgba="0.05 0.05 0.05 1.0"/>
   </material>
@@ -20,10 +22,10 @@
   <!-- Chassis -->
   <xacro:rover_base/>
   <!-- Four modules -->
-  <xacro:swerve_module prefix="fl" parent="left_rocker" xyz=" 0.47 -0.08 -0.18"/>
-  <xacro:swerve_module prefix="fr" parent="right_rocker" xyz=" 0.47 0.08 -0.18"/>
-  <xacro:swerve_module prefix="rl" parent="left_rocker" xyz="-0.47 -0.08 -0.18"/>
-  <xacro:swerve_module prefix="rr" parent="right_rocker" xyz="-0.47 0.08 -0.18"/>
+  <xacro:swerve_module prefix="fr" parent="right_rocker" xyz=" 0.476931 -0.0797 -0.18" direction="1"/>
+  <xacro:swerve_module prefix="fl" parent="left_rocker" xyz=" 0.476931 0.0797 -0.18" direction="-1"/>
+  <xacro:swerve_module prefix="rr" parent="right_rocker" xyz="-0.476931 -0.0797 -0.18" direction="1"/>
+  <xacro:swerve_module prefix="rl" parent="left_rocker" xyz="-0.476931 0.0797 -0.18" direction="-1"/>
   <!-- Manipulator -->
   <xacro:manipulator/>
 

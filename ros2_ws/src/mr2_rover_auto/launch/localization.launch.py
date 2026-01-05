@@ -16,7 +16,7 @@ def generate_launch_description():
         # For Gazebo, set to true. For field test, set to false.
         DeclareLaunchArgument("use_sim_time", default_value="true"),
 
-        #### A. Dual GPS Global heading calculation
+        #### Dual GPS Global heading calculation
         # 1) compute dual-GNSS yaw and publish into GPS odometry stream
         Node(
             package='mr2_rover_auto',
@@ -28,38 +28,6 @@ def generate_launch_description():
                 # Flip baseline direction to correct 180° heading inversion (north/south swap)
                 {"baseline_direction": -1},
             ],
-            remappings=[('rover_north/fix', '/left_gnss/navsat'),
-                        ('rover_south/fix', '/right_gnss/navsat'),
-                        ('imu/data', '/imu/data'),
-                        ('odometry/gps/raw', '/odometry/gps/raw'),
-                        ('odometry/gps', '/odometry/gps')]
-        ),
-
-        #### B. Estimator for robot_localization
-        # 2) static_tf
-        Node( # Describe IMU mount
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_imu',
-            arguments=['0.0', '0.19', '0.0', '0.0', '0.0', '0.0',
-                       # behind below of robot center
-                       'base_link', 'imu_link']
-        ),
-        Node( # Describe Northern GPS mount
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_gps_north',
-            arguments=['0.0', '0.245', '0.0', '0.0', '0.0', '0.0',
-                       # left of robot center
-                       'base_link', 'gps_north_link']
-        ),
-        Node( # Describe Southern GPS mount
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_gps_south',
-            arguments=['0.0', '-0.245', '0.0', '0.0', '0.0', '0.0',
-                       # left of robot center
-                       'base_link', 'gps_south_link']
         ),
 
         # Wheel encoder odometry from ros2_control joint_states
@@ -78,7 +46,7 @@ def generate_launch_description():
 
         # Please consult the graph:
         # https://docs.ros.org/en/noetic/api/robot_localization/html/integrating_gps.html
-        # 3) GPS -> odometry/gps/raw (navsat_transform output)
+        # 2) GPS -> odometry/gps/raw (navsat_transform output)
         TimerAction(period=2.0, actions=[
         Node(
             package="robot_localization",
@@ -90,14 +58,13 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=[
-                ("gps/fix", "/left_gnss/navsat"),
-                ("imu/data", "/imu/data"),
-                ("odometry/gps", "/odometry/gps/raw"),
-                ('odometry/filtered', '/odometry/filtered/global')
+                ("/gps/fix", "/left_gnss/navsat"),
+                ("/odometry/gps", "/odometry/gps/raw"),
+                ('/odometry/filtered', '/odometry/filtered/global')
             ],
         ),
 
-        # 4) Local EKF: publish tf: odom -> base_link
+        # 3) Local EKF: publish tf: odom -> base_link
         Node(
             package="robot_localization",
             executable="ekf_node",
@@ -108,12 +75,11 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
             ],
             remappings=[
-                ("imu/data", "/imu/data"),
-                ('odometry/filtered', '/odometry/filtered/local')
+                ('/odometry/filtered', '/odometry/filtered/local')
             ],
         ),
 
-        # 5) Global EKF: publish tf: map -> odom
+        # 4) Global EKF: publish tf: map -> odom
         Node(
             package="robot_localization",
             executable="ekf_node",
@@ -124,14 +90,12 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
             ],
             remappings=[
-                ("imu/data", "/imu/data"),
-                ("odometry/gps", "/odometry/gps"),
-                ('odometry/filtered', '/odometry/filtered/global')
+                ('/odometry/filtered', '/odometry/filtered/global')
             ],
         ),
 
-        #### B. Query node for goal pose coordinate conversion.
-        # 6) Query for tf: GPS -> odometry/gps ((lat, long) -> ENU) with datum
+        #### Query node for goal pose coordinate conversion.
+        # 5) Query for tf: GPS -> odometry/gps ((lat, long) -> ENU) with datum
         # XXX MUST share same datum!!!
         Node(
             package="robot_localization",
@@ -143,38 +107,10 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
             remappings=[
-                ("gps/fix", "query/fix"),
-                ("odometry/gps", "query/gps"),
-                ("imu/data", "/imu/data"),
-                ('odometry/filtered', '/odometry/filtered/global')
+                ("/gps/fix", "query/fix"),
+                ("/odometry/gps", "query/gps"),
+                ('/odometry/filtered', '/odometry/filtered/global')
             ],
         )
         ]),
-        
-        #### C. Traversability tf (pitch -30 deg, for now)
-        # 7) Define depth camera pose from base_link
-        Node( # Describe Eastern Camera mount
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_cam_east',
-            arguments=['0.1', '0.0', '0.0', '0.0', '0.3491', '0.0',
-                       # front of robot, facing front, tilted toward ground
-                       'base_link', 'cam_east_link']
-        ),
-        Node( # Describe Northen Camera mount
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_cam_north',
-            arguments=['0.0', '0.1', '0.0', '0.0', '0.3491', '1.570796',
-                       # left of robot, facing left, tilted toward ground
-                       'base_link', 'cam_north_link']
-        ),
-        Node( # Describe Southern Camera mount
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='static_tf_cam_south',
-            arguments=['0.0', '-0.1', '0.0', '0.0', '0.3491', '-1.570796',
-                       # left of robot, facing left, tilted toward ground
-                       'base_link', 'cam_south_link']
-        ),
     ])

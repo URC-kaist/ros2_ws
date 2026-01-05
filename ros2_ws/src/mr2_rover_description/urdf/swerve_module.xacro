@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="swerve_module" params="prefix parent xyz">
+  <xacro:macro name="swerve_module" params="prefix parent xyz direction">
 
     <!-- local constants -->
     <xacro:property name="steer_limit" value="3.14"/>
     <xacro:property name="wheel_limit" value="20.0"/>
-    <xacro:property name="wheel_radius" value="0.11"/>
+    <xacro:property name="wheel_radius" value="0.125"/>
     <xacro:property name="wheel_width" value="0.11"/>
 
     <!-- Steering link -->
@@ -16,8 +16,10 @@
       </inertial>
       <visual>
         <geometry>
-          <cylinder radius="0.11" length="0.02"/>
+          <mesh filename="${rover_mesh_prefix}/giuk.obj"
+                scale="${rover_mesh_scale} ${-rover_mesh_scale * direction} ${rover_mesh_scale}"/>
         </geometry>
+	<origin xyz="-0.47931 ${0.3252*direction} 0.17" rpy="0 0 0"/>
       </visual>
       <collision>
         <geometry>
@@ -33,11 +35,11 @@
         <inertia ixx="1e-3" ixy="0" ixz="0" iyy="1e-3" iyz="0" izz="1e-3"/>
       </inertial>
       <visual>
-        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <geometry>
-          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+          <mesh filename="${rover_mesh_prefix}/wheel.obj"
+                scale="${rover_mesh_scale} ${-rover_mesh_scale * direction} ${rover_mesh_scale}"/>
         </geometry>
-        <material name="Rubber"/>
+	<origin xyz="-0.47931 ${0.3252*direction} 0.348457" rpy="0 0 0"/>
       </visual>
       <collision>
         <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -60,7 +62,7 @@
     <joint name="${prefix}_wheel_joint" type="continuous">
       <parent link="${prefix}_mount"/>
       <child link="${prefix}_wheel"/>
-      <origin xyz="0 0 -${wheel_radius}" rpy="0 0 0"/>
+      <origin xyz="0 0 -0.178457" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit effort="5" velocity="${wheel_limit}"/>
     </joint>

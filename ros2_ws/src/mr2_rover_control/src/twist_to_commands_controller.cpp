@@ -7,13 +7,13 @@
 
 namespace mr2_rover_control {
 
-controller_interface::CallbackReturn TwistToCommandsController::on_init()
-{ //TODO: follow actual dimension
+controller_interface::CallbackReturn
+TwistToCommandsController::on_init() { // TODO: follow actual dimension
   auto_declare<std::vector<std::string>>("wheel_joints", {});
   auto_declare<std::vector<std::string>>("steering_joints", {});
-  auto_declare<double>("wheel_base", 0.94);
-  auto_declare<double>("track_width", 0.65);
-  auto_declare<double>("wheel_radius", 0.11);
+  auto_declare<double>("wheel_base", 0.95386);
+  auto_declare<double>("track_width", 0.6504);
+  auto_declare<double>("wheel_radius", 0.125);
   auto_declare<double>("max_steer", 1.5708); // +/- 90 degrees
   auto_declare<double>("twist_timeout", 0.5);
   auto_declare<std::string>("cmd_vel_topic", "/cmd_vel");
@@ -113,10 +113,10 @@ TwistToCommandsController::update(const rclcpp::Time &,
     double y;
   };
   const std::array<Wheel, 4> wheels = {{
-      {+hx, -hy}, // FL
-      {+hx, +hy}, // FR
-      {-hx, -hy}, // RL
-      {-hx, +hy}  // RR
+      {+hx, +hy}, // FL
+      {+hx, -hy}, // FR
+      {-hx, +hy}, // RL
+      {-hx, -hy}  // RR
   }};
 
   std::array<double, 4> steer{};
@@ -136,7 +136,7 @@ TwistToCommandsController::update(const rclcpp::Time &,
 
     double ang = std::atan2(vy_i, vx_i);
     double w_ang = v_lin / wheel_radius_;
-    
+
     if (std::abs(ang) > M_PI_2) { // Modified: choose shortest yaw path
       if (ang > 0) {
         ang -= M_PI;
