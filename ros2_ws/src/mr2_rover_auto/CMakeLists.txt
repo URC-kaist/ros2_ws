@@ -51,12 +51,6 @@ get_filename_component(grid_map_core_PREFIX "${grid_map_core_DIR}/../../.." ABSO
 include_directories(${grid_map_core_PREFIX}/include/grid_map_core)
 add_definitions(${PCL_DEFINITIONS})
 
-add_executable(gps_heading_imu_node src/gps_heading_imu_node.cpp)
-ament_target_dependencies(gps_heading_imu_node
-  rclcpp sensor_msgs
-  tf2 tf2_geometry_msgs Eigen3
-)
-
 add_executable(gps_heading_gps_node src/gps_heading_gps_node.cpp)
 ament_target_dependencies(gps_heading_gps_node
   rclcpp sensor_msgs nav_msgs
@@ -102,7 +96,6 @@ ament_target_dependencies(gridmap_to_occupancy_node
 )
 
 install(TARGETS
-  gps_heading_imu_node
   gps_heading_gps_node
   gnss_only_server
   cover_vision_server

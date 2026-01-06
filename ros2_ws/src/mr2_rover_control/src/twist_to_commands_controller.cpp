@@ -205,9 +205,9 @@ void TwistToCommandsController::publishOdom(
   }
   const double wz = wz_count ? wz_sum / static_cast<double>(wz_count) : 0.0;
 
-  RCLCPP_INFO(get_node()->get_logger(),
-              "wheel_odom twist: vx=%.4f m/s, vy=%.4f m/s, wz=%.4f rad/s",
-              vx, vy, wz);
+  // RCLCPP_DEBUG(get_node()->get_logger(),
+  //             "wheel_odom twist: vx=%.4f m/s, vy=%.4f m/s, wz=%.4f rad/s",
+  //             vx, vy, wz);
 
   nav_msgs::msg::Odometry odom;
   odom.header.stamp = stamp;
