@@ -181,9 +181,11 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
                 [
-                    FindPackageShare("mr2_autonomous"),
+                    FindPackageShare("mr2_rover_auto"),
+                #   FindPackageShare("mr2_autonomous"),
                     "launch",
-                    "traversability_map.launch.py",
+                    "traversability_pipeline.launch.py",
+                #   "traversability_map.launch.py",
                 ]
             )
         )
@@ -323,7 +325,7 @@ def generate_launch_description():
         rover_real_launch,
         localization_launch,
         system_status,
-        pc2_to_heightmap,
+        # pc2_to_heightmap,
         traversability_map_launch,
         aruco_tracker,
         move_group_launch,
