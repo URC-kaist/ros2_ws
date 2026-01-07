@@ -13,7 +13,9 @@ enum class MsgId : uint8_t {
   kCmdDrive = 0x01,
   kCmdArmTwist = 0x02,
   kHeartbeat = 0x03,
-  kTelemBattery = 0x10,
+  kTelemBattery1 = 0x10,
+  kTelemBattery2 = 0x11,
+  kTelemBattery = kTelemBattery1,
 };
 
 struct Header {
@@ -62,6 +64,8 @@ std::vector<uint8_t> encode_cmd_drive(uint8_t seq, const CmdDrive &cmd);
 std::vector<uint8_t> encode_cmd_arm_twist(uint8_t seq, const CmdArmTwist &cmd);
 std::vector<uint8_t> encode_heartbeat(uint8_t seq, const Heartbeat &hb);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem);
+std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem,
+                                          uint8_t battery_id);
 
 std::optional<Frame> decode_frame(const uint8_t *data, size_t length);
 

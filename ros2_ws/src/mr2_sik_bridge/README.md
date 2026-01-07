@@ -27,7 +27,8 @@ Notes:
 - `0x01` CMD_DRIVE
 - `0x02` CMD_ARM_TWIST
 - `0x03` HEARTBEAT
-- `0x10` TELEM_BATTERY
+- `0x10` TELEM_BATTERY_1
+- `0x11` TELEM_BATTERY_2
 
 ## Payloads (ROS-aligned units)
 
@@ -76,7 +77,7 @@ Expected behavior in higher-level code:
 - The ROS bridge also emits heartbeats back over the SiK link to indicate the
   bridge is alive (used by the gateway/UI link status).
 
-### TELEM_BATTERY (msg_id 0x10)
+### TELEM_BATTERY_1 / TELEM_BATTERY_2 (msg_id 0x10 / 0x11)
 Payload size: 16 bytes
 
 - `float32 total_capacity_mah`
@@ -90,6 +91,10 @@ Derived from existing telemetry:
 - `temperature_c` rounded or passed through as whole degrees
 - `pack_voltage_v = pack_voltage_v`
 
+Battery index is implied by the message ID:
+- `0x10` = battery 1
+- `0x11` = battery 2
+
 Suggested rate: 1–2 Hz or on change.
 
 ## Library API
@@ -98,7 +103,8 @@ Header: `mr2_sik_bridge/packets.hpp`
 
 Key functions:
 - `encode_cmd_drive`, `encode_cmd_arm_twist`, `encode_heartbeat`,
-  `encode_telem_battery`
+  `encode_telem_battery` (battery 1 by default) / `encode_telem_battery` with
+  `battery_id`
 - `decode_frame` (validates magic, size, CRC)
 - `decode_cmd_drive`, `decode_cmd_arm_twist`, `decode_heartbeat`,
   `decode_telem_battery`

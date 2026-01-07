@@ -24,9 +24,9 @@ rover_controller:
       - fr_steering_joint
       - rl_steering_joint
       - rr_steering_joint
-    wheel_base: 0.94
-    track_width: 0.65
-    wheel_radius: 0.11
+    wheel_base: 0.95386
+    track_width: 0.6504
+    wheel_radius: 0.125
     max_steer: 1.5708  # +/- 90 degrees
     twist_timeout: 0.5
     odom_publish_rate_hz: 30.0

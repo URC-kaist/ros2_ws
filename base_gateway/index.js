@@ -64,7 +64,8 @@ const MsgId = {
   CMD_DRIVE: 0x01,
   CMD_ARM_TWIST: 0x02,
   HEARTBEAT: 0x03,
-  TELEM_BATTERY: 0x10,
+  TELEM_BATTERY_1: 0x10,
+  TELEM_BATTERY_2: 0x11,
 }
 
 const MAGIC = 0xa5
@@ -347,10 +348,11 @@ function handleFrame(msgId, payload) {
     lastHeartbeatRxMs = Date.now()
   }
 
-  if (msgId === MsgId.TELEM_BATTERY) {
+  if (msgId === MsgId.TELEM_BATTERY_1 || msgId === MsgId.TELEM_BATTERY_2) {
     const telem = decodeTelemBattery(payload)
     if (!telem) return
-    broadcast({ type: 'telem_battery', ...telem })
+    const batteryId = msgId === MsgId.TELEM_BATTERY_2 ? 2 : 1
+    broadcast({ type: 'telem_battery', battery_id: batteryId, ...telem })
   }
 }
 

@@ -13,7 +13,10 @@ export type CmdArmTwist = {
   ang_z_rad_s: number
 }
 
+export type BatteryId = 1 | 2
+
 export type TelemBattery = {
+  battery_id: BatteryId
   total_capacity_mah: number
   available_capacity_mah: number
   temperature_c: number
@@ -28,8 +31,17 @@ export type LinkStatus = {
 
 type MessageHandler<T> = (payload: T) => void
 
+type RawTelemBattery = {
+  type: 'telem_battery'
+  battery_id?: number
+  total_capacity_mah: number
+  available_capacity_mah: number
+  temperature_c: number
+  pack_voltage_v: number
+}
+
 type GatewayMessage =
-  | ({ type: 'telem_battery' } & TelemBattery)
+  | RawTelemBattery
   | ({ type: 'link_status' } & LinkStatus)
 
 const DEFAULT_PATH = '/sik-ws'
@@ -98,8 +110,16 @@ class SikGatewayClient {
       const message = this.safeParse(event.data)
       if (!message) return
       if (message.type === 'telem_battery') {
+        const batteryId = message.battery_id === 2 ? 2 : 1
+        const payload: TelemBattery = {
+          battery_id: batteryId,
+          total_capacity_mah: message.total_capacity_mah,
+          available_capacity_mah: message.available_capacity_mah,
+          temperature_c: message.temperature_c,
+          pack_voltage_v: message.pack_voltage_v,
+        }
         for (const listener of this.batteryListeners) {
-          listener(message)
+          listener(payload)
         }
       } else if (message.type === 'link_status') {
         this.lastLinkStatus = message

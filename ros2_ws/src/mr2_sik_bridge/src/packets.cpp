@@ -180,6 +180,12 @@ std::vector<uint8_t> encode_heartbeat(uint8_t seq, const Heartbeat &hb) {
 
 std::vector<uint8_t> encode_telem_battery(uint8_t seq,
                                           const TelemBattery &telem) {
+  return encode_telem_battery(seq, telem, 1);
+}
+
+std::vector<uint8_t> encode_telem_battery(uint8_t seq,
+                                          const TelemBattery &telem,
+                                          uint8_t battery_id) {
   std::vector<uint8_t> payload;
   payload.reserve(16);
   ByteWriter writer(&payload);
@@ -190,7 +196,8 @@ std::vector<uint8_t> encode_telem_battery(uint8_t seq,
 
   Header header;
   header.magic = kMagic;
-  header.msg_id = MsgId::kTelemBattery;
+  header.msg_id =
+      (battery_id == 2) ? MsgId::kTelemBattery2 : MsgId::kTelemBattery1;
   header.length = static_cast<uint8_t>(payload.size());
   header.seq = seq;
 
@@ -296,7 +303,8 @@ std::optional<Heartbeat> decode_heartbeat(const Frame &frame) {
 }
 
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame) {
-  if (frame.header.msg_id != MsgId::kTelemBattery ||
+  if ((frame.header.msg_id != MsgId::kTelemBattery1 &&
+       frame.header.msg_id != MsgId::kTelemBattery2) ||
       frame.payload.size() != 16) {
     return std::nullopt;
   }

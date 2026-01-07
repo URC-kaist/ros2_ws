@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -47,14 +48,25 @@ class SikBridgeNode : public rclcpp::Node {
         arm_twist_topic_(declare_parameter<std::string>(
             "arm_twist_topic", "/moveit_servo/delta_twist_cmds")),
         arm_frame_id_(declare_parameter<std::string>("arm_frame_id", "base_link")),
+        battery_1_topic_(declare_parameter<std::string>(
+            "battery_1_topic", "battery_1/telemetry")),
+        battery_2_topic_(declare_parameter<std::string>(
+            "battery_2_topic", "battery_2/telemetry")),
         log_frames_(declare_parameter<bool>("log_frames", false)) {
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
     arm_twist_pub_ =
         create_publisher<geometry_msgs::msg::TwistStamped>(arm_twist_topic_, 10);
 
-    battery_sub_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
-        "battery/telemetry", 10,
-        std::bind(&SikBridgeNode::battery_cb, this, std::placeholders::_1));
+    battery_sub_1_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
+        battery_1_topic_, 10,
+        [this](const mr2_battery_monitor::msg::PackTelemetry::SharedPtr msg) {
+          battery_cb(msg, 1);
+        });
+    battery_sub_2_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
+        battery_2_topic_, 10,
+        [this](const mr2_battery_monitor::msg::PackTelemetry::SharedPtr msg) {
+          battery_cb(msg, 2);
+        });
 
     open_serial_();
     start_reader_();
@@ -74,7 +86,8 @@ class SikBridgeNode : public rclcpp::Node {
     }
 
     last_heartbeat_ = now();
-    last_battery_tx_ = now() - rclcpp::Duration::from_seconds(10.0);
+    last_battery_tx_[0] = now() - rclcpp::Duration::from_seconds(10.0);
+    last_battery_tx_[1] = now() - rclcpp::Duration::from_seconds(10.0);
   }
 
   ~SikBridgeNode() override {
@@ -282,14 +295,19 @@ class SikBridgeNode : public rclcpp::Node {
     write_frame_(frame);
   }
 
-  void battery_cb(const mr2_battery_monitor::msg::PackTelemetry::SharedPtr msg) {
+  void battery_cb(const mr2_battery_monitor::msg::PackTelemetry::SharedPtr msg,
+                  uint8_t battery_id) {
+    if (battery_id < 1 || battery_id > 2) {
+      return;
+    }
     if (battery_tx_rate_hz_ <= 0.0) {
       return;
     }
 
     const auto now_time = now();
     const double min_period = 1.0 / battery_tx_rate_hz_;
-    if ((now_time - last_battery_tx_).seconds() < min_period) {
+    auto &last_tx = last_battery_tx_[battery_id - 1];
+    if ((now_time - last_tx).seconds() < min_period) {
       return;
     }
 
@@ -307,9 +325,10 @@ class SikBridgeNode : public rclcpp::Node {
     telem.temperature_c = temperature_c;
     telem.pack_voltage_v = pack_voltage_v;
 
-    auto frame = mr2_sik_bridge::encode_telem_battery(next_seq_(), telem);
+    auto frame =
+        mr2_sik_bridge::encode_telem_battery(next_seq_(), telem, battery_id);
     write_frame_(frame);
-    last_battery_tx_ = now_time;
+    last_tx = now_time;
   }
 
   void write_frame_(const std::vector<uint8_t> &frame) {
@@ -344,13 +363,17 @@ class SikBridgeNode : public rclcpp::Node {
   std::string cmd_vel_topic_;
   std::string arm_twist_topic_;
   std::string arm_frame_id_;
+  std::string battery_1_topic_;
+  std::string battery_2_topic_;
   bool log_frames_;
 
   // ROS interfaces
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr arm_twist_pub_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
-      battery_sub_;
+      battery_sub_1_;
+  rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
+      battery_sub_2_;
   rclcpp::TimerBase::SharedPtr zero_timer_;
   rclcpp::TimerBase::SharedPtr heartbeat_tx_timer_;
 
@@ -363,7 +386,7 @@ class SikBridgeNode : public rclcpp::Node {
 
   // State
   rclcpp::Time last_heartbeat_{};
-  rclcpp::Time last_battery_tx_{};
+  std::array<rclcpp::Time, 2> last_battery_tx_{};
 };
 
 }  // namespace mr2_sik_bridge

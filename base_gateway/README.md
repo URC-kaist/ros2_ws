@@ -34,8 +34,10 @@ Incoming (dashboard -> gateway):
 - `heartbeat` { }
 
 Outgoing (gateway -> dashboard):
-- `telem_battery` { `total_capacity_mah`, `available_capacity_mah`, `temperature_c`, `pack_voltage_v` }
+- `telem_battery` { `battery_id`, `total_capacity_mah`, `available_capacity_mah`, `temperature_c`, `pack_voltage_v` }
 - `link_status` { `connected`, `last_rx_ms`, `last_tx_ms` }
+
+`battery_id` is `1` or `2`, mapped from SiK message IDs `0x10`/`0x11`.
 
 Link status uses recent heartbeat frames from the ROS bridge; it will report
 `connected: false` if no heartbeat is received within the timeout window

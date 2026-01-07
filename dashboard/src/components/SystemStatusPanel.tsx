@@ -29,6 +29,22 @@ type StatusSnapshot = {
   values: DiagnosticKeyValue[]
 }
 
+type BatteryCardId = 'battery_1' | 'battery_2'
+
+type PackTelemetry = {
+  state_of_charge_pct?: number
+  health_pct?: number
+  temperature_c?: number
+  pack_voltage_v?: number
+  pack_life_cycles?: number
+  firmware_cycle_count?: number
+  nominal_cell_capacity_mah?: number
+  parallel_group_count?: number
+  cell_count?: number
+  cell_voltage_mv?: number[]
+  cell_voltage_valid?: boolean[]
+}
+
 const TOPICS: TopicSpec[] = [
   { id: 'cpu', label: 'CPU', topic: '/system_status/cpu' },
   { id: 'memory', label: 'Memory', topic: '/system_status/memory' },
@@ -38,6 +54,16 @@ const TOPICS: TopicSpec[] = [
   { id: 'swap', label: 'Swap', topic: '/system_status/swap' },
   { id: 'temperatures', label: 'Temperatures', topic: '/system_status/temperatures' },
   { id: 'uptime', label: 'Uptime', topic: '/system_status/uptime' },
+]
+
+const BATTERY_SPECS: Array<{ id: BatteryCardId; label: string }> = [
+  { id: 'battery_1', label: 'Battery 1' },
+  { id: 'battery_2', label: 'Battery 2' },
+]
+
+const BATTERY_TOPICS: Array<{ id: BatteryCardId; topic: string }> = [
+  { id: 'battery_1', topic: '/battery_1/telemetry' },
+  { id: 'battery_2', topic: '/battery_2/telemetry' },
 ]
 
 const BYTE_KEYS = new Set([
@@ -68,8 +94,124 @@ const COUNT_KEYS = new Set([
   'sout',
 ])
 
+const buildBatteryValues = (telem: PackTelemetry): DiagnosticKeyValue[] => {
+  const soc = telem.state_of_charge_pct
+  const health = telem.health_pct
+  const temperature = telem.temperature_c
+  const voltage = telem.pack_voltage_v
+  const packCycles = telem.pack_life_cycles
+  const firmwareCycle = telem.firmware_cycle_count
+  const nominalCellMah = telem.nominal_cell_capacity_mah
+  const parallelGroups = telem.parallel_group_count
+  const cellCount = telem.cell_count
+
+  const totalMah =
+    Number.isFinite(nominalCellMah) && Number.isFinite(parallelGroups)
+      ? (nominalCellMah as number) * (parallelGroups as number)
+      : null
+  const availableMah =
+    totalMah != null && Number.isFinite(soc)
+      ? totalMah * ((soc as number) / 100.0)
+      : null
+
+  const voltages = telem.cell_voltage_mv ?? []
+  const valids = telem.cell_voltage_valid ?? []
+  const validSamples = voltages.filter((value, idx) => {
+    if (!Number.isFinite(value)) return false
+    if (valids.length > 0) {
+      return !!valids[idx]
+    }
+    return value > 0
+  })
+  const validCount = validSamples.length
+  const minMv = validCount ? Math.min(...validSamples) : null
+  const maxMv = validCount ? Math.max(...validSamples) : null
+  const avgMv =
+    validCount > 0 ? validSamples.reduce((sum, v) => sum + v, 0) / validCount : null
+
+  return [
+    {
+      key: 'state_of_charge',
+      value: Number.isFinite(soc) ? `${(soc as number).toFixed(1)} %` : '--',
+    },
+    {
+      key: 'health',
+      value: Number.isFinite(health) ? `${(health as number).toFixed(1)} %` : '--',
+    },
+    {
+      key: 'pack_voltage',
+      value: Number.isFinite(voltage) ? `${(voltage as number).toFixed(2)} V` : '--',
+    },
+    {
+      key: 'temperature',
+      value: Number.isFinite(temperature)
+        ? `${(temperature as number).toFixed(1)} °C`
+        : '--',
+    },
+    {
+      key: 'pack_life_cycles',
+      value: Number.isFinite(packCycles) ? `${Math.round(packCycles as number)}` : '--',
+    },
+    {
+      key: 'firmware_cycle_count',
+      value: Number.isFinite(firmwareCycle)
+        ? `${Math.round(firmwareCycle as number)}`
+        : '--',
+    },
+    {
+      key: 'nominal_cell_capacity',
+      value: Number.isFinite(nominalCellMah)
+        ? `${Math.round(nominalCellMah as number)} mAh`
+        : '--',
+    },
+    {
+      key: 'parallel_groups',
+      value: Number.isFinite(parallelGroups)
+        ? `${Math.round(parallelGroups as number)}`
+        : '--',
+    },
+    {
+      key: 'cell_count',
+      value: Number.isFinite(cellCount) ? `${Math.round(cellCount as number)}` : '--',
+    },
+    {
+      key: 'available_capacity',
+      value:
+        availableMah != null ? `${(availableMah / 1000).toFixed(2)} Ah` : '--',
+    },
+    {
+      key: 'total_capacity',
+      value: totalMah != null ? `${(totalMah / 1000).toFixed(2)} Ah` : '--',
+    },
+    {
+      key: 'cell_voltage_min',
+      value: minMv != null ? `${(minMv / 1000).toFixed(3)} V` : '--',
+    },
+    {
+      key: 'cell_voltage_avg',
+      value: avgMv != null ? `${(avgMv / 1000).toFixed(3)} V` : '--',
+    },
+    {
+      key: 'cell_voltage_max',
+      value: maxMv != null ? `${(maxMv / 1000).toFixed(3)} V` : '--',
+    },
+    {
+      key: 'valid_cells',
+      value: Number.isFinite(cellCount)
+        ? `${validCount}/${Math.round(cellCount as number)}`
+        : `${validCount}`,
+    },
+  ]
+}
+
 const SystemStatusPanel = () => {
   const [snapshots, setSnapshots] = useState<Record<string, StatusSnapshot | null>>({})
+  const [batterySnapshots, setBatterySnapshots] = useState<
+    Record<BatteryCardId, StatusSnapshot | null>
+  >({
+    battery_1: null,
+    battery_2: null,
+  })
 
   useEffect(() => {
     const ros = getRosBridgeClient()
@@ -99,18 +241,57 @@ const SystemStatusPanel = () => {
     }
   }, [])
 
+  useEffect(() => {
+    const ros = getRosBridgeClient()
+    ros.connect()
+    const unsubscribers = BATTERY_TOPICS.map((spec) =>
+      ros.subscribe<PackTelemetry>(
+        spec.topic,
+        'mr2_battery_monitor/msg/PackTelemetry',
+        (msg) => {
+          if (!msg) return
+          setBatterySnapshots((prev) => ({
+            ...prev,
+            [spec.id]: {
+              updatedAt: Date.now(),
+              values: buildBatteryValues(msg),
+            },
+          }))
+        },
+        { throttleRate: 1000 }
+      )
+    )
+    return () => {
+      for (const off of unsubscribers) {
+        off()
+      }
+    }
+  }, [])
+
   const cards = useMemo(() => {
-    return TOPICS.map((spec) => {
+    const systemCards = TOPICS.map((spec) => {
       const snapshot = snapshots[spec.id]
       const values = snapshot?.values ?? []
       const sortedValues = [...values].sort((a, b) => a.key.localeCompare(b.key))
       return {
-        spec,
+        spec: { id: spec.id, label: spec.label },
         snapshot,
         values: sortedValues,
       }
     })
-  }, [snapshots])
+
+    const batteryCards = BATTERY_SPECS.map((spec) => {
+      const snapshot = batterySnapshots[spec.id]
+      const values = snapshot?.values ?? []
+      return {
+        spec,
+        snapshot,
+        values,
+      }
+    })
+
+    return [...batteryCards, ...systemCards]
+  }, [snapshots, batterySnapshots])
 
   return (
     <div className="panel-grid" role="tabpanel">

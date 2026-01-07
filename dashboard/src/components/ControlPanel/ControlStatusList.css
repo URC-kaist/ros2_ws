@@ -96,8 +96,9 @@
 }
 
 .battery-meta {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
   font-size: 0.75rem;
   color: var(--muted);
 }
