@@ -5,8 +5,11 @@
 #include <nav2_costmap_2d/cost_values.hpp>
 #include <nav2_costmap_2d/costmap_2d.hpp>
 #include <pluginlib/class_list_macros.hpp>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -46,6 +49,9 @@ void GridMapTraversabilityLayer::onInitialize()
   node->get_parameter(prefix + "flip_x", flip_x_);
   node->get_parameter(prefix + "flip_y", flip_y_);
 
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(node->get_clock());
+  tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
+
   sub_ = node->create_subscription<grid_map_msgs::msg::GridMap>(
     grid_map_topic_, rclcpp::QoS(1),
     std::bind(&GridMapTraversabilityLayer::gridMapCallback, this, std::placeholders::_1));
@@ -77,9 +83,9 @@ void GridMapTraversabilityLayer::gridMapCallback(
 
   const std::string global_frame = layered_costmap_->getGlobalFrameID();
   if (!global_frame.empty() && msg->header.frame_id != global_frame) {
-    RCLCPP_WARN_THROTTLE(
+    RCLCPP_DEBUG_THROTTLE(
       node->get_logger(), *node->get_clock(), 5000,
-      "GridMapTraversabilityLayer: GridMap frame '%s' differs from costmap frame '%s'.",
+      "GridMapTraversabilityLayer: transforming GridMap frame '%s' -> costmap frame '%s'.",
       msg->header.frame_id.c_str(), global_frame.c_str());
   }
 
@@ -87,6 +93,7 @@ void GridMapTraversabilityLayer::gridMapCallback(
     std::lock_guard<std::mutex> lock(mutex_);
     grid_map_ = std::move(local_map);
     map_frame_ = msg->header.frame_id;
+    last_map_stamp_ = rclcpp::Time(msg->header.stamp);
     has_map_ = true;
   }
 }
@@ -99,6 +106,11 @@ void GridMapTraversabilityLayer::updateBounds(
     return;
   }
 
+  auto node = node_.lock();
+  if (!node) {
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(mutex_);
   if (!has_map_) {
     return;
@@ -106,6 +118,43 @@ void GridMapTraversabilityLayer::updateBounds(
 
   const grid_map::Position center = grid_map_.getPosition();
   const grid_map::Length length = grid_map_.getLength();
+  const std::string global_frame = layered_costmap_->getGlobalFrameID();
+  const std::string map_frame = map_frame_;
+  const rclcpp::Time stamp = (last_map_stamp_.nanoseconds() == 0) ?
+    rclcpp::Time(0) : last_map_stamp_;
+
+  if (!global_frame.empty() && !map_frame.empty() && map_frame != global_frame) {
+    geometry_msgs::msg::TransformStamped tf;
+    try {
+      tf = tf_buffer_->lookupTransform(global_frame, map_frame, stamp, tf_timeout_);
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN_THROTTLE(
+        node->get_logger(), *node->get_clock(), 2000,
+        "GridMapTraversabilityLayer: TF lookup failed: %s", ex.what());
+      return;
+    }
+    tf2::Transform T;
+    tf2::fromMsg(tf.transform, T);
+
+    const double half_x = 0.5 * length.x();
+    const double half_y = 0.5 * length.y();
+    const std::array<tf2::Vector3, 4> corners = {
+      tf2::Vector3(center.x() - half_x, center.y() - half_y, 0.0),
+      tf2::Vector3(center.x() - half_x, center.y() + half_y, 0.0),
+      tf2::Vector3(center.x() + half_x, center.y() - half_y, 0.0),
+      tf2::Vector3(center.x() + half_x, center.y() + half_y, 0.0)
+    };
+
+    for (const auto & corner : corners) {
+      const tf2::Vector3 p = T * corner;
+      *min_x = std::min(*min_x, p.x());
+      *min_y = std::min(*min_y, p.y());
+      *max_x = std::max(*max_x, p.x());
+      *max_y = std::max(*max_y, p.y());
+    }
+    return;
+  }
+
   const double half_x = 0.5 * length.x();
   const double half_y = 0.5 * length.y();
 
@@ -123,9 +172,35 @@ void GridMapTraversabilityLayer::updateCosts(
     return;
   }
 
+  auto node = node_.lock();
+  if (!node) {
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(mutex_);
   if (!has_map_ || !grid_map_.exists(layer_)) {
     return;
+  }
+
+  const std::string global_frame = layered_costmap_->getGlobalFrameID();
+  const std::string map_frame = map_frame_;
+  const rclcpp::Time stamp = (last_map_stamp_.nanoseconds() == 0) ?
+    rclcpp::Time(0) : last_map_stamp_;
+  tf2::Transform T;
+  bool use_transform = false;
+
+  if (!global_frame.empty() && !map_frame.empty() && map_frame != global_frame) {
+    geometry_msgs::msg::TransformStamped tf;
+    try {
+      tf = tf_buffer_->lookupTransform(global_frame, map_frame, stamp, tf_timeout_);
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN_THROTTLE(
+        node->get_logger(), *node->get_clock(), 2000,
+        "GridMapTraversabilityLayer: TF lookup failed: %s", ex.what());
+      return;
+    }
+    tf2::fromMsg(tf.transform, T);
+    use_transform = true;
   }
 
   const auto size = grid_map_.getSize();
@@ -145,10 +220,17 @@ void GridMapTraversabilityLayer::updateCosts(
 
     grid_map::Position pos;
     grid_map_.getPosition(*it, pos);
+    double wx = pos.x();
+    double wy = pos.y();
+    if (use_transform) {
+      const tf2::Vector3 p = T * tf2::Vector3(pos.x(), pos.y(), 0.0);
+      wx = p.x();
+      wy = p.y();
+    }
 
     unsigned int mx = 0;
     unsigned int my = 0;
-    if (!master_grid.worldToMap(pos.x(), pos.y(), mx, my)) {
+    if (!master_grid.worldToMap(wx, wy, mx, my)) {
       continue;
     }
 

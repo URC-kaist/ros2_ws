@@ -4,9 +4,12 @@
 #include <grid_map_msgs/msg/grid_map.hpp>
 #include <nav2_costmap_2d/layer.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <mutex>
 #include <string>
+#include <memory>
 
 namespace mr2_rover_auto
 {
@@ -33,6 +36,8 @@ private:
   grid_map::GridMap grid_map_;
   std::mutex mutex_;
   rclcpp::Subscription<grid_map_msgs::msg::GridMap>::SharedPtr sub_;
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
 
   std::string grid_map_topic_;
   std::string layer_;
@@ -46,6 +51,8 @@ private:
   bool flip_y_;
   int unknown_cost_;
   bool has_map_{false};
+  rclcpp::Time last_map_stamp_;
+  const rclcpp::Duration tf_timeout_{rclcpp::Duration::from_seconds(0.1)};
 };
 
 }  // namespace mr2_rover_auto
