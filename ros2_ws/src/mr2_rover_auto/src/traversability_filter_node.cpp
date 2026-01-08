@@ -19,8 +19,7 @@ public:
   : rclcpp::Node(
       "grid_map_filters",
       rclcpp::NodeOptions()
-        .allow_undeclared_parameters(true)
-        .automatically_declare_parameters_from_overrides(true)),
+        .allow_undeclared_parameters(true)),
     filter_chain_("grid_map::GridMap")
   {
     input_topic_ = this->declare_parameter<std::string>("input_topic", "/height_gridmap");

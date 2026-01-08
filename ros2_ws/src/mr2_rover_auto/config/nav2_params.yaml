@@ -118,10 +118,17 @@ local_costmap:
         - "traversability_layer"
         - "inflation_layer"
       traversability_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_topic: /traversability_occupancy
-        map_subscribe_transient_local: true
-        footprint_clearing_enabled: true
+        plugin: "mr2_rover_auto/GridMapTraversabilityLayer"
+        enabled: true
+        grid_map_topic: /traversability_gridmap
+        layer: traversability
+        min_value: 0.0
+        max_value: 1.0
+        invert: true
+        unknown_cost: 255
+        lethal_threshold: -1.0
+        flip_x: true
+        flip_y: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -143,7 +150,7 @@ global_costmap:
       footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]"
       track_unknown_space: true
       plugins:
-        # - "traversability_layer" # TODO: integrate traversability map
+        - "traversability_layer"
         - "static_layer"
         - "inflation_layer"
       static_layer:

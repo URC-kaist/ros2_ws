@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <grid_map_msgs/msg/grid_map.hpp>
+#include <grid_map_ros/grid_map_ros.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
@@ -196,6 +197,14 @@ private:
   {
     const Eigen::Vector3d center_base(x_forward_ / 2.0, y_width_ / 2.0 + y_min_, 0.0);
     const Eigen::Vector3d center_map = T_base_map * center_base;
+
+    grid_map::GridMap map({layer_name_});
+    map.setFrameId(map_frame_);
+    map.setGeometry(
+      grid_map::Length(x_forward_, y_width_), resolution_,
+      grid_map::Position(center_map.x(), center_map.y()));
+    map.setTimestamp(stamp.nanoseconds());
+    map.setBasicLayers({layer_name_});
 
     grid_map_msgs::msg::GridMap msg;
     msg.header.stamp = stamp;

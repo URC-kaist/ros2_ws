@@ -1,5 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <grid_map_msgs/msg/grid_map.hpp>
+#include <grid_map_ros/grid_map_ros.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -7,6 +8,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include <algorithm>
+#include <Eigen/Core>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -65,7 +67,6 @@ private:
       rows = static_cast<std::size_t>(std::round(msg->info.length_y / msg->info.resolution));
       cols = static_cast<std::size_t>(std::round(msg->info.length_x / msg->info.resolution));
     }
-
     if (rows == 0 || cols == 0) {
       RCLCPP_WARN(this->get_logger(), "GridMap has zero-sized layout.");
       return;

@@ -19,6 +19,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_bringup REQUIRED)
+find_package(nav2_costmap_2d REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_behavior_tree REQUIRED)
 find_package(tf2 REQUIRED)
@@ -81,7 +82,7 @@ rclcpp rclcpp_action mr2_action_interface
 
 add_executable(pc2_to_heightmap_node src/pc2_to_heightmap_node.cpp)
 ament_target_dependencies(pc2_to_heightmap_node
-  rclcpp sensor_msgs grid_map_msgs grid_map_core tf2 tf2_ros tf2_eigen pcl_conversions Eigen3
+  rclcpp sensor_msgs grid_map_msgs grid_map_core grid_map_ros tf2 tf2_ros tf2_eigen pcl_conversions Eigen3
 )
 target_link_libraries(pc2_to_heightmap_node ${PCL_LIBRARIES})
 
@@ -92,7 +93,12 @@ ament_target_dependencies(traversability_filter_node
 
 add_executable(gridmap_to_occupancy_node src/gridmap_to_occupancy_node.cpp)
 ament_target_dependencies(gridmap_to_occupancy_node
-  rclcpp grid_map_msgs grid_map_core nav_msgs tf2 tf2_ros tf2_geometry_msgs
+  rclcpp grid_map_msgs grid_map_core grid_map_ros nav_msgs tf2 tf2_ros tf2_geometry_msgs
+)
+
+add_library(mr2_rover_auto_gridmap_layer SHARED src/gridmap_traversability_layer.cpp)
+ament_target_dependencies(mr2_rover_auto_gridmap_layer
+  rclcpp nav2_costmap_2d grid_map_ros grid_map_core grid_map_msgs pluginlib
 )
 
 install(TARGETS
@@ -107,10 +113,17 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}/
 )
 
+install(TARGETS mr2_rover_auto_gridmap_layer
+  LIBRARY DESTINATION lib
+)
+
 install( DIRECTORY include DESTINATION include )
 install( DIRECTORY launch DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY config DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY behavior_trees DESTINATION share/${PROJECT_NAME}/)
 install( DIRECTORY maps DESTINATION share/${PROJECT_NAME}/ )
+install( FILES mr2_rover_auto_plugins.xml DESTINATION share/${PROJECT_NAME}/ )
+
+pluginlib_export_plugin_description_file(nav2_costmap_2d mr2_rover_auto_plugins.xml)
 
 ament_package()
