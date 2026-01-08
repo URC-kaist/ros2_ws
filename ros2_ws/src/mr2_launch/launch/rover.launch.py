@@ -104,13 +104,6 @@ def generate_launch_description():
         name="use_sim_time", value=LaunchConfiguration("use_sim_time")
     )
 
-    pc2_to_heightmap = Node(
-        package="mr2_autonomous",
-        executable="pc2_to_heightmap",
-        name="pc2_to_heightmap",
-        output="screen",
-    )
-
     system_status = Node(
         package="mr2_system_status",
         executable="system_status",
@@ -175,20 +168,6 @@ def generate_launch_description():
                 }.items(),
             )
         ],
-    )
-
-    traversability_map_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [
-                    FindPackageShare("mr2_rover_auto"),
-                #   FindPackageShare("mr2_autonomous"),
-                    "launch",
-                    "traversability_pipeline.launch.py",
-                #   "traversability_map.launch.py",
-                ]
-            )
-        )
     )
 
     aruco_tracker = Node(
@@ -325,8 +304,6 @@ def generate_launch_description():
         rover_real_launch,
         localization_launch,
         system_status,
-        # pc2_to_heightmap,
-        traversability_map_launch,
         aruco_tracker,
         move_group_launch,
         servo_launch,
