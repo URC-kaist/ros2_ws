@@ -102,3 +102,12 @@
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+.battery-stale {
+  opacity: 0.45;
+}
+
+.battery-stale .meter-fill {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+}

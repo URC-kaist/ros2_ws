@@ -10,6 +10,9 @@ const ControlStatusList = () => {
   const [rosConnected, setRosConnected] = useState(false)
   const [battery1, setBattery1] = useState<TelemBattery | null>(null)
   const [battery2, setBattery2] = useState<TelemBattery | null>(null)
+  const [battery1UpdatedAt, setBattery1UpdatedAt] = useState(0)
+  const [battery2UpdatedAt, setBattery2UpdatedAt] = useState(0)
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   useEffect(() => {
     const gateway = getSikGatewayClient()
@@ -19,14 +22,25 @@ const ControlStatusList = () => {
     const offBattery = gateway.onTelemBattery((payload) => {
       if (payload.battery_id === 2) {
         setBattery2(payload)
+        setBattery2UpdatedAt(Date.now())
       } else {
         setBattery1(payload)
+        setBattery1UpdatedAt(Date.now())
       }
     })
     return () => {
       offLink()
       offConnection()
       offBattery()
+    }
+  }, [])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+    return () => {
+      window.clearInterval(interval)
     }
   }, [])
 
@@ -55,6 +69,9 @@ const ControlStatusList = () => {
   }
   const battery1Percent = getBatteryPercent(battery1)
   const battery2Percent = getBatteryPercent(battery2)
+  const batteryStaleMs = 5000
+  const battery1Stale = battery1UpdatedAt === 0 || nowMs - battery1UpdatedAt > batteryStaleMs
+  const battery2Stale = battery2UpdatedAt === 0 || nowMs - battery2UpdatedAt > batteryStaleMs
   let linkState = 'Down'
   let linkDotClass = 'status-dot-error'
   if (wsConnected) {
@@ -108,7 +125,7 @@ const ControlStatusList = () => {
       </section>
       <section className="panel-section">
         <div className="status-list">
-          <div className="status-item battery">
+          <div className={`status-item battery${battery1Stale ? ' battery-stale' : ''}`}>
             <div className="metric-label">
               <span>Battery 1</span>
               <strong>{battery1 ? `${battery1Percent.toFixed(0)}%` : '---'}</strong>
@@ -124,7 +141,7 @@ const ControlStatusList = () => {
               </span>
             </div>
           </div>
-          <div className="status-item battery">
+          <div className={`status-item battery${battery2Stale ? ' battery-stale' : ''}`}>
             <div className="metric-label">
               <span>Battery 2</span>
               <strong>{battery2 ? `${battery2Percent.toFixed(0)}%` : '---'}</strong>
