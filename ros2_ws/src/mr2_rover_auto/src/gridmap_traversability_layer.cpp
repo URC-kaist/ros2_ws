@@ -168,7 +168,7 @@ unsigned char GridMapTraversabilityLayer::valueToCost(float value) const
     return static_cast<unsigned char>(unknown_cost_);
   }
 
-  if (lethal_threshold_ >= 0.0 && value <= lethal_threshold_) {
+  if (lethal_threshold_ >= 0.0 && value >= lethal_threshold_) {
     return nav2_costmap_2d::LETHAL_OBSTACLE;
   }
 

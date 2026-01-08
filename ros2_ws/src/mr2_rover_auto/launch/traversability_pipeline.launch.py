@@ -28,18 +28,33 @@ def generate_launch_description():
     )
     x_forward_arg = DeclareLaunchArgument(
         "x_forward_m",
-        default_value="5.0",
+        default_value="3.0",
         description="Forward range in meters",
     )
     y_width_arg = DeclareLaunchArgument(
         "y_width_m",
-        default_value="3.0",
+        default_value="2.84",
         description="Lateral width in meters",
     )
     resolution_arg = DeclareLaunchArgument(
         "resolution",
-        default_value="0.05",
+        default_value="0.1",
         description="Grid resolution (m)",
+    )
+    voxel_arg = DeclareLaunchArgument(
+        "voxel_size_m",
+        default_value="0.05",
+        description="Voxel size for downsampling (m)",
+    )
+    roi_z_arg = DeclareLaunchArgument(
+        "roi_z_max_m",
+        default_value="3.0",
+        description="Max Z distance in camera frame (m)",
+    )
+    publish_rate_arg = DeclareLaunchArgument(
+        "publish_rate_hz",
+        default_value="5.0",
+        description="Max grid map publish rate (Hz)",
     )
     layer_name_arg = DeclareLaunchArgument(
         "layer_name",
@@ -73,8 +88,13 @@ def generate_launch_description():
     )
     trav_invert_arg = DeclareLaunchArgument(
         "traversability_invert",
-        default_value="true",
+        default_value="false",
         description="Invert traversability when building occupancy",
+    )
+    trav_unknown_arg = DeclareLaunchArgument(
+        "traversability_unknown",
+        default_value="0",
+        description="Unknown occupancy value",
     )
 
     return LaunchDescription(
@@ -85,6 +105,9 @@ def generate_launch_description():
             x_forward_arg,
             y_width_arg,
             resolution_arg,
+            voxel_arg,
+            roi_z_arg,
+            publish_rate_arg,
             layer_name_arg,
             input_topic_arg,
             output_topic_arg,
@@ -92,6 +115,7 @@ def generate_launch_description():
             trav_min_arg,
             trav_max_arg,
             trav_invert_arg,
+            trav_unknown_arg,
             Node(
                 package="mr2_rover_auto",
                 executable="pc2_to_heightmap_node",
@@ -106,6 +130,9 @@ def generate_launch_description():
                         "y_width_m": LaunchConfiguration("y_width_m"),
                         "resolution": LaunchConfiguration("resolution"),
                         "layer_name": LaunchConfiguration("layer_name"),
+                        "voxel_size_m": LaunchConfiguration("voxel_size_m"),
+                        "roi_z_max_m": LaunchConfiguration("roi_z_max_m"),
+                        "publish_rate_hz": LaunchConfiguration("publish_rate_hz"),
                     }
                 ],
             ),
@@ -129,6 +156,7 @@ def generate_launch_description():
                         "min_value": LaunchConfiguration("traversability_min"),
                         "max_value": LaunchConfiguration("traversability_max"),
                         "invert": LaunchConfiguration("traversability_invert"),
+                        "unknown_value": LaunchConfiguration("traversability_unknown"),
                     }
                 ],
             ),

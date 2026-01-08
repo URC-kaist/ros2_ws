@@ -28,8 +28,8 @@ public:
     layer_ = this->declare_parameter<std::string>("layer", "traversability");
     min_value_ = this->declare_parameter<double>("min_value", 0.0);
     max_value_ = this->declare_parameter<double>("max_value", 1.0);
-    invert_ = this->declare_parameter<bool>("invert", true);
-    unknown_value_ = this->declare_parameter<int>("unknown_value", -1);
+    invert_ = this->declare_parameter<bool>("invert", false);
+    unknown_value_ = this->declare_parameter<int>("unknown_value", 0);
 
     rclcpp::QoS qos(1);
     qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);

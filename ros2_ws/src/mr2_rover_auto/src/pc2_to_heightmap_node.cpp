@@ -35,12 +35,13 @@ public:
     output_topic_ = this->declare_parameter<std::string>("output_topic", "height_gridmap");
     base_frame_ = this->declare_parameter<std::string>("base_frame", "base_link");
     map_frame_ = this->declare_parameter<std::string>("map_frame", "base_link");
-    x_forward_ = this->declare_parameter<double>("x_forward_m", 5.0);
-    y_width_ = this->declare_parameter<double>("y_width_m", 3.0);
-    resolution_ = this->declare_parameter<double>("resolution", 0.05);
+    x_forward_ = this->declare_parameter<double>("x_forward_m", 3.0);
+    y_width_ = this->declare_parameter<double>("y_width_m", 2.84);
+    resolution_ = this->declare_parameter<double>("resolution", 0.1);
     layer_name_ = this->declare_parameter<std::string>("layer_name", "elevation");
-    voxel_size_ = this->declare_parameter<double>("voxel_size_m", 0.0);
-    roi_z_max_ = this->declare_parameter<double>("roi_z_max_m", 0.0);
+    voxel_size_ = this->declare_parameter<double>("voxel_size_m", 0.05);
+    roi_z_max_ = this->declare_parameter<double>("roi_z_max_m", 3.0);
+    publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 5.0);
 
     grid_cols_ = static_cast<int>(std::ceil(x_forward_ / resolution_));
     grid_rows_ = static_cast<int>(std::ceil(y_width_ / resolution_));
@@ -65,6 +66,17 @@ public:
 private:
   void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   {
+    if (publish_rate_hz_ > 0.0) {
+      const rclcpp::Time now = this->get_clock()->now();
+      const double period = 1.0 / publish_rate_hz_;
+      if (last_publish_time_.nanoseconds() != 0 &&
+        (now - last_publish_time_).seconds() < period)
+      {
+        return;
+      }
+      last_publish_time_ = now;
+    }
+
     const rclcpp::Time stamp = msg->header.stamp;
     geometry_msgs::msg::TransformStamped tf_cam_map;
     geometry_msgs::msg::TransformStamped tf_cam_base;
@@ -254,6 +266,7 @@ private:
   double resolution_;
   double voxel_size_;
   double roi_z_max_;
+  double publish_rate_hz_;
   double y_min_;
   int grid_cols_;
   int grid_rows_;
@@ -263,6 +276,7 @@ private:
   std::vector<float> sum_bins_;
   std::vector<uint32_t> count_bins_;
   std::vector<float> heightmap_buffer_;
+  rclcpp::Time last_publish_time_;
 };
 
 }  // namespace

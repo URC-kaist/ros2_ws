@@ -103,8 +103,8 @@ local_costmap:
   local_costmap:
     ros__parameters:
       transform_tolerance: 0.3
-      update_frequency: 8.0 # internal calc
-      publish_frequency: 4.0
+      update_frequency: 5.0 # internal calc
+      publish_frequency: 1.0
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: True
@@ -124,9 +124,9 @@ local_costmap:
         layer: traversability
         min_value: 0.0
         max_value: 1.0
-        invert: true
-        unknown_cost: 255
-        lethal_threshold: -1.0
+        invert: false
+        unknown_cost: 0
+        lethal_threshold: 1.0
         flip_x: true
         flip_y: true
       inflation_layer:
@@ -148,7 +148,7 @@ global_costmap:
       # resolution: follow map resolution from map.yaml
       footprint_padding: 0.01  # 로봇 형상 패딩 (m)
       footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]"
-      track_unknown_space: true
+      track_unknown_space: false
       plugins:
         - "traversability_layer"
         - "static_layer"
