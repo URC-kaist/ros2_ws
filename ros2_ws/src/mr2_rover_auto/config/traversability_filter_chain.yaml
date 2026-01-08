@@ -52,6 +52,7 @@ grid_map_filters:
         type: gridMapFilters/MathExpressionFilter
         params:
           output_layer: slope
+          # NOTE: Tune in Field
           expression: acos(normal_vectors_z)
 
       filter7:  # 거칠기(roughness) 계산
@@ -59,6 +60,7 @@ grid_map_filters:
         type: gridMapFilters/MathExpressionFilter
         params:
           output_layer: roughness
+          # NOTE: Tune in Field
           expression: abs(elevation_inpainted - elevation_smooth)
 
       filter8:  # 통행 가능도(traversability) 계산
@@ -66,6 +68,7 @@ grid_map_filters:
         type: gridMapFilters/MathExpressionFilter
         params:
           output_layer: traversability
+          # NOTE: Tune in Field
           expression: |
             0.5 * (1.0 - (slope     / 0.6)) +
             0.5 * (1.0 - (roughness / 0.1))

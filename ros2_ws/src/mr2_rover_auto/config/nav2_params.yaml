@@ -125,8 +125,8 @@ local_costmap:
         min_value: 0.0
         max_value: 1.0
         invert: false
-        unknown_cost: 0
-        lethal_threshold: 1.0
+        unknown_cost: 0 # NOTE: Tune in Field
+        lethal_threshold: 1.0 # NOTE: Tune in Field
         flip_x: true
         flip_y: true
       inflation_layer:

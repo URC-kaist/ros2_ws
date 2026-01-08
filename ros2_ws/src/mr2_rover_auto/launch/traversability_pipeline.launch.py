@@ -88,7 +88,7 @@ def generate_launch_description():
     )
     trav_invert_arg = DeclareLaunchArgument(
         "traversability_invert",
-        default_value="false",
+        default_value="true",
         description="Invert traversability when building occupancy",
     )
     trav_unknown_arg = DeclareLaunchArgument(
