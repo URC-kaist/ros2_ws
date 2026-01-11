@@ -30,7 +30,7 @@ def generate_launch_description():
     use_sim_time_arg = DeclareLaunchArgument(
         "use_sim_time",
         default_value=PythonExpression(
-            ["'", LaunchConfiguration("mode"), "' == 'sim'"]
+            ["'true' if '", LaunchConfiguration("mode"), "' == 'sim' else 'false'"]
         ),
         description="Use simulation time; defaults to true in sim mode and false in real",
     )
