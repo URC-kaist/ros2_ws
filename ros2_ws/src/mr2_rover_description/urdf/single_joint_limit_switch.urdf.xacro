@@ -5,8 +5,8 @@
   <xacro:arg name="motor_id" default="4"/>
   <xacro:arg name="limit_switch_can_id" default="385"/>
   <xacro:arg name="limit_switch_active_high" default="true"/>
-  <xacro:arg name="joint_lower_limit" default="-100"/>
-  <xacro:arg name="joint_upper_limit" default="100"/>
+  <xacro:arg name="joint_lower_limit" default="-4"/>
+  <xacro:arg name="joint_upper_limit" default="4"/>
   <xacro:arg name="homing_search_direction" default="negative"/>
   <xacro:arg name="homing_position" default="0.5"/>
   <xacro:arg name="homing_approach_speed" default="0.05"/>

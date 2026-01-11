@@ -8,23 +8,27 @@
         <plugin>mr2_can_hardware_interface/CanHW</plugin>
       </hardware>
 
-      <!-- <joint name="arm_j1"> -->
-      <!--   <command_interface name="position"/> -->
-      <!--   <state_interface name="position"/> -->
-      <!--   <state_interface name="velocity"/> -->
-      <!--   <state_interface name="effort"/> -->
-      <!--   <param name="actuator">motor1</param> -->
-      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
-      <!--   <param name="motor_id">101</param> -->
-      <!--   <param name="can_iface">${can_iface}</param> -->
-      <!--   <param name="joint_lower_limit">${arm_j1_lower_limit}</param> -->
-      <!--   <param name="joint_upper_limit">${arm_j1_upper_limit}</param> -->
-      <!--   <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
-      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
-      <!--   <param name="homing_device_can_id">201</param> -->
-      <!--   <param name="homing_device_ticks_per_rev">4096</param> -->
-      <!-- </joint> -->
-      <!---->
+      <joint name="arm_j1">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+        <param name="actuator">motor1</param>
+        <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
+        <param name="motor_id">101</param>
+        <param name="can_iface">${can_iface}</param>
+        <param name="joint_lower_limit">${arm_j1_lower_limit}</param>
+        <param name="joint_upper_limit">${arm_j1_upper_limit}</param>
+        <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
+        <param name="homing_device_can_iface">${can_iface}</param>
+        <param name="homing_offset">5.57</param>
+        <param name="homing_split_angle">2.43</param>
+        <param name="homing_encoder_direction">-1.0</param>
+        <param name="homing_device_can_iface">${can_iface}</param>
+        <param name="homing_device_can_id">201</param>
+        <param name="homing_device_ticks_per_rev">4096</param>
+      </joint>
+
       <joint name="arm_j2">
         <command_interface name="position"/>
         <state_interface name="position"/>
@@ -60,7 +64,7 @@
         <param name="joint_upper_limit">${arm_j3_upper_limit}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
         <param name="homing_offset">5.05</param>
-        <param name="homing_split_angle">2.7</param>
+        <param name="homing_split_angle">0.0</param>
         <param name="homing_encoder_direction">-1.0</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">203</param>
@@ -131,18 +135,18 @@
         <param name="homing_backoff_distance">0.12</param>
       </joint>
 
-      <!-- <transmission name="arm_j1_transmission"> -->
-      <!--   <plugin>transmission_interface/SimpleTransmission</plugin> -->
-      <!--   <actuator name="motor1" role="motor1"> -->
-      <!--     <command_interface name="position"/> -->
-      <!--     <state_interface name="position"/> -->
-      <!--     <state_interface name="velocity"/> -->
-      <!--     <state_interface name="effort"/> -->
-      <!--   </actuator> -->
-      <!--   <joint name="arm_j1" role="arm_j1"> -->
-      <!--     <mechanical_reduction>3.0</mechanical_reduction> -->
-      <!--   </joint> -->
-      <!-- </transmission> -->
+      <transmission name="arm_j1_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="motor1" role="motor1">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+          <state_interface name="effort"/>
+        </actuator>
+        <joint name="arm_j1" role="arm_j1">
+          <mechanical_reduction>3.0</mechanical_reduction>
+        </joint>
+      </transmission>
 
       <transmission name="arm_j2_j3_transmission">
         <plugin>transmission_interface/FourBarLinkageTransmission</plugin>
