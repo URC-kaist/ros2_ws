@@ -11,9 +11,9 @@
       </inertial>
       <visual>
         <geometry>
-          <box size="${length} ${width} ${height}"/>
+	<box size="${length/2.0} ${width} ${height}"/>
         </geometry>
-        <origin xyz="0 0 ${height/2.0}"/>
+        <origin xyz="${-length/4.0} 0 ${height/2.0}"/>
       </visual>
       <collision>
         <geometry>
