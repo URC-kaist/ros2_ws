@@ -100,9 +100,9 @@
         <param name="joint_lower_limit">${arm_j3_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j3_upper_limit}</param>
         <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-        <param name="homing_offset">-7.55</param>
+        <param name="homing_offset">4.98</param>
         <param name="homing_split_angle">3.4</param>
-        <param name="homing_encoder_direction">1.0</param>
+        <param name="homing_encoder_direction">-1.0</param>
         <param name="homing_device_can_iface">${can_iface}</param>
         <param name="homing_device_can_id">203</param>
         <param name="homing_device_ticks_per_rev">4096</param>
