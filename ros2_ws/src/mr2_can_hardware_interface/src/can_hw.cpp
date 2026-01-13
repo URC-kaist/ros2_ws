@@ -87,13 +87,17 @@ public:
       joint_data.has_effort_state = false;
 
       if (joint.command_interfaces.size() != 1 ||
-          joint.command_interfaces[0].name !=
-              hardware_interface::HW_IF_POSITION) {
+          (joint.command_interfaces[0].name !=
+               hardware_interface::HW_IF_POSITION &&
+           joint.command_interfaces[0].name !=
+               hardware_interface::HW_IF_VELOCITY)) {
         RCLCPP_ERROR(node_->get_logger(),
-                     "Joint %s must expose a single position command interface",
+                     "Joint %s must expose a single position or velocity "
+                     "command interface",
                      joint.name.c_str());
         return CallbackReturn::ERROR;
       }
+      joint_data.command_interface = joint.command_interfaces[0].name;
 
       bool has_position_state = false;
       for (const auto &state_iface : joint.state_interfaces) {
@@ -473,7 +477,7 @@ public:
         continue;
       }
 
-      interfaces.emplace_back(joint.name, hardware_interface::HW_IF_POSITION,
+      interfaces.emplace_back(joint.name, joints_[it->second].command_interface,
                               &joints_[it->second].command);
     }
 
@@ -601,7 +605,8 @@ public:
     const bool apply_joint_limits = !homing_active_ || homed_;
 
     for (auto &joint : joints_) {
-      if (apply_joint_limits) {
+      if (apply_joint_limits &&
+          joint.command_interface == hardware_interface::HW_IF_POSITION) {
         double limited_command = joint.command;
         if (std::isfinite(limited_command)) {
           if (std::isfinite(joint.lower_limit)) {
@@ -614,8 +619,13 @@ public:
         }
       }
 
-      joint.transmission_passthrough = joint.command + joint.offset;
-      joint.transmission_velocity = 0.0;
+      if (joint.command_interface == hardware_interface::HW_IF_POSITION) {
+        joint.transmission_passthrough = joint.command + joint.offset;
+        joint.transmission_velocity = 0.0;
+      } else {
+        joint.transmission_passthrough = joint.state + joint.offset;
+        joint.transmission_velocity = joint.command;
+      }
       joint.transmission_effort = 0.0;
     }
 
@@ -652,6 +662,7 @@ private:
     double transmission_passthrough{std::numeric_limits<double>::quiet_NaN()};
     double transmission_velocity{std::numeric_limits<double>::quiet_NaN()};
     double transmission_effort{std::numeric_limits<double>::quiet_NaN()};
+    std::string command_interface{hardware_interface::HW_IF_POSITION};
     std::string actuator_name;
     bool has_velocity_state{false};
     bool has_effort_state{false};

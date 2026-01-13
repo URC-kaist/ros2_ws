@@ -66,6 +66,7 @@ def generate_launch_description():
         ["joint_state_broadcaster", "manipulator_controller"],
         start_after=2.0,
         interval=2.0,
+        inactive_controllers=["manipulator_controller"],
     )
 
     return LaunchDescription(
