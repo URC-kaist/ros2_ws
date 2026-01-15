@@ -1,0 +1,14 @@
+#######################################################################
+# MR2 serial device udev rules
+#
+# Copy to /etc/udev/rules.d/99-mr2-serial.rules using the install script:
+#   ./scripts/install_udev_serial_rules.bash
+#
+# Add one line per device. Example entries:
+# SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="DM03L0C6", MODE:="0666", GROUP:="dialout", SYMLINK+="IMU"
+# SUBSYSTEM=="tty", KERNEL=="ttyACM*", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", MODE:="0666", GROUP:="plugdev"
+#######################################################################
+SUBSYSTEM=="tty", KERNEL=="ttyACM*", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", ATTRS{serial}=="NorthRx_", MODE:="0666", GROUP:="dialout", SYMLINK+="ttyRIGHTGNSS"
+SUBSYSTEM=="tty", KERNEL=="ttyACM*", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", ATTRS{serial}=="TowerRx_", MODE:="0666", GROUP:="dialout", SYMLINK+="ttyLEFTGNSS"
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="D30K21VR", MODE:="0666", GROUP:="dialout", SYMLINK+="ttySIK"
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{serial}=="200910120001", MODE:="0666", GROUP:="video", SYMLINK+="videoTOP"
