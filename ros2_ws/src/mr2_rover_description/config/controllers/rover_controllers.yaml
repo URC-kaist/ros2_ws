@@ -8,44 +8,51 @@ controller_manager:
       publish_rate: 50
 
     rover_controller:
-      type: mr2_rover_control/TwistToCommandsController
-    manipulator_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+        type: position_controllers/JointGroupPositionController
+
+    #   type: mr2_rover_control/TwistToCommandsController
+    # manipulator_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
 
 rover_controller:
   ros__parameters:
-    wheel_joints:
-      - fl_wheel_joint
-      - fr_wheel_joint
-      - rl_wheel_joint
-      - rr_wheel_joint
-    steering_joints:
-      - fl_steering_joint
-      - fr_steering_joint
-      - rl_steering_joint
-      - rr_steering_joint
-    wheel_base: 0.95386
-    track_width: 0.6504
-    wheel_radius: 0.125
-    max_steer: 1.5708  # +/- 90 degrees
-    twist_timeout: 0.5
-    odom_publish_rate_hz: 30.0
-    wheel_odom_topic: /wheel_encoder/odometry
-    odom_frame_id: odom
-    base_frame_id: base_link
-    cmd_vel_topic: /cmd_vel
-
-manipulator_controller:
-  ros__parameters:
     joints:
-      - arm_j1
-      - arm_j2
-      - arm_j3
-      - arm_j4
-      - arm_j5
-      - arm_j6
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
+      - fr_steering_joint
+      - rr_steering_joint
+    interface_name: position
+#   ros__parameters:
+#     wheel_joints:
+#       - fl_wheel_joint
+#       - fr_wheel_joint
+#       - rl_wheel_joint
+#       - rr_wheel_joint
+#     steering_joints:
+#       - fl_steering_joint
+#       - fr_steering_joint
+#       - rl_steering_joint
+#       - rr_steering_joint
+#     wheel_base: 0.95386
+#     track_width: 0.6504
+#     wheel_radius: 0.125
+#     max_steer: 1.5708  # +/- 90 degrees
+#     twist_timeout: 0.5
+#     odom_publish_rate_hz: 30.0
+#     wheel_odom_topic: /wheel_encoder/odometry
+#     odom_frame_id: odom
+#     base_frame_id: base_link
+#     cmd_vel_topic: /cmd_vel
+
+# manipulator_controller:
+#   ros__parameters:
+#     joints:
+#       - arm_j1
+#       - arm_j2
+#       - arm_j3
+#       - arm_j4
+#       - arm_j5
+#       - arm_j6
+#     command_interfaces:
+#       - position
+#     state_interfaces:
+#       - position
+#       - velocity

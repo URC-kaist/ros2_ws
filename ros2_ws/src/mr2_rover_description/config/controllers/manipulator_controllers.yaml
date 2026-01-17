@@ -13,7 +13,7 @@ controller_manager:
 manipulator_controller:
   ros__parameters:
     joints:
-      - arm_j1
+      # - arm_j1
       - arm_j2
       - arm_j3
       - arm_j4
