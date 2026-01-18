@@ -31,7 +31,8 @@ public:
     tf_buffer_(this->get_clock()),
     tf_listener_(tf_buffer_)
   {
-    cloud_topic_ = this->declare_parameter<std::string>("cloud_topic", "/rgbd_camera/points");
+    cloud_topic_ = this->declare_parameter<std::string>(
+        "cloud_topic", "/rgbd_camera/depth/color/points");
     output_topic_ = this->declare_parameter<std::string>("output_topic", "height_gridmap");
     base_frame_ = this->declare_parameter<std::string>("base_frame", "base_link");
     map_frame_ = this->declare_parameter<std::string>("map_frame", "base_link");

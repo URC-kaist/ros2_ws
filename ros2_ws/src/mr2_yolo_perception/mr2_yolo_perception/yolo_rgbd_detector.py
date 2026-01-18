@@ -23,9 +23,9 @@ class YoloRgbdDetector(Node):
     def __init__(self) -> None:
         super().__init__("yolo_rgbd_detector")
 
-        self.declare_parameter("rgb_topic", "/rgbd_camera/image")
-        self.declare_parameter("depth_topic", "/rgbd_camera/depth_image")
-        self.declare_parameter("camera_info_topic", "/rgbd_camera/camera_info")
+        self.declare_parameter("rgb_topic", "/rgbd_camera/color/image_raw")
+        self.declare_parameter("depth_topic", "/rgbd_camera/depth/image_rect_raw")
+        self.declare_parameter("camera_info_topic", "/rgbd_camera/color/camera_info")
         self.declare_parameter("annotated_topic", "yolo/annotated_image")
         self.declare_parameter("pose_topic", "yolo/object_pose")
         self.declare_parameter("target_frame", "")

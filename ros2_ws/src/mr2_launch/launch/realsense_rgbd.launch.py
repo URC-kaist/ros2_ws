@@ -100,6 +100,16 @@ def generate_launch_description():
         default_value="true",
         description="Enable pointcloud output",
     )
+    enable_gyro_arg = DeclareLaunchArgument(
+        "enable_gyro",
+        default_value="true",
+        description="Enable IMU gyro stream",
+    )
+    enable_accel_arg = DeclareLaunchArgument(
+        "enable_accel",
+        default_value="true",
+        description="Enable IMU accel stream",
+    )
     log_level_arg = DeclareLaunchArgument(
         "log_level",
         default_value="info",
@@ -111,39 +121,25 @@ def generate_launch_description():
         executable="realsense2_camera_node",
         name=LaunchConfiguration("camera_name"),
         namespace=LaunchConfiguration("camera_namespace"),
-        output="screen",
         parameters=[
-            {"camera_name": LaunchConfiguration("camera_name")},
-            {"camera_namespace": LaunchConfiguration("camera_namespace")},
-            {"serial_no": LaunchConfiguration("serial_no")},
-            {"usb_port_id": LaunchConfiguration("usb_port_id")},
-            {"device_type": LaunchConfiguration("device_type")},
-            {"base_frame_id": LaunchConfiguration("base_frame_id")},
-            {"enable_color": LaunchConfiguration("enable_color")},
-            {"color_width": LaunchConfiguration("color_width")},
-            {"color_height": LaunchConfiguration("color_height")},
-            {"color_fps": LaunchConfiguration("color_fps")},
-            {"rgb_camera.color_profile": LaunchConfiguration("color_profile")},
-            {"enable_depth": LaunchConfiguration("enable_depth")},
-            {"depth_width": LaunchConfiguration("depth_width")},
-            {"depth_height": LaunchConfiguration("depth_height")},
-            {"depth_fps": LaunchConfiguration("depth_fps")},
-            {"depth_module.depth_profile": LaunchConfiguration("depth_profile")},
-            {"align_depth.enable": LaunchConfiguration("align_depth_enable")},
-            {"pointcloud.enable": LaunchConfiguration("pointcloud_enable")},
-            {"publish_tf": True},
+            {
+                "camera_name": LaunchConfiguration("camera_name"),
+                "serial_no": LaunchConfiguration("serial_no"),
+                "usb_port_id": LaunchConfiguration("usb_port_id"),
+                "device_type": LaunchConfiguration("device_type"),
+                "base_frame_id": LaunchConfiguration("base_frame_id"),
+                "enable_color": LaunchConfiguration("enable_color"),
+                "rgb_camera.color_profile": LaunchConfiguration("color_profile"),
+                "enable_depth": LaunchConfiguration("enable_depth"),
+                "depth_module.depth_profile": LaunchConfiguration("depth_profile"),
+                "align_depth.enable": LaunchConfiguration("align_depth_enable"),
+                "pointcloud__neon_.enable": LaunchConfiguration("pointcloud_enable"),
+                "enable_gyro": LaunchConfiguration("enable_gyro"),
+                "enable_accel": LaunchConfiguration("enable_accel"),
+                "log_level": LaunchConfiguration("log_level"),
+            }
         ],
-        arguments=[
-            "--ros-args",
-            "--log-level",
-            LaunchConfiguration("log_level"),
-        ],
-        remappings=[
-            ("/rgbd_camera/color/image_raw", "/rgbd_camera/image"),
-            ("/rgbd_camera/color/camera_info", "/rgbd_camera/camera_info"),
-            ("/rgbd_camera/depth/image_rect_raw", "/rgbd_camera/depth_image"),
-            ("/rgbd_camera/depth/color/points", "/rgbd_camera/points"),
-        ],
+        output="screen",
     )
     camera_base_frame = LaunchConfiguration("base_frame_id")
     camera_link_frame = LaunchConfiguration("camera_frame_id")
@@ -185,6 +181,8 @@ def generate_launch_description():
             depth_profile_arg,
             align_depth_arg,
             pointcloud_arg,
+            enable_gyro_arg,
+            enable_accel_arg,
             log_level_arg,
             realsense_node,
             camera_tf_link,

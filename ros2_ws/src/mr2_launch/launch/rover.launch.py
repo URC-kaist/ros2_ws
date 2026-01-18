@@ -99,7 +99,7 @@ def generate_launch_description():
     )
     aruco_cam_topic_arg = DeclareLaunchArgument(
         "aruco_cam_topic",
-        default_value="/rgbd_camera/image",
+        default_value="/rgbd_camera/color/image_raw",
         description="Base image topic for aruco_opencv (must have matching /camera_info; default is Gazebo RGBD camera)",
     )
 

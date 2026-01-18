@@ -3,7 +3,7 @@
 pc2_to_heightmap:
   ros__parameters:
     use_sim_time: true
-    cloud_topic: /rgbd_camera/points
+    cloud_topic: /rgbd_camera/depth/color/points
     output_topic: /height_gridmap
     base_frame: base_link
     map_frame: base_link

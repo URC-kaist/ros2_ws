@@ -121,6 +121,17 @@ def generate_launch_description():
         ),
     )
 
+    traversability_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_rover_auto"), "launch", "traversability_pipeline.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "use_sim_time": "false",
+        }.items(),
+    )
+
     rover_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -203,6 +214,7 @@ def generate_launch_description():
             right_gnss_frame_arg,
             sik_sim_launch,
             realsense_launch,
+            traversability_launch,
             rover_launch,
             ublox_left_launch,
             ublox_right_launch,

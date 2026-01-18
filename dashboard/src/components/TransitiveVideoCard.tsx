@@ -23,7 +23,7 @@ type TransitiveVideoCardProps = {
 const TransitiveVideoCard = ({
   title = 'Video',
   description = 'Live feed via Transitive WebRTC.',
-  source = '/rgbd_camera/image',
+  source = '/rgbd_camera/color/image_raw',
   jwt,
   videoWidth,
   videoHeight,
