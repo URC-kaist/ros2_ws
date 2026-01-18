@@ -69,7 +69,8 @@ const ControlStatusList = () => {
   }
   const battery1Percent = getBatteryPercent(battery1)
   const battery2Percent = getBatteryPercent(battery2)
-  const batteryStaleMs = 5000
+  // Battery telemetry is ~11.4s in real mode; keep stale threshold above that.
+  const batteryStaleMs = 30000
   const battery1Stale = battery1UpdatedAt === 0 || nowMs - battery1UpdatedAt > batteryStaleMs
   const battery2Stale = battery2UpdatedAt === 0 || nowMs - battery2UpdatedAt > batteryStaleMs
   let linkState = 'Down'

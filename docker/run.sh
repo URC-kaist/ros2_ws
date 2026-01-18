@@ -39,6 +39,7 @@ sudo docker run -d \
   --privileged \
   --name "$CONTAINER_NAME" \
   --hostname "$HOSTNAME_IN_CONTAINER" \
+  -v /dev/videoTOP:/dev/videoTOP \
   -v "$STATE_DIR:/root/.transitive" \
   -v /run/udev:/run/udev:ro \
   -e TR_INSTALL_HASH="$TR_INSTALL_HASH" \

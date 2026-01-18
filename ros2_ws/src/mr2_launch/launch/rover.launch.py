@@ -12,6 +12,7 @@ from launch.substitutions import (
     PythonExpression,
 )
 from launch_ros.actions import Node, SetParameter
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -85,6 +86,16 @@ def generate_launch_description():
         "sik_sim_baud",
         default_value="57600",
         description="Baud rate for the simulated SiK link",
+    )
+    sik_device_arg = DeclareLaunchArgument(
+        "sik_device",
+        default_value="/dev/ttyUSB0",
+        description="Serial device for the real SiK bridge",
+    )
+    sik_baud_arg = DeclareLaunchArgument(
+        "sik_baud",
+        default_value="57600",
+        description="Baud rate for the real SiK bridge",
     )
     aruco_cam_topic_arg = DeclareLaunchArgument(
         "aruco_cam_topic",
@@ -235,8 +246,8 @@ def generate_launch_description():
         name="sik_bridge",
         output="screen",
         parameters=[
-            {"device": "/dev/ttyUSB0"},
-            {"baud": 57600},
+            {"device": LaunchConfiguration("sik_device")},
+            {"baud": LaunchConfiguration("sik_baud")},
             {"heartbeat_timeout_ms": 500},
         ],
         condition=real_condition,
@@ -255,20 +266,45 @@ def generate_launch_description():
         condition=sik_sim_condition,
     )
 
-    foxglove_bridge = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [
-                    FindPackageShare("foxglove_bridge"),
-                    "launch",
-                    "foxglove_bridge_launch.xml",
+    foxglove_bridge = Node(
+        package="foxglove_bridge",
+        executable="foxglove_bridge",
+        name="foxglove_bridge",
+        output="screen",
+        parameters=[
+            {"port": ParameterValue(LaunchConfiguration("foxglove_port"), value_type=int)},
+            {"debug": ParameterValue(False, value_type=bool)},
+            {"address": "0.0.0.0"},
+            {"tls": ParameterValue(False, value_type=bool)},
+            {"certfile": ""},
+            {"keyfile": ""},
+            {"topic_whitelist": [".*"]},
+            {"param_whitelist": [".*"]},
+            {"service_whitelist": [".*"]},
+            {"client_topic_whitelist": [".*"]},
+            {"min_qos_depth": 1},
+            {"max_qos_depth": 10},
+            {"num_threads": 0},
+            {"send_buffer_limit": 10000000},
+            {"use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)},
+            {
+                "capabilities": [
+                    "clientPublish",
+                    "parameters",
+                    "parametersSubscribe",
+                    "services",
+                    "connectionGraph",
+                    "assets",
                 ]
-            )
-        ),
-        launch_arguments={
-            "port": LaunchConfiguration("foxglove_port"),
-            "use_sim_time": LaunchConfiguration("use_sim_time"),
-        }.items(),
+            },
+            {"include_hidden": ParameterValue(False, value_type=bool)},
+            {
+                "asset_uri_allowlist": [
+                    "^package://(?:[-\\w%]+/)*[-\\w%.]+\\.(?:dae|fbx|glb|gltf|jpeg|jpg|mtl|obj|png|stl|tif|tiff|urdf|webp|xacro)$"
+                ]
+            },
+            {"ignore_unresponsive_param_nodes": ParameterValue(True, value_type=bool)},
+        ],
     )
 
     rosbridge_ws = Node(
@@ -298,6 +334,8 @@ def generate_launch_description():
         sik_sim_device_arg,
         sik_sim_peer_arg,
         sik_sim_baud_arg,
+        sik_device_arg,
+        sik_baud_arg,
         aruco_cam_topic_arg,
         use_sim_time_param,
         rover_launch,

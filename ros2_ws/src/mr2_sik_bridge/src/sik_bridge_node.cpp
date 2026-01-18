@@ -19,6 +19,7 @@
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "mr2_battery_monitor/msg/pack_telemetry.hpp"
 #include "mr2_sik_bridge/packets.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 namespace mr2_sik_bridge {
@@ -58,12 +59,12 @@ class SikBridgeNode : public rclcpp::Node {
         create_publisher<geometry_msgs::msg::TwistStamped>(arm_twist_topic_, 10);
 
     battery_sub_1_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
-        battery_1_topic_, 10,
+        battery_1_topic_, rclcpp::SensorDataQoS(),
         [this](const mr2_battery_monitor::msg::PackTelemetry::SharedPtr msg) {
           battery_cb(msg, 1);
         });
     battery_sub_2_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
-        battery_2_topic_, 10,
+        battery_2_topic_, rclcpp::SensorDataQoS(),
         [this](const mr2_battery_monitor::msg::PackTelemetry::SharedPtr msg) {
           battery_cb(msg, 2);
         });
@@ -386,7 +387,8 @@ class SikBridgeNode : public rclcpp::Node {
 
   // State
   rclcpp::Time last_heartbeat_{};
-  std::array<rclcpp::Time, 2> last_battery_tx_{};
+  std::array<rclcpp::Time, 2> last_battery_tx_{
+      {rclcpp::Time(0, 0, RCL_SYSTEM_TIME), rclcpp::Time(0, 0, RCL_SYSTEM_TIME)}};
 };
 
 }  // namespace mr2_sik_bridge

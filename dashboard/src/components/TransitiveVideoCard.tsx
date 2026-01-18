@@ -9,6 +9,15 @@ type TransitiveVideoCardProps = {
   jwt?: string
   videoWidth?: number
   videoHeight?: number
+  type?: string
+  streamtype?: string
+  framerate?: string
+  width?: number | string
+  height?: number | string
+  count?: string
+  quantizer?: string
+  timeout?: string
+  rosversion?: string
 }
 
 const TransitiveVideoCard = ({
@@ -16,14 +25,61 @@ const TransitiveVideoCard = ({
   description = 'Live feed via Transitive WebRTC.',
   source = '/rgbd_camera/image',
   jwt,
-  videoWidth = 320,
-  videoHeight = 240,
+  videoWidth,
+  videoHeight,
+  type = 'rostopic',
+  streamtype,
+  framerate,
+  width,
+  height,
+  count = '1',
+  quantizer = '25',
+  timeout = '1800',
+  rosversion = '2',
 }: TransitiveVideoCardProps) => {
   const [fetchedToken, setFetchedToken] = useState<string | null>(null)
+  const [tokenStatus, setTokenStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
+    'idle'
+  )
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rawToken = jwt ?? fetchedToken ?? ''
   const token = rawToken.trim().replace(/^['"]|['"]$/g, '')
   const missingToken = !token
+  const capabilityProps = useMemo(() => {
+    if (type === 'v4l2src') {
+      return {
+        count,
+        quantizer,
+        source,
+        timeout,
+        type,
+        streamtype,
+        framerate,
+        width: width ? String(width) : undefined,
+        height: height ? String(height) : undefined,
+      }
+    }
+
+    return {
+      count,
+      quantizer,
+      source,
+      timeout,
+      type,
+      rosversion,
+    }
+  }, [
+    count,
+    framerate,
+    height,
+    quantizer,
+    rosversion,
+    source,
+    streamtype,
+    timeout,
+    type,
+    width,
+  ])
 
   const tokenEndpoint = useMemo(() => {
     const explicit = import.meta.env.VITE_TRANSITIVE_TOKEN_URL as string | undefined
@@ -48,16 +104,35 @@ const TransitiveVideoCard = ({
   }, [])
 
   useEffect(() => {
-    if (jwt) return
-    if (fetchedToken) return
+    if (jwt) {
+      setTokenStatus(jwt.trim() ? 'ready' : 'error')
+      return
+    }
+    if (fetchedToken) {
+      setTokenStatus('ready')
+      return
+    }
+
+    let active = true
+    setTokenStatus('loading')
     fetch(tokenEndpoint)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
+        if (!active) return
         if (data?.token && typeof data.token === 'string') {
           setFetchedToken(data.token)
+          setTokenStatus('ready')
+        } else {
+          setTokenStatus('error')
         }
       })
-      .catch(() => null)
+      .catch(() => {
+        if (!active) return
+        setTokenStatus('error')
+      })
+    return () => {
+      active = false
+    }
   }, [jwt, fetchedToken, tokenEndpoint])
 
   useEffect(() => {
@@ -110,19 +185,11 @@ const TransitiveVideoCard = ({
       <p>{description}</p>
       {token ? (
         <div className="transitive-frame" ref={frameRef}>
-          <TransitiveCapability
-            jwt={token}
-            count="1"
-            quantizer="25"
-            rosversion="2"
-            source={source}
-            timeout="1800"
-            type="rostopic"
-          />
+          <TransitiveCapability jwt={token} {...capabilityProps} />
         </div>
       ) : (
         <div className="transitive-placeholder">
-          {missingToken ? 'Missing Transitive JWT' : 'Waiting for token...'}
+          {tokenStatus === 'loading' ? 'Waiting for token...' : 'Missing Transitive JWT'}
         </div>
       )}
     </article>
