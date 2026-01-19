@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="rover_base" params="length:=0.73 width:=0.491 height:=0.19 mass:=10 rocker_size:=0.1 rocker_mass:=0.5 joint_effort:=50 joint_vel:=2.0 joint_lim:=1.57 front_camera_pitch:=0.3491">
+  <xacro:macro name="rover_base" params="length:=0.73 width:=0.491 height:=0.19 mass:=10 rocker_size:=0.1 rocker_mass:=0.5 joint_effort:=50 joint_vel:=2.0 joint_lim:=1.57 front_camera_pitch:=0.523599">
 
     <link name="base_link"/>
 

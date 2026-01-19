@@ -40,26 +40,6 @@ def generate_launch_description():
         default_value="rgbd_camera_front_camera",
         description="Frame ID for the camera link (child of base_frame_id)",
     )
-    enable_color_arg = DeclareLaunchArgument(
-        "enable_color",
-        default_value="true",
-        description="Enable color stream",
-    )
-    color_width_arg = DeclareLaunchArgument(
-        "color_width",
-        default_value="640",
-        description="Color stream width (pixels)",
-    )
-    color_height_arg = DeclareLaunchArgument(
-        "color_height",
-        default_value="480",
-        description="Color stream height (pixels)",
-    )
-    color_fps_arg = DeclareLaunchArgument(
-        "color_fps",
-        default_value="30",
-        description="Color stream FPS",
-    )
     color_profile_arg = DeclareLaunchArgument(
         "color_profile",
         default_value="640x480x30",
@@ -69,26 +49,6 @@ def generate_launch_description():
         "enable_depth",
         default_value="true",
         description="Enable depth stream",
-    )
-    depth_width_arg = DeclareLaunchArgument(
-        "depth_width",
-        default_value="640",
-        description="Depth stream width (pixels)",
-    )
-    depth_height_arg = DeclareLaunchArgument(
-        "depth_height",
-        default_value="480",
-        description="Depth stream height (pixels)",
-    )
-    depth_fps_arg = DeclareLaunchArgument(
-        "depth_fps",
-        default_value="30",
-        description="Depth stream FPS",
-    )
-    depth_profile_arg = DeclareLaunchArgument(
-        "depth_profile",
-        default_value="640x480x30",
-        description="Depth stream profile (width x height x fps)",
     )
     align_depth_arg = DeclareLaunchArgument(
         "align_depth_enable",
@@ -128,14 +88,13 @@ def generate_launch_description():
                 "usb_port_id": LaunchConfiguration("usb_port_id"),
                 "device_type": LaunchConfiguration("device_type"),
                 "base_frame_id": LaunchConfiguration("base_frame_id"),
-                "enable_color": LaunchConfiguration("enable_color"),
                 "rgb_camera.color_profile": LaunchConfiguration("color_profile"),
                 "enable_depth": LaunchConfiguration("enable_depth"),
-                "depth_module.depth_profile": LaunchConfiguration("depth_profile"),
                 "align_depth.enable": LaunchConfiguration("align_depth_enable"),
                 "pointcloud__neon_.enable": LaunchConfiguration("pointcloud_enable"),
                 "enable_gyro": LaunchConfiguration("enable_gyro"),
                 "enable_accel": LaunchConfiguration("enable_accel"),
+                "rgb_camera.power_line_frequency": 2,
                 "log_level": LaunchConfiguration("log_level"),
             }
         ],
@@ -169,16 +128,8 @@ def generate_launch_description():
             device_type_arg,
             base_frame_id_arg,
             camera_frame_id_arg,
-            enable_color_arg,
-            color_width_arg,
-            color_height_arg,
-            color_fps_arg,
             color_profile_arg,
             enable_depth_arg,
-            depth_width_arg,
-            depth_height_arg,
-            depth_fps_arg,
-            depth_profile_arg,
             align_depth_arg,
             pointcloud_arg,
             enable_gyro_arg,

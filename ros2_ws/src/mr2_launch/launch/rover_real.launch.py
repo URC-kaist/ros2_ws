@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
@@ -180,6 +180,12 @@ def generate_launch_description():
         }.items(),
     )
 
+    # Stagger GNSS init to avoid simultaneous USB enumeration timeouts
+    ublox_right_launch_delayed = TimerAction(
+        period=0.0,
+        actions=[ublox_right_launch],
+    )
+
     left_navsat_relay = Node(
         package="topic_tools",
         executable="relay",
@@ -216,8 +222,8 @@ def generate_launch_description():
             realsense_launch,
             traversability_launch,
             rover_launch,
-            ublox_left_launch,
-            ublox_right_launch,
+            # ublox_left_launch,
+            # ublox_right_launch_delayed,
             left_navsat_relay,
             right_navsat_relay,
         ]
