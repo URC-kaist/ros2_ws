@@ -70,6 +70,11 @@ def generate_launch_description():
         default_value="true",
         description="Enable IMU accel stream",
     )
+    unite_imu_method_arg = DeclareLaunchArgument(
+        "unite_imu_method",
+        default_value="2",
+        description="Method to unite IMU data",
+    )
     log_level_arg = DeclareLaunchArgument(
         "log_level",
         default_value="info",
@@ -95,6 +100,7 @@ def generate_launch_description():
                 "enable_gyro": LaunchConfiguration("enable_gyro"),
                 "enable_accel": LaunchConfiguration("enable_accel"),
                 "rgb_camera.power_line_frequency": 2,
+                "unite_imu_method": LaunchConfiguration("unite_imu_method"),
                 "log_level": LaunchConfiguration("log_level"),
             }
         ],
@@ -134,6 +140,7 @@ def generate_launch_description():
             pointcloud_arg,
             enable_gyro_arg,
             enable_accel_arg,
+            unite_imu_method_arg,
             log_level_arg,
             realsense_node,
             camera_tf_link,

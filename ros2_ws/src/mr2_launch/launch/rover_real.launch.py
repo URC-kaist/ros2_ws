@@ -2,7 +2,12 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import (
+    EnvironmentVariable,
+    LaunchConfiguration,
+    PathJoinSubstitution,
+    PythonExpression,
+)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -98,6 +103,51 @@ def generate_launch_description():
         default_value="right_gnss",
         description="Frame ID for right GNSS NavSatFix",
     )
+    enable_ntrip_arg = DeclareLaunchArgument(
+        "enable_ntrip",
+        default_value="false",
+        description="Start NTRIP client for RTCM corrections",
+    )
+    ntrip_use_https_arg = DeclareLaunchArgument(
+        "ntrip_use_https",
+        default_value="false",
+        description="Use HTTPS to reach NTRIP caster",
+    )
+    ntrip_host_arg = DeclareLaunchArgument(
+        "ntrip_host",
+        default_value="www.gnssdata.or.kr",
+        description="NTRIP caster host",
+    )
+    ntrip_port_arg = DeclareLaunchArgument(
+        "ntrip_port",
+        default_value="2101",
+        description="NTRIP caster port",
+    )
+    ntrip_mountpoint_arg = DeclareLaunchArgument(
+        "ntrip_mountpoint",
+        default_value="SEJN-RTCM32",
+        description="NTRIP mountpoint",
+    )
+    ntrip_username_arg = DeclareLaunchArgument(
+        "ntrip_username",
+        default_value=EnvironmentVariable("NTRIP_USERNAME", default_value="gmmyung@kaist.ac.kr"),
+        description="NTRIP username (can also set NTRIP_USERNAME env var)",
+    )
+    ntrip_password_arg = DeclareLaunchArgument(
+        "ntrip_password",
+        default_value=EnvironmentVariable("NTRIP_PASSWORD", default_value="gnss"),
+        description="NTRIP password (can also set NTRIP_PASSWORD env var)",
+    )
+    ntrip_log_level_arg = DeclareLaunchArgument(
+        "ntrip_log_level",
+        default_value="INFO",
+        description="Log level for NTRIP client",
+    )
+    ntrip_maxage_conn_arg = DeclareLaunchArgument(
+        "ntrip_maxage_conn",
+        default_value="30",
+        description="Max age for reconnection attempts (seconds)",
+    )
 
     sik_sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -130,6 +180,25 @@ def generate_launch_description():
         launch_arguments={
             "use_sim_time": "false",
         }.items(),
+    )
+
+    ntrip_client_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("ublox_dgnss"), "launch", "ntrip_client.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "use_https": LaunchConfiguration("ntrip_use_https"),
+            "host": LaunchConfiguration("ntrip_host"),
+            "port": LaunchConfiguration("ntrip_port"),
+            "mountpoint": LaunchConfiguration("ntrip_mountpoint"),
+            "username": LaunchConfiguration("ntrip_username"),
+            "password": LaunchConfiguration("ntrip_password"),
+            "log_level": LaunchConfiguration("ntrip_log_level"),
+            "maxage_conn": LaunchConfiguration("ntrip_maxage_conn"),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration("enable_ntrip")),
     )
 
     rover_launch = IncludeLaunchDescription(
@@ -181,8 +250,13 @@ def generate_launch_description():
     )
 
     # Stagger GNSS init to avoid simultaneous USB enumeration timeouts
+    ublox_left_launch_delayed = TimerAction(
+        period=40.0,
+        actions=[ublox_left_launch],
+    )
+
     ublox_right_launch_delayed = TimerAction(
-        period=0.0,
+        period=20.0,
         actions=[ublox_right_launch],
     )
 
@@ -202,6 +276,21 @@ def generate_launch_description():
         arguments=["/right_gnss/fix", "/right_gnss/navsat"],
     )
 
+    # Static TF for rocker joints (hardware has no joint states for these)
+    left_rocker_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="left_rocker_static_tf",
+        arguments=["0", "0.2455", "0.06", "0", "0", "0", "base_chassis", "left_rocker"],
+    )
+
+    right_rocker_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="right_rocker_static_tf",
+        arguments=["0", "-0.2455", "0.06", "0", "0", "0", "base_chassis", "right_rocker"],
+    )
+
     return LaunchDescription(
         [
             rviz_arg,
@@ -218,13 +307,25 @@ def generate_launch_description():
             right_gnss_serial_arg,
             left_gnss_frame_arg,
             right_gnss_frame_arg,
+            enable_ntrip_arg,
+            ntrip_use_https_arg,
+            ntrip_host_arg,
+            ntrip_port_arg,
+            ntrip_mountpoint_arg,
+            ntrip_username_arg,
+            ntrip_password_arg,
+            ntrip_log_level_arg,
+            ntrip_maxage_conn_arg,
             sik_sim_launch,
             realsense_launch,
             traversability_launch,
+            ntrip_client_launch,
             rover_launch,
-            # ublox_left_launch,
-            # ublox_right_launch_delayed,
+            ublox_left_launch_delayed,
+            ublox_right_launch_delayed,
             left_navsat_relay,
             right_navsat_relay,
+            left_rocker_static_tf,
+            right_rocker_static_tf,
         ]
     )
