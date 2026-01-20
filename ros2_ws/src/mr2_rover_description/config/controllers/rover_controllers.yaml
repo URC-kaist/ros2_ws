@@ -11,8 +11,8 @@ controller_manager:
         type: position_controllers/JointGroupPositionController
 
     #   type: mr2_rover_control/TwistToCommandsController
-    # manipulator_controller:
-    #   type: joint_trajectory_controller/JointTrajectoryController
+    manipulator_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
 
 rover_controller:
   ros__parameters:
@@ -42,17 +42,17 @@ rover_controller:
 #     base_frame_id: base_link
 #     cmd_vel_topic: /cmd_vel
 
-# manipulator_controller:
-#   ros__parameters:
-#     joints:
-#       - arm_j1
-#       - arm_j2
-#       - arm_j3
-#       - arm_j4
-#       - arm_j5
-#       - arm_j6
-#     command_interfaces:
-#       - position
-#     state_interfaces:
-#       - position
-#       - velocity
+manipulator_controller:
+  ros__parameters:
+    joints:
+      - arm_j1
+      - arm_j2
+      - arm_j3
+      - arm_j4
+      - arm_j5
+      - arm_j6
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
