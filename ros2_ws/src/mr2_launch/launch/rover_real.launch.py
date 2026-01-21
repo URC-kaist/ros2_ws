@@ -37,6 +37,11 @@ def generate_launch_description():
         default_value="false",
         description="Start mock AK servo nodes that emulate the manipulator CAN motors",
     )
+    use_servo_arg = DeclareLaunchArgument(
+        "use_servo",
+        default_value="false",
+        description="If true, launch MoveIt Servo instead of move_group",
+    )
     enable_sik_sim_arg = DeclareLaunchArgument(
         "enable_sik_sim",
         default_value="false",
@@ -213,6 +218,7 @@ def generate_launch_description():
             "controller_config": LaunchConfiguration("controller_config"),
             "can_iface": LaunchConfiguration("can_iface"),
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
+            "use_servo": LaunchConfiguration("use_servo"),
             "sik_device": LaunchConfiguration("sik_device"),
             "sik_baud": LaunchConfiguration("sik_baud"),
             "sik_sim_device": LaunchConfiguration("sik_sim_device"),
@@ -297,6 +303,7 @@ def generate_launch_description():
             controller_config_arg,
             can_iface_arg,
             use_mock_servos_arg,
+            use_servo_arg,
             enable_sik_sim_arg,
             sik_sim_device_arg,
             sik_sim_peer_arg,
