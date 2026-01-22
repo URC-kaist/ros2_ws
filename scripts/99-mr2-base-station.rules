@@ -1,0 +1,9 @@
+#######################################################################
+# MR2 base station udev serial rules
+#
+# Copy to /etc/udev/rules.d/99-mr2-base-station.rules using the install script:
+#   ./scripts/install_udev_base_station_rules.bash
+#
+# Add one line per device here.
+#######################################################################
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="DU0D8YJ3", MODE:="0666", GROUP:="dialout", SYMLINK+="ttySIK"
