@@ -23,6 +23,17 @@ export type TelemBattery = {
   pack_voltage_v: number
 }
 
+export type TelemNav = {
+  timestamp_ms: number
+  latitude_deg: number
+  longitude_deg: number
+  altitude_m: number
+  heading_deg: number
+  cov_x_var: number
+  cov_y_var: number
+  cov_yaw_var: number
+}
+
 export type LinkStatus = {
   connected: boolean
   last_rx_ms: number
@@ -40,8 +51,21 @@ type RawTelemBattery = {
   pack_voltage_v: number
 }
 
+type RawTelemNav = {
+  type: 'telem_nav'
+  timestamp_ms: number
+  latitude_deg: number
+  longitude_deg: number
+  altitude_m: number
+  heading_deg: number
+  cov_x_var: number
+  cov_y_var: number
+  cov_yaw_var: number
+}
+
 type GatewayMessage =
   | RawTelemBattery
+  | RawTelemNav
   | ({ type: 'link_status' } & LinkStatus)
 
 const DEFAULT_PATH = '/sik-ws'
@@ -75,6 +99,7 @@ class SikGatewayClient {
   private linkListeners = new Set<MessageHandler<LinkStatus>>()
   private connectionListeners = new Set<MessageHandler<boolean>>()
   private batteryListeners = new Set<MessageHandler<TelemBattery>>()
+  private navListeners = new Set<MessageHandler<TelemNav>>()
   private url: string
 
   constructor(url: string) {
@@ -121,6 +146,20 @@ class SikGatewayClient {
         for (const listener of this.batteryListeners) {
           listener(payload)
         }
+      } else if (message.type === 'telem_nav') {
+        const payload: TelemNav = {
+          timestamp_ms: message.timestamp_ms,
+          latitude_deg: message.latitude_deg,
+          longitude_deg: message.longitude_deg,
+          altitude_m: message.altitude_m,
+          heading_deg: message.heading_deg,
+          cov_x_var: message.cov_x_var,
+          cov_y_var: message.cov_y_var,
+          cov_yaw_var: message.cov_yaw_var,
+        }
+        for (const listener of this.navListeners) {
+          listener(payload)
+        }
       } else if (message.type === 'link_status') {
         this.lastLinkStatus = message
         this.linkConnected = message.connected
@@ -144,6 +183,11 @@ class SikGatewayClient {
   onTelemBattery(handler: MessageHandler<TelemBattery>) {
     this.batteryListeners.add(handler)
     return () => this.batteryListeners.delete(handler)
+  }
+
+  onTelemNav(handler: MessageHandler<TelemNav>) {
+    this.navListeners.add(handler)
+    return () => this.navListeners.delete(handler)
   }
 
   sendCmdDrive(cmd: CmdDrive) {

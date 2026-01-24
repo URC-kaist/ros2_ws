@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -15,12 +16,14 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "mr2_battery_monitor/msg/pack_telemetry.hpp"
 #include "mr2_sik_bridge/packets.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/nav_sat_fix.hpp"
 
 namespace mr2_sik_bridge {
 
@@ -29,6 +32,7 @@ using mr2_sik_bridge::CmdDrive;
 using mr2_sik_bridge::Frame;
 using mr2_sik_bridge::Heartbeat;
 using mr2_sik_bridge::TelemBattery;
+using mr2_sik_bridge::TelemNav;
 
 class SikBridgeNode : public rclcpp::Node {
  public:
@@ -44,11 +48,16 @@ class SikBridgeNode : public rclcpp::Node {
             declare_parameter<double>("battery_tx_rate_hz", 1.0)),
         heartbeat_tx_rate_hz_(
             declare_parameter<double>("heartbeat_tx_rate_hz", 2.0)),
+        nav_tx_rate_hz_(declare_parameter<double>("nav_tx_rate_hz", 2.0)),
         cmd_vel_topic_(
             declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel")),
         arm_twist_topic_(declare_parameter<std::string>(
             "arm_twist_topic", "/moveit_servo/delta_twist_cmds")),
         arm_frame_id_(declare_parameter<std::string>("arm_frame_id", "base_link")),
+        nav_fix_topic_(
+            declare_parameter<std::string>("nav_fix_topic", "/gps/filtered")),
+        odom_topic_(declare_parameter<std::string>(
+            "odom_topic", "/odometry/filtered/global")),
         battery_1_topic_(declare_parameter<std::string>(
             "battery_1_topic", "battery_1/telemetry")),
         battery_2_topic_(declare_parameter<std::string>(
@@ -69,6 +78,15 @@ class SikBridgeNode : public rclcpp::Node {
           battery_cb(msg, 2);
         });
 
+    nav_fix_sub_ = create_subscription<sensor_msgs::msg::NavSatFix>(
+        nav_fix_topic_, rclcpp::SensorDataQoS(),
+        [this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+          nav_fix_cb_(msg);
+        });
+    odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+        odom_topic_, rclcpp::SensorDataQoS(),
+        [this](const nav_msgs::msg::Odometry::SharedPtr msg) { odom_cb_(msg); });
+
     open_serial_();
     start_reader_();
 
@@ -84,6 +102,14 @@ class SikBridgeNode : public rclcpp::Node {
       heartbeat_tx_timer_ = create_wall_timer(
           std::chrono::duration_cast<std::chrono::nanoseconds>(heartbeat_period),
           std::bind(&SikBridgeNode::send_heartbeat_, this));
+    }
+
+    if (nav_tx_rate_hz_ > 0.0) {
+      const auto nav_period =
+          std::chrono::duration<double>(1.0 / std::max(nav_tx_rate_hz_, 0.1));
+      nav_tx_timer_ = create_wall_timer(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(nav_period),
+          std::bind(&SikBridgeNode::send_nav_, this));
     }
 
     last_heartbeat_ = now();
@@ -332,6 +358,72 @@ class SikBridgeNode : public rclcpp::Node {
     last_tx = now_time;
   }
 
+  void nav_fix_cb_(const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+    if (!msg) {
+      return;
+    }
+    std::lock_guard<std::mutex> lock(nav_mutex_);
+    nav_lat_deg_ = msg->latitude;
+    nav_lon_deg_ = msg->longitude;
+    nav_alt_m_ = msg->altitude;
+    nav_has_fix_ = std::isfinite(nav_lat_deg_) && std::isfinite(nav_lon_deg_);
+  }
+
+  void odom_cb_(const nav_msgs::msg::Odometry::SharedPtr msg) {
+    if (!msg) {
+      return;
+    }
+    const auto &q = msg->pose.pose.orientation;
+    const double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
+    const double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
+    const double yaw = std::atan2(siny_cosp, cosy_cosp);
+
+    const float heading_deg = static_cast<float>(
+        std::fmod((yaw * 180.0 / M_PI) + 360.0, 360.0));
+
+    float cov_x = std::numeric_limits<float>::quiet_NaN();
+    float cov_y = std::numeric_limits<float>::quiet_NaN();
+    float cov_yaw = std::numeric_limits<float>::quiet_NaN();
+    const auto &cov = msg->pose.covariance;
+    if (cov.size() >= 36) {
+      cov_x = static_cast<float>(cov[0]);
+      cov_y = static_cast<float>(cov[7]);
+      cov_yaw = static_cast<float>(cov[35]);
+    }
+
+    std::lock_guard<std::mutex> lock(nav_mutex_);
+    nav_heading_deg_ = heading_deg;
+    nav_cov_x_var_ = cov_x;
+    nav_cov_y_var_ = cov_y;
+    nav_cov_yaw_var_ = cov_yaw;
+    nav_has_heading_ = std::isfinite(nav_heading_deg_);
+  }
+
+  void send_nav_() {
+    if (nav_tx_rate_hz_ <= 0.0) {
+      return;
+    }
+    TelemNav nav;
+    {
+      std::lock_guard<std::mutex> lock(nav_mutex_);
+      if (!nav_has_fix_) {
+        return;
+      }
+      nav.timestamp_ms = static_cast<uint32_t>(now().nanoseconds() / 1000000);
+      nav.latitude_deg = static_cast<float>(nav_lat_deg_);
+      nav.longitude_deg = static_cast<float>(nav_lon_deg_);
+      nav.altitude_m = static_cast<float>(nav_alt_m_);
+      nav.heading_deg = nav_has_heading_ ? nav_heading_deg_
+                                         : std::numeric_limits<float>::quiet_NaN();
+      nav.cov_x_var = nav_cov_x_var_;
+      nav.cov_y_var = nav_cov_y_var_;
+      nav.cov_yaw_var = nav_cov_yaw_var_;
+    }
+
+    auto frame = mr2_sik_bridge::encode_telem_nav(next_seq_(), nav);
+    write_frame_(frame);
+  }
+
   void write_frame_(const std::vector<uint8_t> &frame) {
     std::lock_guard<std::mutex> lock(write_mutex_);
     if (fd_ < 0) {
@@ -361,9 +453,12 @@ class SikBridgeNode : public rclcpp::Node {
   double zero_publish_rate_hz_;
   double battery_tx_rate_hz_;
   double heartbeat_tx_rate_hz_;
+  double nav_tx_rate_hz_;
   std::string cmd_vel_topic_;
   std::string arm_twist_topic_;
   std::string arm_frame_id_;
+  std::string nav_fix_topic_;
+  std::string odom_topic_;
   std::string battery_1_topic_;
   std::string battery_2_topic_;
   bool log_frames_;
@@ -375,8 +470,11 @@ class SikBridgeNode : public rclcpp::Node {
       battery_sub_1_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
       battery_sub_2_;
+  rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr nav_fix_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::TimerBase::SharedPtr zero_timer_;
   rclcpp::TimerBase::SharedPtr heartbeat_tx_timer_;
+  rclcpp::TimerBase::SharedPtr nav_tx_timer_;
 
   // Serial
   int fd_{-1};
@@ -389,6 +487,17 @@ class SikBridgeNode : public rclcpp::Node {
   rclcpp::Time last_heartbeat_{};
   std::array<rclcpp::Time, 2> last_battery_tx_{
       {rclcpp::Time(0, 0, RCL_SYSTEM_TIME), rclcpp::Time(0, 0, RCL_SYSTEM_TIME)}};
+
+  std::mutex nav_mutex_;
+  bool nav_has_fix_{false};
+  bool nav_has_heading_{false};
+  double nav_lat_deg_{0.0};
+  double nav_lon_deg_{0.0};
+  double nav_alt_m_{0.0};
+  float nav_heading_deg_{std::numeric_limits<float>::quiet_NaN()};
+  float nav_cov_x_var_{std::numeric_limits<float>::quiet_NaN()};
+  float nav_cov_y_var_{std::numeric_limits<float>::quiet_NaN()};
+  float nav_cov_yaw_var_{std::numeric_limits<float>::quiet_NaN()};
 };
 
 }  // namespace mr2_sik_bridge

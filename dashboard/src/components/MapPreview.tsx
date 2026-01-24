@@ -1,25 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { getRosBridgeClient } from '../lib/rosBridge'
-
-type NavSatFix = {
-  latitude: number
-  longitude: number
-  altitude: number
-}
-
-type Quaternion = { x: number; y: number; z: number; w: number }
-
-type Odometry = {
-  pose: {
-    pose: {
-      position: { x: number; y: number; z: number }
-      orientation: Quaternion
-    }
-    covariance: number[]
-  }
-}
+import { getSikGatewayClient } from '../lib/sikGateway'
 
 const MapPreview = () => {
   const mapRef = useRef<HTMLDivElement | null>(null)
@@ -96,51 +78,33 @@ const MapPreview = () => {
     }
   }, [])
 
-  // Subscribe to fused GPS
+  // Subscribe to GNSS + heading via SiK gateway
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
-    const unsubscribe = ros.subscribe<NavSatFix>(
-      '/gps/filtered',
-      'sensor_msgs/NavSatFix',
-      (msg) => {
-        if (typeof msg?.longitude === 'number' && typeof msg?.latitude === 'number') {
-          setFix([msg.longitude, msg.latitude])
-        }
-      },
-      { throttleRate: 500 }
-    )
-
-    return () => {
-      unsubscribe()
-    }
-  }, [])
-
-  // Subscribe to fused odometry for heading + covariance
-  useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
-    const unsubscribe = ros.subscribe<Odometry>(
-      '/odometry/filtered/global',
-      'nav_msgs/Odometry',
-      (msg) => {
-        const q = msg?.pose?.pose?.orientation
-        const covArr = msg?.pose?.covariance
-        if (q && typeof q.z === 'number' && typeof q.w === 'number') {
-          // yaw from quaternion assuming planar motion
-          const yaw = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
-          setHeadingDeg(((yaw * 180) / Math.PI + 360) % 360)
-        }
-        if (Array.isArray(covArr) && covArr.length >= 36) {
-          setCov({
-            xVar: covArr[0],
-            yVar: covArr[7],
-            yawVar: covArr[35],
-          })
-        }
-      },
-      { throttleRate: 200 }
-    )
+    const sik = getSikGatewayClient()
+    sik.connect()
+    const unsubscribe = sik.onTelemNav((msg) => {
+      if (Number.isFinite(msg.longitude_deg) && Number.isFinite(msg.latitude_deg)) {
+        setFix([msg.longitude_deg, msg.latitude_deg])
+      }
+      if (Number.isFinite(msg.heading_deg)) {
+        setHeadingDeg(msg.heading_deg)
+      } else {
+        setHeadingDeg(null)
+      }
+      if (
+        Number.isFinite(msg.cov_x_var) &&
+        Number.isFinite(msg.cov_y_var) &&
+        Number.isFinite(msg.cov_yaw_var)
+      ) {
+        setCov({
+          xVar: msg.cov_x_var,
+          yVar: msg.cov_y_var,
+          yawVar: msg.cov_yaw_var,
+        })
+      } else {
+        setCov(null)
+      }
+    })
     return () => unsubscribe()
   }, [])
 
