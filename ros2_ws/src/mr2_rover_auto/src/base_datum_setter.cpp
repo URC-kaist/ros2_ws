@@ -57,15 +57,15 @@ class BaseDatumSetter : public rclcpp::Node {
         svin_topic_(
             declare_parameter<std::string>("svin_topic", "/base/ubx_nav_svin")),
         require_svin_complete_(
-            declare_parameter<bool>("require_svin_complete", true)),
+        declare_parameter<bool>("require_svin_complete", true)),
         allow_provisional_(
             declare_parameter<bool>("allow_provisional", false)),
         navsat_service_(
             declare_parameter<std::string>("navsat_service",
-                                           "/navsat_transform/set_datum")),
+                                           "/datum")),
         navsat_query_service_(
             declare_parameter<std::string>("navsat_query_service",
-                                           "/navsat_transform_query/set_datum")) {
+                                           "/datum")) {
     navsat_client_ = create_client<robot_localization::srv::SetDatum>(
         navsat_service_);
     navsat_query_client_ = create_client<robot_localization::srv::SetDatum>(

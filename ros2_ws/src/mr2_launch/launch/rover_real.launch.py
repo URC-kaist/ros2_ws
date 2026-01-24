@@ -330,17 +330,17 @@ def generate_launch_description():
                     "ros2",
                     "service",
                     "call",
-                    "/navsat_transform/set_datum",
+                    "/datum",
                     "robot_localization/srv/SetDatum",
                     PythonExpression(
                         [
-                            "{geo_pose: {position: {latitude: ",
+                            "'{geo_pose: {position: {latitude: ",
                             LaunchConfiguration("datum_lat"),
                             ", longitude: ",
                             LaunchConfiguration("datum_lon"),
                             ", altitude: ",
                             LaunchConfiguration("datum_alt"),
-                            "}}}",
+                            "}}}'",
                         ]
                     ),
                 ],
@@ -351,17 +351,17 @@ def generate_launch_description():
                     "ros2",
                     "service",
                     "call",
-                    "/navsat_transform_query/set_datum",
+                    "/datum",
                     "robot_localization/srv/SetDatum",
                     PythonExpression(
                         [
-                            "{geo_pose: {position: {latitude: ",
+                            "'{geo_pose: {position: {latitude: ",
                             LaunchConfiguration("datum_lat"),
                             ", longitude: ",
                             LaunchConfiguration("datum_lon"),
                             ", altitude: ",
                             LaunchConfiguration("datum_alt"),
-                            "}}}",
+                            "}}}'",
                         ]
                     ),
                 ],

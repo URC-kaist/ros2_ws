@@ -42,6 +42,8 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
                 {"require_svin_complete": False},
                 {"allow_provisional": True},
+                {"navsat_service": "/datum"},
+                {"navsat_query_service": "/datum"},
             ],
             condition=UnlessCondition(LaunchConfiguration("use_sim_time")),
         ),
