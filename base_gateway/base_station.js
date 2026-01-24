@@ -42,6 +42,7 @@ class BaseStationAntenna extends EventEmitter {
     this.device = options.device || null
     this.baud = options.baud || 115200
     this.port = options.port || null
+    this.disableControlLines = options.disableControlLines !== false
     this.seq = 0
     this.rxBuffer = Buffer.alloc(0)
 
@@ -59,7 +60,18 @@ class BaseStationAntenna extends EventEmitter {
   }
 
   _attachPort(port) {
-    port.on('open', () => this.emit('open'))
+    port.on('open', () => {
+      if (this.disableControlLines && typeof port.set === 'function') {
+        port.set({ dtr: false, rts: false }, (err) => {
+          if (err) {
+            this.emit('serial_error', err)
+          }
+          this.emit('open')
+        })
+        return
+      }
+      this.emit('open')
+    })
     port.on('close', () => this.emit('close'))
     port.on('error', (err) => this.emit('serial_error', err))
     port.on('data', (data) => {
