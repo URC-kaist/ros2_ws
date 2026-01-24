@@ -71,8 +71,9 @@ class BaseDatumSetter : public rclcpp::Node {
     navsat_query_client_ = create_client<robot_localization::srv::SetDatum>(
         navsat_query_service_);
 
+    auto svin_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
     svin_sub_ = create_subscription<ublox_ubx_msgs::msg::UBXNavSvin>(
-        svin_topic_, rclcpp::SensorDataQoS(),
+        svin_topic_, svin_qos,
         [this](const ublox_ubx_msgs::msg::UBXNavSvin::SharedPtr msg) {
           handle_svin_(msg);
         });
@@ -121,6 +122,13 @@ class BaseDatumSetter : public rclcpp::Node {
     latest_llh_ = llh;
     latest_valid_ = msg->valid;
     latest_active_ = msg->active;
+    if (!svin_seen_) {
+      svin_seen_ = true;
+      RCLCPP_INFO(get_logger(),
+                  "Received base SVIN (valid=%s active=%s); waiting to set datum",
+                  msg->valid ? "true" : "false",
+                  msg->active ? "true" : "false");
+    }
     try_set_datum_();
   }
 
@@ -163,6 +171,7 @@ class BaseDatumSetter : public rclcpp::Node {
   std::string navsat_service_;
   std::string navsat_query_service_;
   bool datum_set_{false};
+  bool svin_seen_{false};
   std::optional<Llh> latest_llh_;
   bool latest_valid_{false};
   bool latest_active_{false};
