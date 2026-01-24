@@ -34,7 +34,7 @@ class SikBridgeNode : public rclcpp::Node {
  public:
   SikBridgeNode()
       : rclcpp::Node("sik_bridge"),
-        device_(declare_parameter<std::string>("device", "/dev/ttyUSB0")),
+        device_(declare_parameter<std::string>("device", "/dev/ttySIK")),
         baud_(declare_parameter<int>("baud", 57600)),
         heartbeat_timeout_ms_(
             declare_parameter<int>("heartbeat_timeout_ms", 500)),
