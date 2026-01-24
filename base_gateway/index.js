@@ -139,6 +139,8 @@ const MsgId = {
   TELEM_BATTERY_1: 0x10,
   TELEM_BATTERY_2: 0x11,
   TELEM_NAV: 0x20,
+  BASE_SVIN: 0x30,
+  BASE_RTCM: 0x31,
 }
 
 const MAGIC = 0xa5
@@ -152,6 +154,10 @@ let port = null
 let portReconnectTimer = null
 let antennaTracker = null
 let antennaStatusTimer = null
+let rosBridgeReady = false
+let rosNode = null
+let rclnodejs = null
+let lastSvinTxMs = 0
 
 function schedulePortReconnect() {
   if (portReconnectTimer) return
@@ -230,6 +236,8 @@ if (config.antennaEnable) {
     }, Math.max(config.antennaStatusMs, 200))
   }
 }
+
+startRosBridge()
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url && req.url.startsWith('/transitive/token')) {
@@ -372,6 +380,37 @@ function encodeHeartbeat(cmd) {
   return encodeFrame(MsgId.HEARTBEAT, nextSeq(), payload)
 }
 
+function encodeBaseSvin(msg) {
+  // Payload: int32 mean_x/y/z cm (12), int8 mean_xhp/mean_yhp/mean_zhp (3),
+  // uint8 valid, uint8 active (2), uint32 mean_acc_0p1mm, uint32 obs (8) => 25 bytes
+  const payload = Buffer.alloc(25)
+  payload.writeInt32LE(msg.mean_x_cm | 0, 0)
+  payload.writeInt32LE(msg.mean_y_cm | 0, 4)
+  payload.writeInt32LE(msg.mean_z_cm | 0, 8)
+  payload.writeInt8(msg.mean_x_hp | 0, 12)
+  payload.writeInt8(msg.mean_y_hp | 0, 13)
+  payload.writeInt8(msg.mean_z_hp | 0, 14)
+  payload.writeUInt8(msg.valid ? 1 : 0, 15)
+  payload.writeUInt8(msg.active ? 1 : 0, 16)
+  payload.writeUInt32LE(msg.mean_acc_0p1mm >>> 0, 17)
+  payload.writeUInt32LE(msg.obs >>> 0, 21)
+  return encodeFrame(MsgId.BASE_SVIN, nextSeq(), payload)
+}
+
+function encodeBaseRtcm(msg) {
+  if (!msg || !msg.message) return null
+  const buf = Buffer.from(msg.message)
+  const maxLen = 254 // leave 1 byte for length
+  if (buf.length > maxLen) {
+    log(`Dropping RTCM message >${maxLen} bytes (${buf.length})`)
+    return null
+  }
+  const payload = Buffer.alloc(1 + buf.length)
+  payload.writeUInt8(buf.length, 0)
+  buf.copy(payload, 1)
+  return encodeFrame(MsgId.BASE_RTCM, nextSeq(), payload)
+}
+
 function decodeTelemBattery(payload) {
   if (payload.length < 16) return null
   return {
@@ -463,6 +502,65 @@ function handleDashboardMessage(msg) {
       antennaTracker.setBaseHeadingOffsetDeg(heading)
     }
   }
+}
+
+async function startRosBridge() {
+  try {
+    // eslint-disable-next-line global-require
+    rclnodejs = require('rclnodejs')
+  } catch (err) {
+    log(`ROS bridge disabled: rclnodejs not available (${err.message})`)
+    return
+  }
+
+  try {
+    if (!rclnodejs.isInitialized || !rclnodejs.isInitialized()) {
+      await rclnodejs.init()
+    }
+  } catch (err) {
+    // If already initialised elsewhere, ignore.
+    if (!/already been initialized/i.test(err.message || '')) {
+      log(`ROS bridge init failed: ${err.message}`)
+      return
+    }
+  }
+
+  const nodeName = `base_gateway_ros_${process.pid || Math.floor(Math.random() * 1e5)}`
+  rosNode = new rclnodejs.Node(nodeName)
+
+  rosNode.createSubscription(
+    'ublox_ubx_msgs/msg/UBXNavSvin',
+    '/base/ubx_nav_svin',
+    (msg) => {
+      if (!msg) return
+      const nowMs = Date.now()
+      if (nowMs - lastSvinTxMs < 500) return // throttle ~2 Hz max
+      lastSvinTxMs = nowMs
+      const frame = encodeBaseSvin({
+        mean_x_cm: msg.mean_x,
+        mean_y_cm: msg.mean_y,
+        mean_z_cm: msg.mean_z,
+        mean_x_hp: msg.mean_x_hp,
+        mean_y_hp: msg.mean_y_hp,
+        mean_z_hp: msg.mean_z_hp,
+        valid: !!msg.valid,
+        active: !!msg.active,
+        mean_acc_0p1mm: msg.mean_acc >>> 0,
+        obs: msg.obs >>> 0,
+      })
+      if (frame) writeFrame(frame)
+    }
+  )
+
+  rosNode.createSubscription('rtcm_msgs/msg/Message', '/base/rtcm', (msg) => {
+    if (!msg) return
+    const frame = encodeBaseRtcm(msg)
+    if (frame) writeFrame(frame)
+  })
+
+  rclnodejs.spin(rosNode)
+  rosBridgeReady = true
+  log('ROS bridge started (SVIN + RTCM over SiK)')
 }
 
 let rxBuffer = Buffer.alloc(0)

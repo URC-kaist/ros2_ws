@@ -26,6 +26,8 @@ class ByteWriter {
     buffer_->push_back(static_cast<uint8_t>((value >> 24) & 0xFF));
   }
 
+  void write_i32(int32_t value) { write_u32(static_cast<uint32_t>(value)); }
+
   void write_f32(float value) {
     static_assert(sizeof(float) == 4, "float must be 32-bit IEEE-754");
     uint32_t raw = 0;
@@ -70,6 +72,24 @@ class ByteReader {
     out |= static_cast<uint32_t>(data_[offset_++]) << 16;
     out |= static_cast<uint32_t>(data_[offset_++]) << 24;
     *value = out;
+    return true;
+  }
+
+  bool read_i32(int32_t *value) {
+    uint32_t raw = 0;
+    if (!read_u32(&raw)) {
+      return false;
+    }
+    *value = static_cast<int32_t>(raw);
+    return true;
+  }
+
+  bool read_i8(int8_t *value) {
+    uint8_t raw = 0;
+    if (!read_u8(&raw)) {
+      return false;
+    }
+    *value = static_cast<int8_t>(raw);
     return true;
   }
 
@@ -226,6 +246,49 @@ std::vector<uint8_t> encode_telem_nav(uint8_t seq, const TelemNav &nav) {
   return finalize_frame(header, payload);
 }
 
+std::vector<uint8_t> encode_base_svin(uint8_t seq, const BaseSvin &svin) {
+  std::vector<uint8_t> payload;
+  payload.reserve(25);
+  ByteWriter writer(&payload);
+  writer.write_i32(svin.mean_x_cm);
+  writer.write_i32(svin.mean_y_cm);
+  writer.write_i32(svin.mean_z_cm);
+  writer.write_u8(static_cast<uint8_t>(svin.mean_x_hp));
+  writer.write_u8(static_cast<uint8_t>(svin.mean_y_hp));
+  writer.write_u8(static_cast<uint8_t>(svin.mean_z_hp));
+  writer.write_u8(static_cast<uint8_t>(svin.valid ? 1 : 0));
+  writer.write_u8(static_cast<uint8_t>(svin.active ? 1 : 0));
+  writer.write_u32(svin.mean_acc_0p1mm);
+  writer.write_u32(svin.obs);
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kBaseSvin;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
+std::vector<uint8_t> encode_base_rtcm(uint8_t seq, const BaseRtcm &rtcm) {
+  std::vector<uint8_t> payload;
+  payload.reserve(1 + rtcm.message.size());
+  const size_t max_payload = 255;  // length fits in uint8_t
+  const size_t max_rtcm_len = (max_payload >= 1) ? max_payload - 1 : 0;
+  const size_t len = std::min(rtcm.message.size(), max_rtcm_len);
+  payload.push_back(static_cast<uint8_t>(len));
+  payload.insert(payload.end(), rtcm.message.begin(),
+                 rtcm.message.begin() + static_cast<std::ptrdiff_t>(len));
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kBaseRtcm;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
 std::optional<Frame> decode_frame(const uint8_t *data, size_t length) {
   if (!data || length < kHeaderSize + kCrcSize) {
     return std::nullopt;
@@ -360,6 +423,43 @@ std::optional<TelemNav> decode_telem_nav(const Frame &frame) {
     return std::nullopt;
   }
   return nav;
+}
+
+std::optional<BaseSvin> decode_base_svin(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kBaseSvin || frame.payload.size() != 25) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  BaseSvin svin;
+  uint8_t valid = 0;
+  uint8_t active = 0;
+  if (!reader.read_i32(&svin.mean_x_cm) || !reader.read_i32(&svin.mean_y_cm) ||
+      !reader.read_i32(&svin.mean_z_cm) || !reader.read_i8(&svin.mean_x_hp) ||
+      !reader.read_i8(&svin.mean_y_hp) || !reader.read_i8(&svin.mean_z_hp) ||
+      !reader.read_u8(&valid) || !reader.read_u8(&active) ||
+      !reader.read_u32(&svin.mean_acc_0p1mm) || !reader.read_u32(&svin.obs)) {
+    return std::nullopt;
+  }
+  svin.valid = (valid != 0);
+  svin.active = (active != 0);
+  return svin;
+}
+
+std::optional<BaseRtcm> decode_base_rtcm(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kBaseRtcm) {
+    return std::nullopt;
+  }
+  if (frame.payload.empty()) {
+    return std::nullopt;
+  }
+  const uint8_t len = frame.payload[0];
+  if (frame.payload.size() != static_cast<size_t>(len) + 1) {
+    return std::nullopt;
+  }
+  BaseRtcm rtcm;
+  rtcm.message.assign(frame.payload.begin() + 1, frame.payload.end());
+  return rtcm;
 }
 
 }  // namespace mr2_sik_bridge

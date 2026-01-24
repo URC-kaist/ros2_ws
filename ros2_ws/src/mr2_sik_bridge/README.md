@@ -30,6 +30,8 @@ Notes:
 - `0x10` TELEM_BATTERY_1
 - `0x11` TELEM_BATTERY_2
 - `0x20` TELEM_NAV
+- `0x30` BASE_SVIN (survey-in ECEF + validity)
+- `0x31` BASE_RTCM (raw RTCM byte payload)
 
 ## Payloads (ROS-aligned units)
 
@@ -115,6 +117,25 @@ Derived from:
 - `/odometry/filtered/global` (Odometry) for heading and covariance
 
 Suggested rate: 1–5 Hz.
+
+### BASE_SVIN (msg_id 0x30)
+Payload size: 25 bytes
+
+- `int32 mean_x_cm`, `mean_y_cm`, `mean_z_cm`
+- `int8 mean_x_hp`, `mean_y_hp`, `mean_z_hp`
+- `uint8 valid`, `uint8 active`
+- `uint32 mean_acc_0p1mm`
+- `uint32 obs`
+
+Maps directly to `ublox_ubx_msgs/UBXNavSvin` fields and is published on `/base/ubx_nav_svin` on the rover.
+
+### BASE_RTCM (msg_id 0x31)
+Payload size: 1 + N bytes
+
+- `uint8 length` (N, 0–254)
+- `uint8[N] data` (raw RTCM frame)
+
+Delivered to the rover as `rtcm_msgs/Message` on `/base/rtcm`.
 
 ## Library API
 
