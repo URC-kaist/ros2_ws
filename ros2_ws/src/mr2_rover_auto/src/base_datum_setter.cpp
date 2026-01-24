@@ -1,5 +1,6 @@
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "geographic_msgs/msg/geo_pose.hpp"
@@ -75,6 +76,10 @@ class BaseDatumSetter : public rclcpp::Node {
         [this](const ublox_ubx_msgs::msg::UBXNavSvin::SharedPtr msg) {
           handle_svin_(msg);
         });
+
+    retry_timer_ = create_wall_timer(
+        std::chrono::seconds(1),
+        [this]() { try_set_datum_(); });
   }
 
  private:
@@ -113,10 +118,32 @@ class BaseDatumSetter : public rclcpp::Node {
       return;
     }
 
+    latest_llh_ = llh;
+    latest_valid_ = msg->valid;
+    latest_active_ = msg->active;
+    try_set_datum_();
+  }
+
+  void try_set_datum_() {
+    if (datum_set_ || !latest_llh_) {
+      return;
+    }
+    if (!navsat_client_->service_is_ready()) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                           "Waiting for %s service", navsat_service_.c_str());
+      return;
+    }
+    if (!navsat_query_client_->service_is_ready()) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                           "Waiting for %s service",
+                           navsat_query_service_.c_str());
+      return;
+    }
+
     auto req = std::make_shared<robot_localization::srv::SetDatum::Request>();
-    req->geo_pose.position.latitude = llh.lat_deg;
-    req->geo_pose.position.longitude = llh.lon_deg;
-    req->geo_pose.position.altitude = llh.alt_m;
+    req->geo_pose.position.latitude = latest_llh_->lat_deg;
+    req->geo_pose.position.longitude = latest_llh_->lon_deg;
+    req->geo_pose.position.altitude = latest_llh_->alt_m;
     req->geo_pose.orientation.w = 1.0;
 
     navsat_client_->async_send_request(req);
@@ -125,9 +152,9 @@ class BaseDatumSetter : public rclcpp::Node {
     datum_set_ = true;
     RCLCPP_INFO(get_logger(),
                 "Datum set from base survey-in (valid=%s active=%s): lat=%.8f lon=%.8f alt=%.3f",
-                msg->valid ? "true" : "false",
-                msg->active ? "true" : "false",
-                llh.lat_deg, llh.lon_deg, llh.alt_m);
+                latest_valid_ ? "true" : "false",
+                latest_active_ ? "true" : "false",
+                latest_llh_->lat_deg, latest_llh_->lon_deg, latest_llh_->alt_m);
   }
 
   std::string svin_topic_;
@@ -136,11 +163,15 @@ class BaseDatumSetter : public rclcpp::Node {
   std::string navsat_service_;
   std::string navsat_query_service_;
   bool datum_set_{false};
+  std::optional<Llh> latest_llh_;
+  bool latest_valid_{false};
+  bool latest_active_{false};
 
   rclcpp::Subscription<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr svin_sub_;
   rclcpp::Client<robot_localization::srv::SetDatum>::SharedPtr navsat_client_;
   rclcpp::Client<robot_localization::srv::SetDatum>::SharedPtr
       navsat_query_client_;
+  rclcpp::TimerBase::SharedPtr retry_timer_;
 };
 
 int main(int argc, char **argv) {

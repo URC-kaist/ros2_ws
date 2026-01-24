@@ -107,6 +107,15 @@ class AntennaTracker {
       device: this.device,
       baud: this.baud,
     })
+    this.antenna.on('error', (msg) => {
+      const seq = msg?.seq ?? 'unknown'
+      const code = msg?.code ?? 'unknown'
+      const detail = msg?.detail ?? 'unknown'
+      this.log(`Antenna error seq=${seq} code=${code} detail=${detail}`)
+    })
+    this.antenna.on('serial_error', (err) => {
+      this.log(`Antenna serial error: ${err?.message || err}`)
+    })
     this.antenna.on('open', () => {
       this.antennaReady = true
       this.idleReason = 'serial ready'
