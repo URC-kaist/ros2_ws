@@ -9,7 +9,7 @@ ekf_local:
     world_frame: odom # ekf_local for tf: odom -> base_link
 
     # IMU
-    imu0: /imu/data
+    imu0: /rgbd_camera/imu
     imu0_config: [false, false, false, true, true, false, # unreliable magnet
                   false, false, false, true, true, true, # local gyro
                   true, true, true] # local acceleration
@@ -38,7 +38,7 @@ ekf_local:
     # Recall: What are covariances in KF?
     # P: the estimation of state variance (how reliable is my prediction?)
     # Q: the estimation of process variance (outside noise modelled as Gaussian)
-    # R: the inherent sensor noise (Written in /imu/data and /fix)
+    # R: the inherent sensor noise (Written in /rgbd_camera/imu and /fix)
     
     # Then why "co"variance? Because there are correlations everywhere. -> matrix
 
@@ -72,7 +72,7 @@ ekf_global: # with navsat gps
     world_frame: map # ekf_local for tf: map -> odom
 
     # IMU
-    imu0: /imu/data
+    imu0: /rgbd_camera/imu
     imu0_config: [false, false, false, true, true, false, # unreliable magnet
                   false, false, false, true, true, true, # local gyro
                   true, true, true] # local acceleration
@@ -110,7 +110,7 @@ ekf_global: # with navsat gps
     # Recall: What are covariances in KF?
     # P: the estimation of state variance (how reliable is my prediction?)
     # Q: the estimation of process variance (outside noise modelled as Gaussian)
-    # R: the inherent sensor noise (Written in /imu/data and /fix)
+    # R: the inherent sensor noise (Written in /rgbd_camera/imu and /fix)
     
     # Then why "co"variance? Because there are correlations everywhere. -> matrix
 
@@ -133,7 +133,7 @@ ekf_global: # with navsat gps
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  # Ay
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1] # Az
 
-navsat_transform: # gps.fix, /imu/data, odometry/filtered
+navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
   ros__parameters:
     map_frame: map
     odom_frame: odom

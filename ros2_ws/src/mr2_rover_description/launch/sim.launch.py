@@ -161,7 +161,7 @@ def generate_launch_description():
         parameters=[{"use_sim_time": use_sim_time}],
         remappings=[
             ("/world/empty_world/clock", "/clock"),
-            ("/imu", "/imu/data"),  # align Gazebo IMU topic with robot_localization expectations
+            ("/imu", "/rgbd_camera/imu"),  # match RealSense IMU topic used in robot_localization
         ],
         output="screen",
     )

@@ -17,6 +17,8 @@ controller_manager:
 rover_controller:
   ros__parameters:
     joints:
+      - fl_steering_joint
+      - rl_steering_joint
       - fr_steering_joint
       - rr_steering_joint
     interface_name: position
