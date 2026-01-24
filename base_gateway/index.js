@@ -66,6 +66,7 @@ const MsgId = {
   HEARTBEAT: 0x03,
   TELEM_BATTERY_1: 0x10,
   TELEM_BATTERY_2: 0x11,
+  TELEM_NAV: 0x20,
 }
 
 const MAGIC = 0xa5
@@ -252,6 +253,20 @@ function decodeTelemBattery(payload) {
   }
 }
 
+function decodeTelemNav(payload) {
+  if (payload.length < 32) return null
+  return {
+    timestamp_ms: payload.readUInt32LE(0),
+    latitude_deg: payload.readFloatLE(4),
+    longitude_deg: payload.readFloatLE(8),
+    altitude_m: payload.readFloatLE(12),
+    heading_deg: payload.readFloatLE(16),
+    cov_x_var: payload.readFloatLE(20),
+    cov_y_var: payload.readFloatLE(24),
+    cov_yaw_var: payload.readFloatLE(28),
+  }
+}
+
 function writeFrame(frame) {
   if (!serialReady || !port) return
   port.write(frame)
@@ -353,6 +368,13 @@ function handleFrame(msgId, payload) {
     if (!telem) return
     const batteryId = msgId === MsgId.TELEM_BATTERY_2 ? 2 : 1
     broadcast({ type: 'telem_battery', battery_id: batteryId, ...telem })
+    return
+  }
+
+  if (msgId === MsgId.TELEM_NAV) {
+    const nav = decodeTelemNav(payload)
+    if (!nav) return
+    broadcast({ type: 'telem_nav', ...nav })
   }
 }
 

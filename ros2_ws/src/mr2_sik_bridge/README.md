@@ -29,6 +29,7 @@ Notes:
 - `0x03` HEARTBEAT
 - `0x10` TELEM_BATTERY_1
 - `0x11` TELEM_BATTERY_2
+- `0x20` TELEM_NAV
 
 ## Payloads (ROS-aligned units)
 
@@ -97,6 +98,24 @@ Battery index is implied by the message ID:
 
 Suggested rate: 1–2 Hz or on change.
 
+### TELEM_NAV (msg_id 0x20)
+Payload size: 32 bytes
+
+- `uint32 timestamp_ms`
+- `float32 latitude_deg`
+- `float32 longitude_deg`
+- `float32 altitude_m`
+- `float32 heading_deg`
+- `float32 cov_x_var`
+- `float32 cov_y_var`
+- `float32 cov_yaw_var`
+
+Derived from:
+- `/gps/filtered` (NavSatFix) for lat/lon/alt
+- `/odometry/filtered/global` (Odometry) for heading and covariance
+
+Suggested rate: 1–5 Hz.
+
 ## Library API
 
 Header: `mr2_sik_bridge/packets.hpp`
@@ -104,10 +123,10 @@ Header: `mr2_sik_bridge/packets.hpp`
 Key functions:
 - `encode_cmd_drive`, `encode_cmd_arm_twist`, `encode_heartbeat`,
   `encode_telem_battery` (battery 1 by default) / `encode_telem_battery` with
-  `battery_id`
+  `battery_id`, `encode_telem_nav`
 - `decode_frame` (validates magic, size, CRC)
 - `decode_cmd_drive`, `decode_cmd_arm_twist`, `decode_heartbeat`,
-  `decode_telem_battery`
+  `decode_telem_battery`, `decode_telem_nav`
 
 ## Behavior Expectations (out of scope for this package)
 

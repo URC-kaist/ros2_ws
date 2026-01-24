@@ -204,6 +204,28 @@ std::vector<uint8_t> encode_telem_battery(uint8_t seq,
   return finalize_frame(header, payload);
 }
 
+std::vector<uint8_t> encode_telem_nav(uint8_t seq, const TelemNav &nav) {
+  std::vector<uint8_t> payload;
+  payload.reserve(32);
+  ByteWriter writer(&payload);
+  writer.write_u32(nav.timestamp_ms);
+  writer.write_f32(nav.latitude_deg);
+  writer.write_f32(nav.longitude_deg);
+  writer.write_f32(nav.altitude_m);
+  writer.write_f32(nav.heading_deg);
+  writer.write_f32(nav.cov_x_var);
+  writer.write_f32(nav.cov_y_var);
+  writer.write_f32(nav.cov_yaw_var);
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kTelemNav;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
 std::optional<Frame> decode_frame(const uint8_t *data, size_t length) {
   if (!data || length < kHeaderSize + kCrcSize) {
     return std::nullopt;
@@ -318,6 +340,26 @@ std::optional<TelemBattery> decode_telem_battery(const Frame &frame) {
     return std::nullopt;
   }
   return telem;
+}
+
+std::optional<TelemNav> decode_telem_nav(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kTelemNav || frame.payload.size() != 32) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  TelemNav nav;
+  if (!reader.read_u32(&nav.timestamp_ms) ||
+      !reader.read_f32(&nav.latitude_deg) ||
+      !reader.read_f32(&nav.longitude_deg) ||
+      !reader.read_f32(&nav.altitude_m) ||
+      !reader.read_f32(&nav.heading_deg) ||
+      !reader.read_f32(&nav.cov_x_var) ||
+      !reader.read_f32(&nav.cov_y_var) ||
+      !reader.read_f32(&nav.cov_yaw_var)) {
+    return std::nullopt;
+  }
+  return nav;
 }
 
 }  // namespace mr2_sik_bridge

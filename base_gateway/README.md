@@ -56,6 +56,7 @@ Incoming (dashboard -> gateway):
 Outgoing (gateway -> dashboard):
 - `telem_battery` { `battery_id`, `total_capacity_mah`, `available_capacity_mah`, `temperature_c`, `pack_voltage_v` }
 - `link_status` { `connected`, `last_rx_ms`, `last_tx_ms` }
+- `telem_nav` { `timestamp_ms`, `latitude_deg`, `longitude_deg`, `altitude_m`, `heading_deg`, `cov_x_var`, `cov_y_var`, `cov_yaw_var` }
 
 `battery_id` is `1` or `2`, mapped from SiK message IDs `0x10`/`0x11`.
 

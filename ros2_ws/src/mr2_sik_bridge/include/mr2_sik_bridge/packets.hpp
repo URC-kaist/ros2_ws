@@ -15,6 +15,7 @@ enum class MsgId : uint8_t {
   kHeartbeat = 0x03,
   kTelemBattery1 = 0x10,
   kTelemBattery2 = 0x11,
+  kTelemNav = 0x20,
   kTelemBattery = kTelemBattery1,
 };
 
@@ -53,6 +54,17 @@ struct TelemBattery {
   float pack_voltage_v{0.0f};
 };
 
+struct TelemNav {
+  uint32_t timestamp_ms{0};
+  float latitude_deg{0.0f};
+  float longitude_deg{0.0f};
+  float altitude_m{0.0f};
+  float heading_deg{0.0f};
+  float cov_x_var{0.0f};
+  float cov_y_var{0.0f};
+  float cov_yaw_var{0.0f};
+};
+
 struct Frame {
   Header header{};
   std::vector<uint8_t> payload;
@@ -66,6 +78,7 @@ std::vector<uint8_t> encode_heartbeat(uint8_t seq, const Heartbeat &hb);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem,
                                           uint8_t battery_id);
+std::vector<uint8_t> encode_telem_nav(uint8_t seq, const TelemNav &nav);
 
 std::optional<Frame> decode_frame(const uint8_t *data, size_t length);
 
@@ -73,5 +86,6 @@ std::optional<CmdDrive> decode_cmd_drive(const Frame &frame);
 std::optional<CmdArmTwist> decode_cmd_arm_twist(const Frame &frame);
 std::optional<Heartbeat> decode_heartbeat(const Frame &frame);
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame);
+std::optional<TelemNav> decode_telem_nav(const Frame &frame);
 
 }  // namespace mr2_sik_bridge
