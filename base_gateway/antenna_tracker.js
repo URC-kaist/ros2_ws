@@ -77,6 +77,7 @@ class AntennaTracker {
     this.autoHome = options.autoHome === true
     this.bootWaitMs = Number.isFinite(options.bootWaitMs) ? options.bootWaitMs : 2000
     this.logHeadingMs = Number.isFinite(options.logHeadingMs) ? options.logHeadingMs : 5000
+    this.allowProvisional = options.allowProvisional !== false
     this.log = typeof options.log === 'function' ? options.log : () => {}
 
     this.antenna = null
@@ -91,6 +92,8 @@ class AntennaTracker {
     this.lastHeadingLogMs = 0
     this.lastCmdMs = 0
     this.idleReason = 'not started'
+    this.baseSvinValid = false
+    this.baseSvinActive = false
   }
 
   async start() {
@@ -188,7 +191,12 @@ class AntennaTracker {
   }
 
   handleSvin_(msg) {
-    if (!msg || !msg.valid) return
+    if (!msg) return
+    const svinValid = !!msg.valid
+    const svinActive = !!msg.active
+    this.baseSvinValid = svinValid
+    this.baseSvinActive = svinActive
+    if (!svinValid && !this.allowProvisional) return
     const meanX = Number(msg.mean_x)
     const meanY = Number(msg.mean_y)
     const meanZ = Number(msg.mean_z)
@@ -267,18 +275,28 @@ class AntennaTracker {
     const baseAgeMs = this.base ? now - this.base.stampMs : null
     const roverAgeMs = this.rover ? now - this.rover.stampMs : null
     const lastCmdAgeMs = this.lastCmdMs ? now - this.lastCmdMs : null
+    const antennaHeadingDeg =
+      this.lastCmdRad != null
+        ? normalizeHeadingDeg(this.headingOffsetDeg + (this.lastCmdRad * 180) / Math.PI)
+        : null
+    const baseFresh = baseAgeMs != null ? baseAgeMs <= this.staleMs : false
+    const roverFresh = roverAgeMs != null ? roverAgeMs <= this.staleMs : false
     return {
       enabled: this.enabled,
       antenna_ready: this.antennaReady,
       auto_home: this.autoHome,
       heading_offset_deg: this.headingOffsetDeg,
+      base_lat_deg: this.base ? this.base.latDeg : null,
+      base_lon_deg: this.base ? this.base.lonDeg : null,
+      base_alt_m: this.base ? this.base.altM : null,
+      antenna_heading_deg: antennaHeadingDeg,
       last_cmd_heading_deg:
         this.lastCmdRad != null ? (this.lastCmdRad * 180) / Math.PI : null,
       last_cmd_age_ms: lastCmdAgeMs,
       base_fix_age_ms: baseAgeMs,
       rover_nav_age_ms: roverAgeMs,
-      base_fix_valid: baseAgeMs != null ? baseAgeMs <= this.staleMs : false,
-      rover_nav_valid: roverAgeMs != null ? roverAgeMs <= this.staleMs : false,
+      base_fix_valid: baseFresh && this.baseSvinValid,
+      rover_nav_valid: roverFresh,
       idle_reason: this.idleReason,
     }
   }

@@ -57,6 +57,8 @@ class BaseDatumSetter : public rclcpp::Node {
             declare_parameter<std::string>("svin_topic", "/base/ubx_nav_svin")),
         require_svin_complete_(
             declare_parameter<bool>("require_svin_complete", true)),
+        allow_provisional_(
+            declare_parameter<bool>("allow_provisional", false)),
         navsat_service_(
             declare_parameter<std::string>("navsat_service",
                                            "/navsat_transform/set_datum")),
@@ -80,7 +82,7 @@ class BaseDatumSetter : public rclcpp::Node {
     if (!msg || datum_set_) {
       return;
     }
-    if (!msg->valid) {
+    if (!msg->valid && !allow_provisional_) {
       return;
     }
     if (require_svin_complete_ && msg->active) {
@@ -122,12 +124,15 @@ class BaseDatumSetter : public rclcpp::Node {
 
     datum_set_ = true;
     RCLCPP_INFO(get_logger(),
-                "Datum set from base survey-in: lat=%.8f lon=%.8f alt=%.3f",
+                "Datum set from base survey-in (valid=%s active=%s): lat=%.8f lon=%.8f alt=%.3f",
+                msg->valid ? "true" : "false",
+                msg->active ? "true" : "false",
                 llh.lat_deg, llh.lon_deg, llh.alt_m);
   }
 
   std::string svin_topic_;
   bool require_svin_complete_;
+  bool allow_provisional_;
   std::string navsat_service_;
   std::string navsat_query_service_;
   bool datum_set_{false};

@@ -59,6 +59,7 @@ You can also configure with environment variables:
 - `BASE_ANTENNA_BOOT_WAIT_MS` (default 2000, delay after serial open)
 - `BASE_ANTENNA_LOG_MS` (default 5000, log antenna heading interval)
 - `BASE_ANTENNA_STATUS_MS` (default 1000, broadcast base_status interval)
+- `BASE_ANTENNA_ALLOW_PROVISIONAL` (true/false, default true; use survey-in mean before valid)
 - `BASE_HEADING_OFFSET_DEG` (default 0, can be overridden by `base_heading`)
 
 ## WebSocket API
@@ -73,7 +74,7 @@ Outgoing (gateway -> dashboard):
 - `telem_battery` { `battery_id`, `total_capacity_mah`, `available_capacity_mah`, `temperature_c`, `pack_voltage_v` }
 - `link_status` { `connected`, `last_rx_ms`, `last_tx_ms` }
 - `telem_nav` { `timestamp_ms`, `latitude_deg`, `longitude_deg`, `altitude_m`, `heading_deg`, `cov_x_var`, `cov_y_var`, `cov_yaw_var` }
-- `base_status` { `enabled`, `antenna_ready`, `auto_home`, `heading_offset_deg`, `last_cmd_heading_deg`, `last_cmd_age_ms`, `base_fix_age_ms`, `rover_nav_age_ms`, `base_fix_valid`, `rover_nav_valid`, `idle_reason` }
+- `base_status` { `enabled`, `antenna_ready`, `auto_home`, `heading_offset_deg`, `base_lat_deg`, `base_lon_deg`, `base_alt_m`, `antenna_heading_deg`, `last_cmd_heading_deg`, `last_cmd_age_ms`, `base_fix_age_ms`, `rover_nav_age_ms`, `base_fix_valid`, `rover_nav_valid`, `idle_reason` }
 
 `battery_id` is `1` or `2`, mapped from SiK message IDs `0x10`/`0x11`.
 

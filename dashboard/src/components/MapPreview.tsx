@@ -7,12 +7,15 @@ const MapPreview = () => {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
+  const baseMarkerRef = useRef<maplibregl.Marker | null>(null)
   const [mapReady, setMapReady] = useState(false)
   const [followRover, setFollowRover] = useState(true)
   const [fix, setFix] = useState<[number, number] | null>(null) // [lng, lat]
   const [headingDeg, setHeadingDeg] = useState<number | null>(null)
   const [cov, setCov] = useState<{ xVar: number; yVar: number; yawVar: number } | null>(null)
   const [trail, setTrail] = useState<[number, number][]>([])
+  const [baseFix, setBaseFix] = useState<[number, number] | null>(null)
+  const [baseHeadingDeg, setBaseHeadingDeg] = useState<number | null>(null)
   const [baseHeadingInput, setBaseHeadingInput] = useState('')
   const [baseHeadingApplied, setBaseHeadingApplied] = useState<number | null>(null)
 
@@ -111,6 +114,22 @@ const MapPreview = () => {
   }, [])
 
   useEffect(() => {
+    const sik = getSikGatewayClient()
+    sik.connect()
+    const unsubscribe = sik.onBaseStatus((status) => {
+      if (Number.isFinite(status.base_lon_deg) && Number.isFinite(status.base_lat_deg)) {
+        setBaseFix([status.base_lon_deg as number, status.base_lat_deg as number])
+      }
+      if (Number.isFinite(status.antenna_heading_deg)) {
+        setBaseHeadingDeg(status.antenna_heading_deg as number)
+      } else {
+        setBaseHeadingDeg(null)
+      }
+    })
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
     if (typeof window === 'undefined') return
     const stored = window.localStorage.getItem('baseHeadingDeg')
     if (!stored) return
@@ -159,6 +178,36 @@ const MapPreview = () => {
     }
   }, [fix, mapReady, followRover])
 
+  // Update base marker when a base fix arrives
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady || !baseFix) return
+
+    if (!baseMarkerRef.current) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      el.setAttribute('width', '30')
+      el.setAttribute('height', '30')
+      el.setAttribute('viewBox', '0 0 30 30')
+      el.innerHTML = `
+        <defs>
+          <filter id="baseGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g filter="url(#baseGlow)" transform="translate(15 15)">
+          <circle cx="0" cy="0" r="6" fill="#f4d35e" stroke="#0b1220" stroke-width="1.5"/>
+          <path d="M 0 -12 L 4 0 L 0 -2 L -4 0 Z" fill="#f4d35e" stroke="#0b1220" stroke-width="1.2"/>
+        </g>
+      `
+      baseMarkerRef.current = new maplibregl.Marker({ element: el, rotationAlignment: 'map' })
+        .setLngLat(baseFix)
+        .addTo(map)
+    } else {
+      baseMarkerRef.current.setLngLat(baseFix)
+    }
+  }, [baseFix, mapReady])
+
   // Rotate marker when heading updates
   useEffect(() => {
     if (!markerRef.current || headingDeg == null) return
@@ -166,6 +215,13 @@ const MapPreview = () => {
     const rotation = 90 - headingDeg // ENU yaw (0=east, CCW) -> MapLibre rotation (0=north, CW)
     markerRef.current.setRotation(rotation)
   }, [headingDeg])
+
+  // Rotate base marker when antenna heading updates
+  useEffect(() => {
+    if (!baseMarkerRef.current || baseHeadingDeg == null) return
+    // @ts-expect-error maplibre marker rotation typing is looser at runtime
+    baseMarkerRef.current.setRotation(baseHeadingDeg)
+  }, [baseHeadingDeg])
 
   // Build trail from successive fixes
   useEffect(() => {

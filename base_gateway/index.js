@@ -35,6 +35,7 @@ const DEFAULT_ANTENNA_SMOOTHING = 0
 const DEFAULT_ANTENNA_BOOT_WAIT_MS = 2000
 const DEFAULT_ANTENNA_LOG_MS = 5000
 const DEFAULT_ANTENNA_STATUS_MS = 1000
+const DEFAULT_ANTENNA_ALLOW_PROVISIONAL = true
 const DEFAULT_BASE_HEADING_OFFSET_DEG = 0
 
 const args = process.argv.slice(2)
@@ -93,6 +94,11 @@ const config = {
     getArg('--antenna-status-ms') ||
       process.env.BASE_ANTENNA_STATUS_MS ||
       DEFAULT_ANTENNA_STATUS_MS
+  ),
+  antennaAllowProvisional: toBool(
+    getArg('--antenna-allow-provisional') ||
+      process.env.BASE_ANTENNA_ALLOW_PROVISIONAL ||
+      DEFAULT_ANTENNA_ALLOW_PROVISIONAL
   ),
   baseHeadingOffsetDeg: toFloat(
     getArg('--base-heading-deg') ||
@@ -210,6 +216,7 @@ if (config.antennaEnable) {
     smoothing: config.antennaSmoothing,
     bootWaitMs: config.antennaBootWaitMs,
     logHeadingMs: config.antennaLogMs,
+    allowProvisional: config.antennaAllowProvisional,
     headingOffsetDeg: config.baseHeadingOffsetDeg,
     log,
   })

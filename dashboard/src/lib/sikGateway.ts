@@ -45,6 +45,10 @@ export type BaseStatus = {
   antenna_ready: boolean
   auto_home: boolean
   heading_offset_deg: number
+  base_lat_deg: number | null
+  base_lon_deg: number | null
+  base_alt_m: number | null
+  antenna_heading_deg: number | null
   last_cmd_heading_deg: number | null
   last_cmd_age_ms: number | null
   base_fix_age_ms: number | null
