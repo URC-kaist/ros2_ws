@@ -30,6 +30,9 @@ find_package(ament_index_cpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(geographic_msgs REQUIRED)
+find_package(robot_localization REQUIRED)
+find_package(ublox_ubx_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
@@ -75,6 +78,11 @@ ament_target_dependencies(gnss_only_client
 rclcpp rclcpp_action mr2_action_interface
 )
 
+add_executable(base_datum_setter src/base_datum_setter.cpp)
+ament_target_dependencies(base_datum_setter
+  rclcpp geographic_msgs robot_localization ublox_ubx_msgs
+)
+
 add_executable(cover_vision_client src/cover_vision_client.cpp)
 ament_target_dependencies(cover_vision_client
 rclcpp rclcpp_action mr2_action_interface
@@ -107,6 +115,7 @@ install(TARGETS
   cover_vision_server
   gnss_only_client
   cover_vision_client
+  base_datum_setter
   pc2_to_heightmap_node
   traversability_filter_node
   gridmap_to_occupancy_node

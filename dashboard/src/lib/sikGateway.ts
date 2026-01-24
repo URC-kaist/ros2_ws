@@ -40,6 +40,20 @@ export type LinkStatus = {
   last_tx_ms: number
 }
 
+export type BaseStatus = {
+  enabled: boolean
+  antenna_ready: boolean
+  auto_home: boolean
+  heading_offset_deg: number
+  last_cmd_heading_deg: number | null
+  last_cmd_age_ms: number | null
+  base_fix_age_ms: number | null
+  rover_nav_age_ms: number | null
+  base_fix_valid: boolean
+  rover_nav_valid: boolean
+  idle_reason: string
+}
+
 type MessageHandler<T> = (payload: T) => void
 
 type RawTelemBattery = {
@@ -63,9 +77,14 @@ type RawTelemNav = {
   cov_yaw_var: number
 }
 
+type RawBaseStatus = {
+  type: 'base_status'
+} & BaseStatus
+
 type GatewayMessage =
   | RawTelemBattery
   | RawTelemNav
+  | RawBaseStatus
   | ({ type: 'link_status' } & LinkStatus)
 
 const DEFAULT_PATH = '/sik-ws'
@@ -100,6 +119,8 @@ class SikGatewayClient {
   private connectionListeners = new Set<MessageHandler<boolean>>()
   private batteryListeners = new Set<MessageHandler<TelemBattery>>()
   private navListeners = new Set<MessageHandler<TelemNav>>()
+  private baseStatusListeners = new Set<MessageHandler<BaseStatus>>()
+  private pendingBaseHeading: number | null = null
   private url: string
 
   constructor(url: string) {
@@ -115,6 +136,10 @@ class SikGatewayClient {
       this.reconnectDelayMs = RECONNECT_BASE_MS
       this.startHeartbeatMonitor()
       this.emitConnectionStatus(true)
+      if (this.pendingBaseHeading != null) {
+        this.sendBaseHeading(this.pendingBaseHeading)
+        this.pendingBaseHeading = null
+      }
     })
     this.ws.addEventListener('close', () => {
       this.connected = false
@@ -160,6 +185,10 @@ class SikGatewayClient {
         for (const listener of this.navListeners) {
           listener(payload)
         }
+      } else if (message.type === 'base_status') {
+        for (const listener of this.baseStatusListeners) {
+          listener(message)
+        }
       } else if (message.type === 'link_status') {
         this.lastLinkStatus = message
         this.linkConnected = message.connected
@@ -190,6 +219,11 @@ class SikGatewayClient {
     return () => this.navListeners.delete(handler)
   }
 
+  onBaseStatus(handler: MessageHandler<BaseStatus>) {
+    this.baseStatusListeners.add(handler)
+    return () => this.baseStatusListeners.delete(handler)
+  }
+
   sendCmdDrive(cmd: CmdDrive) {
     this.send({
       type: 'cmd_drive',
@@ -208,6 +242,19 @@ class SikGatewayClient {
 
   sendHeartbeat() {
     this.send({ type: 'heartbeat' })
+  }
+
+  sendBaseHeading(headingDeg: number) {
+    if (!Number.isFinite(headingDeg)) return
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.pendingBaseHeading = headingDeg
+      this.connect()
+      return
+    }
+    this.send({
+      type: 'base_heading',
+      heading_deg: headingDeg,
+    })
   }
 
   private send(payload: Record<string, unknown>) {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getRosBridgeClient } from '../lib/rosBridge'
+import { BaseStatus, getSikGatewayClient } from '../lib/sikGateway'
 import './SystemStatusPanel.css'
 
 type DiagnosticKeyValue = {
@@ -206,12 +207,15 @@ const buildBatteryValues = (telem: PackTelemetry): DiagnosticKeyValue[] => {
 
 const SystemStatusPanel = () => {
   const [snapshots, setSnapshots] = useState<Record<string, StatusSnapshot | null>>({})
+  const [baseStatus, setBaseStatus] = useState<BaseStatus | null>(null)
+  const [baseStatusUpdatedAt, setBaseStatusUpdatedAt] = useState<number | null>(null)
   const [batterySnapshots, setBatterySnapshots] = useState<
     Record<BatteryCardId, StatusSnapshot | null>
   >({
     battery_1: null,
     battery_2: null,
   })
+  const [baseHeadingInput, setBaseHeadingInput] = useState('')
 
   useEffect(() => {
     const ros = getRosBridgeClient()
@@ -268,7 +272,45 @@ const SystemStatusPanel = () => {
     }
   }, [])
 
+  useEffect(() => {
+    const sik = getSikGatewayClient()
+    sik.connect()
+    const unsubscribe = sik.onBaseStatus((status) => {
+      setBaseStatus(status)
+      setBaseStatusUpdatedAt(Date.now())
+    })
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('baseHeadingDeg')
+    if (!stored) return
+    setBaseHeadingInput(stored)
+    const parsed = Number(stored)
+    if (!Number.isFinite(parsed)) return
+    const normalized = ((parsed % 360) + 360) % 360
+    const sik = getSikGatewayClient()
+    sik.connect()
+    sik.sendBaseHeading(normalized)
+  }, [])
+
   const cards = useMemo(() => {
+    const baseValues = baseStatus ? buildBaseValues(baseStatus) : []
+    const baseSnapshot =
+      baseStatusUpdatedAt != null
+        ? {
+            updatedAt: baseStatusUpdatedAt,
+            values: baseValues,
+          }
+        : null
+
+    const baseCard = {
+      spec: { id: 'base_station', label: 'Base Station' },
+      snapshot: baseSnapshot,
+      values: baseValues,
+    }
+
     const systemCards = TOPICS.map((spec) => {
       const snapshot = snapshots[spec.id]
       const values = snapshot?.values ?? []
@@ -290,14 +332,56 @@ const SystemStatusPanel = () => {
       }
     })
 
-    return [...batteryCards, ...systemCards]
-  }, [snapshots, batterySnapshots])
+    return [baseCard, ...batteryCards, ...systemCards]
+  }, [snapshots, batterySnapshots, baseStatus, baseStatusUpdatedAt])
 
   return (
     <div className="panel-grid" role="tabpanel">
       {cards.map(({ spec, snapshot, values }) => (
         <article className="card" key={spec.id}>
           <h3>{spec.label}</h3>
+          {spec.id === 'base_station' ? (
+            <div className="base-heading-row">
+              <div className="base-heading-header">
+                <label htmlFor="base-heading-status" className="base-heading-label">
+                  Heading offset
+                </label>
+                <span className="status-kv-value">
+                  {baseStatus && Number.isFinite(baseStatus.heading_offset_deg)
+                    ? `${baseStatus.heading_offset_deg.toFixed(1)}°`
+                    : '—'}
+                </span>
+              </div>
+              <div className="base-heading-input-row">
+                <input
+                  id="base-heading-status"
+                  type="number"
+                  inputMode="decimal"
+                  value={baseHeadingInput}
+                  onChange={(event) => setBaseHeadingInput(event.target.value)}
+                  placeholder="deg"
+                  className="base-heading-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const parsed = Number(baseHeadingInput)
+                    if (!Number.isFinite(parsed)) return
+                    const normalized = ((parsed % 360) + 360) % 360
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('baseHeadingDeg', String(normalized))
+                    }
+                    const sik = getSikGatewayClient()
+                    sik.connect()
+                    sik.sendBaseHeading(normalized)
+                  }}
+                  className="base-heading-apply"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          ) : null}
           {values.length === 0 ? (
             <div className="status-empty">No data yet.</div>
           ) : (
@@ -319,6 +403,36 @@ const SystemStatusPanel = () => {
       ))}
     </div>
   )
+}
+
+const buildBaseValues = (status: BaseStatus): DiagnosticKeyValue[] => {
+  const yesNo = (value: boolean) => (value ? 'yes' : 'no')
+  const fmtAge = (ms: number | null) =>
+    ms == null || !Number.isFinite(ms) ? '--' : `${(ms / 1000).toFixed(1)} s`
+  return [
+    { key: 'enabled', value: yesNo(status.enabled) },
+    { key: 'serial_ready', value: yesNo(status.antenna_ready) },
+    { key: 'auto_home', value: yesNo(status.auto_home) },
+    {
+      key: 'heading_offset',
+      value: Number.isFinite(status.heading_offset_deg)
+        ? `${status.heading_offset_deg.toFixed(1)} deg`
+        : '--',
+    },
+    {
+      key: 'last_cmd_heading',
+      value:
+        status.last_cmd_heading_deg != null && Number.isFinite(status.last_cmd_heading_deg)
+          ? `${status.last_cmd_heading_deg.toFixed(1)} deg`
+          : '--',
+    },
+    { key: 'last_cmd_age', value: fmtAge(status.last_cmd_age_ms) },
+    { key: 'base_fix_age', value: fmtAge(status.base_fix_age_ms) },
+    { key: 'rover_nav_age', value: fmtAge(status.rover_nav_age_ms) },
+    { key: 'base_fix_valid', value: yesNo(status.base_fix_valid) },
+    { key: 'rover_nav_valid', value: yesNo(status.rover_nav_valid) },
+    { key: 'state', value: status.idle_reason || '--' },
+  ]
 }
 
 const formatKey = (topicId: string, key: string) => {

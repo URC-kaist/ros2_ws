@@ -17,13 +17,25 @@ const jwt = require('jsonwebtoken')
 const { SerialPort } = require('serialport')
 const { WebSocketServer } = require('ws')
 
-const DEFAULT_DEVICE = '/dev/ttyUSB0'
+const DEFAULT_DEVICE = '/dev/ttySIK'
 const DEFAULT_BAUD = 57600
 const DEFAULT_PORT = 8081
 const DEFAULT_HEARTBEAT_HZ = 2
 const DEFAULT_CMD_HZ = 10
 const DEFAULT_CMD_TIMEOUT_MS = 500
 const DEFAULT_LINK_TIMEOUT_MS = 2000
+const DEFAULT_ANTENNA_ENABLE = false
+const DEFAULT_ANTENNA_DEVICE = ''
+const DEFAULT_ANTENNA_BAUD = 115200
+const DEFAULT_ANTENNA_CMD_HZ = 2
+const DEFAULT_ANTENNA_STALE_MS = 5000
+const DEFAULT_ANTENNA_HOME = true
+const DEFAULT_ANTENNA_MAX_DEG = 90
+const DEFAULT_ANTENNA_SMOOTHING = 0
+const DEFAULT_ANTENNA_BOOT_WAIT_MS = 2000
+const DEFAULT_ANTENNA_LOG_MS = 5000
+const DEFAULT_ANTENNA_STATUS_MS = 1000
+const DEFAULT_BASE_HEADING_OFFSET_DEG = 0
 
 const args = process.argv.slice(2)
 const config = {
@@ -39,6 +51,53 @@ const config = {
   ),
   linkTimeoutMs: toInt(
     getArg('--link-timeout-ms') || process.env.SIK_LINK_TIMEOUT_MS || DEFAULT_LINK_TIMEOUT_MS
+  ),
+  antennaEnable: toBool(
+    getArg('--antenna-enable') || process.env.BASE_ANTENNA_ENABLE || DEFAULT_ANTENNA_ENABLE
+  ),
+  antennaDevice:
+    getArg('--antenna-device') || process.env.BASE_ANTENNA_DEVICE || DEFAULT_ANTENNA_DEVICE,
+  antennaBaud: toInt(
+    getArg('--antenna-baud') || process.env.BASE_ANTENNA_BAUD || DEFAULT_ANTENNA_BAUD
+  ),
+  antennaCmdHz: toFloat(
+    getArg('--antenna-cmd-hz') || process.env.BASE_ANTENNA_CMD_HZ || DEFAULT_ANTENNA_CMD_HZ
+  ),
+  antennaStaleMs: toInt(
+    getArg('--antenna-stale-ms') ||
+      process.env.BASE_ANTENNA_STALE_MS ||
+      DEFAULT_ANTENNA_STALE_MS
+  ),
+  antennaHome: toBool(
+    getArg('--antenna-home') || process.env.BASE_ANTENNA_HOME || DEFAULT_ANTENNA_HOME
+  ),
+  antennaMaxDeg: toFloat(
+    getArg('--antenna-max-deg') || process.env.BASE_ANTENNA_MAX_DEG || DEFAULT_ANTENNA_MAX_DEG
+  ),
+  antennaSmoothing: toFloat(
+    getArg('--antenna-smoothing') ||
+      process.env.BASE_ANTENNA_SMOOTHING ||
+      DEFAULT_ANTENNA_SMOOTHING
+  ),
+  antennaBootWaitMs: toInt(
+    getArg('--antenna-boot-wait-ms') ||
+      process.env.BASE_ANTENNA_BOOT_WAIT_MS ||
+      DEFAULT_ANTENNA_BOOT_WAIT_MS
+  ),
+  antennaLogMs: toInt(
+    getArg('--antenna-log-ms') ||
+      process.env.BASE_ANTENNA_LOG_MS ||
+      DEFAULT_ANTENNA_LOG_MS
+  ),
+  antennaStatusMs: toInt(
+    getArg('--antenna-status-ms') ||
+      process.env.BASE_ANTENNA_STATUS_MS ||
+      DEFAULT_ANTENNA_STATUS_MS
+  ),
+  baseHeadingOffsetDeg: toFloat(
+    getArg('--base-heading-deg') ||
+      process.env.BASE_HEADING_OFFSET_DEG ||
+      DEFAULT_BASE_HEADING_OFFSET_DEG
   ),
 }
 
@@ -60,6 +119,13 @@ function toFloat(value) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function toBool(value) {
+  if (value === true || value === false) return value
+  const text = String(value).toLowerCase()
+  return text === '1' || text === 'true' || text === 'yes' || text === 'on'
+}
+
+const { AntennaTracker } = require('./antenna_tracker')
 const MsgId = {
   CMD_DRIVE: 0x01,
   CMD_ARM_TWIST: 0x02,
@@ -78,6 +144,8 @@ let lastTxMs = 0
 let lastHeartbeatRxMs = 0
 let port = null
 let portReconnectTimer = null
+let antennaTracker = null
+let antennaStatusTimer = null
 
 function schedulePortReconnect() {
   if (portReconnectTimer) return
@@ -130,6 +198,32 @@ function setupPort() {
 
 setupPort()
 
+if (config.antennaEnable) {
+  antennaTracker = new AntennaTracker({
+    enabled: true,
+    device: config.antennaDevice,
+    baud: config.antennaBaud,
+    cmdHz: config.antennaCmdHz,
+    staleMs: config.antennaStaleMs,
+    autoHome: config.antennaHome,
+    maxRad: (Math.max(config.antennaMaxDeg, 0) * Math.PI) / 180,
+    smoothing: config.antennaSmoothing,
+    bootWaitMs: config.antennaBootWaitMs,
+    logHeadingMs: config.antennaLogMs,
+    headingOffsetDeg: config.baseHeadingOffsetDeg,
+    log,
+  })
+  antennaTracker.start()
+
+  if (config.antennaStatusMs > 0) {
+    antennaStatusTimer = setInterval(() => {
+      if (!antennaTracker) return
+      const status = antennaTracker.getStatus()
+      broadcast({ type: 'base_status', ...status })
+    }, Math.max(config.antennaStatusMs, 200))
+  }
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url && req.url.startsWith('/transitive/token')) {
     handleTransitiveToken(req, res)
@@ -137,6 +231,34 @@ const server = http.createServer((req, res) => {
   }
   res.writeHead(404)
   res.end()
+})
+
+function shutdown() {
+  if (antennaStatusTimer) {
+    clearInterval(antennaStatusTimer)
+    antennaStatusTimer = null
+  }
+  if (antennaTracker) {
+    antennaTracker.stop()
+  }
+  if (port) {
+    try {
+      port.close()
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  process.exit(0)
+}
+
+process.on('SIGINT', () => {
+  log('SIGINT received, shutting down')
+  shutdown()
+})
+
+process.on('SIGTERM', () => {
+  log('SIGTERM received, shutting down')
+  shutdown()
 })
 
 const wss = new WebSocketServer({ server })
@@ -325,6 +447,14 @@ function handleDashboardMessage(msg) {
       timestamp_ms: Date.now() >>> 0,
     })
     writeFrame(frame)
+    return
+  }
+
+  if (type === 'base_heading') {
+    const heading = coerceNumber(msg.heading_deg)
+    if (antennaTracker) {
+      antennaTracker.setBaseHeadingOffsetDeg(heading)
+    }
   }
 }
 
@@ -374,6 +504,9 @@ function handleFrame(msgId, payload) {
   if (msgId === MsgId.TELEM_NAV) {
     const nav = decodeTelemNav(payload)
     if (!nav) return
+    if (antennaTracker) {
+      antennaTracker.updateRoverNav(nav)
+    }
     broadcast({ type: 'telem_nav', ...nav })
   }
 }
