@@ -24,6 +24,8 @@
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
+#include "ublox_ubx_msgs/msg/ubx_nav_svin.hpp"
+#include "rtcm_msgs/msg/message.hpp"
 
 namespace mr2_sik_bridge {
 
@@ -57,15 +59,23 @@ class SikBridgeNode : public rclcpp::Node {
         nav_fix_topic_(
             declare_parameter<std::string>("nav_fix_topic", "/gps/filtered")),
         odom_topic_(declare_parameter<std::string>(
-            "odom_topic", "/odometry/filtered/global")),
+        "odom_topic", "/odometry/filtered/global")),
         battery_1_topic_(declare_parameter<std::string>(
             "battery_1_topic", "battery_1/telemetry")),
         battery_2_topic_(declare_parameter<std::string>(
             "battery_2_topic", "battery_2/telemetry")),
+        base_svin_topic_(declare_parameter<std::string>(
+            "base_svin_topic", "/base/ubx_nav_svin")),
+        base_rtcm_topic_(declare_parameter<std::string>(
+            "base_rtcm_topic", "/base/rtcm")),
         log_frames_(declare_parameter<bool>("log_frames", false)) {
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
     arm_twist_pub_ =
         create_publisher<geometry_msgs::msg::TwistStamped>(arm_twist_topic_, 10);
+    base_svin_pub_ = create_publisher<ublox_ubx_msgs::msg::UBXNavSvin>(
+        base_svin_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
+    base_rtcm_pub_ = create_publisher<rtcm_msgs::msg::Message>(
+        base_rtcm_topic_, rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
 
     battery_sub_1_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
         battery_1_topic_, rclcpp::SensorDataQoS(),
@@ -257,6 +267,34 @@ class SikBridgeNode : public rclcpp::Node {
         auto hb = mr2_sik_bridge::decode_heartbeat(frame);
         if (hb) {
           last_heartbeat_ = now();
+        }
+        break;
+      }
+      case mr2_sik_bridge::MsgId::kBaseSvin: {
+        auto svin = mr2_sik_bridge::decode_base_svin(frame);
+        if (svin && base_svin_pub_) {
+          ublox_ubx_msgs::msg::UBXNavSvin msg;
+          msg.header.stamp = now();
+          msg.mean_x = svin->mean_x_cm;
+          msg.mean_y = svin->mean_y_cm;
+          msg.mean_z = svin->mean_z_cm;
+          msg.mean_x_hp = svin->mean_x_hp;
+          msg.mean_y_hp = svin->mean_y_hp;
+          msg.mean_z_hp = svin->mean_z_hp;
+          msg.valid = svin->valid;
+          msg.active = svin->active;
+          msg.mean_acc = svin->mean_acc_0p1mm;
+          msg.obs = svin->obs;
+          base_svin_pub_->publish(msg);
+        }
+        break;
+      }
+      case mr2_sik_bridge::MsgId::kBaseRtcm: {
+        auto rtcm = mr2_sik_bridge::decode_base_rtcm(frame);
+        if (rtcm && base_rtcm_pub_) {
+          rtcm_msgs::msg::Message msg;
+          msg.message = rtcm->message;
+          base_rtcm_pub_->publish(msg);
         }
         break;
       }
@@ -461,11 +499,15 @@ class SikBridgeNode : public rclcpp::Node {
   std::string odom_topic_;
   std::string battery_1_topic_;
   std::string battery_2_topic_;
+  std::string base_svin_topic_;
+  std::string base_rtcm_topic_;
   bool log_frames_;
 
   // ROS interfaces
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr arm_twist_pub_;
+  rclcpp::Publisher<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr base_svin_pub_;
+  rclcpp::Publisher<rtcm_msgs::msg::Message>::SharedPtr base_rtcm_pub_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
       battery_sub_1_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
