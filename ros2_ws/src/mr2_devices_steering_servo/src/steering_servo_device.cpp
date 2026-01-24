@@ -72,6 +72,10 @@ public:
 
   void export_state(double *&position, double *&velocity,
                     double *&effort) override {
+    // Ensure we never expose NaN to the hardware interface / TF chain.
+    if (!std::isfinite(position_rad_)) {
+      position_rad_ = 0.0;
+    }
     position = &position_rad_;
     velocity = nullptr;
     effort = nullptr;
@@ -114,7 +118,9 @@ private:
   std::string iface_;
   uint8_t node_id_{0};
 
-  double position_rad_{std::numeric_limits<double>::quiet_NaN()};
+  // Start at a neutral angle so robot_state_publisher doesn't emit invalid TFs
+  // before the first feedback frame arrives from the servo.
+  double position_rad_{0.0};
   double desired_command_rad_{std::numeric_limits<double>::quiet_NaN()};
   double hold_position_rad_{std::numeric_limits<double>::quiet_NaN()};
 };
