@@ -86,6 +86,53 @@ def decode_frame(seq: int, cmd: int, payload: bytes) -> str:
         return f"ERROR seq={payload[0]:02x} code={payload[1]:02x} detail={detail}"
     return f"FRAME cmd={cmd:02x} seq={seq:02x} payload={payload.hex()}"
 
+def wait_for_done(
+    ser: serial.Serial,
+    deadline: float,
+    target_cmd: int,
+    print_frames: bool,
+) -> bool:
+    while True:
+        res = read_frame(ser, deadline)
+        if res is None:
+            if print_frames:
+                print("no response")
+            return False
+        seq, cmd, payload = res
+        if print_frames:
+            print(decode_frame(seq, cmd, payload))
+        if cmd == 0x81 and len(payload) == 2 and payload[1] == target_cmd:
+            return True
+        if time.time() >= deadline:
+            return False
+
+
+def periodic_send(
+    ser: serial.Serial,
+    frame: bytes,
+    duration_s: float,
+    period_s: float,
+    read: bool,
+    timeout_s: float,
+) -> None:
+    if duration_s <= 0 or period_s <= 0:
+        return
+    end = time.monotonic() + duration_s
+    next_send = time.monotonic()
+    read_timeout = min(max(timeout_s, 0.0), 0.05)
+    while time.monotonic() < end:
+        now = time.monotonic()
+        if now >= next_send:
+            ser.write(frame)
+            ser.flush()
+            next_send = now + period_s
+        if read:
+            res = read_frame(ser, time.time() + read_timeout)
+            if res is None:
+                continue
+            seq, cmd, payload = res
+            print(decode_frame(seq, cmd, payload))
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Send commands to base_arduino")
@@ -96,23 +143,70 @@ def main() -> int:
     ap.add_argument("--timeout", type=float, default=3.0, help="Read timeout seconds")
     ap.add_argument("--boot-wait", type=float, default=2.0, help="Seconds to wait after opening port")
     ap.add_argument("--raw", action="store_true", help="Dump any raw bytes received")
+    ap.add_argument("--keep-secs", type=float, default=0.0, help="Seconds to keep sending after command")
+    ap.add_argument("--keep-period", type=float, default=0.5, help="Seconds between keep sends")
     cmd_group = ap.add_mutually_exclusive_group()
     cmd_group.add_argument("--home", action="store_true", help="Send HOMING_START")
     cmd_group.add_argument("--move-rad", type=float, help="Send MOVE_TO_RAD with radians")
+    cmd_group.add_argument(
+        "--home-then-move",
+        type=float,
+        help="Send HOMING_START, wait for DONE, then MOVE_TO_RAD with radians",
+    )
     args = ap.parse_args()
 
-    if args.move_rad is not None:
-        cmd = 0x02
-        q = q16_16(args.move_rad)
-        payload = q.to_bytes(4, byteorder="little", signed=True)
-    else:
-        cmd = 0x01
-        payload = b""
-
-    frame = build_frame(args.seq, cmd, payload)
     with serial.Serial(args.port, args.baud, timeout=0.1) as ser:
         if args.boot_wait > 0:
             time.sleep(args.boot_wait)
+        if args.home_then_move is not None:
+            home_frame = build_frame(args.seq, 0x01, b"")
+            ser.write(home_frame)
+            ser.flush()
+            deadline = time.time() + args.timeout
+            wait_for_done(ser, deadline, 0x01, args.read)
+
+            move_seq = (args.seq + 1) & 0xFF
+            q = q16_16(args.home_then_move)
+            payload = q.to_bytes(4, byteorder="little", signed=True)
+            move_frame = build_frame(move_seq, 0x02, payload)
+            ser.write(move_frame)
+            ser.flush()
+            deadline = time.time() + args.timeout
+            if args.read:
+                wait_for_done(ser, deadline, 0x02, True)
+            elif args.raw:
+                data = bytearray()
+                while time.time() < deadline:
+                    chunk = ser.read(64)
+                    if chunk:
+                        data.extend(chunk)
+                if data:
+                    print(data.hex())
+                else:
+                    print("no response")
+
+            periodic_send(
+                ser,
+                move_frame,
+                args.keep_secs,
+                args.keep_period,
+                args.read,
+                args.timeout,
+            )
+
+            print(home_frame.hex())
+            print(move_frame.hex())
+            return 0
+
+        if args.move_rad is not None:
+            cmd = 0x02
+            q = q16_16(args.move_rad)
+            payload = q.to_bytes(4, byteorder="little", signed=True)
+        else:
+            cmd = 0x01
+            payload = b""
+
+        frame = build_frame(args.seq, cmd, payload)
         ser.write(frame)
         ser.flush()
         if args.read:
@@ -138,7 +232,16 @@ def main() -> int:
             else:
                 print("no response")
 
-    print(frame.hex())
+        periodic_send(
+            ser,
+            frame,
+            args.keep_secs,
+            args.keep_period,
+            args.read,
+            args.timeout,
+        )
+
+        print(frame.hex())
     return 0
 
 
