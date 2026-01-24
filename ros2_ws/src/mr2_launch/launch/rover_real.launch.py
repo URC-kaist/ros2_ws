@@ -1,6 +1,7 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
 from launch.conditions import IfCondition
+from launch.actions import ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     EnvironmentVariable,
@@ -13,6 +14,29 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    # Optional manual datum setter for navsat_transform if base survey-in message
+    # is not available on the rover network. Disabled by default.
+    set_manual_datum_arg = DeclareLaunchArgument(
+        "set_manual_datum",
+        default_value="false",
+        description="When true, call navsat_transform set_datum with provided lat/lon/alt",
+    )
+    datum_lat_arg = DeclareLaunchArgument(
+        "datum_lat",
+        default_value="0.0",
+        description="WGS84 latitude for manual datum",
+    )
+    datum_lon_arg = DeclareLaunchArgument(
+        "datum_lon",
+        default_value="0.0",
+        description="WGS84 longitude for manual datum",
+    )
+    datum_alt_arg = DeclareLaunchArgument(
+        "datum_alt",
+        default_value="0.0",
+        description="WGS84 altitude (meters) for manual datum",
+    )
+
     rviz_arg = DeclareLaunchArgument(
         "rviz_config",
         default_value=PathJoinSubstitution(
@@ -297,8 +321,62 @@ def generate_launch_description():
         arguments=["0", "-0.2455", "0.06", "0", "0", "0", "base_chassis", "right_rocker"],
     )
 
+    # Manually set navsat datum if requested (after navsat_transform nodes start)
+    manual_set_datum = TimerAction(
+        period=10.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    "ros2",
+                    "service",
+                    "call",
+                    "/navsat_transform/set_datum",
+                    "robot_localization/srv/SetDatum",
+                    PythonExpression(
+                        [
+                            "{geo_pose: {position: {latitude: ",
+                            LaunchConfiguration("datum_lat"),
+                            ", longitude: ",
+                            LaunchConfiguration("datum_lon"),
+                            ", altitude: ",
+                            LaunchConfiguration("datum_alt"),
+                            "}}}",
+                        ]
+                    ),
+                ],
+                output="screen",
+            ),
+            ExecuteProcess(
+                cmd=[
+                    "ros2",
+                    "service",
+                    "call",
+                    "/navsat_transform_query/set_datum",
+                    "robot_localization/srv/SetDatum",
+                    PythonExpression(
+                        [
+                            "{geo_pose: {position: {latitude: ",
+                            LaunchConfiguration("datum_lat"),
+                            ", longitude: ",
+                            LaunchConfiguration("datum_lon"),
+                            ", altitude: ",
+                            LaunchConfiguration("datum_alt"),
+                            "}}}",
+                        ]
+                    ),
+                ],
+                output="screen",
+            ),
+        ],
+        condition=IfCondition(LaunchConfiguration("set_manual_datum")),
+    )
+
     return LaunchDescription(
         [
+            set_manual_datum_arg,
+            datum_lat_arg,
+            datum_lon_arg,
+            datum_alt_arg,
             rviz_arg,
             controller_config_arg,
             can_iface_arg,
@@ -334,5 +412,6 @@ def generate_launch_description():
             right_navsat_relay,
             left_rocker_static_tf,
             right_rocker_static_tf,
+            manual_set_datum,
         ]
     )
