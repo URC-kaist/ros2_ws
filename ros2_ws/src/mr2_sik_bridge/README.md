@@ -137,6 +137,17 @@ Payload size: 1 + N bytes
 
 Delivered to the rover as `rtcm_msgs/Message` on `/base/rtcm`.
 
+### BASE_RTCM_FRAG (msg_id 0x32)
+Payload size: 4 + N bytes
+
+- `uint16 msg_len_le` (total RTCM message length)
+- `uint8 frag_count` (number of fragments)
+- `uint8 frag_index` (0-based index)
+- `uint8[N] data` (fragment slice, up to 251 bytes)
+
+Fragments sharing the same frame `seq` value are reassembled in-order on the
+rover before publishing a single `rtcm_msgs/Message` on `/base/rtcm`.
+
 ## Library API
 
 Header: `mr2_sik_bridge/packets.hpp`

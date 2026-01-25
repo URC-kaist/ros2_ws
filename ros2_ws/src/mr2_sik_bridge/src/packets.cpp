@@ -462,4 +462,27 @@ std::optional<BaseRtcm> decode_base_rtcm(const Frame &frame) {
   return rtcm;
 }
 
+std::optional<BaseRtcmFrag> decode_base_rtcm_frag(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kBaseRtcmFrag) {
+    return std::nullopt;
+  }
+  if (frame.payload.size() < 4) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  BaseRtcmFrag frag;
+  if (!reader.read_u16(&frag.msg_len) || !reader.read_u8(&frag.frag_count) ||
+      !reader.read_u8(&frag.frag_index)) {
+    return std::nullopt;
+  }
+
+  if (frag.frag_count == 0 || frag.frag_index >= frag.frag_count) {
+    return std::nullopt;
+  }
+
+  frag.data.assign(frame.payload.begin() + 4, frame.payload.end());
+  return frag;
+}
+
 }  // namespace mr2_sik_bridge

@@ -18,6 +18,7 @@ enum class MsgId : uint8_t {
   kTelemNav = 0x20,
   kBaseSvin = 0x30,
   kBaseRtcm = 0x31,
+  kBaseRtcmFrag = 0x32,
   kTelemBattery = kTelemBattery1,
 };
 
@@ -84,6 +85,13 @@ struct BaseRtcm {
   std::vector<uint8_t> message;
 };
 
+struct BaseRtcmFrag {
+  uint16_t msg_len{0};
+  uint8_t frag_count{0};
+  uint8_t frag_index{0};
+  std::vector<uint8_t> data;
+};
+
 struct Frame {
   Header header{};
   std::vector<uint8_t> payload;
@@ -110,5 +118,6 @@ std::optional<TelemBattery> decode_telem_battery(const Frame &frame);
 std::optional<TelemNav> decode_telem_nav(const Frame &frame);
 std::optional<BaseSvin> decode_base_svin(const Frame &frame);
 std::optional<BaseRtcm> decode_base_rtcm(const Frame &frame);
+std::optional<BaseRtcmFrag> decode_base_rtcm_frag(const Frame &frame);
 
 }  // namespace mr2_sik_bridge

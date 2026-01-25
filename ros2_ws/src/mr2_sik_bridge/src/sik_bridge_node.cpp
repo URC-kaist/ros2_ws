@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <fcntl.h>
@@ -298,6 +299,13 @@ class SikBridgeNode : public rclcpp::Node {
         }
         break;
       }
+      case mr2_sik_bridge::MsgId::kBaseRtcmFrag: {
+        auto frag = mr2_sik_bridge::decode_base_rtcm_frag(frame);
+        if (frag && base_rtcm_pub_) {
+          handle_base_rtcm_frag_(frame.header.seq, *frag);
+        }
+        break;
+      }
       default:
         break;
     }
@@ -333,6 +341,67 @@ class SikBridgeNode : public rclcpp::Node {
                            "CMD_ARM_TWIST lin=(%.3f, %.3f, %.3f) ang=(%.3f, %.3f, %.3f)",
                            cmd.lin_x_m_s, cmd.lin_y_m_s, cmd.lin_z_m_s,
                            cmd.ang_x_rad_s, cmd.ang_y_rad_s, cmd.ang_z_rad_s);
+    }
+  }
+
+  void handle_base_rtcm_frag_(uint8_t seq, const BaseRtcmFrag &frag) {
+    const auto now_time = now();
+    prune_rtcm_frags_(now_time);
+
+    auto &state = rtcm_frags_[seq];
+    const bool needs_reset =
+        state.parts.empty() || state.msg_len != frag.msg_len ||
+        state.total_frags != frag.frag_count;
+    if (needs_reset) {
+      state.msg_len = frag.msg_len;
+      state.total_frags = frag.frag_count;
+      state.parts.clear();
+      state.parts.resize(frag.frag_count);
+      state.start = now_time;
+    }
+
+    if (frag.frag_index >= state.parts.size()) {
+      return;
+    }
+
+    if (state.parts[frag.frag_index].empty()) {
+      state.parts[frag.frag_index] = frag.data;
+    }
+
+    size_t bytes_accumulated = 0;
+    for (const auto &p : state.parts) {
+      if (p.empty()) {
+        return;
+      }
+      bytes_accumulated += p.size();
+    }
+
+    if (bytes_accumulated != state.msg_len) {
+      rtcm_frags_.erase(seq);
+      return;
+    }
+
+    std::vector<uint8_t> merged;
+    merged.reserve(state.msg_len);
+    for (const auto &p : state.parts) {
+      merged.insert(merged.end(), p.begin(), p.end());
+    }
+
+    rtcm_msgs::msg::Message msg;
+    msg.message = merged;
+    base_rtcm_pub_->publish(msg);
+    rtcm_frags_.erase(seq);
+  }
+
+  void prune_rtcm_frags_(const rclcpp::Time &now_time) {
+    auto it = rtcm_frags_.begin();
+    while (it != rtcm_frags_.end()) {
+      const auto age = now_time - it->second.start;
+      if (age.seconds() > 2.0) {
+        it = rtcm_frags_.erase(it);
+      } else {
+        ++it;
+      }
     }
   }
 
@@ -529,6 +598,14 @@ class SikBridgeNode : public rclcpp::Node {
   rclcpp::Time last_heartbeat_{};
   std::array<rclcpp::Time, 2> last_battery_tx_{
       {rclcpp::Time(0, 0, RCL_SYSTEM_TIME), rclcpp::Time(0, 0, RCL_SYSTEM_TIME)}};
+
+  struct RtcmFragState {
+    uint16_t msg_len{0};
+    uint8_t total_frags{0};
+    rclcpp::Time start{};
+    std::vector<std::vector<uint8_t>> parts;
+  };
+  std::unordered_map<uint8_t, RtcmFragState> rtcm_frags_;
 
   std::mutex nav_mutex_;
   bool nav_has_fix_{false};

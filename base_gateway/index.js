@@ -141,6 +141,7 @@ const MsgId = {
   TELEM_NAV: 0x20,
   BASE_SVIN: 0x30,
   BASE_RTCM: 0x31,
+  BASE_RTCM_FRAG: 0x32,
 }
 
 const MAGIC = 0xa5
@@ -398,17 +399,39 @@ function encodeBaseSvin(msg) {
 }
 
 function encodeBaseRtcm(msg) {
-  if (!msg || !msg.message) return null
+  if (!msg || !msg.message) return []
   const buf = Buffer.from(msg.message)
-  const maxLen = 254 // leave 1 byte for length
-  if (buf.length > maxLen) {
-    log(`Dropping RTCM message >${maxLen} bytes (${buf.length})`)
-    return null
+  const maxSingleLen = 254 // legacy single-frame limit
+  if (buf.length <= maxSingleLen) {
+    const payload = Buffer.alloc(1 + buf.length)
+    payload.writeUInt8(buf.length, 0)
+    buf.copy(payload, 1)
+    return [encodeFrame(MsgId.BASE_RTCM, nextSeq(), payload)]
   }
-  const payload = Buffer.alloc(1 + buf.length)
-  payload.writeUInt8(buf.length, 0)
-  buf.copy(payload, 1)
-  return encodeFrame(MsgId.BASE_RTCM, nextSeq(), payload)
+
+  const maxPayload = 255 // fits in uint8 length field
+  const fragHeaderSize = 4 // u16 msg_len, u8 frag_count, u8 frag_index
+  const maxFragData = maxPayload - fragHeaderSize // 251 bytes
+  const fragCount = Math.ceil(buf.length / maxFragData)
+  if (fragCount > 255) {
+    log(`Dropping RTCM message >${maxFragData * 255} bytes (${buf.length})`)
+    return []
+  }
+
+  const seqValue = nextSeq()
+  const frames = []
+  for (let fragIndex = 0; fragIndex < fragCount; fragIndex += 1) {
+    const start = fragIndex * maxFragData
+    const end = Math.min(start + maxFragData, buf.length)
+    const frag = buf.slice(start, end)
+    const payload = Buffer.alloc(fragHeaderSize + frag.length)
+    payload.writeUInt16LE(buf.length, 0)
+    payload.writeUInt8(fragCount, 2)
+    payload.writeUInt8(fragIndex, 3)
+    frag.copy(payload, fragHeaderSize)
+    frames.push(encodeFrame(MsgId.BASE_RTCM_FRAG, seqValue, payload))
+  }
+  return frames
 }
 
 function decodeTelemBattery(payload) {
@@ -554,8 +577,10 @@ async function startRosBridge() {
 
   rosNode.createSubscription('rtcm_msgs/msg/Message', '/base/rtcm', (msg) => {
     if (!msg) return
-    const frame = encodeBaseRtcm(msg)
-    if (frame) writeFrame(frame)
+    const frames = encodeBaseRtcm(msg)
+    for (const frame of frames) {
+      writeFrame(frame)
+    }
   })
 
   rclnodejs.spin(rosNode)
