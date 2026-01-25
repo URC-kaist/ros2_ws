@@ -15,6 +15,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration("namespace")
     device_serial_string = LaunchConfiguration("device_serial_string")
     frame_id = LaunchConfiguration("frame_id")
+    rtcm_input_topic = LaunchConfiguration("rtcm_input_topic")
 
     log_level_arg = DeclareLaunchArgument(
         "log_level", default_value=TextSubstitution(text="INFO")
@@ -32,6 +33,11 @@ def generate_launch_description():
         "frame_id",
         default_value="rover",
         description="The frame_id to use in header of published messages",
+    )
+    rtcm_input_topic_arg = DeclareLaunchArgument(
+        "rtcm_input_topic",
+        default_value="/base/rtcm",
+        description="Topic supplying RTCM corrections (e.g., /base/rtcm or /ntrip_client/rtcm)",
     )
 
     params = [
@@ -66,6 +72,9 @@ def generate_launch_description():
                 name="ublox_dgnss",
                 namespace=namespace,
                 parameters=params,
+                remappings=[
+                    ("/ntrip_client/rtcm", rtcm_input_topic),
+                ],
             )
         ],
     )
@@ -93,6 +102,7 @@ def generate_launch_description():
             namespace_arg,
             device_serial_string_arg,
             frame_id_arg,
+            rtcm_input_topic_arg,
             container1,
             container2,
         ]

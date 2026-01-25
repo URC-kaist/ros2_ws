@@ -132,6 +132,11 @@ def generate_launch_description():
         default_value="right_gnss",
         description="Frame ID for right GNSS NavSatFix",
     )
+    rtcm_input_topic_arg = DeclareLaunchArgument(
+        "rtcm_input_topic",
+        default_value="/base/rtcm",
+        description="Topic providing RTCM corrections for rover F9Ps (set to /ntrip_client/rtcm to use NTRIP)",
+    )
     enable_ntrip_arg = DeclareLaunchArgument(
         "enable_ntrip",
         default_value="false",
@@ -262,6 +267,7 @@ def generate_launch_description():
             "device_family": "F9P",
             "device_serial_string": LaunchConfiguration("left_gnss_serial"),
             "frame_id": LaunchConfiguration("left_gnss_frame_id"),
+            "rtcm_input_topic": LaunchConfiguration("rtcm_input_topic"),
         }.items(),
     )
 
@@ -276,6 +282,7 @@ def generate_launch_description():
             "device_family": "F9P",
             "device_serial_string": LaunchConfiguration("right_gnss_serial"),
             "frame_id": LaunchConfiguration("right_gnss_frame_id"),
+            "rtcm_input_topic": LaunchConfiguration("rtcm_input_topic"),
         }.items(),
     )
 
@@ -392,6 +399,7 @@ def generate_launch_description():
             right_gnss_serial_arg,
             left_gnss_frame_arg,
             right_gnss_frame_arg,
+            rtcm_input_topic_arg,
             enable_ntrip_arg,
             ntrip_use_https_arg,
             ntrip_host_arg,

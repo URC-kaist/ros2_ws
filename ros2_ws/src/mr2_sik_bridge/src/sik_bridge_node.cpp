@@ -294,6 +294,8 @@ class SikBridgeNode : public rclcpp::Node {
         auto rtcm = mr2_sik_bridge::decode_base_rtcm(frame);
         if (rtcm && base_rtcm_pub_) {
           rtcm_msgs::msg::Message msg;
+          msg.header.stamp = now();
+          msg.header.frame_id = "base_rtcm";
           msg.message = rtcm->message;
           base_rtcm_pub_->publish(msg);
         }
@@ -388,6 +390,8 @@ class SikBridgeNode : public rclcpp::Node {
     }
 
     rtcm_msgs::msg::Message msg;
+    msg.header.stamp = now();
+    msg.header.frame_id = "base_rtcm";
     msg.message = merged;
     base_rtcm_pub_->publish(msg);
     rtcm_frags_.erase(seq);
