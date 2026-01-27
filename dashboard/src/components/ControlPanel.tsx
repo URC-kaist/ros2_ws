@@ -18,6 +18,7 @@ const ControlPanel = () => {
   const [gamepadIndex, setGamepadIndex] = useState<number | null>(null)
   const gamepadConnectedRef = useRef(false)
   const gamepadIndexRef = useRef<number | null>(null)
+  const controlEnabledRef = useRef(true)
 
   useEffect(() => {
     gatewayRef.current.connect()
@@ -66,7 +67,11 @@ const ControlPanel = () => {
       setGamepads(list)
       if (list.length === 0) {
         setGamepadIndex(null)
-      } else if (gamepadIndexRef.current == null || !pads[gamepadIndexRef.current]) {
+        controlEnabledRef.current = false
+      } else if (
+        controlEnabledRef.current &&
+        (gamepadIndexRef.current == null || !pads[gamepadIndexRef.current])
+      ) {
         setGamepadIndex(list[0].index)
       }
     }
@@ -92,7 +97,12 @@ const ControlPanel = () => {
     const tick = () => {
       const pads = navigator.getGamepads?.() ?? []
       const selectedIndex = gamepadIndexRef.current
-      const pad = selectedIndex != null ? pads[selectedIndex] : pads.find(Boolean)
+      const pad =
+        controlEnabledRef.current && selectedIndex != null
+          ? pads[selectedIndex]
+          : controlEnabledRef.current
+            ? null
+            : null
       if (pad) {
         if (!gamepadConnectedRef.current) {
           gamepadConnectedRef.current = true
@@ -134,7 +144,14 @@ const ControlPanel = () => {
         isConnected={gamepadConnected}
         gamepads={gamepads}
         selectedGamepadIndex={gamepadIndex}
-        onSelectGamepad={setGamepadIndex}
+        onSelectGamepad={(value) => {
+          controlEnabledRef.current = value !== null
+          setGamepadIndex(value)
+          if (value === null) {
+            setGamepadConnected(false)
+            setCmdVel({ x: 0, y: 0, yaw: 0 })
+          }
+        }}
         isSettingsOpen={settingsOpen}
         onToggleSettings={() => setSettingsOpen((open) => !open)}
       />

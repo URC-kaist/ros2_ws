@@ -1,0 +1,214 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <world name="empty_world">
+    <gravity>0 0 -9.80665 </gravity> <!--G_ACC-->
+
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.005</max_step_size>
+      <real_time_update_rate>200</real_time_update_rate>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+
+    <scene>
+      <!-- Clear sky blue background -->
+      <background>0.529 0.808 0.922 1</background>
+      <sky>
+        <clouds>
+          <speed>0</speed>
+          <direction>0 0 0</direction>
+          <mean_size>0</mean_size>
+        </clouds>
+      </sky>
+    </scene>
+
+    <plugin
+      filename="ignition-gazebo-navsat-system"
+      name="ignition::gazebo::systems::NavSat">
+    </plugin>
+
+    <!-- Handles requests to update the spherical coordinates -->
+    <plugin
+      filename="ignition-gazebo-user-commands-system"
+      name="ignition::gazebo::systems::UserCommands">
+    </plugin>
+
+    <!-- Populates the GUI with data from the server -->
+    <plugin
+      filename="ignition-gazebo-scene-broadcaster-system"
+      name="ignition::gazebo::systems::SceneBroadcaster">
+    </plugin>
+
+    <plugin
+      filename="ignition-gazebo-sensors-system"
+      name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Processes pose commands -->
+    <plugin
+      filename="ignition-gazebo-physics-system"
+      name="ignition::gazebo::systems::Physics">
+    </plugin>
+
+    <plugin filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
+
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>38.406739</latitude_deg>
+      <longitude_deg>-110.791394</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
+    <include>
+      <uri>
+	https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun
+      </uri>
+    </include>
+    <model name="mdrs_dem">
+        <static>true</static>
+        <pose>0 0 -1373 0 0 0</pose>
+        <link name="link">
+            <collision name="collision">
+                <geometry>
+                    <mesh>
+                        <!-- Keep STL for collision to avoid loading the large textured mesh in physics -->
+                        <uri>mdrs.stl</uri>
+                    </mesh>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <!-- UV-mapped mesh with satellite texture -->
+                        <uri>mdrs_textured.obj</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+    </model>
+    <model name="mallet">
+        <static>false</static>
+        <pose>5 0 0.1 0 0 0</pose>
+        <link name="link">
+            <inertial>
+                <mass>0.5</mass>
+                <inertia>
+                    <ixx>0.00384703</ixx>
+                    <ixy>0.0</ixy>
+                    <ixz>0.0</ixz>
+                    <iyy>0.00105424</iyy>
+                    <iyz>0.0</iyz>
+                    <izz>0.00470721</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <pose>-5.8e-06 0.149999999977 0.000246281654 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.1515685776 0.3 0.0482563182</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>../meshes/mallet/mallet.obj</uri>
+                        <scale>0.165400708 0.165400708 0.165400708</scale>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+    </model>
+    <model name="rock_pick">
+        <static>false</static>
+        <pose>5 0.5 0.1 0 0 0</pose>
+        <link name="link">
+            <inertial>
+                <mass>0.6</mass>
+                <inertia>
+                    <ixx>0.00598906</ixx>
+                    <ixy>0.0</ixy>
+                    <ixz>0.0</ixz>
+                    <iyy>0.00459253</iyy>
+                    <iyz>0.0</iyz>
+                    <izz>0.0015816</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <pose>-1.79e-06 0.086286294125 -0.001944294495 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.0430196053 0.1725725883 0.3000000006</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>../meshes/rock_pick/rock_pick.obj</uri>
+                        <scale>0.163091431 0.163091431 0.163091431</scale>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+    </model>
+    <model name="bottle">
+        <static>false</static>
+        <pose>5.5 0.5 0.1 0 0 0</pose>
+        <link name="link">
+            <inertial>
+                <mass>0.25</mass>
+                <inertia>
+                    <ixx>0.00130234</ixx>
+                    <ixy>0.0</ixy>
+                    <ixz>0.0</ixz>
+                    <iyy>0.00051839</iyy>
+                    <iyz>0.0</iyz>
+                    <izz>0.0011421</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <pose>0.0000033157 0.1074999997 -0.000418489293 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.0927130227 0.215 0.1276214717</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>../meshes/bottle/bottle.obj</uri>
+                        <scale>0.118418023 0.118418023 0.118418023</scale>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+    </model>
+    <model name="aruco_prism_home">
+        <static>true</static>
+        <pose>7 0 0 0 0 0</pose>
+        <link name="body">
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>../meshes/aruco_prism_external/aruco_3sided_marker.obj</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+            <collision name="collision">
+                <geometry>
+                    <cylinder>
+                        <radius>0.1</radius>
+                        <length>0.2</length>
+                    </cylinder>
+                </geometry>
+            </collision>
+        </link>
+    </model>
+  </world>
+</sdf>

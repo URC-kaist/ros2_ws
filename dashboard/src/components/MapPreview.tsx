@@ -1,9 +1,23 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { getSikGatewayClient } from '../lib/sikGateway'
 
 const MapPreview = () => {
   const mapRef = useRef<HTMLDivElement | null>(null)
+  const mapInstanceRef = useRef<maplibregl.Map | null>(null)
+  const markerRef = useRef<maplibregl.Marker | null>(null)
+  const baseMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const [mapReady, setMapReady] = useState(false)
+  const [followRover, setFollowRover] = useState(true)
+  const [fix, setFix] = useState<[number, number] | null>(null) // [lng, lat]
+  const [headingDeg, setHeadingDeg] = useState<number | null>(null)
+  const [cov, setCov] = useState<{ xVar: number; yVar: number; yawVar: number } | null>(null)
+  const [trail, setTrail] = useState<[number, number][]>([])
+  const [baseFix, setBaseFix] = useState<[number, number] | null>(null)
+  const [baseHeadingDeg, setBaseHeadingDeg] = useState<number | null>(null)
+  const [baseHeadingInput, setBaseHeadingInput] = useState('')
+  const [baseHeadingApplied, setBaseHeadingApplied] = useState<number | null>(null)
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -36,12 +50,315 @@ const MapPreview = () => {
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
+    map.once('load', () => {
+      map.addSource('rover-trail', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [] },
+          properties: {},
+        },
+      })
+      map.addLayer({
+        id: 'rover-trail-line',
+        type: 'line',
+        source: 'rover-trail',
+        paint: {
+          'line-color': '#35d3c3',
+          'line-width': 3,
+          'line-opacity': 0.7,
+        },
+      })
+      setMapReady(true)
+    })
+
+    map.on('dragstart', () => setFollowRover(false))
+    map.on('zoomstart', () => setFollowRover(false))
+
+    mapInstanceRef.current = map
+
     return () => {
       map.remove()
+      mapInstanceRef.current = null
     }
   }, [])
 
-  return <div className="map" ref={mapRef} />
+  // Subscribe to GNSS + heading via SiK gateway
+  useEffect(() => {
+    const sik = getSikGatewayClient()
+    sik.connect()
+    const unsubscribe = sik.onTelemNav((msg) => {
+      if (Number.isFinite(msg.longitude_deg) && Number.isFinite(msg.latitude_deg)) {
+        setFix([msg.longitude_deg, msg.latitude_deg])
+      }
+      if (Number.isFinite(msg.heading_deg)) {
+        setHeadingDeg(msg.heading_deg)
+      } else {
+        setHeadingDeg(null)
+      }
+      if (
+        Number.isFinite(msg.cov_x_var) &&
+        Number.isFinite(msg.cov_y_var) &&
+        Number.isFinite(msg.cov_yaw_var)
+      ) {
+        setCov({
+          xVar: msg.cov_x_var,
+          yVar: msg.cov_y_var,
+          yawVar: msg.cov_yaw_var,
+        })
+      } else {
+        setCov(null)
+      }
+    })
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const sik = getSikGatewayClient()
+    sik.connect()
+    const unsubscribe = sik.onBaseStatus((status) => {
+      if (Number.isFinite(status.base_lon_deg) && Number.isFinite(status.base_lat_deg)) {
+        setBaseFix([status.base_lon_deg as number, status.base_lat_deg as number])
+      }
+      if (Number.isFinite(status.antenna_heading_deg)) {
+        setBaseHeadingDeg(status.antenna_heading_deg as number)
+      } else {
+        setBaseHeadingDeg(null)
+      }
+    })
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('baseHeadingDeg')
+    if (!stored) return
+    setBaseHeadingInput(stored)
+    const parsed = Number(stored)
+    if (!Number.isFinite(parsed)) return
+    const normalized = ((parsed % 360) + 360) % 360
+    setBaseHeadingApplied(normalized)
+    const sik = getSikGatewayClient()
+    sik.connect()
+    sik.sendBaseHeading(normalized)
+  }, [])
+
+  // Update marker + view when a fix arrives
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady || !fix) return
+
+    const lngLat: [number, number] = fix
+    if (!markerRef.current) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      el.setAttribute('width', '34')
+      el.setAttribute('height', '34')
+      el.setAttribute('viewBox', '0 0 34 34')
+      el.innerHTML = `
+        <defs>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g filter="url(#glow)" transform="translate(17 17)">
+          <path d="M 0 -12 L 8 10 L 0 6 L -8 10 Z" fill="#35d3c3" stroke="#0b1220" stroke-width="1.5"/>
+          <circle cx="0" cy="0" r="2.6" fill="#0b1220" stroke="#35d3c3" stroke-width="1.2"/>
+        </g>
+      `
+      markerRef.current = new maplibregl.Marker({ element: el, rotationAlignment: 'map' })
+        .setLngLat(lngLat)
+        .addTo(map)
+    } else {
+      markerRef.current.setLngLat(lngLat)
+    }
+
+    if (followRover) {
+      map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 17), duration: 600 })
+    }
+  }, [fix, mapReady, followRover])
+
+  // Update base marker when a base fix arrives
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady || !baseFix) return
+
+    if (!baseMarkerRef.current) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      el.setAttribute('width', '30')
+      el.setAttribute('height', '30')
+      el.setAttribute('viewBox', '0 0 30 30')
+      el.innerHTML = `
+        <defs>
+          <filter id="baseGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g filter="url(#baseGlow)" transform="translate(15 15)">
+          <circle cx="0" cy="0" r="6" fill="#f4d35e" stroke="#0b1220" stroke-width="1.5"/>
+          <path d="M 0 -12 L 4 0 L 0 -2 L -4 0 Z" fill="#f4d35e" stroke="#0b1220" stroke-width="1.2"/>
+        </g>
+      `
+      baseMarkerRef.current = new maplibregl.Marker({ element: el, rotationAlignment: 'map' })
+        .setLngLat(baseFix)
+        .addTo(map)
+    } else {
+      baseMarkerRef.current.setLngLat(baseFix)
+    }
+  }, [baseFix, mapReady])
+
+  // Rotate marker when heading updates
+  useEffect(() => {
+    if (!markerRef.current || headingDeg == null) return
+    // @ts-expect-error maplibre marker rotation typing is looser at runtime
+    const rotation = 90 - headingDeg // ENU yaw (0=east, CCW) -> MapLibre rotation (0=north, CW)
+    markerRef.current.setRotation(rotation)
+  }, [headingDeg])
+
+  // Rotate base marker when antenna heading updates
+  useEffect(() => {
+    if (!baseMarkerRef.current || baseHeadingDeg == null) return
+    // @ts-expect-error maplibre marker rotation typing is looser at runtime
+    baseMarkerRef.current.setRotation(baseHeadingDeg)
+  }, [baseHeadingDeg])
+
+  // Build trail from successive fixes
+  useEffect(() => {
+    if (!fix) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTrail((prev) => {
+      const last = prev[prev.length - 1]
+      if (last && Math.abs(last[0] - fix[0]) < 1e-6 && Math.abs(last[1] - fix[1]) < 1e-6) {
+        return prev
+      }
+      const next = [...prev, fix]
+      if (next.length > 1200) next.shift()
+      return next
+    })
+  }, [fix])
+
+  // Push trail to map source
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const source = map.getSource('rover-trail') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: trail },
+      properties: {},
+    })
+  }, [trail, mapReady])
+
+  return (
+    <div className="map" ref={mapRef}>
+      <button
+        type="button"
+        onClick={() => {
+          setFollowRover(true)
+          const map = mapInstanceRef.current
+          if (map && fix) {
+            map.easeTo({ center: fix, zoom: Math.max(map.getZoom(), 17), duration: 300 })
+          }
+        }}
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          zIndex: 2,
+          background: followRover ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
+          color: followRover ? '#0b1220' : '#cdd6f4',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 10,
+          padding: '8px 12px',
+          fontSize: '12px',
+          cursor: 'pointer',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+        }}
+      >
+        {followRover ? 'Following rover' : 'Follow rover'}
+      </button>
+      <div
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          background: 'rgba(11, 18, 32, 0.8)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 8,
+          padding: '6px 10px',
+          fontSize: '12px',
+          color: '#cdd6f4',
+          zIndex: 1,
+          pointerEvents: 'none',
+          minWidth: 170,
+        }}
+      >
+        <div><strong>Lat/Lon:</strong> {fix ? `${fix[1].toFixed(6)}, ${fix[0].toFixed(6)}` : '—'}</div>
+        <div><strong>Heading:</strong> {headingDeg != null ? `${headingDeg.toFixed(1)}°` : '—'}</div>
+        <div>
+          <strong>Std XY:</strong>{' '}
+          {cov ? `${Math.sqrt(Math.max(cov.xVar, 0)).toFixed(2)} m, ${Math.sqrt(Math.max(cov.yVar, 0)).toFixed(2)} m` : '—'}
+        </div>
+        <div>
+          <strong>Std yaw:</strong>{' '}
+          {cov ? `${(Math.sqrt(Math.max(cov.yawVar, 0)) * (180 / Math.PI)).toFixed(1)}°` : '—'}
+        </div>
+        <div><strong>Trail pts:</strong> {trail.length}</div>
+        <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
+          <label htmlFor="base-heading" style={{ minWidth: 88 }}>
+            <strong>Base heading:</strong>
+          </label>
+          <input
+            id="base-heading"
+            type="number"
+            inputMode="decimal"
+            value={baseHeadingInput}
+            onChange={(event) => setBaseHeadingInput(event.target.value)}
+            placeholder="deg"
+            style={{
+              width: 78,
+              background: 'rgba(5, 10, 20, 0.6)',
+              color: '#cdd6f4',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 6,
+              padding: '2px 6px',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const parsed = Number(baseHeadingInput)
+              if (!Number.isFinite(parsed)) return
+              const normalized = ((parsed % 360) + 360) % 360
+              setBaseHeadingApplied(normalized)
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem('baseHeadingDeg', String(normalized))
+              }
+              const sik = getSikGatewayClient()
+              sik.connect()
+              sik.sendBaseHeading(normalized)
+            }}
+            style={{
+              background: 'rgba(53, 211, 195, 0.9)',
+              color: '#0b1220',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 6,
+              padding: '2px 8px',
+              fontSize: '12px',
+              cursor: 'pointer',
+            }}
+          >
+            Apply
+          </button>
+          <span style={{ opacity: 0.7 }}>
+            {baseHeadingApplied != null ? `${baseHeadingApplied.toFixed(1)}°` : '—'}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default MapPreview

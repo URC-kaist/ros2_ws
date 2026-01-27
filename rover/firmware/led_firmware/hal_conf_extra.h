@@ -1,0 +1,2 @@
+#pragma once
+#define HAL_FDCAN_MODULE_ENABLED

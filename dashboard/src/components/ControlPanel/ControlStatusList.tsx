@@ -8,20 +8,46 @@ const ControlStatusList = () => {
   const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
   const [wsConnected, setWsConnected] = useState(false)
   const [rosConnected, setRosConnected] = useState(false)
-  const [battery, setBattery] = useState<TelemBattery | null>(null)
+  const [battery1, setBattery1] = useState<TelemBattery | null>(null)
+  const [battery2, setBattery2] = useState<TelemBattery | null>(null)
+  const [battery1UpdatedAt, setBattery1UpdatedAt] = useState(0)
+  const [battery2UpdatedAt, setBattery2UpdatedAt] = useState(0)
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   useEffect(() => {
     const gateway = getSikGatewayClient()
     gateway.connect()
     const offLink = gateway.onLinkStatus(setLinkStatus)
     const offConnection = gateway.onConnectionStatus(setWsConnected)
-    const offBattery = gateway.onTelemBattery(setBattery)
+    const offBattery = gateway.onTelemBattery((payload) => {
+      if (payload.battery_id === 2) {
+        setBattery2(payload)
+        setBattery2UpdatedAt(Date.now())
+      } else {
+        setBattery1(payload)
+        setBattery1UpdatedAt(Date.now())
+      }
+    })
     return () => {
       offLink()
       offConnection()
       offBattery()
     }
   }, [])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [])
+
+  // Clear stale link status whenever the websocket reconnects/disconnects
+  useEffect(() => {
+    setLinkStatus(null)
+  }, [wsConnected])
 
   useEffect(() => {
     const rosBridge = getRosBridgeClient()
@@ -32,25 +58,34 @@ const ControlStatusList = () => {
     }
   }, [])
 
-  const batteryPercent =
-    battery && battery.total_capacity_mah > 0
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            (battery.available_capacity_mah / battery.total_capacity_mah) * 100
-          )
-        )
-      : 0
+  const getBatteryPercent = (battery: TelemBattery | null) => {
+    if (!battery || battery.total_capacity_mah <= 0) {
+      return 0
+    }
+    return Math.max(
+      0,
+      Math.min(100, (battery.available_capacity_mah / battery.total_capacity_mah) * 100)
+    )
+  }
+  const battery1Percent = getBatteryPercent(battery1)
+  const battery2Percent = getBatteryPercent(battery2)
+  // Battery telemetry is ~11.4s in real mode; keep stale threshold above that.
+  const batteryStaleMs = 30000
+  const battery1Stale = battery1UpdatedAt === 0 || nowMs - battery1UpdatedAt > batteryStaleMs
+  const battery2Stale = battery2UpdatedAt === 0 || nowMs - battery2UpdatedAt > batteryStaleMs
   let linkState = 'Down'
   let linkDotClass = 'status-dot-error'
   if (wsConnected) {
     if (linkStatus?.connected) {
       linkState = 'Up'
       linkDotClass = ''
-    } else {
+    } else if (linkStatus && linkStatus.connected === false) {
       linkState = 'Lost'
       linkDotClass = 'status-dot-warn'
+    } else {
+      // WebSocket is up but no link_status message yet (e.g., node just restarted)
+      linkState = 'Down'
+      linkDotClass = 'status-dot-error'
     }
   }
   const rosState = rosConnected ? 'Up' : 'Down'
@@ -60,54 +95,66 @@ const ControlStatusList = () => {
     <>
       <section className="panel-section">
         <div className="status-list">
-        <div className="status-item status-link">
-          <span className="status-label">
-            <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
-            SiK Link
-          </span>
-          <div className="status-pill">
-            <strong>{linkState}</strong>
+          <div className="status-item status-link">
+            <span className="status-label">
+              <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
+              SiK Link
+            </span>
+            <div className="status-pill">
+              <strong>{linkState}</strong>
+            </div>
+          </div>
+          <div className="status-item status-link">
+            <span className="status-label">
+              <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />
+              ROS Bridge
+            </span>
+            <div className="status-pill">
+              <strong>{rosState}</strong>
+            </div>
+          </div>
+          <div className="status-item status-softstop">
+            <span className="status-label">
+              <span className={`status-dot ${isNormal ? '' : 'status-dot-error'}`} aria-hidden="true" />
+              Status
+            </span>
+            <div className="status-pill">
+              <strong>{isNormal ? 'Normal' : 'E-Stop'}</strong>
+            </div>
           </div>
         </div>
-        <div className="status-item status-link">
-          <span className="status-label">
-            <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />
-            ROS Bridge
-          </span>
-          <div className="status-pill">
-            <strong>{rosState}</strong>
-          </div>
-        </div>
-        <div className="status-item status-softstop">
-          <span className="status-label">
-            <span className={`status-dot ${isNormal ? '' : 'status-dot-error'}`} aria-hidden="true" />
-            Status
-          </span>
-          <div className="status-pill">
-            <strong>{isNormal ? 'Normal' : 'E-Stop'}</strong>
-          </div>
-        </div>
-      </div>
-    </section>
+      </section>
       <section className="panel-section">
         <div className="status-list">
-          <div className="status-item battery">
+          <div className={`status-item battery${battery1Stale ? ' battery-stale' : ''}`}>
             <div className="metric-label">
-              <span>Battery</span>
-              <strong>{battery ? `${batteryPercent.toFixed(0)}%` : '---'}</strong>
+              <span>Battery 1</span>
+              <strong>{battery1 ? `${battery1Percent.toFixed(0)}%` : '---'}</strong>
             </div>
             <div className="meter">
-              <div className="meter-fill good" style={{ width: `${batteryPercent}%` }} />
+              <div className="meter-fill good" style={{ width: `${battery1Percent}%` }} />
             </div>
             <div className="battery-meta">
               <span>
-                Temp {battery ? `${battery.temperature_c.toFixed(1)}°C` : '--'}
+                {battery1 ? `${battery1.temperature_c.toFixed(1)}°C` : '--°C'} ·{' '}
+                {battery1 ? `${battery1.pack_voltage_v.toFixed(1)}V` : '--V'} ·{' '}
+                {battery1 ? `${(battery1.total_capacity_mah / 1000).toFixed(1)}Ah` : '--Ah'}
               </span>
+            </div>
+          </div>
+          <div className={`status-item battery${battery2Stale ? ' battery-stale' : ''}`}>
+            <div className="metric-label">
+              <span>Battery 2</span>
+              <strong>{battery2 ? `${battery2Percent.toFixed(0)}%` : '---'}</strong>
+            </div>
+            <div className="meter">
+              <div className="meter-fill accent" style={{ width: `${battery2Percent}%` }} />
+            </div>
+            <div className="battery-meta">
               <span>
-                Voltage {battery ? `${battery.pack_voltage_v.toFixed(1)}V` : '--'}
-              </span>
-              <span>
-                Capacity {battery ? `${(battery.total_capacity_mah / 1000).toFixed(1)}Ah` : '--'}
+                {battery2 ? `${battery2.temperature_c.toFixed(1)}°C` : '--°C'} ·{' '}
+                {battery2 ? `${battery2.pack_voltage_v.toFixed(1)}V` : '--V'} ·{' '}
+                {battery2 ? `${(battery2.total_capacity_mah / 1000).toFixed(1)}Ah` : '--Ah'}
               </span>
             </div>
           </div>

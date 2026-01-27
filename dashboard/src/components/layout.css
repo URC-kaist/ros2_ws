@@ -4,6 +4,37 @@
   background: radial-gradient(circle at top, #1b2a40 0%, #0b0f14 52%, #07090d 100%);
 }
 
+.fullscreen-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1000;
+  padding: 10px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(12, 17, 25, 0.75);
+  color: #f5f7fb;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(26, 37, 53, 0.9);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+  transform: translateY(-1px);
+}
+
+.fullscreen-btn:active {
+  transform: translateY(0);
+}
+
+.fullscreen-btn svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 .main {
   padding: 24px 28px;
   display: flex;

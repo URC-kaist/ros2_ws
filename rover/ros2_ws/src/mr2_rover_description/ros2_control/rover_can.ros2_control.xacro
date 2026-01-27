@@ -1,0 +1,389 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="rover_can_ros2_control" params="name can_iface:=can0">
+
+    <ros2_control name="${name}" type="system">
+      <hardware>
+        <plugin>mr2_can_hardware_interface/CanHW</plugin>
+      </hardware>
+
+      <joint name="fl_steering_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <param name="actuator">steering_fl</param>
+        <param name="device_plugin">mr2_devices_steering_servo/SteeringServoDevice</param>
+        <param name="node_id">2</param>
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+      <joint name="fr_steering_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <param name="actuator">steering_fr</param>
+        <param name="device_plugin">mr2_devices_steering_servo/SteeringServoDevice</param>
+        <param name="node_id">3</param>
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+      <joint name="rl_steering_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <param name="actuator">steering_rl</param>
+        <param name="device_plugin">mr2_devices_steering_servo/SteeringServoDevice</param>
+        <param name="node_id">4</param>
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+      <joint name="rr_steering_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <param name="actuator">steering_rr</param>
+        <param name="device_plugin">mr2_devices_steering_servo/SteeringServoDevice</param>
+        <param name="node_id">1</param>
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+      <!-- Drive wheel velocity interfaces -->
+      <joint name="fl_wheel_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <param name="actuator">drive_fl</param>
+        <param name="device_plugin">mr2_devices_drive_motor/DriveMotorDevice</param>
+        <param name="node_id">18</param> <!-- 0x12 -->
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+      <joint name="fr_wheel_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <param name="actuator">drive_fr</param>
+        <param name="device_plugin">mr2_devices_drive_motor/DriveMotorDevice</param>
+        <param name="node_id">19</param> <!-- 0x13 -->
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+      <joint name="rl_wheel_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <param name="actuator">drive_rl</param>
+        <param name="device_plugin">mr2_devices_drive_motor/DriveMotorDevice</param>
+        <param name="node_id">17</param> <!-- 0x11 -->
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+      <joint name="rr_wheel_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <param name="actuator">drive_rr</param>
+        <param name="device_plugin">mr2_devices_drive_motor/DriveMotorDevice</param>
+        <param name="node_id">20</param> <!-- 0x14 -->
+        <param name="can_iface">${can_iface}</param>
+      </joint>
+
+
+      <!-- <joint name="arm_j1"> -->
+      <!--   <command_interface name="position"/> -->
+      <!--   <state_interface name="position"/> -->
+      <!--   <state_interface name="velocity"/> -->
+      <!--   <state_interface name="effort"/> -->
+      <!--   <param name="actuator">motor1</param> -->
+      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
+      <!--   <param name="motor_id">101</param> -->
+      <!--   <param name="can_iface">${can_iface}</param> -->
+      <!--   <param name="joint_lower_limit">${arm_j1_lower_limit}</param> -->
+      <!--   <param name="joint_upper_limit">${arm_j1_upper_limit}</param> -->
+      <!--   <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_offset">-4.70</param> -->
+      <!--   <param name="homing_split_angle">2.43</param> -->
+      <!--   <param name="homing_encoder_direction">1.0</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_device_can_id">201</param> -->
+      <!--   <param name="homing_device_ticks_per_rev">4096</param> -->
+      <!-- </joint> -->
+      <!---->
+      <!-- <joint name="arm_j2"> -->
+      <!--   <command_interface name="position"/> -->
+      <!--   <state_interface name="position"/> -->
+      <!--   <state_interface name="velocity"/> -->
+      <!--   <state_interface name="effort"/> -->
+      <!--   <param name="actuator">motor2</param> -->
+      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
+      <!--   <param name="motor_id">102</param> -->
+      <!--   <param name="can_iface">${can_iface}</param> -->
+      <!--   <param name="joint_lower_limit">${arm_j2_lower_limit}</param> -->
+      <!--   <param name="joint_upper_limit">${arm_j2_upper_limit}</param> -->
+      <!--   <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
+      <!--   <param name="homing_position">-0.69</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_device_can_id">202</param> -->
+      <!--   <param name="homing_device_active_high">true</param> -->
+      <!--   <param name="homing_search_direction">negative</param> -->
+      <!--   <param name="homing_approach_speed">0.1</param> -->
+      <!--   <param name="homing_fine_speed">0.02</param> -->
+      <!--   <param name="homing_backoff_distance">0.05</param> -->
+      <!-- </joint> -->
+      <!---->
+      <!-- <joint name="arm_j3"> -->
+      <!--   <command_interface name="position"/> -->
+      <!--   <state_interface name="position"/> -->
+      <!--   <state_interface name="velocity"/> -->
+      <!--   <state_interface name="effort"/> -->
+      <!--   <param name="actuator">motor3</param> -->
+      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
+      <!--   <param name="motor_id">103</param> -->
+      <!--   <param name="can_iface">${can_iface}</param> -->
+      <!--   <param name="joint_lower_limit">${arm_j3_lower_limit}</param> -->
+      <!--   <param name="joint_upper_limit">${arm_j3_upper_limit}</param> -->
+      <!--   <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+      <!--   <param name="homing_offset">-7.52</param> -->
+      <!--   <param name="homing_split_angle">3.4</param> -->
+      <!--   <param name="homing_encoder_direction">1.0</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_device_can_id">203</param> -->
+      <!--   <param name="homing_device_ticks_per_rev">4096</param> -->
+      <!-- </joint> -->
+      <!---->
+      <!-- <joint name="arm_j4"> -->
+      <!--   <command_interface name="position"/> -->
+      <!--   <state_interface name="position"/> -->
+      <!--   <state_interface name="velocity"/> -->
+      <!--   <state_interface name="effort"/> -->
+      <!--   <param name="actuator">motor4</param> -->
+      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
+      <!--   <param name="motor_id">104</param> -->
+      <!--   <param name="can_iface">${can_iface}</param> -->
+      <!--   <param name="joint_lower_limit">${arm_j4_lower_limit}</param> -->
+      <!--   <param name="joint_upper_limit">${arm_j4_upper_limit}</param> -->
+      <!--   <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
+      <!--   <param name="homing_position">-2.55</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_device_can_id">204</param> -->
+      <!--   <param name="homing_device_active_high">true</param> -->
+      <!--   <param name="homing_search_direction">negative</param> -->
+      <!--   <param name="homing_approach_speed">0.35</param> -->
+      <!--   <param name="homing_fine_speed">0.05</param> -->
+      <!--   <param name="homing_backoff_distance">0.12</param> -->
+      <!-- </joint> -->
+      <!---->
+      <!-- <joint name="arm_j5"> -->
+      <!--   <command_interface name="position"/> -->
+      <!--   <state_interface name="position"/> -->
+      <!--   <state_interface name="velocity"/> -->
+      <!--   <state_interface name="effort"/> -->
+      <!--   <param name="actuator">motor5</param> -->
+      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
+      <!--   <param name="motor_id">105</param> -->
+      <!--   <param name="can_iface">${can_iface}</param> -->
+      <!--   <param name="joint_lower_limit">${arm_j5_lower_limit}</param> -->
+      <!--   <param name="joint_upper_limit">${arm_j5_upper_limit}</param> -->
+      <!--   <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+      <!--   <param name="homing_offset">-2.46</param> -->
+      <!--   <param name="homing_split_angle">0.98</param> -->
+      <!--   <param name="homing_encoder_direction">1.0</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_device_can_id">205</param> -->
+      <!--   <param name="homing_device_ticks_per_rev">4096</param> -->
+      <!-- </joint> -->
+      <!---->
+      <!-- <joint name="arm_j6"> -->
+      <!--   <command_interface name="position"/> -->
+      <!--   <state_interface name="position"/> -->
+      <!--   <state_interface name="velocity"/> -->
+      <!--   <state_interface name="effort"/> -->
+      <!--   <param name="actuator">motor6</param> -->
+      <!--   <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param> -->
+      <!--   <param name="motor_id">106</param> -->
+      <!--   <param name="can_iface">${can_iface}</param> -->
+      <!--   <param name="joint_lower_limit">${arm_j6_lower_limit}</param> -->
+      <!--   <param name="joint_upper_limit">${arm_j6_upper_limit}</param> -->
+      <!--   <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
+      <!--   <param name="homing_device_can_id">206</param> -->
+      <!--   <param name="homing_device_can_iface">${can_iface}</param> -->
+      <!--   <param name="homing_position">-3.03</param> -->
+      <!--   <param name="homing_device_active_high">true</param> -->
+      <!--   <param name="homing_search_direction">negative</param> -->
+      <!--   <param name="homing_approach_speed">0.35</param> -->
+      <!--   <param name="homing_fine_speed">0.05</param> -->
+      <!--   <param name="homing_backoff_distance">0.12</param> -->
+      <!-- </joint> -->
+
+      <transmission name="fl_steering_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="steering_fl" role="steering_fl">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+        </actuator>
+        <joint name="fl_steering_joint" role="fl_steering_joint">
+          <mechanical_reduction>1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <transmission name="fr_steering_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="steering_fr" role="steering_fr">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+        </actuator>
+        <joint name="fr_steering_joint" role="fr_steering_joint">
+          <mechanical_reduction>1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <transmission name="rl_steering_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="steering_rl" role="steering_rl">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+        </actuator>
+        <joint name="rl_steering_joint" role="rl_steering_joint">
+          <mechanical_reduction>1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <transmission name="rr_steering_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="steering_rr" role="steering_rr">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+        </actuator>
+        <joint name="rr_steering_joint" role="rr_steering_joint">
+          <mechanical_reduction>1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <transmission name="fl_drive_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="drive_fl" role="drive_fl">
+          <command_interface name="velocity"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </actuator>
+        <joint name="fl_wheel_joint" role="fl_wheel_joint">
+          <mechanical_reduction>-1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <transmission name="fr_drive_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="drive_fr" role="drive_fr">
+          <command_interface name="velocity"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </actuator>
+        <joint name="fr_wheel_joint" role="fr_wheel_joint">
+          <mechanical_reduction>-1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <transmission name="rl_drive_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="drive_rl" role="drive_rl">
+          <command_interface name="velocity"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </actuator>
+        <joint name="rl_wheel_joint" role="rl_wheel_joint">
+          <mechanical_reduction>-1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <transmission name="rr_drive_transmission">
+        <plugin>transmission_interface/SimpleTransmission</plugin>
+        <actuator name="drive_rr" role="drive_rr">
+          <command_interface name="velocity"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </actuator>
+        <joint name="rr_wheel_joint" role="rr_wheel_joint">
+          <mechanical_reduction>-1.0</mechanical_reduction>
+        </joint>
+      </transmission>
+
+      <!-- <transmission name="arm_j1_transmission"> -->
+      <!--   <plugin>transmission_interface/SimpleTransmission</plugin> -->
+      <!--   <actuator name="motor1" role="motor1"> -->
+      <!--     <command_interface name="position"/> -->
+      <!--     <state_interface name="position"/> -->
+      <!--     <state_interface name="velocity"/> -->
+      <!--     <state_interface name="effort"/> -->
+      <!--   </actuator> -->
+      <!--   <joint name="arm_j1" role="arm_j1"> -->
+      <!--     <mechanical_reduction>-3.0</mechanical_reduction> -->
+      <!--   </joint> -->
+      <!-- </transmission> -->
+      <!---->
+      <!-- <transmission name="arm_j2_j3_transmission"> -->
+      <!--   <plugin>transmission_interface/FourBarLinkageTransmission</plugin> -->
+      <!--   <actuator name="motor2" role="motor2"> -->
+      <!--     <command_interface name="position"/> -->
+      <!--     <state_interface name="position"/> -->
+      <!--     <state_interface name="velocity"/> -->
+      <!--     <state_interface name="effort"/> -->
+      <!--     <mechanical_reduction>50.0</mechanical_reduction> -->
+      <!--   </actuator> -->
+      <!--   <actuator name="motor3" role="motor3"> -->
+      <!--     <command_interface name="position"/> -->
+      <!--     <state_interface name="position"/> -->
+      <!--     <state_interface name="velocity"/> -->
+      <!--     <state_interface name="effort"/> -->
+      <!--     <mechanical_reduction>50.0</mechanical_reduction> -->
+      <!--   </actuator> -->
+      <!--   <joint name="arm_j2" role="arm_j2"> -->
+      <!--     <mechanical_reduction>-1.0</mechanical_reduction> -->
+      <!--     <offset>0.0</offset> -->
+      <!--   </joint> -->
+      <!--   <joint name="arm_j3" role="arm_j3"> -->
+      <!--     <mechanical_reduction>1.0</mechanical_reduction> -->
+      <!--     <offset>0.0</offset> -->
+      <!--   </joint> -->
+      <!-- </transmission> -->
+      <!---->
+      <!-- <transmission name="arm_j4_transmission"> -->
+      <!--   <plugin>transmission_interface/SimpleTransmission</plugin> -->
+      <!--   <actuator name="motor4" role="motor4"> -->
+      <!--     <command_interface name="position"/> -->
+      <!--     <state_interface name="position"/> -->
+      <!--     <state_interface name="velocity"/> -->
+      <!--     <state_interface name="effort"/> -->
+      <!--   </actuator> -->
+      <!--   <joint name="arm_j4" role="arm_j4"> -->
+      <!--     <mechanical_reduction>1.0</mechanical_reduction> -->
+      <!--   </joint> -->
+      <!-- </transmission> -->
+      <!---->
+      <!-- <transmission name="arm_j5_transmission"> -->
+      <!--   <plugin>transmission_interface/SimpleTransmission</plugin> -->
+      <!--   <actuator name="motor5" role="motor5"> -->
+      <!--     <command_interface name="position"/> -->
+      <!--     <state_interface name="position"/> -->
+      <!--     <state_interface name="velocity"/> -->
+      <!--     <state_interface name="effort"/> -->
+      <!--   </actuator> -->
+      <!--   <joint name="arm_j5" role="arm_j5"> -->
+      <!--     <mechanical_reduction>-1.0</mechanical_reduction> -->
+      <!--   </joint> -->
+      <!-- </transmission> -->
+      <!---->
+      <!-- <transmission name="arm_j6_transmission"> -->
+      <!--   <plugin>transmission_interface/SimpleTransmission</plugin> -->
+      <!--   <actuator name="motor6" role="motor6"> -->
+      <!--     <command_interface name="position"/> -->
+      <!--     <state_interface name="position"/> -->
+      <!--     <state_interface name="velocity"/> -->
+      <!--     <state_interface name="effort"/> -->
+      <!--   </actuator> -->
+      <!--   <joint name="arm_j6" role="arm_j6"> -->
+      <!--     <mechanical_reduction>1.0</mechanical_reduction> -->
+      <!--   </joint> -->
+      <!-- </transmission> -->
+
+    </ros2_control>
+  </xacro:macro>
+
+</robot>

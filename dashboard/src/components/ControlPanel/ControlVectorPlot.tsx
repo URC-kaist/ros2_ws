@@ -14,7 +14,7 @@ type ControlVectorPlotProps = {
   isConnected: boolean
   gamepads: Array<{ index: number; id: string }>
   selectedGamepadIndex: number | null
-  onSelectGamepad: (index: number) => void
+  onSelectGamepad: (index: number | null) => void
   isSettingsOpen: boolean
   onToggleSettings: () => void
 }
@@ -85,12 +85,16 @@ const ControlVectorPlot = ({
             </IconButton>
           </span>
           <select
-            value={selectedGamepadIndex ?? (gamepads[0]?.index ?? '')}
-            onChange={(event) => onSelectGamepad(Number(event.target.value))}
-            disabled={gamepads.length === 0}
+            value={selectedGamepadIndex ?? ''}
+            onChange={(event) =>
+              onSelectGamepad(event.target.value === '' ? null : Number(event.target.value))
+            }
           >
+            <option value="">No control</option>
             {gamepads.length === 0 ? (
-              <option value="">No gamepad detected</option>
+              <option value="" disabled>
+                No gamepad detected
+              </option>
             ) : (
               gamepads.map((pad) => (
                 <option key={pad.index} value={pad.index}>

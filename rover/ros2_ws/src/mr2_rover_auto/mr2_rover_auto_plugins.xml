@@ -1,0 +1,8 @@
+<library path="mr2_rover_auto_gridmap_layer">
+  <class
+    name="mr2_rover_auto/GridMapTraversabilityLayer"
+    type="mr2_rover_auto::GridMapTraversabilityLayer"
+    base_class_type="nav2_costmap_2d::Layer">
+    <description>GridMap traversability layer for Nav2 costmaps.</description>
+  </class>
+</library>

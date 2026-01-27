@@ -84,6 +84,7 @@
   background: #0b1220;
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
+  position: relative;
 }
 
 .pose-grid {

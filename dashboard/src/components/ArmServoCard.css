@@ -1,0 +1,65 @@
+.arm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.arm-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gamepad-picker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.gamepad-picker select {
+  background: rgba(11, 18, 32, 0.7);
+  color: #dfe6fb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 10px;
+  width: 100%;
+}
+
+.gamepad-label {
+  color: var(--muted);
+}
+
+.arm-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.arm-card__label {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.arm-card__values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.arm-card__values span {
+  background: rgba(53, 211, 195, 0.08);
+  border: 1px solid rgba(53, 211, 195, 0.18);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.arm-card__hint {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

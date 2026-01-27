@@ -1,0 +1,166 @@
+ekf_local:
+  ros__parameters:
+    frequency: 30.0 # filter Hz
+    sensor_timeout: 2.0
+    two_d_mode: true # Do not consider in 3D
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom # ekf_local for tf: odom -> base_link
+
+    # IMU
+    imu0: /rgbd_camera/imu
+    imu0_config: [false, false, false, true, true, false, # unreliable magnet
+                  false, false, false, true, true, true, # local gyro
+                  true, true, true] # local acceleration
+    imu0_queue_size: 32 # <= 960 Hz
+    imu0_differential: false # using navsat
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true
+    gravitational_acceleration: 9.80665 # G_ACC; Value depends on where you are
+
+    # Wheel odometry
+    odom0: /wheel_encoder/odometry
+    odom0_config: [false, false, false, false, false, false,
+                   true,  true, false, false, false, true, # vX, vY and w_yaw
+                   false, false, false]
+    odom0_queue_size: 30 # <= 900 Hz
+    odom0_differential: false # using navsat
+    odom0_relative: false
+
+    publish_tf: true # ekf_local tf: odom -> base_link
+    permit_corrected_publication: true # compensate delayed GNSS data
+    print_diagnostics: true # true for debugging with /diagnostics topic
+    debug: false
+
+    use_control: false # if true, internally used for acceleration term
+
+    # Recall: What are covariances in KF?
+    # P: the estimation of state variance (how reliable is my prediction?)
+    # Q: the estimation of process variance (outside noise modelled as Gaussian)
+    # R: the inherent sensor noise (Written in /rgbd_camera/imu and /fix)
+    
+    # Then why "co"variance? Because there are correlations everywhere. -> matrix
+
+    # Here we set Q, the metric of "how noizy the environment is"
+    # Position, velocity, acceleration: high Q for rough terrain
+    process_noise_covariance: [ # XXX This has to be tuned properly.
+      1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
+      0.0,  1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
+      0.0,  0.0,  100.0,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
+      0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
+      0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
+      0.0,  0.0,  0.0,  0.0,  0.0,  1e-5, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # y; relatively smooth
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vx (m^2/s^2)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vy
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  5e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vz
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  # wr (rad^2/s^2)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  # wp
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  # wy
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  0.0,  # Ax (m^2/s^4)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  # Ay
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1] # Az
+
+ekf_global: # with navsat gps
+  ros__parameters:
+    frequency: 30.0 # filter Hz
+    sensor_timeout: 2.0
+    two_d_mode: true # Do not consider in 3d
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: map # ekf_local for tf: map -> odom
+
+    # IMU
+    imu0: /rgbd_camera/imu
+    imu0_config: [false, false, false, true, true, false, # unreliable magnet
+                  false, false, false, true, true, true, # local gyro
+                  true, true, true] # local acceleration
+    imu0_queue_size: 32 # <= 960 Hz
+    imu0_differential: false # using navsat
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true
+    gravitational_acceleration: 9.80665 # G_ACC; Value depends on where you are
+
+    # Wheel odometry
+    odom0: /wheel_encoder/odometry
+    odom0_config: [false, false, false, false, false, false,
+                   true,  true, false, false, false, true, # vX, vY, and w_yaw
+                   false, false, false]
+    odom0_queue_size: 32 # <= 960 Hz
+    odom0_differential: false # using navsat
+    odom0_relative: false
+
+    # GPS
+    odom1: /odometry/gps # from navsat_transform
+    odom1_config: [true, true, true, false, false, true, # X, Y, yaw (north-south)
+                   false, false, false, false, false, false,
+                   false, false, false]
+    odom1_queue_size: 32 # <= 960 Hz
+    odom1_differential: false
+    odom1_relative: false
+
+    publish_tf: true # ekf_gloal tf: map -> odom
+    permit_corrected_publication: true # compensate delayed GNSS data
+    print_diagnostics: true # true for debugging with /diagnostics topic
+    debug: false
+
+    use_control: false # if true, internally used for acceleration term
+
+    # Recall: What are covariances in KF?
+    # P: the estimation of state variance (how reliable is my prediction?)
+    # Q: the estimation of process variance (outside noise modelled as Gaussian)
+    # R: the inherent sensor noise (Written in /rgbd_camera/imu and /fix)
+    
+    # Then why "co"variance? Because there are correlations everywhere. -> matrix
+
+    # Here we set Q, the metric of "how noizy the environment is"
+    # Position, velocity, acceleration: high Q for rough terrain
+    process_noise_covariance: [ # XXX This has to be tuned properly.
+      1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
+      0.0,  1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
+      0.0,  0.0,  100.0,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
+      0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
+      0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
+      0.0,  0.0,  0.0,  0.0,  0.0,  1e-5, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # y; relatively smooth
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vx (m^2/s^2)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vy
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  5e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vz
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  # wr (rad^2/s^2)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  # wp
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  # wy
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  0.0,  # Ax (m^2/s^4)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  # Ay
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1] # Az
+
+navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
+  ros__parameters:
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: map
+    frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
+    delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
+    magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
+    yaw_offset: 0.0 # 0 for north
+    broadcast_cartesian_transform: false # we do not use UTM
+    publish_filtered_gps: true # publish estimation back to WGS84
+    use_odometry_yaw: true
+    wait_for_datum: true
+    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
+
+navsat_transform_query: # copied configuration from navsat_transform
+  ros__parameters:
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: map # Purposed for query
+    frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
+    delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
+    magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
+    yaw_offset: 0.0
+    broadcast_cartesian_transform: false # we do not use UTM
+    publish_filtered_gps: true # publish estimation back to WGS84
+    use_odometry_yaw: true
+    wait_for_datum: true
+    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
