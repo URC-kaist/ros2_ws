@@ -64,17 +64,42 @@ def generate_launch_description():
 
     ros2_control = ros2_control_node(controller_config, robot_description, use_sim_time)
     spawners = controller_spawners(
-        ["joint_state_broadcaster", "rover_controller", "manipulator_controller"],
+        # ["joint_state_broadcaster", "rover_controller", "manipulator_controller"],
+        ["joint_state_broadcaster", "rover_controller"],
         start_after=2.0,
         interval=2.0,
+        # inactive_controllers=["manipulator_controller"],
     )
 
     battery_monitor = Node(
         package="mr2_battery_monitor",
         executable="battery_monitor_node",
-        name="battery_monitor",
+        name="battery_1",
         output="screen",
         parameters=[{"can_iface": can_iface}],
+        remappings=[
+            ("battery/telemetry", "battery_1/telemetry"),
+            ("battery/state", "battery_1/state"),
+        ],
+    )
+
+    battery_monitor_secondary = Node(
+        package="mr2_battery_monitor",
+        executable="battery_monitor_node",
+        name="battery_2",
+        output="screen",
+        parameters=[
+            {
+                "can_iface": can_iface,
+                "summary_can_id": 0x320,
+                "metadata_can_id": 0x321,
+                "cell_base_can_id": 0x330,
+            }
+        ],
+        remappings=[
+            ("battery/telemetry", "battery_2/telemetry"),
+            ("battery/state", "battery_2/state"),
+        ],
     )
 
     return LaunchDescription(
@@ -88,5 +113,6 @@ def generate_launch_description():
             ros2_control,
             *spawners,
             battery_monitor,
+            battery_monitor_secondary,
         ]
     )

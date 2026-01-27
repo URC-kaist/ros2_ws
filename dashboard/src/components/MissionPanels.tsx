@@ -1,6 +1,7 @@
 import DeliveryPanel from './DeliveryPanel'
 import MapPreview from './MapPreview'
 import SystemStatusPanel from './SystemStatusPanel'
+import ArmServoCard from './ArmServoCard'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -55,24 +56,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
 
       {activeTab === 'manipulation' && (
         <div className="panel-grid" role="tabpanel">
-          <article className="card">
-            <h3>Arm Pose</h3>
-            <p>Joint targets and end-effector orientation.</p>
-            <div className="pose-grid">
-              <div>
-                <span>Joint 1</span>
-                <strong>32 deg</strong>
-              </div>
-              <div>
-                <span>Joint 2</span>
-                <strong>18 deg</strong>
-              </div>
-              <div>
-                <span>Joint 3</span>
-                <strong>44 deg</strong>
-              </div>
-            </div>
-          </article>
+          <ArmServoCard />
           <article className="card">
             <h3>Tool Status</h3>
             <p>Gripper, drill, and wrist telemetry.</p>

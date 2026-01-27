@@ -93,12 +93,31 @@ def generate_launch_description():
     # ───── robot_state_publisher & ros2_control_node ────────────────────
     rsp = robot_state_publisher_node(robot_description, use_sim_time)
 
-    battery_emulator = Node(
+    battery_emulator_1 = Node(
         package="mr2_battery_monitor",
         executable="battery_emulator_node",
-        name="battery_emulator",
+        name="battery_1",
         output="screen",
         parameters=[{"use_sim_time": use_sim_time}],
+        remappings=[
+            ("battery/telemetry", "battery_1/telemetry"),
+            ("battery/state", "battery_1/state"),
+        ],
+    )
+
+    battery_emulator_2 = Node(
+        package="mr2_battery_monitor",
+        executable="battery_emulator_node",
+        name="battery_2",
+        output="screen",
+        parameters=[
+            {"use_sim_time": use_sim_time},
+            {"state_of_charge_pct": 65.0, "pack_voltage_v": 38.0},
+        ],
+        remappings=[
+            ("battery/telemetry", "battery_2/telemetry"),
+            ("battery/state", "battery_2/state"),
+        ],
     )
 
     # ───── spawn the robot into Gazebo ───────────────────────────────────
@@ -142,7 +161,7 @@ def generate_launch_description():
         parameters=[{"use_sim_time": use_sim_time}],
         remappings=[
             ("/world/empty_world/clock", "/clock"),
-            ("/imu", "/imu/data"),  # align Gazebo IMU topic with robot_localization expectations
+            ("/imu", "/rgbd_camera/imu"),  # match RealSense IMU topic used in robot_localization
         ],
         output="screen",
     )
@@ -164,7 +183,8 @@ def generate_launch_description():
             SetEnvironmentVariable("IGN_GAZEBO_RESOURCE_PATH", ign_resource_path),
             gz_sim,
             rsp,
-            battery_emulator,
+            battery_emulator_1,
+            battery_emulator_2,
             spawn,
             *spawners,
             gz_bridge,

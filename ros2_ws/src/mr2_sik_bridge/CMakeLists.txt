@@ -8,7 +8,11 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(mr2_battery_monitor REQUIRED)
+find_package(ublox_ubx_msgs REQUIRED)
+find_package(rtcm_msgs REQUIRED)
 add_library(${PROJECT_NAME} src/packets.cpp)
 target_include_directories(${PROJECT_NAME}
   PUBLIC
@@ -22,7 +26,11 @@ ament_target_dependencies(
   sik_bridge_node
   rclcpp
   geometry_msgs
+  nav_msgs
+  sensor_msgs
   mr2_battery_monitor
+  ublox_ubx_msgs
+  rtcm_msgs
 )
 target_link_libraries(sik_bridge_node ${PROJECT_NAME})
 

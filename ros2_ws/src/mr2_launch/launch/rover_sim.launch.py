@@ -30,6 +30,21 @@ def generate_launch_description():
         default_value="can0",
         description="CAN interface used by the AK servo hardware",
     )
+    sik_sim_device_arg = DeclareLaunchArgument(
+        "sik_sim_device",
+        default_value="/tmp/sik_sim0",
+        description="PTy path the SiK bridge will open in sim mode",
+    )
+    sik_sim_peer_arg = DeclareLaunchArgument(
+        "sik_sim_peer",
+        default_value="/tmp/sik_sim1",
+        description="Peer PTY path for external attachment",
+    )
+    sik_sim_baud_arg = DeclareLaunchArgument(
+        "sik_sim_baud",
+        default_value="57600",
+        description="Baud rate for the simulated SiK link",
+    )
 
     rover_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -43,6 +58,9 @@ def generate_launch_description():
             "rviz_config": LaunchConfiguration("rviz_config"),
             "controller_config": LaunchConfiguration("controller_config"),
             "can_iface": LaunchConfiguration("can_iface"),
+            "sik_sim_device": LaunchConfiguration("sik_sim_device"),
+            "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
+            "sik_sim_baud": LaunchConfiguration("sik_sim_baud"),
         }.items(),
     )
 
@@ -52,6 +70,9 @@ def generate_launch_description():
             rviz_arg,
             controller_config_arg,
             can_iface_arg,
+            sik_sim_device_arg,
+            sik_sim_peer_arg,
+            sik_sim_baud_arg,
             rover_launch,
         ]
     )

@@ -81,15 +81,6 @@ T parse_number(const std::unordered_map<std::string, std::string> &params,
   }
 }
 
-std::string resolve_topic(const std::unordered_map<std::string, std::string> &params,
-                          const std::string &key, const std::string &default_topic) {
-  auto it = params.find(key);
-  if (it != params.end()) {
-    return it->second;
-  }
-  return default_topic;
-}
-
 } // namespace
 
 void LimitSwitchDevice::configure(const hardware_interface::ComponentInfo &info,
@@ -102,18 +93,15 @@ void LimitSwitchDevice::configure(const hardware_interface::ComponentInfo &info,
   active_high_ = parse_bool(info.parameters, "active_high", true);
 
   state_name_ = require_param(info.parameters, "state_name");
-  fault_state_name_ = resolve_topic(info.parameters, "fault_state_name",
-                                    state_name_ + "_fault");
+  fault_state_name_ = state_name_ + "_fault";
 
   logger_ = node->get_logger();
 
-  state_topic_ = resolve_topic(info.parameters, "state_topic",
-                               "can_sensors/" + state_name_);
+  state_topic_ = "can_sensors/" + state_name_;
   state_pub_ = node->create_publisher<std_msgs::msg::Bool>(
       state_topic_, rclcpp::SensorDataQoS());
 
-  fault_topic_ = resolve_topic(info.parameters, "fault_topic",
-                               "can_sensors/" + fault_state_name_);
+  fault_topic_ = "can_sensors/" + fault_state_name_;
   if (!fault_topic_.empty()) {
     fault_pub_ = node->create_publisher<std_msgs::msg::Bool>(
         fault_topic_, rclcpp::SensorDataQoS());

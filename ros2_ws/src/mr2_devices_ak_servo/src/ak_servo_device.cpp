@@ -102,6 +102,18 @@ public:
 
   void export_state(double *&position, double *&velocity,
                     double *&effort) override {
+    // Guard against propagating NaNs into TF/robot_state_publisher before
+    // valid feedback arrives. Default to 0 so transforms stay normalized.
+    if (!std::isfinite(position_rad_)) {
+      position_rad_ = 0.0;
+    }
+    if (!std::isfinite(velocity_rad_)) {
+      velocity_rad_ = 0.0;
+    }
+    if (!std::isfinite(effort_amp_)) {
+      effort_amp_ = 0.0;
+    }
+
     position = &position_rad_;
     velocity = &velocity_rad_;
     effort = &effort_amp_;
@@ -308,9 +320,10 @@ private:
   int8_t last_temperature_c_{0};
   uint8_t last_error_code_{0};
 
-  double position_rad_{std::numeric_limits<double>::quiet_NaN()};
-  double velocity_rad_{std::numeric_limits<double>::quiet_NaN()};
-  double effort_amp_{std::numeric_limits<double>::quiet_NaN()};
+  // Initialize to neutral values so early state publications remain valid.
+  double position_rad_{0.0};
+  double velocity_rad_{0.0};
+  double effort_amp_{0.0};
   double command_out_rad_{std::numeric_limits<double>::quiet_NaN()};
   double desired_command_rad_{std::numeric_limits<double>::quiet_NaN()};
   double hold_position_rad_{std::numeric_limits<double>::quiet_NaN()};

@@ -13,11 +13,25 @@ export type CmdArmTwist = {
   ang_z_rad_s: number
 }
 
+export type BatteryId = 1 | 2
+
 export type TelemBattery = {
+  battery_id: BatteryId
   total_capacity_mah: number
   available_capacity_mah: number
   temperature_c: number
   pack_voltage_v: number
+}
+
+export type TelemNav = {
+  timestamp_ms: number
+  latitude_deg: number
+  longitude_deg: number
+  altitude_m: number
+  heading_deg: number
+  cov_x_var: number
+  cov_y_var: number
+  cov_yaw_var: number
 }
 
 export type LinkStatus = {
@@ -26,10 +40,55 @@ export type LinkStatus = {
   last_tx_ms: number
 }
 
+export type BaseStatus = {
+  enabled: boolean
+  antenna_ready: boolean
+  auto_home: boolean
+  heading_offset_deg: number
+  base_lat_deg: number | null
+  base_lon_deg: number | null
+  base_alt_m: number | null
+  antenna_heading_deg: number | null
+  last_cmd_heading_deg: number | null
+  last_cmd_age_ms: number | null
+  base_fix_age_ms: number | null
+  rover_nav_age_ms: number | null
+  base_fix_valid: boolean
+  rover_nav_valid: boolean
+  idle_reason: string
+}
+
 type MessageHandler<T> = (payload: T) => void
 
+type RawTelemBattery = {
+  type: 'telem_battery'
+  battery_id?: number
+  total_capacity_mah: number
+  available_capacity_mah: number
+  temperature_c: number
+  pack_voltage_v: number
+}
+
+type RawTelemNav = {
+  type: 'telem_nav'
+  timestamp_ms: number
+  latitude_deg: number
+  longitude_deg: number
+  altitude_m: number
+  heading_deg: number
+  cov_x_var: number
+  cov_y_var: number
+  cov_yaw_var: number
+}
+
+type RawBaseStatus = {
+  type: 'base_status'
+} & BaseStatus
+
 type GatewayMessage =
-  | ({ type: 'telem_battery' } & TelemBattery)
+  | RawTelemBattery
+  | RawTelemNav
+  | RawBaseStatus
   | ({ type: 'link_status' } & LinkStatus)
 
 const DEFAULT_PATH = '/sik-ws'
@@ -63,6 +122,9 @@ class SikGatewayClient {
   private linkListeners = new Set<MessageHandler<LinkStatus>>()
   private connectionListeners = new Set<MessageHandler<boolean>>()
   private batteryListeners = new Set<MessageHandler<TelemBattery>>()
+  private navListeners = new Set<MessageHandler<TelemNav>>()
+  private baseStatusListeners = new Set<MessageHandler<BaseStatus>>()
+  private pendingBaseHeading: number | null = null
   private url: string
 
   constructor(url: string) {
@@ -78,6 +140,10 @@ class SikGatewayClient {
       this.reconnectDelayMs = RECONNECT_BASE_MS
       this.startHeartbeatMonitor()
       this.emitConnectionStatus(true)
+      if (this.pendingBaseHeading != null) {
+        this.sendBaseHeading(this.pendingBaseHeading)
+        this.pendingBaseHeading = null
+      }
     })
     this.ws.addEventListener('close', () => {
       this.connected = false
@@ -98,7 +164,33 @@ class SikGatewayClient {
       const message = this.safeParse(event.data)
       if (!message) return
       if (message.type === 'telem_battery') {
+        const batteryId = message.battery_id === 2 ? 2 : 1
+        const payload: TelemBattery = {
+          battery_id: batteryId,
+          total_capacity_mah: message.total_capacity_mah,
+          available_capacity_mah: message.available_capacity_mah,
+          temperature_c: message.temperature_c,
+          pack_voltage_v: message.pack_voltage_v,
+        }
         for (const listener of this.batteryListeners) {
+          listener(payload)
+        }
+      } else if (message.type === 'telem_nav') {
+        const payload: TelemNav = {
+          timestamp_ms: message.timestamp_ms,
+          latitude_deg: message.latitude_deg,
+          longitude_deg: message.longitude_deg,
+          altitude_m: message.altitude_m,
+          heading_deg: message.heading_deg,
+          cov_x_var: message.cov_x_var,
+          cov_y_var: message.cov_y_var,
+          cov_yaw_var: message.cov_yaw_var,
+        }
+        for (const listener of this.navListeners) {
+          listener(payload)
+        }
+      } else if (message.type === 'base_status') {
+        for (const listener of this.baseStatusListeners) {
           listener(message)
         }
       } else if (message.type === 'link_status') {
@@ -126,6 +218,16 @@ class SikGatewayClient {
     return () => this.batteryListeners.delete(handler)
   }
 
+  onTelemNav(handler: MessageHandler<TelemNav>) {
+    this.navListeners.add(handler)
+    return () => this.navListeners.delete(handler)
+  }
+
+  onBaseStatus(handler: MessageHandler<BaseStatus>) {
+    this.baseStatusListeners.add(handler)
+    return () => this.baseStatusListeners.delete(handler)
+  }
+
   sendCmdDrive(cmd: CmdDrive) {
     this.send({
       type: 'cmd_drive',
@@ -144,6 +246,19 @@ class SikGatewayClient {
 
   sendHeartbeat() {
     this.send({ type: 'heartbeat' })
+  }
+
+  sendBaseHeading(headingDeg: number) {
+    if (!Number.isFinite(headingDeg)) return
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.pendingBaseHeading = headingDeg
+      this.connect()
+      return
+    }
+    this.send({
+      type: 'base_heading',
+      heading_deg: headingDeg,
+    })
   }
 
   private send(payload: Record<string, unknown>) {

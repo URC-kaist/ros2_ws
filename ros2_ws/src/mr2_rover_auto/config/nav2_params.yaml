@@ -103,8 +103,8 @@ local_costmap:
   local_costmap:
     ros__parameters:
       transform_tolerance: 0.3
-      update_frequency: 8.0 # internal calc
-      publish_frequency: 4.0
+      update_frequency: 5.0 # internal calc
+      publish_frequency: 1.0
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: True
@@ -118,10 +118,17 @@ local_costmap:
         - "traversability_layer"
         - "inflation_layer"
       traversability_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_topic: /traversability_occupancy
-        map_subscribe_transient_local: true
-        footprint_clearing_enabled: true
+        plugin: "mr2_rover_auto/GridMapTraversabilityLayer"
+        enabled: true
+        grid_map_topic: /traversability_gridmap
+        layer: traversability
+        min_value: 0.0
+        max_value: 1.0
+        invert: false
+        unknown_cost: 0 # NOTE: Tune in Field
+        lethal_threshold: 1.0 # NOTE: Tune in Field
+        flip_x: true
+        flip_y: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -141,9 +148,9 @@ global_costmap:
       # resolution: follow map resolution from map.yaml
       footprint_padding: 0.01  # 로봇 형상 패딩 (m)
       footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]"
-      track_unknown_space: true
+      track_unknown_space: false
       plugins:
-        # - "traversability_layer" # TODO: integrate traversability map
+        - "traversability_layer"
         - "static_layer"
         - "inflation_layer"
       static_layer:
@@ -177,7 +184,7 @@ bt_navigator:
     use_sim_time: True
     global_frame: map
     robot_base_frame: base_link
-    odom_topic: /odom
+    odom_topic: odom
     bt_loop_duration: 50 # ms -> 20 Hz
     default_server_timeout: 20
     wait_for_service_timeout: 1000

@@ -74,11 +74,15 @@ def controller_spawners(
     start_after: float = 2.0,
     interval: float = 1.0,
     output: str = "screen",
+    inactive_controllers: Sequence[str] = (),
 ):
     """Create staggered controller spawner TimerActions for a list of controllers."""
     actions = []
     delay = start_after
     for name in controller_names:
+        args = [name]
+        if name in inactive_controllers:
+            args.append("--inactive")
         actions.append(
             TimerAction(
                 period=delay,
@@ -86,7 +90,7 @@ def controller_spawners(
                     Node(
                         package="controller_manager",
                         executable="spawner",
-                        arguments=[name],
+                        arguments=args,
                         output=output,
                     )
                 ],

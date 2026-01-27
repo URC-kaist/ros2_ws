@@ -1,13 +1,18 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    TimerAction,
+)
 from launch.conditions import IfCondition, UnlessCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
 from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
     PythonExpression,
 )
 from launch_ros.actions import Node, SetParameter
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -26,7 +31,7 @@ def generate_launch_description():
     use_sim_time_arg = DeclareLaunchArgument(
         "use_sim_time",
         default_value=PythonExpression(
-            ["'", LaunchConfiguration("mode"), "' == 'sim'"]
+            ["'true' if '", LaunchConfiguration("mode"), "' == 'sim' else 'false'"]
         ),
         description="Use simulation time; defaults to true in sim mode and false in real",
     )
@@ -39,6 +44,11 @@ def generate_launch_description():
         "headless",
         default_value="false",
         description="Run without GUI components",
+    )
+    foxglove_port_arg = DeclareLaunchArgument(
+        "foxglove_port",
+        default_value="8765",
+        description="WebSocket port for the Foxglove Bridge",
     )
     can_iface_arg = DeclareLaunchArgument(
         "can_iface",
@@ -62,10 +72,35 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
-    use_sik_bridge_sim_arg = DeclareLaunchArgument(
-        "use_sik_bridge_sim",
-        default_value="false",
-        description="If true, launch the SiK bridge node in sim mode using /dev/pts/6",
+    sik_sim_device_arg = DeclareLaunchArgument(
+        "sik_sim_device",
+        default_value="/tmp/sik_sim0",
+        description="Path to the PTY device that the SiK bridge will open in sim mode",
+    )
+    sik_sim_peer_arg = DeclareLaunchArgument(
+        "sik_sim_peer",
+        default_value="/tmp/sik_sim1",
+        description="Path to the peer PTY that external tools can attach to",
+    )
+    sik_sim_baud_arg = DeclareLaunchArgument(
+        "sik_sim_baud",
+        default_value="57600",
+        description="Baud rate for the simulated SiK link",
+    )
+    sik_device_arg = DeclareLaunchArgument(
+        "sik_device",
+        default_value="/dev/ttyUSB0",
+        description="Serial device for the real SiK bridge",
+    )
+    sik_baud_arg = DeclareLaunchArgument(
+        "sik_baud",
+        default_value="57600",
+        description="Baud rate for the real SiK bridge",
+    )
+    aruco_cam_topic_arg = DeclareLaunchArgument(
+        "aruco_cam_topic",
+        default_value="/rgbd_camera/color/image_raw",
+        description="Base image topic for aruco_opencv (must have matching /camera_info; default is Gazebo RGBD camera)",
     )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
@@ -75,26 +110,9 @@ def generate_launch_description():
     real_condition = IfCondition(
         PythonExpression(["'", LaunchConfiguration("mode"), "' == 'real'"])
     )
-    sik_sim_condition = IfCondition(
-        PythonExpression(
-            [
-                "'",
-                LaunchConfiguration("mode"),
-                "' == 'sim' and '",
-                LaunchConfiguration("use_sik_bridge_sim"),
-                "' == 'true'",
-            ]
-        )
-    )
+    sik_sim_condition = sim_condition
     use_sim_time_param = SetParameter(
         name="use_sim_time", value=LaunchConfiguration("use_sim_time")
-    )
-
-    pc2_to_heightmap = Node(
-        package="mr2_autonomous",
-        executable="pc2_to_heightmap",
-        name="pc2_to_heightmap",
-        output="screen",
     )
 
     system_status = Node(
@@ -102,6 +120,19 @@ def generate_launch_description():
         executable="system_status",
         name="system_status",
         output="screen",
+    )
+
+    sik_sim_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_launch"), "launch", "sik_sim.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "sik_sim_device": LaunchConfiguration("sik_sim_device"),
+            "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
+        }.items(),
+        condition=sik_sim_condition,
     )
 
     rover_launch = IncludeLaunchDescription(
@@ -150,16 +181,30 @@ def generate_launch_description():
         ],
     )
 
-    traversability_map_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
+    aruco_tracker = Node(
+        package="aruco_opencv",
+        executable="aruco_tracker_autostart",
+        name="aruco_tracker",
+        output="screen",
+        parameters=[
             PathJoinSubstitution(
-                [
-                    FindPackageShare("mr2_autonomous"),
-                    "launch",
-                    "traversability_map.launch.py",
-                ]
-            )
-        )
+                [FindPackageShare("aruco_opencv"), "config", "aruco_tracker.yaml"]
+            ),
+            {
+                "board_descriptions_path": PathJoinSubstitution(
+                    [
+                        FindPackageShare("mr2_launch"),
+                        "config",
+                        "board_descriptions.yaml",
+                    ]
+                ),
+                "cam_base_topic": LaunchConfiguration("aruco_cam_topic"),
+                "marker_size": 0.20,  # 20 cm face as observed on the post
+                "image_is_rectified": False,
+                "aruco.detectInvertedMarker": True,
+                "use_sim_time": LaunchConfiguration("use_sim_time"),
+            },
+        ],
     )
 
     move_group_launch = IncludeLaunchDescription(
@@ -201,8 +246,8 @@ def generate_launch_description():
         name="sik_bridge",
         output="screen",
         parameters=[
-            {"device": "/dev/ttyUSB0"},
-            {"baud": 57600},
+            {"device": LaunchConfiguration("sik_device")},
+            {"baud": LaunchConfiguration("sik_baud")},
             {"heartbeat_timeout_ms": 500},
         ],
         condition=real_condition,
@@ -213,12 +258,53 @@ def generate_launch_description():
         name="sik_bridge_sim",
         output="screen",
         parameters=[
-            {"device": "/dev/pts/2"},
-            {"baud": 57600},
+            {"device": LaunchConfiguration("sik_sim_device")},
+            {"baud": LaunchConfiguration("sik_sim_baud")},
             {"heartbeat_timeout_ms": 500},
-            {"log_frames": True},
+            {"log_frames": False},
         ],
         condition=sik_sim_condition,
+    )
+
+    foxglove_bridge = Node(
+        package="foxglove_bridge",
+        executable="foxglove_bridge",
+        name="foxglove_bridge",
+        output="screen",
+        parameters=[
+            {"port": ParameterValue(LaunchConfiguration("foxglove_port"), value_type=int)},
+            {"debug": ParameterValue(False, value_type=bool)},
+            {"address": "0.0.0.0"},
+            {"tls": ParameterValue(False, value_type=bool)},
+            {"certfile": ""},
+            {"keyfile": ""},
+            {"topic_whitelist": [".*"]},
+            {"param_whitelist": [".*"]},
+            {"service_whitelist": [".*"]},
+            {"client_topic_whitelist": [".*"]},
+            {"min_qos_depth": 1},
+            {"max_qos_depth": 10},
+            {"num_threads": 0},
+            {"send_buffer_limit": 10000000},
+            {"use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)},
+            {
+                "capabilities": [
+                    "clientPublish",
+                    "parameters",
+                    "parametersSubscribe",
+                    "services",
+                    "connectionGraph",
+                    "assets",
+                ]
+            },
+            {"include_hidden": ParameterValue(False, value_type=bool)},
+            {
+                "asset_uri_allowlist": [
+                    "^package://(?:[-\\w%]+/)*[-\\w%.]+\\.(?:dae|fbx|glb|gltf|jpeg|jpg|mtl|obj|png|stl|tif|tiff|urdf|webp|xacro)$"
+                ]
+            },
+            {"ignore_unresponsive_param_nodes": ParameterValue(True, value_type=bool)},
+        ],
     )
 
     rosbridge_ws = Node(
@@ -240,22 +326,29 @@ def generate_launch_description():
         mode_arg,
         use_sim_time_arg,
         headless_arg,
+        foxglove_port_arg,
         can_iface_arg,
         controller_config_arg,
         use_mock_servos_arg,
         use_servo_arg,
-        use_sik_bridge_sim_arg,
+        sik_sim_device_arg,
+        sik_sim_peer_arg,
+        sik_sim_baud_arg,
+        sik_device_arg,
+        sik_baud_arg,
+        aruco_cam_topic_arg,
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
         localization_launch,
         system_status,
-        pc2_to_heightmap,
-        traversability_map_launch,
+        aruco_tracker,
         move_group_launch,
         servo_launch,
+        sik_sim_launch,
         sik_bridge,
         sik_bridge_sim,
+        foxglove_bridge,
         rosbridge_ws,
         rviz2,
     ])

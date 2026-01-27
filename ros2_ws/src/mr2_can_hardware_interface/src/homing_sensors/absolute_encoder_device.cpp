@@ -80,26 +80,6 @@ inline T parse_number(const std::unordered_map<std::string, std::string> &params
   }
 }
 
-inline std::string resolve_topic(
-    const std::unordered_map<std::string, std::string> &params,
-    const std::string &key, const std::string &fallback) {
-  auto it = params.find(key);
-  if (it != params.end()) {
-    return it->second;
-  }
-  return fallback;
-}
-
-inline std::string resolve_string(
-    const std::unordered_map<std::string, std::string> &params,
-    const std::string &key, const std::string &fallback) {
-  auto it = params.find(key);
-  if (it != params.end()) {
-    return it->second;
-  }
-  return fallback;
-}
-
 } // namespace
 
 void AbsoluteEncoderDevice::configure(const hardware_interface::ComponentInfo &info,
@@ -118,22 +98,12 @@ void AbsoluteEncoderDevice::configure(const hardware_interface::ComponentInfo &i
   zero_offset_rad_ = -M_PI; // Fixed -180 degree offset
 
   state_name_ = require_param(info.parameters, "state_name");
-  auto raw_it = info.parameters.find("raw_name");
-  if (raw_it != info.parameters.end()) {
-    raw_name_ = raw_it->second;
-  }
-  auto flags_it = info.parameters.find("flags_name");
-  if (flags_it != info.parameters.end()) {
-    flags_name_ = flags_it->second;
-  }
+  raw_name_ = state_name_ + "_raw";
+  flags_name_ = state_name_ + "_flags";
 
-  index_state_name_ = resolve_string(info.parameters, "index_state_name",
-                                     state_name_ + "_index_seen");
-  error_state_name_ = resolve_string(info.parameters, "error_state_name",
-                                     state_name_ + "_error_latched");
-  sensor_fault_state_name_ =
-      resolve_string(info.parameters, "sensor_fault_state_name",
-                     state_name_ + "_sensor_fault");
+  index_state_name_ = state_name_ + "_index_seen";
+  error_state_name_ = state_name_ + "_error_latched";
+  sensor_fault_state_name_ = state_name_ + "_sensor_fault";
 
   logger_ = node->get_logger();
   ros_clock_ = node->get_clock();
@@ -141,20 +111,17 @@ void AbsoluteEncoderDevice::configure(const hardware_interface::ComponentInfo &i
   timeout_sec_ = parse_number<double>(info.parameters, "timeout_sec", 0.5);
   last_frame_time_ = ros_clock_->now();
 
-  angle_topic_ = resolve_topic(info.parameters, "angle_topic",
-                               "can_sensors/" + state_name_);
+  angle_topic_ = "can_sensors/" + state_name_;
   angle_pub_ = node->create_publisher<std_msgs::msg::Float64>(
       angle_topic_, rclcpp::SensorDataQoS());
 
   if (!raw_name_.empty()) {
-    raw_topic_ = resolve_topic(info.parameters, "raw_topic",
-                               "can_sensors/" + raw_name_);
+    raw_topic_ = "can_sensors/" + raw_name_;
     raw_pub_ = node->create_publisher<std_msgs::msg::Float64>(
         raw_topic_, rclcpp::SensorDataQoS());
   }
   if (!flags_name_.empty()) {
-    flags_topic_ = resolve_topic(info.parameters, "flags_topic",
-                                 "can_sensors/" + flags_name_);
+    flags_topic_ = "can_sensors/" + flags_name_;
     flags_pub_ = node->create_publisher<std_msgs::msg::Float64>(
         flags_topic_, rclcpp::SensorDataQoS());
   }

@@ -1,0 +1,15 @@
+# Materials for 3-sided ArUco marker
+newmtl aruco
+Ka 1.000 1.000 1.000
+Kd 1.000 1.000 1.000
+Ks 0.000 0.000 0.000
+d 1.0
+illum 1
+map_Kd aruco_4x4_50_id0.png
+
+newmtl plain
+Ka 0.200 0.200 0.200
+Kd 0.700 0.700 0.700
+Ks 0.000 0.000 0.000
+d 1.0
+illum 1

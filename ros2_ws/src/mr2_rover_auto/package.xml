@@ -19,19 +19,41 @@
   <exec_depend>rclcpp_action</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_costmap_2d</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
   <exec_depend>tf2</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
   <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>tf2_eigen</exec_depend>
   <exec_depend>ament_index_cpp</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geographic_msgs</exec_depend>
   <exec_depend>eigen</exec_depend>
   <exec_depend>mr2_action_interface</exec_depend>
   <exec_depend>robot_localization</exec_depend>
+  <exec_depend>ublox_ubx_msgs</exec_depend>
   <exec_depend>behaviortree_cpp_v3</exec_depend>
   <exec_depend>nav2_behavior_tree</exec_depend>
+  <build_depend>grid_map_ros</build_depend>
+  <build_depend>grid_map_core</build_depend>
+  <build_depend>grid_map_msgs</build_depend>
+  <build_depend>grid_map_filters</build_depend>
+  <build_depend>filters</build_depend>
+  <build_depend>pluginlib</build_depend>
+  <build_depend>pcl_conversions</build_depend>
+  <build_depend>nav2_costmap_2d</build_depend>
+
+  <exec_depend>grid_map_ros</exec_depend>
+  <exec_depend>grid_map_core</exec_depend>
+  <exec_depend>grid_map_msgs</exec_depend>
+  <exec_depend>grid_map_filters</exec_depend>
+  <exec_depend>filters</exec_depend>
+  <exec_depend>pluginlib</exec_depend>
+  <exec_depend>pcl_conversions</exec_depend>
   
   <export>
     <build_type>ament_cmake</build_type>
+    <nav2_costmap_2d plugin="${prefix}/mr2_rover_auto_plugins.xml"/>
   </export>
 </package>

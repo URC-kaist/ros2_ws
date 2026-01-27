@@ -9,6 +9,18 @@
       <real_time_factor>1</real_time_factor>
     </physics>
 
+    <scene>
+      <!-- Clear sky blue background -->
+      <background>0.529 0.808 0.922 1</background>
+      <sky>
+        <clouds>
+          <speed>0</speed>
+          <direction>0 0 0</direction>
+          <mean_size>0</mean_size>
+        </clouds>
+      </sky>
+    </scene>
+
     <plugin
       filename="ignition-gazebo-navsat-system"
       name="ignition::gazebo::systems::NavSat">
@@ -59,33 +71,48 @@
     <model name="mdrs_dem">
         <static>true</static>
         <pose>0 0 -1373 0 0 0</pose>
-    	<link name="link">
+        <link name="link">
             <collision name="collision">
                 <geometry>
-			<mesh>
-		        <uri>mdrs.stl</uri>
-          </mesh>
+                    <mesh>
+                        <!-- Keep STL for collision to avoid loading the large textured mesh in physics -->
+                        <uri>mdrs.stl</uri>
+                    </mesh>
                 </geometry>
             </collision>
             <visual name="visual">
                 <geometry>
-			<mesh>
-		        <uri>mdrs.stl</uri>
-          </mesh>
+                    <mesh>
+                        <!-- UV-mapped mesh with satellite texture -->
+                        <uri>mdrs_textured.obj</uri>
+                    </mesh>
                 </geometry>
-		<material>
-      <ambient>0.80 0.72 0.52 1</ambient>
-      <diffuse>0.85 0.76 0.54 1</diffuse>
-      <specular>0.05 0.05 0.05 1</specular>
-      <shininess>2</shininess>
-		</material>
             </visual>
         </link>
     </model>
     <model name="mallet">
-        <static>true</static>
+        <static>false</static>
         <pose>5 0 0.1 0 0 0</pose>
         <link name="link">
+            <inertial>
+                <mass>0.5</mass>
+                <inertia>
+                    <ixx>0.00384703</ixx>
+                    <ixy>0.0</ixy>
+                    <ixz>0.0</ixz>
+                    <iyy>0.00105424</iyy>
+                    <iyz>0.0</iyz>
+                    <izz>0.00470721</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <pose>-5.8e-06 0.149999999977 0.000246281654 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.1515685776 0.3 0.0482563182</size>
+                    </box>
+                </geometry>
+            </collision>
             <visual name="visual">
                 <geometry>
                     <mesh>
@@ -97,9 +124,28 @@
         </link>
     </model>
     <model name="rock_pick">
-        <static>true</static>
+        <static>false</static>
         <pose>5 0.5 0.1 0 0 0</pose>
         <link name="link">
+            <inertial>
+                <mass>0.6</mass>
+                <inertia>
+                    <ixx>0.00598906</ixx>
+                    <ixy>0.0</ixy>
+                    <ixz>0.0</ixz>
+                    <iyy>0.00459253</iyy>
+                    <iyz>0.0</iyz>
+                    <izz>0.0015816</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <pose>-1.79e-06 0.086286294125 -0.001944294495 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.0430196053 0.1725725883 0.3000000006</size>
+                    </box>
+                </geometry>
+            </collision>
             <visual name="visual">
                 <geometry>
                     <mesh>
@@ -111,9 +157,28 @@
         </link>
     </model>
     <model name="bottle">
-        <static>true</static>
+        <static>false</static>
         <pose>5.5 0.5 0.1 0 0 0</pose>
         <link name="link">
+            <inertial>
+                <mass>0.25</mass>
+                <inertia>
+                    <ixx>0.00130234</ixx>
+                    <ixy>0.0</ixy>
+                    <ixz>0.0</ixz>
+                    <iyy>0.00051839</iyy>
+                    <iyz>0.0</iyz>
+                    <izz>0.0011421</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <pose>0.0000033157 0.1074999997 -0.000418489293 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.0927130227 0.215 0.1276214717</size>
+                    </box>
+                </geometry>
+            </collision>
             <visual name="visual">
                 <geometry>
                     <mesh>
@@ -122,6 +187,27 @@
                     </mesh>
                 </geometry>
             </visual>
+        </link>
+    </model>
+    <model name="aruco_prism_home">
+        <static>true</static>
+        <pose>7 0 0 0 0 0</pose>
+        <link name="body">
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>../meshes/aruco_prism_external/aruco_3sided_marker.obj</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+            <collision name="collision">
+                <geometry>
+                    <cylinder>
+                        <radius>0.1</radius>
+                        <length>0.2</length>
+                    </cylinder>
+                </geometry>
+            </collision>
         </link>
     </model>
   </world>

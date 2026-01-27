@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="rover_base" params="length:=0.73 width:=0.49 height:=0.19 mass:=10 rocker_size:=0.1 rocker_mass:=0.5 joint_effort:=50 joint_vel:=2.0 joint_lim:=1.57 front_camera_pitch:=0.3491">
+  <xacro:macro name="rover_base" params="length:=0.73 width:=0.491 height:=0.19 mass:=10 rocker_size:=0.1 rocker_mass:=0.5 joint_effort:=50 joint_vel:=2.0 joint_lim:=1.57 front_camera_pitch:=0.523599">
 
     <link name="base_link"/>
 
@@ -11,9 +11,9 @@
       </inertial>
       <visual>
         <geometry>
-          <box size="${length} ${width} ${height}"/>
+	<box size="${length/2.0} ${width} ${height}"/>
         </geometry>
-        <origin xyz="0 0 ${height/2.0}"/>
+        <origin xyz="${-length/4.0} 0 ${height/2.0}"/>
       </visual>
       <collision>
         <geometry>
@@ -29,7 +29,7 @@
       <origin xyz="0 0 0"/>
     </joint>
 
-    <link name="left_rocker">
+    <link name="right_rocker">
       <inertial>
         <origin xyz="0 -${width/2.0} 0"/>
         <mass value="${rocker_mass}"/>
@@ -37,38 +37,10 @@
       </inertial>
       <visual>
         <geometry>
-          <box size="${rocker_size} ${rocker_size} ${rocker_size}"/>
+          <mesh filename="${rover_mesh_prefix}/rocker.obj"
+                scale="${rover_mesh_scale} ${rover_mesh_scale} ${rover_mesh_scale}"/>
         </geometry>
-        <origin xyz="0 0 ${rocker_size/2.0}"/>
-      </visual>
-      <collision>
-        <geometry>
-          <box size="${rocker_size} ${rocker_size} ${rocker_size}"/>
-        </geometry>
-        <origin xyz="0 0 ${rocker_size/2.0}"/>
-      </collision>
-    </link>
-
-    <joint name="left_rocker_joint" type="revolute">
-      <parent link="base_chassis"/>
-      <child link="left_rocker"/>
-      <origin xyz="0 -${width/2.0} 0" rpy="0 0 0"/>
-      <axis xyz="0 1 0"/>
-      <dynamics damping="0.1" friction="0.0"/>
-      <limit lower="-${joint_lim}" upper="${joint_lim}" effort="${joint_effort}" velocity="${joint_vel}"/>
-    </joint>
-
-    <link name="right_rocker">
-      <inertial>
-        <origin xyz="0 ${width/2.0} 0"/>
-        <mass value="${rocker_mass}"/>
-        <inertia ixx="1e-3" ixy="0" ixz="0" iyy="1e-3" iyz="0" izz="1e-3"/>
-      </inertial>
-      <visual>
-        <geometry>
-          <box size="${rocker_size} ${rocker_size} ${rocker_size}"/>
-        </geometry>
-        <origin xyz="0 0 ${rocker_size/2.0}"/>
+        <origin xyz="0 ${width/2.0} -0.01"/>
       </visual>
       <collision>
         <geometry>
@@ -81,11 +53,41 @@
     <joint name="right_rocker_joint" type="revolute">
       <parent link="base_chassis"/>
       <child link="right_rocker"/>
-      <origin xyz="0 ${width/2.0} 0" rpy="0 0 0"/>
+      <origin xyz="0 -${width/2.0} 0.06" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <dynamics damping="0.1" friction="0.0"/>
       <limit lower="-${joint_lim}" upper="${joint_lim}" effort="${joint_effort}" velocity="${joint_vel}"/>
       <mimic joint="left_rocker_joint" multiplier="-1" offset="0"/>
+    </joint>
+
+    <link name="left_rocker">
+      <inertial>
+        <origin xyz="0 ${width/2.0} 0"/>
+        <mass value="${rocker_mass}"/>
+        <inertia ixx="1e-3" ixy="0" ixz="0" iyy="1e-3" iyz="0" izz="1e-3"/>
+      </inertial>
+      <visual>
+        <geometry>
+          <mesh filename="${rover_mesh_prefix}/rocker.obj"
+                scale="${rover_mesh_scale} ${rover_mesh_scale} ${rover_mesh_scale}"/>
+        </geometry>
+	<origin xyz="0 ${-width/2.0} -0.01" rpy="0 0 3.141592"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="${rocker_size} ${rocker_size} ${rocker_size}"/>
+        </geometry>
+        <origin xyz="0 0 ${rocker_size/2.0}"/>
+      </collision>
+    </link>
+
+    <joint name="left_rocker_joint" type="revolute">
+      <parent link="base_chassis"/>
+      <child link="left_rocker"/>
+      <origin xyz="0 ${width/2.0} 0.06" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.1" friction="0.0"/>
+      <limit lower="-${joint_lim}" upper="${joint_lim}" effort="${joint_effort}" velocity="${joint_vel}"/>
     </joint>
 
     <joint name="right_rocker_joint_mimic" type="fixed">
@@ -95,23 +97,23 @@
 
     <link name="dummy_link"/>
 
-    <link name="left_gnss"/>
-    <joint name="base_to_left_gnss" type="fixed">
-      <origin xyz="0 ${-width/2.0} 0" rpy="0 0 0"/>
-      <parent link="base_chassis"/>
-      <child link="left_gnss"/>
-    </joint>
-
     <link name="right_gnss"/>
     <joint name="base_to_right_gnss" type="fixed">
-      <origin xyz="0 ${width/2.0} 0" rpy="0 0 0"/>
+      <origin xyz="0 ${-width/2.0} 0" rpy="0 0 0"/>
       <parent link="base_chassis"/>
       <child link="right_gnss"/>
     </joint>
 
+    <link name="left_gnss"/>
+    <joint name="base_to_left_gnss" type="fixed">
+      <origin xyz="0 ${width/2.0} 0" rpy="0 0 0"/>
+      <parent link="base_chassis"/>
+      <child link="left_gnss"/>
+    </joint>
+
     <link name="front_camera"/>
     <joint name="base_to_front_camera" type="fixed">
-            <origin xyz="${length/2.0} 0 ${height}" rpy="0 ${front_camera_pitch} 0"/>
+      <origin xyz="${length/2.0} 0 0" rpy="0 ${front_camera_pitch} 0"/>
       <parent link="base_chassis"/>
       <child link="front_camera"/>
     </joint>
@@ -119,7 +121,7 @@
     <!-- IMU mounted at the top of the base box -->
     <link name="imu_link"/>
     <joint name="base_to_imu" type="fixed">
-      <origin xyz="0 0 ${height}" rpy="0 0 0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="base_chassis"/>
       <child link="imu_link"/>
     </joint>

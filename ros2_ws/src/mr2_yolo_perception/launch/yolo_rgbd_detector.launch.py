@@ -12,9 +12,9 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {
-                        "rgb_topic": "/rgbd_camera/image",
-                        "depth_topic": "/rgbd_camera/depth_image",
-                        "camera_info_topic": "/rgbd_camera/camera_info",
+                        "rgb_topic": "/rgbd_camera/color/image_raw",
+                        "depth_topic": "/rgbd_camera/depth/image_rect_raw",
+                        "camera_info_topic": "/rgbd_camera/color/camera_info",
                         "annotated_topic": "yolo/annotated_image",
                         "pose_topic": "yolo/object_pose",
                         "target_frame": "",

@@ -36,6 +36,7 @@ class SystemStatusNode(Node):
         )
 
         self.timer = self.create_timer(1.0 / publish_rate_hz, self.publish)
+        self._temps_ok = True
 
         # Prime psutil's CPU percent to avoid a misleading first sample.
         psutil.cpu_percent(interval=None)
@@ -89,10 +90,19 @@ class SystemStatusNode(Node):
         self._publish_status(self.network_pub, "network", network_payload)
 
         temps_payload: Dict[str, Any] = {}
-        if hasattr(psutil, "sensors_temperatures"):
-            temps = psutil.sensors_temperatures(fahrenheit=False)
+        if self._temps_ok and hasattr(psutil, "sensors_temperatures"):
+            try:
+                temps = psutil.sensors_temperatures(fahrenheit=False) or {}
+            except Exception as exc:
+                self.get_logger().warn(
+                    f"Failed to read temperatures; disabling temperature polling: {exc}"
+                )
+                self._temps_ok = False
+                temps = {}
             for name, entries in temps.items():
                 for idx, entry in enumerate(entries):
+                    if entry.current is None:
+                        continue
                     label = entry.label or f"sensor_{idx}"
                     key = f"{name}.{label}"
                     temps_payload[key] = float(entry.current)

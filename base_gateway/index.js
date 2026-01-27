@@ -17,13 +17,26 @@ const jwt = require('jsonwebtoken')
 const { SerialPort } = require('serialport')
 const { WebSocketServer } = require('ws')
 
-const DEFAULT_DEVICE = '/dev/ttyUSB0'
+const DEFAULT_DEVICE = '/dev/ttySIK'
 const DEFAULT_BAUD = 57600
 const DEFAULT_PORT = 8081
 const DEFAULT_HEARTBEAT_HZ = 2
 const DEFAULT_CMD_HZ = 10
 const DEFAULT_CMD_TIMEOUT_MS = 500
 const DEFAULT_LINK_TIMEOUT_MS = 2000
+const DEFAULT_ANTENNA_ENABLE = false
+const DEFAULT_ANTENNA_DEVICE = ''
+const DEFAULT_ANTENNA_BAUD = 115200
+const DEFAULT_ANTENNA_CMD_HZ = 2
+const DEFAULT_ANTENNA_STALE_MS = 5000
+const DEFAULT_ANTENNA_HOME = true
+const DEFAULT_ANTENNA_MAX_DEG = 90
+const DEFAULT_ANTENNA_SMOOTHING = 0
+const DEFAULT_ANTENNA_BOOT_WAIT_MS = 2000
+const DEFAULT_ANTENNA_LOG_MS = 5000
+const DEFAULT_ANTENNA_STATUS_MS = 1000
+const DEFAULT_ANTENNA_ALLOW_PROVISIONAL = true
+const DEFAULT_BASE_HEADING_OFFSET_DEG = 0
 
 const args = process.argv.slice(2)
 const config = {
@@ -39,6 +52,58 @@ const config = {
   ),
   linkTimeoutMs: toInt(
     getArg('--link-timeout-ms') || process.env.SIK_LINK_TIMEOUT_MS || DEFAULT_LINK_TIMEOUT_MS
+  ),
+  antennaEnable: toBool(
+    getArg('--antenna-enable') || process.env.BASE_ANTENNA_ENABLE || DEFAULT_ANTENNA_ENABLE
+  ),
+  antennaDevice:
+    getArg('--antenna-device') || process.env.BASE_ANTENNA_DEVICE || DEFAULT_ANTENNA_DEVICE,
+  antennaBaud: toInt(
+    getArg('--antenna-baud') || process.env.BASE_ANTENNA_BAUD || DEFAULT_ANTENNA_BAUD
+  ),
+  antennaCmdHz: toFloat(
+    getArg('--antenna-cmd-hz') || process.env.BASE_ANTENNA_CMD_HZ || DEFAULT_ANTENNA_CMD_HZ
+  ),
+  antennaStaleMs: toInt(
+    getArg('--antenna-stale-ms') ||
+      process.env.BASE_ANTENNA_STALE_MS ||
+      DEFAULT_ANTENNA_STALE_MS
+  ),
+  antennaHome: toBool(
+    getArg('--antenna-home') || process.env.BASE_ANTENNA_HOME || DEFAULT_ANTENNA_HOME
+  ),
+  antennaMaxDeg: toFloat(
+    getArg('--antenna-max-deg') || process.env.BASE_ANTENNA_MAX_DEG || DEFAULT_ANTENNA_MAX_DEG
+  ),
+  antennaSmoothing: toFloat(
+    getArg('--antenna-smoothing') ||
+      process.env.BASE_ANTENNA_SMOOTHING ||
+      DEFAULT_ANTENNA_SMOOTHING
+  ),
+  antennaBootWaitMs: toInt(
+    getArg('--antenna-boot-wait-ms') ||
+      process.env.BASE_ANTENNA_BOOT_WAIT_MS ||
+      DEFAULT_ANTENNA_BOOT_WAIT_MS
+  ),
+  antennaLogMs: toInt(
+    getArg('--antenna-log-ms') ||
+      process.env.BASE_ANTENNA_LOG_MS ||
+      DEFAULT_ANTENNA_LOG_MS
+  ),
+  antennaStatusMs: toInt(
+    getArg('--antenna-status-ms') ||
+      process.env.BASE_ANTENNA_STATUS_MS ||
+      DEFAULT_ANTENNA_STATUS_MS
+  ),
+  antennaAllowProvisional: toBool(
+    getArg('--antenna-allow-provisional') ||
+      process.env.BASE_ANTENNA_ALLOW_PROVISIONAL ||
+      DEFAULT_ANTENNA_ALLOW_PROVISIONAL
+  ),
+  baseHeadingOffsetDeg: toFloat(
+    getArg('--base-heading-deg') ||
+      process.env.BASE_HEADING_OFFSET_DEG ||
+      DEFAULT_BASE_HEADING_OFFSET_DEG
   ),
 }
 
@@ -60,11 +125,23 @@ function toFloat(value) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function toBool(value) {
+  if (value === true || value === false) return value
+  const text = String(value).toLowerCase()
+  return text === '1' || text === 'true' || text === 'yes' || text === 'on'
+}
+
+const { AntennaTracker } = require('./antenna_tracker')
 const MsgId = {
   CMD_DRIVE: 0x01,
   CMD_ARM_TWIST: 0x02,
   HEARTBEAT: 0x03,
-  TELEM_BATTERY: 0x10,
+  TELEM_BATTERY_1: 0x10,
+  TELEM_BATTERY_2: 0x11,
+  TELEM_NAV: 0x20,
+  BASE_SVIN: 0x30,
+  BASE_RTCM: 0x31,
+  BASE_RTCM_FRAG: 0x32,
 }
 
 const MAGIC = 0xa5
@@ -74,31 +151,94 @@ let serialReady = false
 let lastRxMs = 0
 let lastTxMs = 0
 let lastHeartbeatRxMs = 0
-let latestCmdDrive = null
-let latestCmdArmTwist = null
-let lastCmdDriveRxMs = 0
-let lastCmdArmTwistRxMs = 0
+let port = null
+let portReconnectTimer = null
+let antennaTracker = null
+let antennaStatusTimer = null
+let rosBridgeReady = false
+let rosNode = null
+let rclnodejs = null
+let lastSvinTxMs = 0
 
-const port = new SerialPort({
-  path: config.device,
-  baudRate: config.baud,
-  autoOpen: true,
-})
+function schedulePortReconnect() {
+  if (portReconnectTimer) return
+  portReconnectTimer = setTimeout(() => {
+    portReconnectTimer = null
+    setupPort()
+  }, 1000)
+}
 
-port.on('open', () => {
-  serialReady = true
-  log(`Serial open ${config.device} @ ${config.baud}`)
-})
+function setupPort() {
+  if (port) {
+    try {
+      port.removeAllListeners()
+      port.destroy()
+    } catch (_) {
+      /* ignore */
+    }
+    port = null
+  }
 
-port.on('error', (err) => {
-  serialReady = false
-  log(`Serial error: ${err.message}`)
-})
+  port = new SerialPort({
+    path: config.device,
+    baudRate: config.baud,
+    autoOpen: true,
+  })
 
-port.on('close', () => {
-  serialReady = false
-  log('Serial closed')
-})
+  port.on('open', () => {
+    serialReady = true
+    rxBuffer = Buffer.alloc(0)
+    log(`Serial open ${config.device} @ ${config.baud}`)
+  })
+
+  port.on('error', (err) => {
+    serialReady = false
+    log(`Serial error: ${err.message}`)
+    schedulePortReconnect()
+  })
+
+  port.on('close', () => {
+    serialReady = false
+    log('Serial closed')
+    schedulePortReconnect()
+  })
+
+  port.on('data', (data) => {
+    rxBuffer = Buffer.concat([rxBuffer, data])
+    parseFrames()
+  })
+}
+
+setupPort()
+
+if (config.antennaEnable) {
+  antennaTracker = new AntennaTracker({
+    enabled: true,
+    device: config.antennaDevice,
+    baud: config.antennaBaud,
+    cmdHz: config.antennaCmdHz,
+    staleMs: config.antennaStaleMs,
+    autoHome: config.antennaHome,
+    maxRad: (Math.max(config.antennaMaxDeg, 0) * Math.PI) / 180,
+    smoothing: config.antennaSmoothing,
+    bootWaitMs: config.antennaBootWaitMs,
+    logHeadingMs: config.antennaLogMs,
+    allowProvisional: config.antennaAllowProvisional,
+    headingOffsetDeg: config.baseHeadingOffsetDeg,
+    log,
+  })
+  antennaTracker.start()
+
+  if (config.antennaStatusMs > 0) {
+    antennaStatusTimer = setInterval(() => {
+      if (!antennaTracker) return
+      const status = antennaTracker.getStatus()
+      broadcast({ type: 'base_status', ...status })
+    }, Math.max(config.antennaStatusMs, 200))
+  }
+}
+
+startRosBridge()
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url && req.url.startsWith('/transitive/token')) {
@@ -107,6 +247,34 @@ const server = http.createServer((req, res) => {
   }
   res.writeHead(404)
   res.end()
+})
+
+function shutdown() {
+  if (antennaStatusTimer) {
+    clearInterval(antennaStatusTimer)
+    antennaStatusTimer = null
+  }
+  if (antennaTracker) {
+    antennaTracker.stop()
+  }
+  if (port) {
+    try {
+      port.close()
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  process.exit(0)
+}
+
+process.on('SIGINT', () => {
+  log('SIGINT received, shutting down')
+  shutdown()
+})
+
+process.on('SIGTERM', () => {
+  log('SIGTERM received, shutting down')
+  shutdown()
 })
 
 const wss = new WebSocketServer({ server })
@@ -213,6 +381,59 @@ function encodeHeartbeat(cmd) {
   return encodeFrame(MsgId.HEARTBEAT, nextSeq(), payload)
 }
 
+function encodeBaseSvin(msg) {
+  // Payload: int32 mean_x/y/z cm (12), int8 mean_xhp/mean_yhp/mean_zhp (3),
+  // uint8 valid, uint8 active (2), uint32 mean_acc_0p1mm, uint32 obs (8) => 25 bytes
+  const payload = Buffer.alloc(25)
+  payload.writeInt32LE(msg.mean_x_cm | 0, 0)
+  payload.writeInt32LE(msg.mean_y_cm | 0, 4)
+  payload.writeInt32LE(msg.mean_z_cm | 0, 8)
+  payload.writeInt8(msg.mean_x_hp | 0, 12)
+  payload.writeInt8(msg.mean_y_hp | 0, 13)
+  payload.writeInt8(msg.mean_z_hp | 0, 14)
+  payload.writeUInt8(msg.valid ? 1 : 0, 15)
+  payload.writeUInt8(msg.active ? 1 : 0, 16)
+  payload.writeUInt32LE(msg.mean_acc_0p1mm >>> 0, 17)
+  payload.writeUInt32LE(msg.obs >>> 0, 21)
+  return encodeFrame(MsgId.BASE_SVIN, nextSeq(), payload)
+}
+
+function encodeBaseRtcm(msg) {
+  if (!msg || !msg.message) return []
+  const buf = Buffer.from(msg.message)
+  const maxSingleLen = 254 // legacy single-frame limit
+  if (buf.length <= maxSingleLen) {
+    const payload = Buffer.alloc(1 + buf.length)
+    payload.writeUInt8(buf.length, 0)
+    buf.copy(payload, 1)
+    return [encodeFrame(MsgId.BASE_RTCM, nextSeq(), payload)]
+  }
+
+  const maxPayload = 255 // fits in uint8 length field
+  const fragHeaderSize = 4 // u16 msg_len, u8 frag_count, u8 frag_index
+  const maxFragData = maxPayload - fragHeaderSize // 251 bytes
+  const fragCount = Math.ceil(buf.length / maxFragData)
+  if (fragCount > 255) {
+    log(`Dropping RTCM message >${maxFragData * 255} bytes (${buf.length})`)
+    return []
+  }
+
+  const seqValue = nextSeq()
+  const frames = []
+  for (let fragIndex = 0; fragIndex < fragCount; fragIndex += 1) {
+    const start = fragIndex * maxFragData
+    const end = Math.min(start + maxFragData, buf.length)
+    const frag = buf.slice(start, end)
+    const payload = Buffer.alloc(fragHeaderSize + frag.length)
+    payload.writeUInt16LE(buf.length, 0)
+    payload.writeUInt8(fragCount, 2)
+    payload.writeUInt8(fragIndex, 3)
+    frag.copy(payload, fragHeaderSize)
+    frames.push(encodeFrame(MsgId.BASE_RTCM_FRAG, seqValue, payload))
+  }
+  return frames
+}
+
 function decodeTelemBattery(payload) {
   if (payload.length < 16) return null
   return {
@@ -223,8 +444,22 @@ function decodeTelemBattery(payload) {
   }
 }
 
+function decodeTelemNav(payload) {
+  if (payload.length < 32) return null
+  return {
+    timestamp_ms: payload.readUInt32LE(0),
+    latitude_deg: payload.readFloatLE(4),
+    longitude_deg: payload.readFloatLE(8),
+    altitude_m: payload.readFloatLE(12),
+    heading_deg: payload.readFloatLE(16),
+    cov_x_var: payload.readFloatLE(20),
+    cov_y_var: payload.readFloatLE(24),
+    cov_yaw_var: payload.readFloatLE(28),
+  }
+}
+
 function writeFrame(frame) {
-  if (!serialReady) return
+  if (!serialReady || !port) return
   port.write(frame)
   lastTxMs = Date.now()
 }
@@ -241,31 +476,38 @@ function handleDashboardMessage(msg) {
   if (!type) return
 
   if (type === 'cmd_drive') {
-    const linear = coerceNumber(msg.linear_x_m_s ?? msg.linear_x ?? msg.x)
-    const lateral = coerceNumber(msg.linear_y_m_s ?? msg.linear_y ?? msg.y)
-    const angular = coerceNumber(msg.angular_z_rad_s ?? msg.angular_z ?? msg.yaw)
+    const linear = coerceNumber(msg.linear_x_m_s)
+    const lateral = coerceNumber(msg.linear_y_m_s)
+    const angular = coerceNumber(msg.angular_z_rad_s)
     log(`cmd_drive rx x=${linear} y=${lateral} yaw=${angular}`)
-    latestCmdDrive = {
+    const frame = encodeCmdDrive({
       timestamp_ms: Date.now() >>> 0,
       linear_x_m_s: linear,
       linear_y_m_s: lateral,
       angular_z_rad_s: angular,
-    }
-    lastCmdDriveRxMs = Date.now()
+    })
+    writeFrame(frame)
     return
   }
 
   if (type === 'cmd_arm_twist') {
-    latestCmdArmTwist = {
+    log(
+      `cmd_arm_twist rx lin=(${coerceNumber(msg.lin_x_m_s)}, ${coerceNumber(
+        msg.lin_y_m_s
+      )}, ${coerceNumber(msg.lin_z_m_s)}) ang=(${coerceNumber(
+        msg.ang_x_rad_s
+      )}, ${coerceNumber(msg.ang_y_rad_s)}, ${coerceNumber(msg.ang_z_rad_s)})`
+    )
+    const frame = encodeCmdArmTwist({
       timestamp_ms: Date.now() >>> 0,
-      lin_x_m_s: coerceNumber(msg.lin_x_m_s ?? msg.lin_x ?? msg.linear_x ?? msg.x),
-      lin_y_m_s: coerceNumber(msg.lin_y_m_s ?? msg.lin_y ?? msg.linear_y ?? msg.y),
-      lin_z_m_s: coerceNumber(msg.lin_z_m_s ?? msg.lin_z ?? msg.linear_z ?? msg.z),
-      ang_x_rad_s: coerceNumber(msg.ang_x_rad_s ?? msg.ang_x ?? msg.angular_x),
-      ang_y_rad_s: coerceNumber(msg.ang_y_rad_s ?? msg.ang_y ?? msg.angular_y),
-      ang_z_rad_s: coerceNumber(msg.ang_z_rad_s ?? msg.ang_z ?? msg.angular_z ?? msg.yaw),
-    }
-    lastCmdArmTwistRxMs = Date.now()
+      lin_x_m_s: coerceNumber(msg.lin_x_m_s),
+      lin_y_m_s: coerceNumber(msg.lin_y_m_s),
+      lin_z_m_s: coerceNumber(msg.lin_z_m_s),
+      ang_x_rad_s: coerceNumber(msg.ang_x_rad_s),
+      ang_y_rad_s: coerceNumber(msg.ang_y_rad_s),
+      ang_z_rad_s: coerceNumber(msg.ang_z_rad_s),
+    })
+    writeFrame(frame)
     return
   }
 
@@ -274,15 +516,79 @@ function handleDashboardMessage(msg) {
       timestamp_ms: Date.now() >>> 0,
     })
     writeFrame(frame)
+    return
+  }
+
+  if (type === 'base_heading') {
+    const heading = coerceNumber(msg.heading_deg)
+    if (antennaTracker) {
+      antennaTracker.setBaseHeadingOffsetDeg(heading)
+    }
   }
 }
 
-let rxBuffer = Buffer.alloc(0)
+async function startRosBridge() {
+  try {
+    // eslint-disable-next-line global-require
+    rclnodejs = require('rclnodejs')
+  } catch (err) {
+    log(`ROS bridge disabled: rclnodejs not available (${err.message})`)
+    return
+  }
 
-port.on('data', (data) => {
-  rxBuffer = Buffer.concat([rxBuffer, data])
-  parseFrames()
-})
+  try {
+    if (!rclnodejs.isInitialized || !rclnodejs.isInitialized()) {
+      await rclnodejs.init()
+    }
+  } catch (err) {
+    // If already initialised elsewhere, ignore.
+    if (!/already been initialized/i.test(err.message || '')) {
+      log(`ROS bridge init failed: ${err.message}`)
+      return
+    }
+  }
+
+  const nodeName = `base_gateway_ros_${process.pid || Math.floor(Math.random() * 1e5)}`
+  rosNode = new rclnodejs.Node(nodeName)
+
+  rosNode.createSubscription(
+    'ublox_ubx_msgs/msg/UBXNavSvin',
+    '/base/ubx_nav_svin',
+    (msg) => {
+      if (!msg) return
+      const nowMs = Date.now()
+      if (nowMs - lastSvinTxMs < 500) return // throttle ~2 Hz max
+      lastSvinTxMs = nowMs
+      const frame = encodeBaseSvin({
+        mean_x_cm: msg.mean_x,
+        mean_y_cm: msg.mean_y,
+        mean_z_cm: msg.mean_z,
+        mean_x_hp: msg.mean_x_hp,
+        mean_y_hp: msg.mean_y_hp,
+        mean_z_hp: msg.mean_z_hp,
+        valid: !!msg.valid,
+        active: !!msg.active,
+        mean_acc_0p1mm: msg.mean_acc >>> 0,
+        obs: msg.obs >>> 0,
+      })
+      if (frame) writeFrame(frame)
+    }
+  )
+
+  rosNode.createSubscription('rtcm_msgs/msg/Message', '/base/rtcm', (msg) => {
+    if (!msg) return
+    const frames = encodeBaseRtcm(msg)
+    for (const frame of frames) {
+      writeFrame(frame)
+    }
+  })
+
+  rclnodejs.spin(rosNode)
+  rosBridgeReady = true
+  log('ROS bridge started (SVIN + RTCM over SiK)')
+}
+
+let rxBuffer = Buffer.alloc(0)
 
 function parseFrames() {
   while (rxBuffer.length >= 4) {
@@ -317,10 +623,21 @@ function handleFrame(msgId, payload) {
     lastHeartbeatRxMs = Date.now()
   }
 
-  if (msgId === MsgId.TELEM_BATTERY) {
+  if (msgId === MsgId.TELEM_BATTERY_1 || msgId === MsgId.TELEM_BATTERY_2) {
     const telem = decodeTelemBattery(payload)
     if (!telem) return
-    broadcast({ type: 'telem_battery', ...telem })
+    const batteryId = msgId === MsgId.TELEM_BATTERY_2 ? 2 : 1
+    broadcast({ type: 'telem_battery', battery_id: batteryId, ...telem })
+    return
+  }
+
+  if (msgId === MsgId.TELEM_NAV) {
+    const nav = decodeTelemNav(payload)
+    if (!nav) return
+    if (antennaTracker) {
+      antennaTracker.updateRoverNav(nav)
+    }
+    broadcast({ type: 'telem_nav', ...nav })
   }
 }
 
@@ -395,36 +712,5 @@ if (config.heartbeatHz > 0) {
       last_rx_ms: lastRxMs,
       last_tx_ms: lastTxMs,
     })
-  }, periodMs)
-}
-
-if (config.cmdHz > 0) {
-  const periodMs = Math.max(1000 / config.cmdHz, 50)
-  setInterval(() => {
-    const nowMs = Date.now()
-    const timeoutMs = config.cmdTimeoutMs > 0 ? config.cmdTimeoutMs : Number.POSITIVE_INFINITY
-    if (latestCmdDrive) {
-      const isStale = nowMs - lastCmdDriveRxMs > timeoutMs
-      const frame = encodeCmdDrive({
-        timestamp_ms: nowMs >>> 0,
-        linear_x_m_s: isStale ? 0 : latestCmdDrive.linear_x_m_s,
-        linear_y_m_s: isStale ? 0 : latestCmdDrive.linear_y_m_s,
-        angular_z_rad_s: isStale ? 0 : latestCmdDrive.angular_z_rad_s,
-      })
-      writeFrame(frame)
-    }
-    if (latestCmdArmTwist) {
-      const isStale = nowMs - lastCmdArmTwistRxMs > timeoutMs
-      const frame = encodeCmdArmTwist({
-        timestamp_ms: nowMs >>> 0,
-        lin_x_m_s: isStale ? 0 : latestCmdArmTwist.lin_x_m_s,
-        lin_y_m_s: isStale ? 0 : latestCmdArmTwist.lin_y_m_s,
-        lin_z_m_s: isStale ? 0 : latestCmdArmTwist.lin_z_m_s,
-        ang_x_rad_s: isStale ? 0 : latestCmdArmTwist.ang_x_rad_s,
-        ang_y_rad_s: isStale ? 0 : latestCmdArmTwist.ang_y_rad_s,
-        ang_z_rad_s: isStale ? 0 : latestCmdArmTwist.ang_z_rad_s,
-      })
-      writeFrame(frame)
-    }
   }, periodMs)
 }

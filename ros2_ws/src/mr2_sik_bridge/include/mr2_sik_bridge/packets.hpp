@@ -13,7 +13,13 @@ enum class MsgId : uint8_t {
   kCmdDrive = 0x01,
   kCmdArmTwist = 0x02,
   kHeartbeat = 0x03,
-  kTelemBattery = 0x10,
+  kTelemBattery1 = 0x10,
+  kTelemBattery2 = 0x11,
+  kTelemNav = 0x20,
+  kBaseSvin = 0x30,
+  kBaseRtcm = 0x31,
+  kBaseRtcmFrag = 0x32,
+  kTelemBattery = kTelemBattery1,
 };
 
 struct Header {
@@ -51,6 +57,41 @@ struct TelemBattery {
   float pack_voltage_v{0.0f};
 };
 
+struct TelemNav {
+  uint32_t timestamp_ms{0};
+  float latitude_deg{0.0f};
+  float longitude_deg{0.0f};
+  float altitude_m{0.0f};
+  float heading_deg{0.0f};
+  float cov_x_var{0.0f};
+  float cov_y_var{0.0f};
+  float cov_yaw_var{0.0f};
+};
+
+struct BaseSvin {
+  int32_t mean_x_cm{0};
+  int32_t mean_y_cm{0};
+  int32_t mean_z_cm{0};
+  int8_t mean_x_hp{0};
+  int8_t mean_y_hp{0};
+  int8_t mean_z_hp{0};
+  bool valid{false};
+  bool active{false};
+  uint32_t mean_acc_0p1mm{0};
+  uint32_t obs{0};
+};
+
+struct BaseRtcm {
+  std::vector<uint8_t> message;
+};
+
+struct BaseRtcmFrag {
+  uint16_t msg_len{0};
+  uint8_t frag_count{0};
+  uint8_t frag_index{0};
+  std::vector<uint8_t> data;
+};
+
 struct Frame {
   Header header{};
   std::vector<uint8_t> payload;
@@ -62,6 +103,11 @@ std::vector<uint8_t> encode_cmd_drive(uint8_t seq, const CmdDrive &cmd);
 std::vector<uint8_t> encode_cmd_arm_twist(uint8_t seq, const CmdArmTwist &cmd);
 std::vector<uint8_t> encode_heartbeat(uint8_t seq, const Heartbeat &hb);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem);
+std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem,
+                                          uint8_t battery_id);
+std::vector<uint8_t> encode_telem_nav(uint8_t seq, const TelemNav &nav);
+std::vector<uint8_t> encode_base_svin(uint8_t seq, const BaseSvin &svin);
+std::vector<uint8_t> encode_base_rtcm(uint8_t seq, const BaseRtcm &rtcm);
 
 std::optional<Frame> decode_frame(const uint8_t *data, size_t length);
 
@@ -69,5 +115,9 @@ std::optional<CmdDrive> decode_cmd_drive(const Frame &frame);
 std::optional<CmdArmTwist> decode_cmd_arm_twist(const Frame &frame);
 std::optional<Heartbeat> decode_heartbeat(const Frame &frame);
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame);
+std::optional<TelemNav> decode_telem_nav(const Frame &frame);
+std::optional<BaseSvin> decode_base_svin(const Frame &frame);
+std::optional<BaseRtcm> decode_base_rtcm(const Frame &frame);
+std::optional<BaseRtcmFrag> decode_base_rtcm_frag(const Frame &frame);
 
 }  // namespace mr2_sik_bridge
