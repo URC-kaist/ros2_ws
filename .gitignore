@@ -3,3 +3,4 @@ base_gateway/node_modules
 base_gateway/.env.local
 
 /.vscode
+base/gateway/node_modules

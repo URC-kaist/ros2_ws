@@ -71,7 +71,7 @@
         <state_interface name="velocity"/>
         <param name="actuator">drive_rl</param>
         <param name="device_plugin">mr2_devices_drive_motor/DriveMotorDevice</param>
-        <param name="node_id">17</param> <!-- 0x11 -->
+        <param name="node_id">20</param> <!-- 0x14 -->
         <param name="can_iface">${can_iface}</param>
       </joint>
 
@@ -81,7 +81,7 @@
         <state_interface name="velocity"/>
         <param name="actuator">drive_rr</param>
         <param name="device_plugin">mr2_devices_drive_motor/DriveMotorDevice</param>
-        <param name="node_id">20</param> <!-- 0x14 -->
+        <param name="node_id">17</param> <!-- 0x11 -->
         <param name="can_iface">${can_iface}</param>
       </joint>
 
