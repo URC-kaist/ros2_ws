@@ -2,12 +2,12 @@
 
 This service bridges SiK serial frames to the dashboard using WebSocket, and
 hosts a small HTTP endpoint for Transitive JWT minting.
-It implements the MR2 SiK protocol described in `ros2_ws/src/mr2_sik_bridge/README.md`.
+It implements the MR2 SiK protocol described in `rover/ros2_ws/src/mr2_sik_bridge/README.md`.
 
 ## Base Station Antenna Protocol Helper
 
 `base_station.js` provides a small Node.js abstraction for the base station antenna
-serial protocol used by `base_arduino`.
+serial protocol used by `arduino`.
 
 Example:
 
@@ -27,7 +27,7 @@ antenna.sendMoveRad(0.3)
 ## Install
 
 ```bash
-cd base_gateway
+cd base/gateway
 npm install
 ```
 

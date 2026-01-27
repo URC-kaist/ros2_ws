@@ -316,7 +316,7 @@ function broadcast(obj) {
 
 function log(message) {
   // eslint-disable-next-line no-console
-  console.log(`[base_gateway] ${message}`)
+  console.log(`[gateway] ${message}`)
 }
 
 function nextSeq() {
@@ -548,7 +548,7 @@ async function startRosBridge() {
     }
   }
 
-  const nodeName = `base_gateway_ros_${process.pid || Math.floor(Math.random() * 1e5)}`
+  const nodeName = `gateway_ros_${process.pid || Math.floor(Math.random() * 1e5)}`
   rosNode = new rclnodejs.Node(nodeName)
 
   rosNode.createSubscription(

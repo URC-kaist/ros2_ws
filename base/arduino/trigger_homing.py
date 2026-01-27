@@ -135,7 +135,7 @@ def periodic_send(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Send commands to base_arduino")
+    ap = argparse.ArgumentParser(description="Send commands to arduino")
     ap.add_argument("--port", required=True, help="Serial port, e.g. /dev/ttyUSB0")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--seq", type=lambda x: int(x, 0), default=0x01)

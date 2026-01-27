@@ -1,5 +1,5 @@
 {
-  "name": "base-gateway",
+  "name": "gateway",
   "version": "0.1.0",
   "private": true,
   "description": "Headless MR2 serial <-> dashboard WebSocket gateway",

@@ -187,7 +187,7 @@ class AntennaTracker {
     }
 
     const pid = process.pid || Math.floor(Math.random() * 10000)
-    const nodeName = `base_gateway_antenna_tracker_${pid}`
+    const nodeName = `gateway_antenna_tracker_${pid}`
     const node = new rclnodejs.Node(nodeName)
     this.rosNode = node
     node.createSubscription(
