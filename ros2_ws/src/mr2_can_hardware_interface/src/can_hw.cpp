@@ -149,6 +149,9 @@ public:
       }
 
       auto &actuator = get_actuator(joint_data.actuator_name);
+      if (joint_data.command_interface == hardware_interface::HW_IF_VELOCITY) {
+        actuator.uses_velocity_command = true;
+      }
 
       if (!actuator.configured) {
         std::shared_ptr<CanDevice> dev;
@@ -617,7 +620,12 @@ public:
     }
 
     for (auto &actuator : actuators_) {
-      actuator.command = actuator.transmission_passthrough;
+      if (actuator.uses_velocity_command &&
+          std::isfinite(actuator.transmission_velocity)) {
+        actuator.command = actuator.transmission_velocity;
+      } else {
+        actuator.command = actuator.transmission_passthrough;
+      }
       if (actuator.device && actuator.device->command_ptr) {
         *actuator.device->command_ptr = actuator.command;
       }
@@ -670,6 +678,7 @@ private:
     double transmission_effort{std::numeric_limits<double>::quiet_NaN()};
     DevicePointers *device{nullptr};
     bool configured{false};
+    bool uses_velocity_command{false};
   };
 
   JointData &get_joint(const std::string &name) {
