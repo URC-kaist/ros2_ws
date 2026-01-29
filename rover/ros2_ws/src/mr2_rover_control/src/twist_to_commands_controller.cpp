@@ -15,7 +15,7 @@ TwistToCommandsController::on_init() { // TODO: follow actual dimension
   auto_declare<double>("wheel_base", 0.95386);
   auto_declare<double>("track_width", 0.6504);
   auto_declare<double>("wheel_radius", 0.125);
-  auto_declare<double>("max_steer", 1.5708); // +/- 90 degrees
+  auto_declare<double>("max_steer", 2.35619); // +/- 135 degrees
   auto_declare<double>("twist_timeout", 0.5);
   auto_declare<double>("odom_publish_rate_hz", 30.0);
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
@@ -250,6 +250,21 @@ TwistToCommandsController::update(const rclcpp::Time &,
   std::array<double, 4> steer{};
   std::array<double, 4> speed{};
 
+  // Read current steering joint positions (state_interfaces_: wheel vels first, then steering positions)
+  std::array<double, 4> current_steer{};
+  for (size_t i = 0; i < 4; ++i) {
+    const double val = (state_interfaces_.size() > i + 4)
+                           ? state_interfaces_[i + 4].get_value()
+                           : std::numeric_limits<double>::quiet_NaN();
+    current_steer[i] = std::isfinite(val) ? val : 0.0;
+  }
+
+  auto ang_distance = [](double a, double b) {
+    // Smallest absolute difference between two angles (wrap at 2*pi)
+    const double diff = std::remainder(a - b, 2.0 * M_PI);
+    return std::abs(diff);
+  };
+
   for (size_t i = 0; i < wheels.size(); ++i) {
     const auto &w = wheels[i];
     const double vx_i = vx - wz * w[1];
@@ -265,14 +280,24 @@ TwistToCommandsController::update(const rclcpp::Time &,
     double ang = std::atan2(vy_i, vx_i);
     double w_ang = v_lin / wheel_radius_;
 
-    if (std::abs(ang) > M_PI_2) { // Modified: choose shortest yaw path
-      if (ang > 0) {
-        ang -= M_PI;
-      } else {
-        ang += M_PI;
-      }
-      w_ang *= -1.0;
+    // Two equivalent steering solutions: (ang, w_ang) or (ang +/- pi, -w_ang).
+    double ang_alt = ang;
+    double w_ang_alt = w_ang;
+    if (ang > 0) {
+      ang_alt = ang - M_PI;
+    } else {
+      ang_alt = ang + M_PI;
     }
+    w_ang_alt *= -1.0;
+
+    // Choose the solution closest to current steering angle for that wheel.
+    const double cand1 = std::clamp(ang, -max_steer_, max_steer_);
+    const double cand2 = std::clamp(ang_alt, -max_steer_, max_steer_);
+    if (ang_distance(cand2, current_steer[i]) < ang_distance(cand1, current_steer[i])) {
+      ang = cand2;
+      w_ang = w_ang_alt;
+    }
+
     steer[i] = std::clamp(ang, -max_steer_, max_steer_);
     speed[i] = w_ang;
   }

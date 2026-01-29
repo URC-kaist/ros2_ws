@@ -637,9 +637,14 @@ public:
     }
 
     for (auto &actuator : actuators_) {
-      if (actuator.uses_velocity_command &&
-          std::isfinite(actuator.transmission_velocity)) {
-        actuator.command = actuator.transmission_velocity;
+      if (actuator.uses_velocity_command) {
+        // Velocity-mode actuators should never be driven by position fallback.
+        // If no finite velocity command is available yet, hold them at zero.
+        if (std::isfinite(actuator.transmission_velocity)) {
+          actuator.command = actuator.transmission_velocity;
+        } else {
+          actuator.command = 0.0;
+        }
       } else {
         actuator.command = actuator.transmission_passthrough;
       }
