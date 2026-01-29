@@ -41,6 +41,8 @@ private:
                    const std::array<double, 4> &steer_angle,
                    const rclcpp::Time &stamp);
   std::array<std::array<double, 2>, 4> wheelPositions() const;
+  double applyRateLimit(double target, double prev, double rate_limit,
+                        double dt) const;
 
   std::vector<std::string> wheel_joints_;
   std::vector<std::string> steering_joints_;
@@ -51,6 +53,11 @@ private:
   double max_steer_;
   double timeout_;
   double odom_publish_rate_;
+  double rate_limit_vx_;
+  double rate_limit_vy_;
+  double rate_limit_wz_;
+  double steering_error_zero_rad_;
+  double steering_error_ratio_rad_;
   std::string odom_frame_id_;
   std::string base_frame_id_;
 
@@ -59,6 +66,7 @@ private:
   rclcpp::Time last_twist_time_;
   rclcpp::Time last_odom_pub_time_;
   geometry_msgs::msg::Twist last_twist_;
+  geometry_msgs::msg::Twist limited_twist_;
 };
 
 } // namespace mr2_rover_control

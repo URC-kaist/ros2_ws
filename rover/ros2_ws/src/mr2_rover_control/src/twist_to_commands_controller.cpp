@@ -9,7 +9,7 @@
 namespace mr2_rover_control {
 
 controller_interface::CallbackReturn
-TwistToCommandsController::on_init() { // TODO: follow actual dimension
+TwistToCommandsController::on_init() {
   auto_declare<std::vector<std::string>>("wheel_joints", {});
   auto_declare<std::vector<std::string>>("steering_joints", {});
   auto_declare<double>("wheel_base", 0.95386);
@@ -18,6 +18,11 @@ TwistToCommandsController::on_init() { // TODO: follow actual dimension
   auto_declare<double>("max_steer", 2.35619); // +/- 135 degrees
   auto_declare<double>("twist_timeout", 0.5);
   auto_declare<double>("odom_publish_rate_hz", 30.0);
+  auto_declare<double>("rate_limit_linear_x", 1.5);  // m/s^2
+  auto_declare<double>("rate_limit_linear_y", 1.5);  // m/s^2
+  auto_declare<double>("rate_limit_angular_z", 1.0); // rad/s^2 (tighter yaw slew)
+  auto_declare<double>("steering_error_zero_deg", 30.0);
+  auto_declare<double>("steering_error_ratio_deg", 30.0); // drive scale->0 around 30 deg
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
   auto_declare<std::string>("odom_frame_id", "odom");
   auto_declare<std::string>("base_frame_id", "base_link");
@@ -77,6 +82,18 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   timeout_ = get_node()->get_parameter("twist_timeout").as_double();
   odom_publish_rate_ =
       get_node()->get_parameter("odom_publish_rate_hz").as_double();
+  rate_limit_vx_ = get_node()->get_parameter("rate_limit_linear_x").as_double();
+  rate_limit_vy_ = get_node()->get_parameter("rate_limit_linear_y").as_double();
+  rate_limit_wz_ =
+      get_node()->get_parameter("rate_limit_angular_z").as_double();
+  const double steer_err_zero_deg =
+      get_node()->get_parameter("steering_error_zero_deg").as_double();
+  steering_error_zero_rad_ = steer_err_zero_deg * M_PI / 180.0;
+  const double steer_err_ratio_deg =
+      get_node()->get_parameter("steering_error_ratio_deg").as_double();
+  steering_error_ratio_rad_ =
+      (steer_err_ratio_deg > 0.0) ? steer_err_ratio_deg * M_PI / 180.0
+                                  : max_steer_;
   odom_frame_id_ = get_node()->get_parameter("odom_frame_id").as_string();
   base_frame_id_ = get_node()->get_parameter("base_frame_id").as_string();
   const auto cmd_topic = get_node()->get_parameter("cmd_vel_topic").as_string();
@@ -93,6 +110,9 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
 
   last_twist_.linear.x = 0.0;
   last_twist_.angular.z = 0.0;
+  limited_twist_.linear.x = 0.0;
+  limited_twist_.linear.y = 0.0;
+  limited_twist_.angular.z = 0.0;
   last_twist_time_ = get_node()->now();
   last_odom_pub_time_ =
       rclcpp::Time(0, 0, get_node()->get_clock()->get_clock_type());
@@ -101,12 +121,18 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
 
 controller_interface::CallbackReturn
 TwistToCommandsController::on_activate(const rclcpp_lifecycle::State &) {
+  limited_twist_.linear.x = 0.0;
+  limited_twist_.linear.y = 0.0;
+  limited_twist_.angular.z = 0.0;
   publishZeros();
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::CallbackReturn
 TwistToCommandsController::on_deactivate(const rclcpp_lifecycle::State &) {
+  limited_twist_.linear.x = 0.0;
+  limited_twist_.linear.y = 0.0;
+  limited_twist_.angular.z = 0.0;
   publishZeros();
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -235,15 +261,39 @@ void TwistToCommandsController::publishOdom(
   odom_pub_->publish(odom);
 }
 
+double TwistToCommandsController::applyRateLimit(double target, double prev,
+                                                 double rate_limit,
+                                                 double dt) const {
+  if (rate_limit <= 0.0 || dt <= 0.0) {
+    return target;
+  }
+  const double delta = target - prev;
+  const double max_delta = rate_limit * dt;
+  return prev + std::clamp(delta, -max_delta, max_delta);
+}
+
 controller_interface::return_type
 TwistToCommandsController::update(const rclcpp::Time &,
-                                  const rclcpp::Duration &) {
+                                  const rclcpp::Duration &period) {
   const auto now = get_node()->now();
   const bool timed_out = (now - last_twist_time_).seconds() > timeout_;
 
-  const double vx = timed_out ? 0.0 : last_twist_.linear.x;
-  const double vy = timed_out ? 0.0 : last_twist_.linear.y;
-  const double wz = timed_out ? 0.0 : last_twist_.angular.z;
+  const double dt = std::max(0.0, period.seconds());
+
+  const double target_vx = timed_out ? 0.0 : last_twist_.linear.x;
+  const double target_vy = timed_out ? 0.0 : last_twist_.linear.y;
+  const double target_wz = timed_out ? 0.0 : last_twist_.angular.z;
+
+  limited_twist_.linear.x =
+      applyRateLimit(target_vx, limited_twist_.linear.x, rate_limit_vx_, dt);
+  limited_twist_.linear.y =
+      applyRateLimit(target_vy, limited_twist_.linear.y, rate_limit_vy_, dt);
+  limited_twist_.angular.z =
+      applyRateLimit(target_wz, limited_twist_.angular.z, rate_limit_wz_, dt);
+
+  const double vx = limited_twist_.linear.x;
+  const double vy = limited_twist_.linear.y;
+  const double wz = limited_twist_.angular.z;
 
   const auto wheels = wheelPositions();
 
@@ -300,6 +350,25 @@ TwistToCommandsController::update(const rclcpp::Time &,
 
     steer[i] = std::clamp(ang, -max_steer_, max_steer_);
     speed[i] = w_ang;
+  }
+
+  // Apply a global speed scale based on the worst steering error.
+  double max_steer_err = 0.0;
+  for (size_t i = 0; i < wheels.size(); ++i) {
+    const double steer_err = ang_distance(steer[i], current_steer[i]);
+    if (steer_err > max_steer_err) {
+      max_steer_err = steer_err;
+    }
+  }
+  if (max_steer_ > 0.0) {
+    const double denom = steering_error_ratio_rad_ > 0.0 ? steering_error_ratio_rad_ : max_steer_;
+    const double norm = denom > 0.0 ? (max_steer_err / denom) : 0.0;
+    constexpr double power = 2.0; // square the normalized error
+    double scale = 1.0 - std::pow(norm, power);
+    scale = std::clamp(scale, 0.0, 1.0);
+    for (double &v : speed) {
+      v *= scale;
+    }
   }
 
   for (size_t i = 0; i < 4; ++i) {
