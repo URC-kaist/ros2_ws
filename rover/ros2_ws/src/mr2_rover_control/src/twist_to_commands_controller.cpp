@@ -295,11 +295,26 @@ TwistToCommandsController::update(const rclcpp::Time &,
   // Read current steering joint positions (state_interfaces_: wheel vels first,
   // then steering positions)
   std::array<double, 4> current_steer{};
+  bool steer_feedback_valid = true;
   for (size_t i = 0; i < 4; ++i) {
     const double val = (state_interfaces_.size() > i + 4)
                            ? state_interfaces_[i + 4].get_value()
                            : std::numeric_limits<double>::quiet_NaN();
-    current_steer[i] = std::isfinite(val) ? val : 0.0;
+    if (std::isfinite(val)) {
+      current_steer[i] = val;
+    } else {
+      current_steer[i] = std::numeric_limits<double>::quiet_NaN();
+      steer_feedback_valid = false;
+      RCLCPP_WARN_THROTTLE(
+          get_node()->get_logger(), *get_node()->get_clock(), 2000,
+          "Steering joint %s position missing/invalid; zeroing wheel commands",
+          steering_joints_[i].c_str());
+    }
+  }
+
+  if (!steer_feedback_valid) {
+    publishZeros();
+    return controller_interface::return_type::OK;
   }
 
   auto ang_distance = [](double a, double b) {
@@ -333,13 +348,35 @@ TwistToCommandsController::update(const rclcpp::Time &,
     }
     w_ang_alt *= -1.0;
 
+    const bool reachable1 = std::abs(ang) <= max_steer_;
+    const bool reachable2 = std::abs(ang_alt) <= max_steer_;
+
     // Choose the solution closest to current steering angle for that wheel.
-    const double cand1 = std::clamp(ang, -max_steer_, max_steer_);
-    const double cand2 = std::clamp(ang_alt, -max_steer_, max_steer_);
-    if (ang_distance(cand2, current_steer[i]) <
-        ang_distance(cand1, current_steer[i])) {
-      ang = cand2;
+    if (reachable1 && !reachable2) {
+      ang = std::clamp(ang, -max_steer_, max_steer_);
+    } else if (!reachable1 && reachable2) {
+      ang = std::clamp(ang_alt, -max_steer_, max_steer_);
       w_ang = w_ang_alt;
+    } else if (!reachable1 && !reachable2) {
+      const double unclamped = ang;
+      ang = std::clamp(unclamped, -max_steer_, max_steer_);
+      w_ang = 0.0; // cannot realize kinematics at this angle
+      RCLCPP_WARN_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(),
+                           2000,
+                           "Steering solution %.2f rad exceeds limit (±%.2f); "
+                           "zeroing wheel speed for wheel %zu",
+                           unclamped, max_steer_, i);
+    }
+    else { // both reachable
+      const double cand1 = std::clamp(ang, -max_steer_, max_steer_);
+      const double cand2 = std::clamp(ang_alt, -max_steer_, max_steer_);
+      if (ang_distance(cand2, current_steer[i]) <
+          ang_distance(cand1, current_steer[i])) {
+        ang = cand2;
+        w_ang = w_ang_alt;
+      } else {
+        ang = cand1;
+      }
     }
 
     steer[i] = std::clamp(ang, -max_steer_, max_steer_);
