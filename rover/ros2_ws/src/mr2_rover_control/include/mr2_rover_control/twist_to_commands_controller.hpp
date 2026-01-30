@@ -56,7 +56,6 @@ private:
   double rate_limit_vx_;
   double rate_limit_vy_;
   double rate_limit_wz_;
-  double steering_error_zero_rad_;
   double steering_error_ratio_rad_;
   std::string odom_frame_id_;
   std::string base_frame_id_;

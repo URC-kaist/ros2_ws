@@ -8,8 +8,7 @@
 
 namespace mr2_rover_control {
 
-controller_interface::CallbackReturn
-TwistToCommandsController::on_init() {
+controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<std::vector<std::string>>("wheel_joints", {});
   auto_declare<std::vector<std::string>>("steering_joints", {});
   auto_declare<double>("wheel_base", 0.95386);
@@ -18,11 +17,12 @@ TwistToCommandsController::on_init() {
   auto_declare<double>("max_steer", 2.35619); // +/- 135 degrees
   auto_declare<double>("twist_timeout", 0.5);
   auto_declare<double>("odom_publish_rate_hz", 30.0);
-  auto_declare<double>("rate_limit_linear_x", 1.5);  // m/s^2
-  auto_declare<double>("rate_limit_linear_y", 1.5);  // m/s^2
-  auto_declare<double>("rate_limit_angular_z", 1.0); // rad/s^2 (tighter yaw slew)
-  auto_declare<double>("steering_error_zero_deg", 30.0);
-  auto_declare<double>("steering_error_ratio_deg", 30.0); // drive scale->0 around 30 deg
+  auto_declare<double>("rate_limit_linear_x", 1.5); // m/s^2
+  auto_declare<double>("rate_limit_linear_y", 1.5); // m/s^2
+  auto_declare<double>("rate_limit_angular_z",
+                       1.0); // rad/s^2 (tighter yaw slew)
+  auto_declare<double>("steering_error_ratio_deg",
+                       40.0); // drive scale->0 around 30 deg
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
   auto_declare<std::string>("odom_frame_id", "odom");
   auto_declare<std::string>("base_frame_id", "base_link");
@@ -34,11 +34,12 @@ controller_interface::InterfaceConfiguration
 TwistToCommandsController::command_interface_configuration() const {
   controller_interface::InterfaceConfiguration conf;
   conf.type = controller_interface::interface_configuration_type::INDIVIDUAL;
-  // Pull parameter defaults so interfaces are declared even before on_configure.
-  auto wheels =
-      get_node()->get_parameter("wheel_joints").as_string_array(); // size may be 0 pre-configure
-  auto steer =
-      get_node()->get_parameter("steering_joints").as_string_array();
+  // Pull parameter defaults so interfaces are declared even before
+  // on_configure.
+  auto wheels = get_node()
+                    ->get_parameter("wheel_joints")
+                    .as_string_array(); // size may be 0 pre-configure
+  auto steer = get_node()->get_parameter("steering_joints").as_string_array();
   for (const auto &joint : wheels) {
     conf.names.push_back(joint + "/velocity");
   }
@@ -52,10 +53,8 @@ controller_interface::InterfaceConfiguration
 TwistToCommandsController::state_interface_configuration() const {
   controller_interface::InterfaceConfiguration conf;
   conf.type = controller_interface::interface_configuration_type::INDIVIDUAL;
-  auto wheels =
-      get_node()->get_parameter("wheel_joints").as_string_array();
-  auto steer =
-      get_node()->get_parameter("steering_joints").as_string_array();
+  auto wheels = get_node()->get_parameter("wheel_joints").as_string_array();
+  auto steer = get_node()->get_parameter("steering_joints").as_string_array();
   for (const auto &joint : wheels) {
     conf.names.push_back(joint + "/velocity");
   }
@@ -86,13 +85,10 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   rate_limit_vy_ = get_node()->get_parameter("rate_limit_linear_y").as_double();
   rate_limit_wz_ =
       get_node()->get_parameter("rate_limit_angular_z").as_double();
-  const double steer_err_zero_deg =
-      get_node()->get_parameter("steering_error_zero_deg").as_double();
-  steering_error_zero_rad_ = steer_err_zero_deg * M_PI / 180.0;
   const double steer_err_ratio_deg =
       get_node()->get_parameter("steering_error_ratio_deg").as_double();
-  steering_error_ratio_rad_ =
-      (steer_err_ratio_deg > 0.0) ? steer_err_ratio_deg * M_PI / 180.0
+  steering_error_ratio_rad_ = (steer_err_ratio_deg > 0.0)
+                                  ? steer_err_ratio_deg * M_PI / 180.0
                                   : max_steer_;
   odom_frame_id_ = get_node()->get_parameter("odom_frame_id").as_string();
   base_frame_id_ = get_node()->get_parameter("base_frame_id").as_string();
@@ -231,10 +227,6 @@ void TwistToCommandsController::publishOdom(
   }
   const double wz = wz_count ? wz_sum / static_cast<double>(wz_count) : 0.0;
 
-  // RCLCPP_DEBUG(get_node()->get_logger(),
-  //             "wheel_odom twist: vx=%.4f m/s, vy=%.4f m/s, wz=%.4f rad/s",
-  //             vx, vy, wz);
-
   nav_msgs::msg::Odometry odom;
   odom.header.stamp = stamp;
   odom.header.frame_id = odom_frame_id_;
@@ -300,7 +292,8 @@ TwistToCommandsController::update(const rclcpp::Time &,
   std::array<double, 4> steer{};
   std::array<double, 4> speed{};
 
-  // Read current steering joint positions (state_interfaces_: wheel vels first, then steering positions)
+  // Read current steering joint positions (state_interfaces_: wheel vels first,
+  // then steering positions)
   std::array<double, 4> current_steer{};
   for (size_t i = 0; i < 4; ++i) {
     const double val = (state_interfaces_.size() > i + 4)
@@ -343,7 +336,8 @@ TwistToCommandsController::update(const rclcpp::Time &,
     // Choose the solution closest to current steering angle for that wheel.
     const double cand1 = std::clamp(ang, -max_steer_, max_steer_);
     const double cand2 = std::clamp(ang_alt, -max_steer_, max_steer_);
-    if (ang_distance(cand2, current_steer[i]) < ang_distance(cand1, current_steer[i])) {
+    if (ang_distance(cand2, current_steer[i]) <
+        ang_distance(cand1, current_steer[i])) {
       ang = cand2;
       w_ang = w_ang_alt;
     }
@@ -361,7 +355,9 @@ TwistToCommandsController::update(const rclcpp::Time &,
     }
   }
   if (max_steer_ > 0.0) {
-    const double denom = steering_error_ratio_rad_ > 0.0 ? steering_error_ratio_rad_ : max_steer_;
+    const double denom = steering_error_ratio_rad_ > 0.0
+                             ? steering_error_ratio_rad_
+                             : max_steer_;
     const double norm = denom > 0.0 ? (max_steer_err / denom) : 0.0;
     constexpr double power = 2.0; // square the normalized error
     double scale = 1.0 - std::pow(norm, power);
