@@ -104,6 +104,11 @@ ament_target_dependencies(gridmap_to_occupancy_node
   rclcpp grid_map_msgs grid_map_core grid_map_ros nav_msgs tf2 tf2_ros tf2_geometry_msgs
 )
 
+add_executable(gridmap_to_pointcloud_node src/gridmap_to_pointcloud_node.cpp)
+ament_target_dependencies(gridmap_to_pointcloud_node
+  rclcpp grid_map_msgs grid_map_core grid_map_ros sensor_msgs
+)
+
 add_library(mr2_rover_auto_gridmap_layer SHARED src/gridmap_traversability_layer.cpp)
 ament_target_dependencies(mr2_rover_auto_gridmap_layer
   rclcpp nav2_costmap_2d grid_map_ros grid_map_core grid_map_msgs pluginlib
@@ -119,6 +124,7 @@ install(TARGETS
   pc2_to_heightmap_node
   traversability_filter_node
   gridmap_to_occupancy_node
+  gridmap_to_pointcloud_node
   DESTINATION lib/${PROJECT_NAME}/
 )
 

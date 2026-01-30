@@ -117,3 +117,11 @@ gridmap_to_occupancy:
     max_value: 1.0
     invert: true
     unknown_value: 0
+
+gridmap_to_pointcloud:
+  ros__parameters:
+    use_sim_time: true
+    input_topic: /traversability_gridmap
+    output_topic: /traversability_cloud
+    layer: traversability
+    # TODO: configure on how to translate traversability as height.
