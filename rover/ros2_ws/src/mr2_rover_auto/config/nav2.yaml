@@ -1,6 +1,6 @@
 # Modification of:
 #  /opt/ros/humble/share/nav2_bringup/params/nav2_params.yaml
-# Removed "amcl" as we do not rely on amcl for localization.
+# Creation date: 2026. 01. 31
 
 bt_navigator:
   ros__parameters:

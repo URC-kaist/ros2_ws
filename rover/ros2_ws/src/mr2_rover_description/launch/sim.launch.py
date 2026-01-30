@@ -162,6 +162,10 @@ def generate_launch_description():
         remappings=[
             ("/world/empty_world/clock", "/clock"),
             ("/imu", "/rgbd_camera/imu"),  # match RealSense IMU topic used in robot_localization
+            ("/rgbd_camera/image", "/rgbd_camera/color/image_raw"),
+            ("/rgbd_camera/camera_info", "/rgbd_camera/color/camera_info"),
+            ("/rgbd_camera/depth_image", "/rgbd_camera/depth/image_rect_raw"),
+            ("/rgbd_camera/points", "/rgbd_camera/depth/color/points"),
         ],
         output="screen",
     )

@@ -13,16 +13,16 @@ topics:
   - name: /right_gnss/navsat
     ros_type: sensor_msgs/msg/NavSatFix
     gz_type: gz.msgs.NavSat
-  - name: /rgbd_camera/color/camera_info
+  - name: /rgbd_camera/camera_info
     ros_type: sensor_msgs/msg/CameraInfo
     gz_type: gz.msgs.CameraInfo
-  - name: /rgbd_camera/depth/image_rect_raw
+  - name: /rgbd_camera/depth_image
     ros_type: sensor_msgs/msg/Image
     gz_type: gz.msgs.Image
-  - name: /rgbd_camera/color/image_raw
+  - name: /rgbd_camera/image
     ros_type: sensor_msgs/msg/Image
     gz_type: gz.msgs.Image
-  - name: /rgbd_camera/depth/color/points
+  - name: /rgbd_camera/points
     ros_type: sensor_msgs/msg/PointCloud2
     gz_type: gz.msgs.PointCloudPacked
   - name: /imu

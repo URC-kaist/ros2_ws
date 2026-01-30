@@ -72,8 +72,8 @@
           </clip>
           <depth_camera>
             <clip>
-              <near>0.1</near>
-              <far>10</far>
+              <near>0.3</near>
+              <far>3.0</far>
             </clip>
           </depth_camera>
           <noise>
