@@ -61,12 +61,12 @@ def generate_launch_description():
             #     output="screen",
             #     parameters=[configured_params],
             # ),
-            Node(
-                package="mr2_rover_auto",
-                executable="gridmap_to_pointcloud_node",
-                name="gridmap_to_pointcloud",
-                output="screen",
-                parameters=[configured_params],
-            ),
+            # Node(
+            #     package="mr2_rover_auto",
+            #     executable="gridmap_to_pointcloud_node",
+            #     name="gridmap_to_pointcloud",
+            #     output="screen",
+            #     parameters=[configured_params],
+            # ),
         ]
     )

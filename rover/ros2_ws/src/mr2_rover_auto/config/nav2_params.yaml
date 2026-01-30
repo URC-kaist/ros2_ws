@@ -102,7 +102,8 @@ controller_server:
       yaw_goal_tolerance: 0.25
     # DWB parameters
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
+      plugin: "dwb_core::DWBLocalPlanner" # Or, consider MPPI if tuning / cost allows.
+      # https://docs.nav2.org/configuration/packages/dwb-params/controller.html
       debug_trajectory_details: True
       min_vel_x: 0.0
       min_vel_y: 0.0
@@ -152,38 +153,38 @@ local_costmap:
       robot_base_frame: base_link
       use_sim_time: True
       rolling_window: true
-      width: 3
-      height: 3
-      resolution: 0.05
-      robot_radius: 0.22
-      plugins: ["voxel_layer", "inflation_layer"]
+      width: 10
+      height: 10
+      resolution: 0.1 # cells = width * height * resolution**-2
+      footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]" # TODO: Actual geometry (#34)
+      plugins: ["traversability_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.55
-      voxel_layer:
-        plugin: "nav2_costmap_2d::VoxelLayer"
-        enabled: True
-        publish_voxel_map: True
-        origin_z: 0.0
-        z_resolution: 0.05
-        z_voxels: 16
-        max_obstacle_height: 2.0
-        mark_threshold: 0
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: True
+      # voxel_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/voxel.html
+      #   plugin: "nav2_costmap_2d::VoxelLayer"
+      #   enabled: True
+      #   publish_voxel_map: True
+      #   origin_z: 0.0
+      #   z_resolution: 0.05
+      #   z_voxels: 16
+      #   max_obstacle_height: 2.0
+      #   mark_threshold: 0
+      #   observation_sources: cloud
+      #   cloud:
+      #     topic: /traversability_cloud
+      #     max_obstacle_height: 2.0
+      #     clearing: True
+      #     marking: True
+      #     data_type: "PointCloud2"
+      #     raytrace_max_range: 3.0
+      #     raytrace_min_range: 0.0
+      #     obstacle_max_range: 2.5
+      #     obstacle_min_range: 0.0
+      traversability_layer:
+        plugin: "mr2_rover_auto/GridMapTraversabilityLayer"
+        clearable: true
       always_send_full_costmap: True
 
 global_costmap:
@@ -194,26 +195,31 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
-      robot_radius: 0.22
-      resolution: 0.05
+      footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]" # TODO: Actual geometry (#34)
+      resolution: 0.783011944543186 # follow map.yaml resolution
       track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
-      static_layer:
+      plugins: ["static_layer", "traversability_layer", "inflation_layer"]
+      # obstacle_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/obstacle.html
+      #   plugin: "nav2_costmap_2d::ObstacleLayer"
+      #   enabled: True
+      #   observation_sources: cloud
+      #   cloud:
+      #     topic: /traversability_cloud
+      #     max_obstacle_height: 2.0
+      #     clearing: True
+      #     marking: True
+      #     data_type: "PointCloud2"
+      #     raytrace_max_range: 3.0
+      #     raytrace_min_range: 0.0
+      #     obstacle_max_range: 2.5
+      #     obstacle_min_range: 0.0
+      traversability_layer:
+        plugin: "mr2_rover_auto/GridMapTraversabilityLayer"
+        clearable: true
+      static_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/static.html
         plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: "/map"
+        subscribe_to_updates: True
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
@@ -221,31 +227,30 @@ global_costmap:
         inflation_radius: 0.55
       always_send_full_costmap: True
 
-map_server:
+map_server: # https://docs.nav2.org/configuration/packages/map_server/configuring-map-server.html
   ros__parameters:
     use_sim_time: True
     # Overridden in launch by the "map" launch configuration or provided default value.
     # To use in yaml, remove the default "map" value in the tb3_simulation_launch.py file & provide full path to map below.
-    yaml_filename: ""
+    yaml_filename: "package://mr2_rover_auto/maps/map.yaml"
 
-map_saver:
-  ros__parameters:
-    use_sim_time: True
-    save_map_timeout: 5.0
-    free_thresh_default: 0.25
-    occupied_thresh_default: 0.65
-    map_subscribe_transient_local: True
+# map_saver:
+#   ros__parameters:
+#     use_sim_time: True
+#     save_map_timeout: 5.0
+#     free_thresh_default: 0.25
+#     occupied_thresh_default: 0.65
+#     map_subscribe_transient_local: True
 
-planner_server:
+planner_server: # https://docs.nav2.org/configuration/packages/configuring-planner-server.html
   ros__parameters:
     expected_planner_frequency: 20.0
     use_sim_time: True
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5
-      use_astar: false
-      allow_unknown: true
+      plugin: "nav2_smac_planner/SmacPlannerHybrid" # hybrid A* for ackerman;
+      # https://docs.nav2.org/configuration/packages/smac/configuring-smac-hybrid.html
+
 
 smoother_server:
   ros__parameters:

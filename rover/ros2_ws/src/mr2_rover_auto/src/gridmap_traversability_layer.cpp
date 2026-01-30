@@ -37,6 +37,10 @@ void GridMapTraversabilityLayer::onInitialize()
   node->declare_parameter(prefix + "lethal_threshold", -1.0);
   node->declare_parameter(prefix + "flip_x", false);
   node->declare_parameter(prefix + "flip_y", false);
+  node->declare_parameter(prefix + "clearable", false);
+  node->declare_parameter(prefix + "qos_reliable", true);
+  node->declare_parameter(prefix + "qos_transient_local", true);
+  node->declare_parameter(prefix + "tf_timeout", 0.1);
 
   node->get_parameter(prefix + "enabled", enabled_);
   node->get_parameter(prefix + "grid_map_topic", grid_map_topic_);
@@ -48,12 +52,29 @@ void GridMapTraversabilityLayer::onInitialize()
   node->get_parameter(prefix + "lethal_threshold", lethal_threshold_);
   node->get_parameter(prefix + "flip_x", flip_x_);
   node->get_parameter(prefix + "flip_y", flip_y_);
+  node->get_parameter(prefix + "clearable", clearable_);
+  node->get_parameter(prefix + "qos_reliable", qos_reliable_);
+  node->get_parameter(prefix + "qos_transient_local", qos_transient_local_);
+  double tf_timeout_sec = 0.1;
+  node->get_parameter(prefix + "tf_timeout", tf_timeout_sec);
+  tf_timeout_ = rclcpp::Duration::from_seconds(tf_timeout_sec);
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(node->get_clock());
   tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 
+  rclcpp::QoS qos(rclcpp::KeepLast(1));
+  if (qos_reliable_) {
+    qos.reliable();
+  } else {
+    qos.best_effort();
+  }
+  if (qos_transient_local_) {
+    qos.transient_local();
+  } else {
+    qos.durability_volatile();
+  }
   sub_ = node->create_subscription<grid_map_msgs::msg::GridMap>(
-    grid_map_topic_, rclcpp::QoS(1),
+    grid_map_topic_, qos,
     std::bind(&GridMapTraversabilityLayer::gridMapCallback, this, std::placeholders::_1));
 
   current_ = true;
@@ -124,17 +145,10 @@ void GridMapTraversabilityLayer::updateBounds(
     rclcpp::Time(0) : last_map_stamp_;
 
   if (!global_frame.empty() && !map_frame.empty() && map_frame != global_frame) {
-    geometry_msgs::msg::TransformStamped tf;
-    try {
-      tf = tf_buffer_->lookupTransform(global_frame, map_frame, stamp, tf_timeout_);
-    } catch (const tf2::TransformException & ex) {
-      RCLCPP_WARN_THROTTLE(
-        node->get_logger(), *node->get_clock(), 2000,
-        "GridMapTraversabilityLayer: TF lookup failed: %s", ex.what());
+    tf2::Transform T;
+    if (!lookupTransformWithFallback(global_frame, map_frame, stamp, T)) {
       return;
     }
-    tf2::Transform T;
-    tf2::fromMsg(tf.transform, T);
 
     const double half_x = 0.5 * length.x();
     const double half_y = 0.5 * length.y();
@@ -190,16 +204,9 @@ void GridMapTraversabilityLayer::updateCosts(
   bool use_transform = false;
 
   if (!global_frame.empty() && !map_frame.empty() && map_frame != global_frame) {
-    geometry_msgs::msg::TransformStamped tf;
-    try {
-      tf = tf_buffer_->lookupTransform(global_frame, map_frame, stamp, tf_timeout_);
-    } catch (const tf2::TransformException & ex) {
-      RCLCPP_WARN_THROTTLE(
-        node->get_logger(), *node->get_clock(), 2000,
-        "GridMapTraversabilityLayer: TF lookup failed: %s", ex.what());
+    if (!lookupTransformWithFallback(global_frame, map_frame, stamp, T)) {
       return;
     }
-    tf2::fromMsg(tf.transform, T);
     use_transform = true;
   }
 
@@ -242,6 +249,39 @@ void GridMapTraversabilityLayer::updateCosts(
 
     master_grid.setCost(mx, my, valueToCost(value));
   }
+}
+
+bool GridMapTraversabilityLayer::lookupTransformWithFallback(
+  const std::string & target, const std::string & source,
+  const rclcpp::Time & stamp, tf2::Transform & out_tf)
+{
+  auto node = node_.lock();
+  if (!node) {
+    return false;
+  }
+
+  // First try at message stamp; if it fails, fall back to latest.
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    const rclcpp::Time query_time = (attempt == 0) ? stamp : rclcpp::Time(0);
+    try {
+      const auto tf_msg = tf_buffer_->lookupTransform(target, source, query_time, tf_timeout_);
+      tf2::fromMsg(tf_msg.transform, out_tf);
+      return true;
+    } catch (const tf2::TransformException & ex) {
+      if (attempt == 0) {
+        RCLCPP_WARN_THROTTLE(
+          node->get_logger(), *node->get_clock(), 2000,
+          "GridMapTraversabilityLayer: TF lookup failed (%s -> %s @ stamp). Will try latest. Error: %s",
+          source.c_str(), target.c_str(), ex.what());
+      } else {
+        RCLCPP_WARN_THROTTLE(
+          node->get_logger(), *node->get_clock(), 2000,
+          "GridMapTraversabilityLayer: TF lookup failed (%s -> %s @ latest). Error: %s",
+          source.c_str(), target.c_str(), ex.what());
+      }
+    }
+  }
+  return false;
 }
 
 unsigned char GridMapTraversabilityLayer::valueToCost(float value) const

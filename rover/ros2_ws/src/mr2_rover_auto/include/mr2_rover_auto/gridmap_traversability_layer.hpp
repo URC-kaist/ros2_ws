@@ -27,11 +27,14 @@ public:
     nav2_costmap_2d::Costmap2D & master_grid,
     int min_i, int min_j, int max_i, int max_j) override;
   void reset() override;
-  bool isClearable() override { return false; }
+  bool isClearable() override { return clearable_; }
 
 private:
   void gridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg);
   unsigned char valueToCost(float value) const;
+  bool lookupTransformWithFallback(
+    const std::string & target, const std::string & source,
+    const rclcpp::Time & stamp, tf2::Transform & out_tf);
 
   grid_map::GridMap grid_map_;
   std::mutex mutex_;
@@ -50,9 +53,12 @@ private:
   bool flip_x_;
   bool flip_y_;
   int unknown_cost_;
+  bool clearable_{false};
+  bool qos_reliable_{true};
+  bool qos_transient_local_{true};
+  rclcpp::Duration tf_timeout_{rclcpp::Duration::from_seconds(0.1)};
   bool has_map_{false};
   rclcpp::Time last_map_stamp_;
-  const rclcpp::Duration tf_timeout_{rclcpp::Duration::from_seconds(0.1)};
 };
 
 }  // namespace mr2_rover_auto

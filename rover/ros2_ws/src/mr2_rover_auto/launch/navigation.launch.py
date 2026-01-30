@@ -31,7 +31,17 @@ def generate_launch_description():
             "launch_actions",
             default_value="false",
             description="Launch action servers (currently experimental)",
-        )
+        ),
+        DeclareLaunchArgument(
+            "map",
+            default_value=os.path.join(pkg_share, "maps", "map.yaml"),
+            description="Occupancy grid YAML passed to Nav2 map_server",
+        ),
+        DeclareLaunchArgument(
+            "params_file",
+            default_value=os.path.join(pkg_share, "config", "nav2_params.yaml"),
+            description="Nav2 parameters file",
+        ),
     ]
 
     pipeline_include = IncludeLaunchDescription(
@@ -45,6 +55,8 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(nav2_launch),
         launch_arguments={
             "use_sim_time": LaunchConfiguration("use_sim_time"),
+            "map": LaunchConfiguration("map"),
+            "params_file": LaunchConfiguration("params_file"),
         }.items(),
     )
 
