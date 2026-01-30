@@ -6,9 +6,9 @@ pc2_to_heightmap:
     cloud_topic: /rgbd_camera/depth/color/points
     output_topic: /height_gridmap
     base_frame: base_link
-    map_frame: base_link
+    map_frame: map
     x_forward_m: 3.0
-    y_width_m: 2.84
+    y_width_m: 4.0
     resolution: 0.1
     layer_name: elevation
     voxel_size_m: 0.05

@@ -46,7 +46,6 @@ public:
 
     grid_cols_ = static_cast<int>(std::ceil(x_forward_ / resolution_));
     grid_rows_ = static_cast<int>(std::ceil(y_width_ / resolution_));
-    y_min_ = -y_width_ / 2.0;
     total_cells_ = static_cast<std::size_t>(grid_cols_ * grid_rows_);
 
     sum_bins_.assign(total_cells_, 0.0f);
@@ -148,6 +147,7 @@ private:
     const Eigen::Isometry3d T_cam_map = tf2::transformToEigen(tf_cam_map);
     const Eigen::Isometry3d T_cam_base = tf2::transformToEigen(tf_cam_base);
     const Eigen::Isometry3d T_base_map = tf2::transformToEigen(tf_base_map);
+    cam_origin_base_ = T_cam_base.translation();
 
     for (const auto & p : filtered) {
       const Eigen::Vector3d p_cam(p.x, p.y, p.z);
@@ -155,15 +155,18 @@ private:
 
       const double x = p_base.x();
       const double y = p_base.y();
-      if (x <= 0.0) {
+      // ROI anchored at camera position (expressed in base frame), orientation ignored.
+      const double x_min = cam_origin_base_.x();
+      const double y_min = cam_origin_base_.y() - y_width_ / 2.0;
+      if (x < x_min || x >= (x_min + x_forward_)) {
         continue;
       }
-      if (y < y_min_ || y >= (y_min_ + y_width_)) {
+      if (y < y_min || y >= (y_min + y_width_)) {
         continue;
       }
 
-      const int ix = static_cast<int>(std::floor(x / resolution_));
-      const int iy = static_cast<int>(std::floor((y - y_min_) / resolution_));
+      const int ix = static_cast<int>(std::floor((x - x_min) / resolution_));
+      const int iy = static_cast<int>(std::floor((y - y_min) / resolution_));
       if (ix < 0 || ix >= grid_cols_ || iy < 0 || iy >= grid_rows_) {
         continue;
       }
@@ -196,7 +199,11 @@ private:
       }
     }
 
-    publishGridMap(T_base_map, tf_base_map.transform.rotation, msg->header.stamp);
+    cam_origin_base_ = T_cam_base.translation();
+
+    publishGridMap(
+      T_base_map, tf_base_map.transform.rotation,
+      cam_origin_base_, msg->header.stamp);
 
     RCLCPP_DEBUG(
       this->get_logger(), "pc2 -> heightmap: pts %zu, cells %zu / %zu",
@@ -206,9 +213,13 @@ private:
   void publishGridMap(
     const Eigen::Isometry3d & T_base_map,
     const geometry_msgs::msg::Quaternion & orientation,
+    const Eigen::Vector3d & cam_origin_base,
     const rclcpp::Time & stamp)
   {
-    const Eigen::Vector3d center_base(x_forward_ / 2.0, y_width_ / 2.0 + y_min_, 0.0);
+    const Eigen::Vector3d center_base(
+      cam_origin_base.x() + x_forward_ / 2.0,
+      cam_origin_base.y(),
+      0.0);
     const Eigen::Vector3d center_map = T_base_map * center_base;
 
     grid_map::GridMap map({layer_name_});
@@ -268,7 +279,6 @@ private:
   double voxel_size_;
   double roi_z_max_;
   double publish_rate_hz_;
-  double y_min_;
   int grid_cols_;
   int grid_rows_;
   std::size_t total_cells_;
@@ -278,6 +288,8 @@ private:
   std::vector<uint32_t> count_bins_;
   std::vector<float> heightmap_buffer_;
   rclcpp::Time last_publish_time_;
+
+  Eigen::Vector3d cam_origin_base_{Eigen::Vector3d::Zero()};
 };
 
 }  // namespace
