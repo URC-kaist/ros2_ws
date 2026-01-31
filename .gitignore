@@ -4,3 +4,5 @@ base_gateway/.env.local
 
 /.vscode
 base/gateway/node_modules
+
+tmp/
