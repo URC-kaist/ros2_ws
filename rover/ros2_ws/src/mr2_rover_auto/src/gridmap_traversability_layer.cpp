@@ -39,7 +39,7 @@ void GridMapTraversabilityLayer::onInitialize()
   node->declare_parameter(prefix + "flip_y", false);
   node->declare_parameter(prefix + "clearable", false);
   node->declare_parameter(prefix + "qos_reliable", true);
-  node->declare_parameter(prefix + "qos_transient_local", true);
+  node->declare_parameter(prefix + "qos_transient_local", false);
   node->declare_parameter(prefix + "tf_timeout", 0.1);
 
   node->get_parameter(prefix + "enabled", enabled_);
