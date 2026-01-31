@@ -248,8 +248,11 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
     use_sim_time: True
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_smac_planner/SmacPlannerHybrid" # hybrid A* for ackerman;
-      # https://docs.nav2.org/configuration/packages/smac/configuring-smac-hybrid.html
+      plugin: "nav2_navfn_planner/NavfnPlanner" # Correct for 
+      tolerance: 0.5
+      use_astar: true
+      allow_unknown: true
+      use_final_approach_orientation: true
 
 
 smoother_server:
