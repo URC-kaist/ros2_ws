@@ -2,6 +2,7 @@ import DeliveryPanel from './DeliveryPanel'
 import MapPreview from './MapPreview'
 import SystemStatusPanel from './SystemStatusPanel'
 import ArmServoCard from './ArmServoCard'
+import RocketM2Card from './RocketM2Card'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -99,6 +100,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
 
       {activeTab === 'comms' && (
         <div className="panel-grid" role="tabpanel">
+          <RocketM2Card />
           <article className="card">
             <h3>Link Budget</h3>
             <p>SiK telemetry strength and latency.</p>

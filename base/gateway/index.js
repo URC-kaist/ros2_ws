@@ -3,6 +3,9 @@
 const fs = require('fs')
 const path = require('path')
 const dotenv = require('dotenv')
+const { execFile } = require('child_process')
+const os = require('os')
+const { promisify } = require('util')
 
 const envLocalPath = path.join(__dirname, '.env.local')
 const envPath = path.join(__dirname, '.env')
@@ -37,6 +40,14 @@ const DEFAULT_ANTENNA_LOG_MS = 5000
 const DEFAULT_ANTENNA_STATUS_MS = 1000
 const DEFAULT_ANTENNA_ALLOW_PROVISIONAL = true
 const DEFAULT_BASE_HEADING_OFFSET_DEG = 0
+const DEFAULT_ROCKET_M2_ENABLE = false
+const DEFAULT_ROCKET_M2_IP = ''
+const DEFAULT_ROCKET_M2_USER = ''
+const DEFAULT_ROCKET_M2_PASS = ''
+const DEFAULT_ROCKET_M2_POLL_MS = 5000
+const DEFAULT_ROCKET_M2_TIMEOUT_MS = 4000
+
+const execFileAsync = promisify(execFile)
 
 const args = process.argv.slice(2)
 const config = {
@@ -105,6 +116,24 @@ const config = {
       process.env.BASE_HEADING_OFFSET_DEG ||
       DEFAULT_BASE_HEADING_OFFSET_DEG
   ),
+  rocketM2Enable: toBool(
+    getArg('--rocket-m2-enable') || process.env.ROCKET_M2_ENABLE || DEFAULT_ROCKET_M2_ENABLE
+  ),
+  rocketM2Ip: getArg('--rocket-m2-ip') || process.env.ROCKET_M2_IP || DEFAULT_ROCKET_M2_IP,
+  rocketM2User:
+    getArg('--rocket-m2-user') || process.env.ROCKET_M2_USER || DEFAULT_ROCKET_M2_USER,
+  rocketM2Pass:
+    getArg('--rocket-m2-pass') || process.env.ROCKET_M2_PASS || DEFAULT_ROCKET_M2_PASS,
+  rocketM2PollMs: toInt(
+    getArg('--rocket-m2-poll-ms') ||
+      process.env.ROCKET_M2_POLL_MS ||
+      DEFAULT_ROCKET_M2_POLL_MS
+  ),
+  rocketM2TimeoutMs: toInt(
+    getArg('--rocket-m2-timeout-ms') ||
+      process.env.ROCKET_M2_TIMEOUT_MS ||
+      DEFAULT_ROCKET_M2_TIMEOUT_MS
+  ),
 }
 
 function getArg(name) {
@@ -159,6 +188,12 @@ let rosBridgeReady = false
 let rosNode = null
 let rclnodejs = null
 let lastSvinTxMs = 0
+let rocketM2Status = null
+let rocketM2LastSuccessMs = 0
+let rocketM2PollTimer = null
+let rocketM2PollInFlight = false
+let rocketM2CookiePath = null
+let rocketM2LastError = null
 
 function schedulePortReconnect() {
   if (portReconnectTimer) return
@@ -245,6 +280,10 @@ const server = http.createServer((req, res) => {
     handleTransitiveToken(req, res)
     return
   }
+  if (req.method === 'GET' && req.url && req.url.startsWith('/rocket-m2/status')) {
+    handleRocketM2Status(req, res)
+    return
+  }
   res.writeHead(404)
   res.end()
 })
@@ -253,6 +292,10 @@ function shutdown() {
   if (antennaStatusTimer) {
     clearInterval(antennaStatusTimer)
     antennaStatusTimer = null
+  }
+  if (rocketM2PollTimer) {
+    clearInterval(rocketM2PollTimer)
+    rocketM2PollTimer = null
   }
   if (antennaTracker) {
     antennaTracker.stop()
@@ -303,7 +346,17 @@ wss.on('connection', (ws) => {
       last_tx_ms: lastTxMs,
     })
   )
+  if (rocketM2Status) {
+    ws.send(
+      JSON.stringify({
+        type: 'rocket_m2_status',
+        ...rocketM2Status,
+      })
+    )
+  }
 })
+
+startRocketM2Polling()
 
 function broadcast(obj) {
   const payload = JSON.stringify(obj)
@@ -317,6 +370,208 @@ function broadcast(obj) {
 function log(message) {
   // eslint-disable-next-line no-console
   console.log(`[gateway] ${message}`)
+}
+
+function startRocketM2Polling() {
+  const configured =
+    config.rocketM2Ip && config.rocketM2User && config.rocketM2Pass
+  const enabled = config.rocketM2Enable || configured
+  if (!enabled) return
+  if (!configured) {
+    log('Rocket M2 enabled but missing ROCKET_M2_IP/USER/PASS')
+    return
+  }
+  const pollMs = Math.max(config.rocketM2PollMs, 0)
+  if (pollMs <= 0) {
+    log('Rocket M2 polling disabled (interval <= 0)')
+    return
+  }
+  if (!rocketM2CookiePath) {
+    rocketM2CookiePath = path.join(os.tmpdir(), `rocket_m2_${process.pid}.cookies`)
+  }
+  pollRocketM2Status()
+  rocketM2PollTimer = setInterval(pollRocketM2Status, Math.max(pollMs, 500))
+  log(`Rocket M2 polling every ${Math.max(pollMs, 500)} ms`)
+}
+
+async function pollRocketM2Status() {
+  if (rocketM2PollInFlight) return
+  rocketM2PollInFlight = true
+  const nowMs = Date.now()
+  try {
+    const data = await fetchRocketM2Signal()
+    rocketM2LastSuccessMs = nowMs
+    rocketM2Status = createRocketM2Status({
+      connected: true,
+      updated_at_ms: nowMs,
+      last_success_ms: nowMs,
+      error: null,
+      ...data,
+    })
+    if (rocketM2LastError) {
+      log('Rocket M2 polling recovered')
+      rocketM2LastError = null
+    }
+  } catch (err) {
+    const error = formatRocketM2Error(err)
+    const previous = rocketM2Status
+    rocketM2Status = createRocketM2Status({
+      connected: false,
+      updated_at_ms: nowMs,
+      last_success_ms: rocketM2LastSuccessMs || null,
+      signal: previous?.signal ?? null,
+      rssi: previous?.rssi ?? null,
+      noisef: previous?.noisef ?? null,
+      chwidth: previous?.chwidth ?? null,
+      rx_chainmask: previous?.rx_chainmask ?? null,
+      chainrssi: previous?.chainrssi ?? [],
+      chainrssimgmt: previous?.chainrssimgmt ?? [],
+      chainrssiext: previous?.chainrssiext ?? [],
+      error,
+    })
+    if (error && error !== rocketM2LastError) {
+      log(`Rocket M2 poll failed: ${error}`)
+      rocketM2LastError = error
+    }
+  } finally {
+    rocketM2PollInFlight = false
+  }
+
+  if (rocketM2Status) {
+    broadcast({ type: 'rocket_m2_status', ...rocketM2Status })
+  }
+}
+
+async function fetchRocketM2Signal() {
+  const cookiePath = rocketM2CookiePath
+  if (!cookiePath) {
+    throw new Error('Rocket M2 cookie path not initialized')
+  }
+  const loginPayload = new URLSearchParams({
+    username: config.rocketM2User,
+    password: config.rocketM2Pass,
+    uri: '/index.cgi',
+  }).toString()
+
+  await runCurl(
+    [
+      '-k',
+      '--ciphers',
+      'DEFAULT:@SECLEVEL=0',
+      '-sS',
+      '-L',
+      '-c',
+      cookiePath,
+      '-b',
+      cookiePath,
+      '-X',
+      'POST',
+      `https://${config.rocketM2Ip}/login.cgi`,
+      '-H',
+      'Content-Type: application/x-www-form-urlencoded',
+      '--data',
+      loginPayload,
+      '-o',
+      '/dev/null',
+    ],
+    config.rocketM2TimeoutMs
+  )
+
+  const signalRaw = await runCurl(
+    [
+      '-k',
+      '--ciphers',
+      'DEFAULT:@SECLEVEL=0',
+      '-sS',
+      '-L',
+      '-b',
+      cookiePath,
+      '-c',
+      cookiePath,
+      '-H',
+      'Accept: application/json',
+      `https://${config.rocketM2Ip}/signal.cgi?_=${Date.now()}`,
+    ],
+    config.rocketM2TimeoutMs
+  )
+
+  return parseRocketM2Signal(signalRaw)
+}
+
+function runCurl(args, timeoutMs) {
+  return execFileAsync('curl', args, {
+    timeout: Math.max(timeoutMs || 0, 1000),
+    maxBuffer: 1024 * 1024,
+    encoding: 'utf8',
+  }).then(({ stdout }) => stdout)
+}
+
+function parseRocketM2Signal(raw) {
+  const text = String(raw || '').trim()
+  const parsed = JSON.parse(text)
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid Rocket M2 response')
+  }
+  return {
+    signal: toNumberOrNull(parsed.signal),
+    rssi: toNumberOrNull(parsed.rssi),
+    noisef: toNumberOrNull(parsed.noisef),
+    chwidth: toNumberOrNull(parsed.chwidth),
+    rx_chainmask: toNumberOrNull(parsed.rx_chainmask),
+    chainrssi: toNumberArray(parsed.chainrssi),
+    chainrssimgmt: toNumberArray(parsed.chainrssimgmt),
+    chainrssiext: toNumberArray(parsed.chainrssiext),
+  }
+}
+
+function createRocketM2Status(overrides = {}) {
+  return {
+    connected: false,
+    updated_at_ms: Date.now(),
+    last_success_ms: rocketM2LastSuccessMs || null,
+    signal: null,
+    rssi: null,
+    noisef: null,
+    chwidth: null,
+    rx_chainmask: null,
+    chainrssi: [],
+    chainrssimgmt: [],
+    chainrssiext: [],
+    error: null,
+    ...overrides,
+  }
+}
+
+function toNumberOrNull(value) {
+  if (value == null) return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function toNumberArray(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => (item == null ? null : Number(item)))
+    .filter((item) => Number.isFinite(item))
+}
+
+function formatRocketM2Error(err) {
+  if (!err) return 'Unknown error'
+  if (typeof err === 'string') return err
+  const parts = []
+  if (err.code != null) parts.push(`code=${err.code}`)
+  if (err.signal) parts.push(`signal=${err.signal}`)
+  if (err.killed) parts.push('killed')
+  if (err.message) {
+    const message = redactRocketM2Secrets(err.message.split('\n')[0])
+    if (message) parts.push(message)
+  }
+  return parts.join(' ') || 'Unknown error'
+}
+
+function redactRocketM2Secrets(text) {
+  if (!text) return ''
+  return text.replace(/(password=)([^&\\s]+)/gi, '$1***')
 }
 
 function nextSeq() {
@@ -645,6 +900,37 @@ function isLinkAlive() {
   if (!serialReady) return false
   if (lastHeartbeatRxMs === 0) return false
   return Date.now() - lastHeartbeatRxMs <= config.linkTimeoutMs
+}
+
+function handleRocketM2Status(_req, res) {
+  const configured =
+    config.rocketM2Ip && config.rocketM2User && config.rocketM2Pass
+  const enabled = config.rocketM2Enable || configured
+  if (!enabled) {
+    res.writeHead(503, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Rocket M2 disabled' }))
+    return
+  }
+  if (!configured) {
+    res.writeHead(500, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Rocket M2 missing configuration' }))
+    return
+  }
+  if (!rocketM2Status) {
+    res.writeHead(503, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Rocket M2 status not ready' }))
+    return
+  }
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+  })
+  res.end(
+    JSON.stringify({
+      type: 'rocket_m2_status',
+      ...rocketM2Status,
+    })
+  )
 }
 
 function handleTransitiveToken(req, res) {

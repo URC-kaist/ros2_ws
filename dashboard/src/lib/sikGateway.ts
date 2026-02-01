@@ -58,6 +58,21 @@ export type BaseStatus = {
   idle_reason: string
 }
 
+export type RocketM2Status = {
+  connected: boolean
+  updated_at_ms: number
+  last_success_ms: number | null
+  signal: number | null
+  rssi: number | null
+  noisef: number | null
+  chwidth: number | null
+  rx_chainmask: number | null
+  chainrssi: number[]
+  chainrssimgmt: number[]
+  chainrssiext: number[]
+  error: string | null
+}
+
 type MessageHandler<T> = (payload: T) => void
 
 type RawTelemBattery = {
@@ -85,10 +100,15 @@ type RawBaseStatus = {
   type: 'base_status'
 } & BaseStatus
 
+type RawRocketM2Status = {
+  type: 'rocket_m2_status'
+} & RocketM2Status
+
 type GatewayMessage =
   | RawTelemBattery
   | RawTelemNav
   | RawBaseStatus
+  | RawRocketM2Status
   | ({ type: 'link_status' } & LinkStatus)
 
 const DEFAULT_PATH = '/sik-ws'
@@ -124,6 +144,7 @@ class SikGatewayClient {
   private batteryListeners = new Set<MessageHandler<TelemBattery>>()
   private navListeners = new Set<MessageHandler<TelemNav>>()
   private baseStatusListeners = new Set<MessageHandler<BaseStatus>>()
+  private rocketM2Listeners = new Set<MessageHandler<RocketM2Status>>()
   private pendingBaseHeading: number | null = null
   private url: string
 
@@ -193,6 +214,10 @@ class SikGatewayClient {
         for (const listener of this.baseStatusListeners) {
           listener(message)
         }
+      } else if (message.type === 'rocket_m2_status') {
+        for (const listener of this.rocketM2Listeners) {
+          listener(message)
+        }
       } else if (message.type === 'link_status') {
         this.lastLinkStatus = message
         this.linkConnected = message.connected
@@ -226,6 +251,11 @@ class SikGatewayClient {
   onBaseStatus(handler: MessageHandler<BaseStatus>) {
     this.baseStatusListeners.add(handler)
     return () => this.baseStatusListeners.delete(handler)
+  }
+
+  onRocketM2Status(handler: MessageHandler<RocketM2Status>) {
+    this.rocketM2Listeners.add(handler)
+    return () => this.rocketM2Listeners.delete(handler)
   }
 
   sendCmdDrive(cmd: CmdDrive) {
