@@ -43,29 +43,54 @@
  * https://navigation.ros.org/tutorials/docs/writing_new_costmap2d_plugin.html
  *********************************************************************/
 
-#ifndef TRAVERSABILITY_LAYER_HPP_
-#define TRAVERSABILITY_LAYER_HPP_
+#ifndef MR2_TRAVERSABILITY_LAYER_HPP_
+#define MR2_TRAVERSABILITY_LAYER_HPP_
 
-#include "rclcpp/rclcpp.hpp"
-#include "nav2_costmap_2d/layer.hpp"
-#include "nav2_costmap_2d/layered_costmap.hpp"
+#include <string>
+#include <mutex>
+
+#include <rclcpp/rclcpp.hpp>
+#include <nav2_costmap_2d/costmap_layer.hpp>
+#include <nav2_costmap_2d/layered_costmap.hpp>
+#include <grid_map_msgs/msg/grid_map.hpp>
 
 namespace mr2_nav2_plugins
 {
 
-class TraversabilityLayer : public nav2_costmap_2d::Layer
-
+class TraversabilityLayer : public nav2_costmap_2d::CostmapLayer
+{
 public:
-    GradientLayer();
+  TraversabilityLayer();
+  ~TraversabilityLayer() override = default;
 
-    virtual void onInitialize();
-    virtual void updateBounds();
-    virtual void updateCosts();
-    virtual void reset();
-    virtual void onFootprintChanged();
-    virtual bool isClearable() {return false;}
+  void onInitialize() override;
+  void updateBounds(
+    double robot_x, double robot_y, double robot_yaw,
+    double * min_x, double * min_y, double * max_x, double * max_y) override;
+  void updateCosts(
+    nav2_costmap_2d::Costmap2D & master_grid,
+    int min_i, int min_j, int max_i, int max_j) override;
+  void reset() override;
+  void onFootprintChanged() override;
+  bool isClearable() override { return false; }
 
 private:
-    // pass
+  void gridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg);
+  unsigned char convertToCost(float value) const;
 
-}
+  std::string gridmap_topic_;
+  std::string gridmap_layer_;
+  std::string rectangle_frame_;
+  double x_forward_m_;
+  double y_width_m_;
+  bool use_maximum_;
+  double tf_timeout_;
+
+  bool has_data_;
+  rclcpp::Subscription<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_sub_;
+  std::mutex mutex_;
+};
+
+}  // namespace mr2_nav2_plugins
+
+#endif  // MR2_TRAVERSABILITY_LAYER_HPP_
