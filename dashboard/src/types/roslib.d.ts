@@ -3,6 +3,7 @@ export {}
 declare global {
   interface Window {
     ROSLIB?: typeof ROSLIB
+    uPlot?: unknown
   }
 }
 
@@ -30,5 +31,24 @@ declare namespace ROSLIB {
     subscribe(callback: (message: T) => void): void
     unsubscribe(callback?: (message: T) => void): void
     publish(message: T): void
+  }
+
+  interface ServiceOptions {
+    ros: Ros
+    name: string
+    serviceType: string
+  }
+
+  class ServiceRequest<T = Record<string, unknown>> {
+    constructor(values?: T)
+  }
+
+  class Service<TRequest = Record<string, unknown>, TResponse = unknown> {
+    constructor(options: ServiceOptions)
+    callService(
+      request: ServiceRequest<TRequest>,
+      callback: (response: TResponse) => void,
+      failedCallback?: (error?: unknown) => void
+    ): void
   }
 }
