@@ -82,6 +82,7 @@ TraversabilityLayer::onInitialize()
 
   current_ = true;
   enabled_ = true;
+  log_clock_ = node->get_clock();
 
   declareParameter("gridmap_topic", rclcpp::ParameterValue(gridmap_topic_));
   declareParameter("gridmap_layer", rclcpp::ParameterValue(gridmap_layer_));
@@ -99,7 +100,7 @@ TraversabilityLayer::onInitialize()
   node->get_parameter(getFullName("use_maximum"), use_maximum_);
   node->get_parameter(getFullName("tf_timeout"), tf_timeout_);
 
-  auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+  auto qos = rclcpp::SensorDataQoS();
   gridmap_sub_ = node->create_subscription<grid_map_msgs::msg::GridMap>(
     gridmap_topic_, qos,
     std::bind(&TraversabilityLayer::gridMapCallback, this, std::placeholders::_1));
@@ -268,6 +269,11 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
 
   has_data_ = true;
   current_ = true;
+
+  RCLCPP_INFO_THROTTLE(
+    node->get_logger(), *log_clock_, 5000,
+    "TraversabilityLayer wrote data: bounds [%.2f, %.2f] to [%.2f, %.2f]",
+    min_x, min_y, max_x, max_y);
 }
 
 unsigned char TraversabilityLayer::convertToCost(float value) const

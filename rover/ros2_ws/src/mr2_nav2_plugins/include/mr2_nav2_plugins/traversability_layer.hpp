@@ -85,6 +85,8 @@ private:
   double y_width_m_;
   bool use_maximum_;
   double tf_timeout_;
+  // Debug logging throttling
+  rclcpp::Clock::SharedPtr log_clock_;
 
   bool has_data_;
   rclcpp::Subscription<grid_map_msgs::msg::GridMap>::SharedPtr gridmap_sub_;
