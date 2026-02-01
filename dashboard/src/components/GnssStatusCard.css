@@ -1,0 +1,90 @@
+.gnss-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.gnss-card__subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.gnss-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.gnss-card__side {
+  background: rgba(9, 15, 26, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.gnss-card__side-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.gnss-card__side-header h4 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.gnss-pill {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gnss-pill--good {
+  background: rgba(53, 211, 195, 0.2);
+  color: var(--accent);
+}
+
+.gnss-pill--warn {
+  background: rgba(247, 178, 77, 0.2);
+  color: var(--accent-2);
+}
+
+.gnss-pill--bad {
+  background: rgba(242, 95, 92, 0.2);
+  color: #ffb4b4;
+}
+
+.gnss-pill--neutral {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5f5;
+}
+
+.gnss-card__kv {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.gnss-card__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gnss-card__row strong {
+  color: #e8f4ff;
+  font-weight: 600;
+}
+
+.gnss-updated {
+  margin-top: 8px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+}
