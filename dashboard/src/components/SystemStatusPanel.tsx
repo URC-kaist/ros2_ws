@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getRosBridgeClient } from '../lib/rosBridge'
 import { BaseStatus, getSikGatewayClient } from '../lib/sikGateway'
+import GnssStatusCard from './GnssStatusCard'
 import './SystemStatusPanel.css'
 
 type DiagnosticKeyValue = {
@@ -337,6 +338,7 @@ const SystemStatusPanel = () => {
 
   return (
     <div className="panel-grid" role="tabpanel">
+      <GnssStatusCard />
       {cards.map(({ spec, snapshot, values }) => (
         <article className="card" key={spec.id}>
           <h3>{spec.label}</h3>
