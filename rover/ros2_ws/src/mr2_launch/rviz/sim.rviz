@@ -5,8 +5,8 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Map2
         - /Path1
+        - /Path1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 378
   - Class: rviz_common/Selection
@@ -89,8 +89,6 @@ Visualization Manager:
           Value: true
         map:
           Value: true
-        marker_17:
-          Value: true
         odom:
           Value: true
         right_gnss:
@@ -125,8 +123,7 @@ Visualization Manager:
                 dummy_link:
                   {}
                 front_camera:
-                  marker_17:
-                    {}
+                  {}
                 imu_link:
                   {}
                 left_gnss:
@@ -472,6 +469,34 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /plan
       Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 25; 255; 0
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_plan
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -518,7 +543,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/ThirdPersonFollower
-      Distance: 15.737465858459473
+      Distance: 13.774144172668457
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -533,10 +558,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6847963333129883
+      Pitch: 0.8347962498664856
       Target Frame: base_link
       Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 3.479865074157715
+      Yaw: 3.224865674972534
     Saved: ~
 Window Geometry:
   Camera:

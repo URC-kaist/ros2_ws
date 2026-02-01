@@ -34,7 +34,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "map",
-            default_value=os.path.join(pkg_share, "maps", "map.yaml"),
+            default_value=os.path.join(pkg_share, "maps", "map0p4.yaml"),
             description="Occupancy grid YAML passed to Nav2 map_server",
         ),
         DeclareLaunchArgument(

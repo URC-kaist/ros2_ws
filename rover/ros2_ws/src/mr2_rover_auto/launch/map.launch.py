@@ -78,7 +78,7 @@ def generate_launch_description():
         description='Top-level namespace')
 
     default_map = os.path.join(
-        get_package_share_directory('mr2_rover_auto'), 'maps', 'map.yaml')
+        get_package_share_directory('mr2_rover_auto'), 'maps', 'map0p4.yaml')
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
         default_value=default_map,

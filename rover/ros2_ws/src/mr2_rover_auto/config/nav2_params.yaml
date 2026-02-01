@@ -15,6 +15,8 @@ bt_navigator:
     # nav2_bt_navigator/navigate_to_pose_w_replanning_and_recovery.xml
     # nav2_bt_navigator/navigate_through_poses_w_replanning_and_recovery.xml
     # They can be set here or via a RewrittenYaml remap from a parent launch file to Nav2.
+    default_nav_to_pose_bt_xml: "/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_rover_auto/behavior_trees/my_navigate_to_pose.xml"
+    # default_nav_through_poses_bt_xml: "package://mr2_rover_auto/behavior_trees/..."
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
@@ -77,11 +79,12 @@ controller_server:
     use_sim_time: True
     controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
-    min_y_velocity_threshold: 0.5
+    min_y_velocity_threshold: 0.0
     min_theta_velocity_threshold: 0.001
     failure_tolerance: 0.3
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"] # "precise_goal_checker"
+    current_goal_checker: "general_goal_checker"
     controller_plugins: ["FollowPath"]
 
     # Progress checker parameters
@@ -108,7 +111,7 @@ controller_server:
       min_vel_x: 0.0
       min_vel_y: 0.0
       max_vel_x: 2.0
-      max_vel_y: 2.0
+      max_vel_y: 0.0   # non-holonomic; suppress lateral commands
       max_vel_theta: 1.0
       min_speed_xy: 0.0
       max_speed_xy: 2.0
@@ -122,7 +125,7 @@ controller_server:
       decel_lim_y: 0.0
       decel_lim_theta: -3.2
       vx_samples: 20
-      vy_samples: 5
+      vy_samples: 1    # only vy=0
       vtheta_samples: 20
       sim_time: 1.7
       linear_granularity: 0.05
@@ -196,7 +199,7 @@ global_costmap:
       robot_base_frame: base_link
       use_sim_time: True
       footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]" # TODO: Actual geometry (#34)
-      resolution: 0.783011944543186 # follow map.yaml resolution
+      resolution: 0.2 # follow map0p4.yaml resolution
       track_unknown_space: true
       plugins: ["static_layer", "inflation_layer"] # ["static_layer", "traversability_layer", "inflation_layer"]
       # obstacle_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/obstacle.html
@@ -232,7 +235,7 @@ map_server: # https://docs.nav2.org/configuration/packages/map_server/configurin
     use_sim_time: True
     # Overridden in launch by the "map" launch configuration or provided default value.
     # To use in yaml, remove the default "map" value in the tb3_simulation_launch.py file & provide full path to map below.
-    yaml_filename: "package://mr2_rover_auto/maps/map.yaml"
+    yaml_filename: "package://mr2_rover_auto/maps/map0p4.yaml"
 
 # map_saver:
 #   ros__parameters:
@@ -244,12 +247,15 @@ map_server: # https://docs.nav2.org/configuration/packages/map_server/configurin
 
 planner_server: # https://docs.nav2.org/configuration/packages/configuring-planner-server.html
   ros__parameters:
-    expected_planner_frequency: 20.0
+    expected_planner_frequency: 1.0 # calculate once per second
     use_sim_time: True
     planner_plugins: ["GridBased"]
+    # Smac2D:
+    #   plugin: "nav2_smac_planner/SmacPlanner2D"
+    #   allow_unknown: true
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner" # Correct for 
-      tolerance: 0.5
+      plugin: "nav2_navfn_planner/NavfnPlanner" # Correct for 4WS4WD
+      tolerance: 0.4
       use_astar: true
       allow_unknown: true
       use_final_approach_orientation: true
@@ -258,12 +264,14 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
 smoother_server:
   ros__parameters:
     use_sim_time: True
-    smoother_plugins: ["simple_smoother"]
+    smoother_plugins: ["simple_smoother", "curvature_smoother"]
     simple_smoother:
       plugin: "nav2_smoother::SimpleSmoother"
       tolerance: 1.0e-10
       max_its: 1000
       do_refinement: True
+    curvature_smoother:
+      plugin: "nav2_smoother::SavitzkyGolaySmoother"
 
 behavior_server:
   ros__parameters:
@@ -311,8 +319,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.26, 0.0, 1.0]
-    min_velocity: [-0.26, 0.0, -1.0]
+    max_velocity: [2.0, 2.0, 1.0]
+    min_velocity: [-2.0, -2.0, -1.0]
     max_accel: [2.5, 0.0, 3.2]
     max_decel: [-2.5, 0.0, -3.2]
     odom_topic: "odom"
