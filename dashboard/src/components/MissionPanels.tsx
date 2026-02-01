@@ -2,6 +2,7 @@ import DeliveryPanel from './DeliveryPanel'
 import MapPreview from './MapPreview'
 import SystemStatusPanel from './SystemStatusPanel'
 import ArmServoCard from './ArmServoCard'
+import SpectrophotometerCard from './SpectrophotometerCard'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -24,11 +25,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
               <span className="pill">ROCK-11</span>
             </div>
           </article>
-          <article className="card">
-            <h3>Spectrometer</h3>
-            <p>Live spectrum capture and anomaly detection.</p>
-            <div className="sparkline" />
-          </article>
+          <SpectrophotometerCard />
           <article className="card">
             <h3>Thermal Map</h3>
             <p>Hotspot overlay from thermal camera feed.</p>

@@ -1,0 +1,6 @@
+bool use_absorbance
+bool publish_topic
+---
+bool success
+string message
+mr2_spectrophotometer_msgs/Spectrum spectrum

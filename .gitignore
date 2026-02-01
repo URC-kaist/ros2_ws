@@ -6,3 +6,4 @@ base_gateway/.env.local
 base/gateway/node_modules
 
 tmp/
+base/gateway/.env.local
