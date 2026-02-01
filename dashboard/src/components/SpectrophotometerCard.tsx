@@ -1,6 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getRosBridgeClient } from '../lib/rosBridge'
 import './SpectrophotometerCard.css'
+
+type UPlotInstance = { destroy: () => void; setData: (data: number[][]) => void }
+
+type UPlotConstructor = new (
+  options: UPlotOptions,
+  data: number[][],
+  target: HTMLElement
+) => UPlotInstance
+
+type UPlotOptions = {
+  width: number
+  height: number
+  legend: { show: boolean }
+  cursor: { show: boolean }
+  scales: { x: { time: boolean } }
+  padding: [number, number, number, number]
+  axes: Array<{
+    label: string
+    stroke: string
+    grid: { stroke: string }
+    font: string
+  }>
+  series: Array<
+    | Record<string, never>
+    | { label: string; stroke: string; width: number; fill: string }
+  >
+}
 
 type SpectrumMsg = {
   header?: { stamp?: { sec?: number; nanosec?: number }; frame_id?: string }
@@ -28,29 +55,37 @@ const formatTimestamp = (timestamp: number | null) => {
   return new Date(timestamp).toLocaleTimeString()
 }
 
-const buildPath = (x: number[], y: number[]) => {
-  if (x.length === 0 || y.length === 0 || x.length !== y.length) {
-    return ''
-  }
-  const xMin = Math.min(...x)
-  const xMax = Math.max(...x)
-  const yMin = Math.min(...y)
-  const yMax = Math.max(...y)
-  const xSpan = xMax - xMin || 1
-  const ySpan = yMax - yMin || 1
-
-  const points = x.map((xVal, idx) => {
-    const xNorm = ((xVal - xMin) / xSpan) * 100
-    const yNorm = 100 - ((y[idx] - yMin) / ySpan) * 100
-    return `${xNorm.toFixed(2)},${yNorm.toFixed(2)}`
-  })
-  return points.length > 0 ? `M ${points.join(' L ')}` : ''
-}
-
-const buildAreaPath = (linePath: string) => {
-  if (!linePath) return ''
-  return `${linePath} L 100,100 L 0,100 Z`
-}
+const makePlotOptions = (label: string, width: number, height: number): UPlotOptions => ({
+  width,
+  height,
+  legend: { show: false },
+  cursor: { show: true },
+  scales: { x: { time: false } },
+  padding: [10, 12, 6, 6],
+  axes: [
+    {
+      label: 'Wavelength (nm)',
+      stroke: 'rgba(232, 238, 245, 0.7)',
+      grid: { stroke: 'rgba(255, 255, 255, 0.08)' },
+      font: '12px "IBM Plex Sans", system-ui',
+    },
+    {
+      label,
+      stroke: 'rgba(232, 238, 245, 0.7)',
+      grid: { stroke: 'rgba(255, 255, 255, 0.08)' },
+      font: '12px "IBM Plex Sans", system-ui',
+    },
+  ],
+  series: [
+    {},
+    {
+      label,
+      stroke: '#35d3c3',
+      width: 1.2,
+      fill: 'rgba(53, 211, 195, 0.18)',
+    },
+  ],
+})
 
 const SpectrophotometerCard = () => {
   const [rosConnected, setRosConnected] = useState(false)
@@ -59,12 +94,27 @@ const SpectrophotometerCard = () => {
   const [error, setError] = useState<string | null>(null)
   const [spectrum, setSpectrum] = useState<SpectrumMsg | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  const [plotSize, setPlotSize] = useState({ width: 0, height: 0 })
+  const [uplotCtor, setUplotCtor] = useState<UPlotConstructor | null>(null)
+  const plotContainerRef = useRef<HTMLDivElement | null>(null)
+  const plotInstanceRef = useRef<UPlotInstance | null>(null)
+  const modeLabel = useAbsorbance ? 'Absorbance' : 'Transmittance'
 
   useEffect(() => {
     const ros = getRosBridgeClient()
     ros.connect()
     const offConnection = ros.onConnectionStatus(setRosConnected)
     return () => offConnection()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const ctor = (window as unknown as { uPlot?: UPlotConstructor }).uPlot
+    if (!ctor) {
+      setError('Plotting library not loaded')
+      return
+    }
+    setUplotCtor(() => ctor)
   }, [])
 
   const handleCapture = useCallback(async () => {
@@ -106,11 +156,61 @@ const SpectrophotometerCard = () => {
     }
   }, [useAbsorbance])
 
+  useEffect(() => {
+    const container = plotContainerRef.current
+    if (!container || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect
+      if (!rect) return
+      const nextWidth = Math.max(320, Math.floor(rect.width))
+      const nextHeight = Math.max(180, Math.floor(rect.height))
+      setPlotSize((prev) =>
+        prev.width === nextWidth && prev.height === nextHeight
+          ? prev
+          : { width: nextWidth, height: nextHeight }
+      )
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const container = plotContainerRef.current
+    if (!container || plotSize.width === 0 || plotSize.height === 0 || !uplotCtor) return
+
+    plotInstanceRef.current?.destroy()
+    const options = makePlotOptions(modeLabel, plotSize.width, plotSize.height)
+    const initial = spectrum
+      ? [spectrum.wavelength_nm, spectrum.intensity]
+      : [[], []]
+    const plot = new uplotCtor(options, initial, container)
+    plotInstanceRef.current = plot
+    return () => plot.destroy()
+  }, [plotSize, modeLabel, uplotCtor])
+
+  useEffect(() => {
+    const plot = plotInstanceRef.current
+    if (!plot) return
+    if (!spectrum) {
+      plot.setData([[], []])
+      return
+    }
+    plot.setData([spectrum.wavelength_nm, spectrum.intensity])
+  }, [spectrum])
+
   const handleExport = useCallback(() => {
     if (!spectrum) return
+    const frameId = spectrum.header?.frame_id ?? 'unknown'
+    const calibrationPath =
+      (spectrum as unknown as { calibration_path?: string }).calibration_path ??
+      (import.meta.env.VITE_SPECTRO_CALIBRATION_PATH as string | undefined) ??
+      'unknown'
     const header = [
       `# mode: ${useAbsorbance ? 'absorbance' : 'transmittance'}`,
       `# captured_at: ${lastUpdated ? new Date(lastUpdated).toISOString() : 'unknown'}`,
+      `# frame_id: ${frameId}`,
+      `# calibration_path: ${calibrationPath}`,
       'wavelength_nm,intensity',
     ]
     const rows = spectrum.wavelength_nm.map((wl, idx) => {
@@ -130,25 +230,14 @@ const SpectrophotometerCard = () => {
     URL.revokeObjectURL(url)
   }, [spectrum, useAbsorbance, lastUpdated])
 
-  const plot = useMemo(() => {
-    if (!spectrum) {
-      return { linePath: '', areaPath: '', peak: null as null | { wl: number; intensity: number } }
-    }
+  const peak = useMemo(() => {
+    if (!spectrum || !spectrum.intensity.length) return null
     const { wavelength_nm: wl, intensity } = spectrum
-    const linePath = buildPath(wl, intensity)
-    const areaPath = buildAreaPath(linePath)
-    if (!wl.length || !intensity.length) {
-      return { linePath, areaPath, peak: null }
-    }
     let peakIdx = 0
     for (let i = 1; i < intensity.length; i += 1) {
       if (intensity[i] > intensity[peakIdx]) peakIdx = i
     }
-    return {
-      linePath,
-      areaPath,
-      peak: { wl: wl[peakIdx], intensity: intensity[peakIdx] },
-    }
+    return { wl: wl[peakIdx], intensity: intensity[peakIdx] }
   }, [spectrum])
 
   const range = useMemo(() => {
@@ -159,8 +248,6 @@ const SpectrophotometerCard = () => {
     const max = Math.max(...spectrum.wavelength_nm)
     return { min, max }
   }, [spectrum])
-
-  const modeLabel = useAbsorbance ? 'Absorbance' : 'Transmittance'
 
   return (
     <article className="card card--span-2 spectro-card">
@@ -206,30 +293,8 @@ const SpectrophotometerCard = () => {
       </div>
 
       <div className="spectro-card__plot" role="img" aria-label="Spectrum plot">
-        {plot.linePath ? (
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="spectro-line" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#35d3c3" />
-                <stop offset="100%" stopColor="#f7b24d" />
-              </linearGradient>
-              <linearGradient id="spectro-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="rgba(53, 211, 195, 0.35)" />
-                <stop offset="100%" stopColor="rgba(15, 23, 36, 0.0)" />
-              </linearGradient>
-            </defs>
-            <g className="spectro-card__grid">
-              {[20, 40, 60, 80].map((x) => (
-                <line key={`x-${x}`} x1={x} y1="0" x2={x} y2="100" />
-              ))}
-              {[25, 50, 75].map((y) => (
-                <line key={`y-${y}`} x1="0" y1={y} x2="100" y2={y} />
-              ))}
-            </g>
-            <path className="spectro-card__area" d={plot.areaPath} />
-            <path className="spectro-card__line" d={plot.linePath} />
-          </svg>
-        ) : (
+        <div className="spectro-card__plot-inner" ref={plotContainerRef} />
+        {!spectrum && (
           <div className="spectro-card__placeholder">
             {rosConnected ? 'No spectrum captured yet.' : 'Waiting for ROS connection…'}
           </div>
@@ -254,9 +319,7 @@ const SpectrophotometerCard = () => {
         <div>
           <span>Peak</span>
           <strong>
-            {plot.peak
-              ? `${plot.peak.wl.toFixed(1)} nm`
-              : '—'}
+            {peak ? `${peak.wl.toFixed(1)} nm` : '—'}
           </strong>
         </div>
       </div>

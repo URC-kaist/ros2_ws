@@ -339,12 +339,22 @@ def main() -> int:
     parser.add_argument("--interval-ms", type=int, default=200, help="Update interval in milliseconds")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host/interface to bind")
     parser.add_argument("--port", type=int, default=8001, help="Port to bind")
-    parser.add_argument("--outfile", type=str, default="calibration.json", help="Where to write calibration JSON")
-    parser.add_argument("--save-plot", type=str, default="calibration_fit.html", help="HTML calibration plot")
+    parser.add_argument(
+        "--outfile",
+        type=str,
+        default="/home/mr2/spectrophotometer/calibration.json",
+        help="Where to write calibration JSON",
+    )
+    parser.add_argument(
+        "--save-plot",
+        type=str,
+        default="/home/mr2/spectrophotometer/calibration_fit.html",
+        help="HTML calibration plot",
+    )
     parser.add_argument(
         "--intensity-out",
         type=str,
-        default="intensity_ref.npz",
+        default="/home/mr2/spectrophotometer/intensity_ref.npz",
         help="Where to write intensity reference NPZ",
     )
     args = parser.parse_args()

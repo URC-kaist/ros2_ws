@@ -3,6 +3,7 @@ export {}
 declare global {
   interface Window {
     ROSLIB?: typeof ROSLIB
+    uPlot?: unknown
   }
 }
 
