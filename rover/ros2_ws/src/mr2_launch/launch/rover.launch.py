@@ -347,7 +347,7 @@ def generate_launch_description():
         servo_launch,
         sik_sim_launch,
         sik_bridge,
-        sik_bridge_sim,
+        # sik_bridge_sim,
         foxglove_bridge,
         rosbridge_ws,
         rviz2,
