@@ -33,13 +33,13 @@ def main():
     parser.add_argument(
         "--calibration",
         type=str,
-        default="calibration.json",
+        default="/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_spectrophotometer/config/calibration.json",
         help="Path to calibration file",
     )
     parser.add_argument(
         "--intensity-ref",
         type=str,
-        default=None,
+        default="/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_spectrophotometer/config/intensity_ref.npz",
         help="Path to intensity reference NPZ (from intensity_setup.py) for transmittance/absorbance",
     )
     parser.add_argument(

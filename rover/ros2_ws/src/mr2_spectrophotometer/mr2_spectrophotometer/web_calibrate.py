@@ -342,19 +342,19 @@ def main() -> int:
     parser.add_argument(
         "--outfile",
         type=str,
-        default="/home/mr2/spectrophotometer/calibration.json",
+        default="/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_spectrophotometer/config/calibration.json",
         help="Where to write calibration JSON",
     )
     parser.add_argument(
         "--save-plot",
         type=str,
-        default="/home/mr2/spectrophotometer/calibration_fit.html",
+        default="/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_spectrophotometer/config/calibration_fit.html",
         help="HTML calibration plot",
     )
     parser.add_argument(
         "--intensity-out",
         type=str,
-        default="/home/mr2/spectrophotometer/intensity_ref.npz",
+        default="/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_spectrophotometer/config/intensity_ref.npz",
         help="Where to write intensity reference NPZ",
     )
     args = parser.parse_args()
