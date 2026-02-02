@@ -3,6 +3,7 @@
 ```bash
 ros2 run tf2_tools view_frames
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
+ros2 doctor --report > doctor.log # detect QoS mode mismatch failure
 ```
 
 

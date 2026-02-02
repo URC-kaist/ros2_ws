@@ -191,7 +191,7 @@ local_costmap:
         enabled: true
         clearable: true
         gridmap_topic: "/traversability_gridmap"
-        gridmap_layer: "elevation"
+        gridmap_layer: "traversability"
         rectangle_frame: front_camera # frame of /rgbd_camera/depth/color/points
         x_forward_m: 3.0
         y_width_m: 4.0
@@ -233,7 +233,7 @@ global_costmap:
         enabled: true
         clearable: true
         gridmap_topic: "/traversability_gridmap"
-        gridmap_layer: "elevation"
+        gridmap_layer: "traversability"
         rectangle_frame: front_camera # frame of /rgbd_camera/depth/color/points
         x_forward_m: 3.0
         y_width_m: 4.0

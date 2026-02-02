@@ -13,8 +13,10 @@ def generate_launch_description():
     pkg_share = get_package_share_directory("mr2_rover_auto")
     default_params = os.path.join(pkg_share, "config", "trav_pipeline.yaml")
 
+    # Use a distinct launch argument name to avoid colliding with Nav2's
+    # `params_file` (which broke map_server earlier).
     params_file_arg = DeclareLaunchArgument(
-        "params_file",
+        "trav_params_file",
         default_value=default_params,
         description="Traversability pipeline parameters file",
     )
@@ -25,7 +27,7 @@ def generate_launch_description():
     )
 
     use_sim_time = LaunchConfiguration("use_sim_time")
-    params_file = LaunchConfiguration("params_file")
+    params_file = LaunchConfiguration("trav_params_file")
     param_substitutions = {"use_sim_time": use_sim_time}
     configured_params = ParameterFile(
         RewrittenYaml(

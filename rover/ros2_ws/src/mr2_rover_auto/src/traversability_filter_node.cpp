@@ -33,10 +33,11 @@ public:
       throw std::runtime_error("Failed to configure filter chain.");
     }
 
+    auto qos = rclcpp::SensorDataQoS();  // Match depth→height publisher and Nav2 consumers.
     sub_ = this->create_subscription<grid_map_msgs::msg::GridMap>(
-      input_topic_, rclcpp::QoS(1),
+      input_topic_, qos,
       std::bind(&TraversabilityFilterNode::gridMapCallback, this, std::placeholders::_1));
-    pub_ = this->create_publisher<grid_map_msgs::msg::GridMap>(output_topic_, rclcpp::QoS(1));
+    pub_ = this->create_publisher<grid_map_msgs::msg::GridMap>(output_topic_, qos);
 
     RCLCPP_INFO(
       this->get_logger(), "GridMap filter chain listening on %s -> %s (prefix=%s)",

@@ -48,6 +48,9 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(pipeline_launch),
         launch_arguments={
             "use_sim_time": LaunchConfiguration("use_sim_time"),
+            # Dedicated arg name in traversability_pipeline.launch.py to avoid
+            # clashing with Nav2's params_file.
+            "trav_params_file": os.path.join(pkg_share, "config", "trav_pipeline.yaml"),
         }.items(),
     )
 

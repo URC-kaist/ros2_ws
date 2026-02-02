@@ -21,13 +21,10 @@ public:
     output_topic_ = this->declare_parameter<std::string>("output_topic", "/traversability_cloud");
     layer_ = this->declare_parameter<std::string>("layer", "traversability");
 
-    // Reliable + transient to match OccupancyGrid publisher
-    rclcpp::QoS qos(1);
-    qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-    qos.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
+    auto qos = rclcpp::SensorDataQoS();
 
     sub_ = this->create_subscription<grid_map_msgs::msg::GridMap>(
-      input_topic_, rclcpp::QoS(1),
+      input_topic_, qos,
       std::bind(&GridMapToPointCloudNode::gridMapCallback, this, std::placeholders::_1));
     pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(output_topic_, qos);
 

@@ -31,12 +31,9 @@ public:
     invert_ = this->declare_parameter<bool>("invert", true);
     unknown_value_ = this->declare_parameter<int>("unknown_value", 0);
 
-    rclcpp::QoS qos(1);
-    qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-    qos.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
-
+    auto qos = rclcpp::SensorDataQoS();
     sub_ = this->create_subscription<grid_map_msgs::msg::GridMap>(
-      input_topic_, rclcpp::QoS(1),
+      input_topic_, qos,
       std::bind(&GridMapToOccupancyNode::gridMapCallback, this, std::placeholders::_1));
     pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(output_topic_, qos);
 
