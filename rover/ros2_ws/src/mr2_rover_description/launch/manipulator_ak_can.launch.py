@@ -63,7 +63,7 @@ def generate_launch_description():
 
     ros2_control = ros2_control_node(controller_config, robot_description, use_sim_time)
     spawners = controller_spawners(
-        ["joint_state_broadcaster", "manipulator_controller"],
+        ["joint_state_broadcaster", "manipulator_controller", "gripper_position_controller"],
         start_after=2.0,
         interval=2.0,
         inactive_controllers=["manipulator_controller"],
