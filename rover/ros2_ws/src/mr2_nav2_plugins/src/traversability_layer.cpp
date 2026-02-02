@@ -69,7 +69,13 @@ TraversabilityLayer::TraversabilityLayer()
   y_width_m_(4.0),
   use_maximum_(true),
   tf_timeout_(0.1),
-  has_data_(false)
+  publish_private_costmap_(false),
+  has_data_(false),
+  pending_bounds_(false),
+  pending_min_x_(0.0),
+  pending_min_y_(0.0),
+  pending_max_x_(0.0),
+  pending_max_y_(0.0)
 {}
 
 void
@@ -91,6 +97,7 @@ TraversabilityLayer::onInitialize()
   declareParameter("y_width_m", rclcpp::ParameterValue(y_width_m_));
   declareParameter("use_maximum", rclcpp::ParameterValue(use_maximum_));
   declareParameter("tf_timeout", rclcpp::ParameterValue(tf_timeout_));
+  declareParameter("publish_private_costmap", rclcpp::ParameterValue(publish_private_costmap_));
 
   node->get_parameter(getFullName("gridmap_topic"), gridmap_topic_);
   node->get_parameter(getFullName("gridmap_layer"), gridmap_layer_);
@@ -99,11 +106,16 @@ TraversabilityLayer::onInitialize()
   node->get_parameter(getFullName("y_width_m"), y_width_m_);
   node->get_parameter(getFullName("use_maximum"), use_maximum_);
   node->get_parameter(getFullName("tf_timeout"), tf_timeout_);
+  node->get_parameter(getFullName("publish_private_costmap"), publish_private_costmap_);
 
   auto qos = rclcpp::SensorDataQoS();
   gridmap_sub_ = node->create_subscription<grid_map_msgs::msg::GridMap>(
     gridmap_topic_, qos,
     std::bind(&TraversabilityLayer::gridMapCallback, this, std::placeholders::_1));
+  if (publish_private_costmap_) {
+    private_costmap_pub_ = node->create_publisher<nav_msgs::msg::OccupancyGrid>(
+      "/traversability_private", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort());
+  }
 
   matchSize();
 }
@@ -113,9 +125,22 @@ TraversabilityLayer::updateBounds(
   double robot_x, double robot_y, double robot_yaw,
   double * min_x, double * min_y, double * max_x, double * max_y)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
   if (!enabled_ || !has_data_) {
     return;
+  }
+
+  // Keep the private costmap rolling with the master so data stays centered
+  // around the robot instead of remaining fixed at the odom origin.
+  if (layered_costmap_->isRolling()) {
+    const double half_x = 0.5 * getSizeInMetersX();
+    const double half_y = 0.5 * getSizeInMetersY();
+    updateOrigin(robot_x - half_x, robot_y - half_y);
+  }
+
+  if (pending_bounds_) {
+    addExtraBounds(pending_min_x_, pending_min_y_, pending_max_x_, pending_max_y_);
+    pending_bounds_ = false;
   }
 
   useExtraBounds(min_x, min_y, max_x, max_y);
@@ -125,36 +150,51 @@ TraversabilityLayer::updateBounds(
     return;
   }
 
+  // Copy parameters for TF / geometry work outside the mutex to avoid blocking callbacks.
+  const double x_forward = x_forward_m_;
+  const double y_width = y_width_m_;
+  const std::string rectangle_frame = rectangle_frame_;
+  const double tf_timeout = tf_timeout_;
+  const std::string costmap_frame = layered_costmap_->getGlobalFrameID();
+
+  lock.unlock();
+
   geometry_msgs::msg::TransformStamped tf_stamped;
   try {
     tf_stamped = tf_->lookupTransform(
-      layered_costmap_->getGlobalFrameID(), rectangle_frame_,
-      rclcpp::Time(0), rclcpp::Duration::from_seconds(tf_timeout_));
+      costmap_frame, rectangle_frame,
+      rclcpp::Time(0), rclcpp::Duration::from_seconds(tf_timeout));
   } catch (const tf2::TransformException & ex) {
     RCLCPP_WARN(node->get_logger(),
       "TraversabilityLayer: failed to get TF %s -> %s: %s",
-      rectangle_frame_.c_str(), layered_costmap_->getGlobalFrameID().c_str(), ex.what());
+      rectangle_frame.c_str(), costmap_frame.c_str(), ex.what());
     return;
   }
 
-  const double half_w = 0.5 * y_width_m_;
+  const double half_w = 0.5 * y_width;
   std::array<geometry_msgs::msg::PointStamped, 4> corners{};
   // rectangle in sensor frame: origin at camera, forward +x, lateral +y
   corners[0].point.x = 0.0;         corners[0].point.y = -half_w;
-  corners[1].point.x = x_forward_m_; corners[1].point.y = -half_w;
-  corners[2].point.x = x_forward_m_; corners[2].point.y =  half_w;
+  corners[1].point.x = x_forward;   corners[1].point.y = -half_w;
+  corners[2].point.x = x_forward;   corners[2].point.y =  half_w;
   corners[3].point.x = 0.0;         corners[3].point.y =  half_w;
   for (auto & c : corners) {
     c.point.z = 0.0;
-    c.header.frame_id = rectangle_frame_;
+    c.header.frame_id = rectangle_frame;
   }
 
-  // We intentionally ignore the camera's orientation: ROI axes stay parallel to costmap axes.
-  const auto & trans = tf_stamped.transform.translation;
+  // Transform rectangle corners with full pose so ROI follows the sensor frame,
+  // not just its translation. This keeps bounds aligned when the camera rotates.
   for (auto & c : corners) {
-    const double wx = trans.x + c.point.x;
-    const double wy = trans.y + c.point.y;
-    touch(wx, wy, min_x, min_y, max_x, max_y);
+    geometry_msgs::msg::PointStamped c_out;
+    try {
+      tf2::doTransform(c, c_out, tf_stamped);
+      touch(c_out.point.x, c_out.point.y, min_x, min_y, max_x, max_y);
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN(node->get_logger(),
+        "TraversabilityLayer: rectangle corner transform failed: %s", ex.what());
+      return;
+    }
   }
 }
 
@@ -176,6 +216,13 @@ TraversabilityLayer::updateCosts(
 }
 
 void
+TraversabilityLayer::matchSize()
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  CostmapLayer::matchSize();
+}
+
+void
 TraversabilityLayer::onFootprintChanged()
 {
   // No footprint-specific logic yet.
@@ -192,8 +239,6 @@ TraversabilityLayer::reset()
 
 void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   auto node = node_.lock();
   if (!node || !enabled_) {
     return;
@@ -236,39 +281,76 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
   double max_x = -std::numeric_limits<double>::max();
   double max_y = -std::numeric_limits<double>::max();
 
-  for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it) {
-    const float value = map.at(gridmap_layer_, *it);
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
 
-    grid_map::Position pos_in_map;
-    map.getPosition(*it, pos_in_map);
+    for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it) {
+      const float value = map.at(gridmap_layer_, *it);
 
-    geometry_msgs::msg::PointStamped p_in, p_out;
-    p_in.header.frame_id = map.getFrameId();
-    p_in.point.x = pos_in_map.x();
-    p_in.point.y = pos_in_map.y();
-    p_in.point.z = 0.0;
+      grid_map::Position pos_in_map;
+      map.getPosition(*it, pos_in_map);
 
-    try {
-      tf2::doTransform(p_in, p_out, tf_stamped);
-    } catch (const tf2::TransformException & ex) {
-      RCLCPP_DEBUG(node->get_logger(),
-        "TraversabilityLayer: point transform failed: %s", ex.what());
-      continue;
+      geometry_msgs::msg::PointStamped p_in, p_out;
+      p_in.header.frame_id = map.getFrameId();
+      p_in.point.x = pos_in_map.x();
+      p_in.point.y = pos_in_map.y();
+      p_in.point.z = 0.0;
+
+      try {
+        tf2::doTransform(p_in, p_out, tf_stamped);
+      } catch (const tf2::TransformException & ex) {
+        RCLCPP_DEBUG(node->get_logger(),
+          "TraversabilityLayer: point transform failed: %s", ex.what());
+        continue;
+      }
+
+      unsigned int mx, my;
+      if (worldToMap(p_out.point.x, p_out.point.y, mx, my)) {
+        setCost(mx, my, convertToCost(value));
+        touch(p_out.point.x, p_out.point.y, &min_x, &min_y, &max_x, &max_y);
+      }
     }
 
-    unsigned int mx, my;
-    if (worldToMap(p_out.point.x, p_out.point.y, mx, my)) {
-      setCost(mx, my, convertToCost(value));
-      touch(p_out.point.x, p_out.point.y, &min_x, &min_y, &max_x, &max_y);
+    if (min_x <= max_x && min_y <= max_y) {
+      pending_min_x_ = min_x;
+      pending_min_y_ = min_y;
+      pending_max_x_ = max_x;
+      pending_max_y_ = max_y;
+      pending_bounds_ = true;
+    } else {
+      pending_bounds_ = false;
     }
+
+    has_data_ = true;
+    current_ = true;
   }
 
-  if (min_x <= max_x && min_y <= max_y) {
-    addExtraBounds(min_x, min_y, max_x, max_y);
-  }
+  // Publish a snapshot of the private costmap for debugging.
+  if (publish_private_costmap_ && private_costmap_pub_ &&
+      private_costmap_pub_->get_subscription_count() > 0) {
+    nav_msgs::msg::OccupancyGrid out;
+    out.header.stamp = msg->header.stamp;
+    out.header.frame_id = layered_costmap_->getGlobalFrameID();
+    out.info.resolution = getResolution();
+    out.info.width = getSizeInCellsX();
+    out.info.height = getSizeInCellsY();
+    out.info.origin.position.x = getOriginX();
+    out.info.origin.position.y = getOriginY();
+    out.info.origin.position.z = 0.0;
+    out.info.origin.orientation.w = 1.0;
 
-  has_data_ = true;
-  current_ = true;
+    const unsigned char * src = getCharMap();
+    out.data.resize(out.info.width * out.info.height);
+    for (size_t i = 0; i < out.data.size(); ++i) {
+      const unsigned char c = src[i];
+      if (c == nav2_costmap_2d::NO_INFORMATION) {
+        out.data[i] = -1;
+      } else {
+        out.data[i] = static_cast<int8_t>(std::min<int>(100, (c * 100) / 254));
+      }
+    }
+    private_costmap_pub_->publish(std::move(out));
+  }
 
   RCLCPP_INFO_THROTTLE(
     node->get_logger(), *log_clock_, 5000,

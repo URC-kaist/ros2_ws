@@ -189,6 +189,7 @@ local_costmap:
       traversability_layer:
         plugin: "mr2_nav2_plugins::TraversabilityLayer"
         enabled: true
+        publish_private_costmap: false # topic: /traversability_private (always)
         clearable: true
         gridmap_topic: "/traversability_gridmap"
         gridmap_layer: "traversability"
