@@ -34,19 +34,19 @@ grid_map_filters:
         name: buffer_normalizer
         type: gridMapFilters/BufferNormalizerFilter
 
-      filter2:  # Inpainting으로 결측값 보간
+      filter2:  # Removes nan by inpaint operation (basically interpolation)
         name: inpaint
         type: gridMapCv/InpaintFilter
         params:
           input_layer:  elevation
           output_layer: elevation_inpainted
-          radius: 0.1
+          radius: 0.4
 
       filter3:  # 반경 평균화로 노이즈 저감
         name: mean_in_radius
         type: gridMapFilters/MeanInRadiusFilter
         params:
-          input_layer:  elevation_inpainted
+          input_layer:  elevation # do not use inpaint
           output_layer: elevation_smooth
           radius: 0.4
 
@@ -57,7 +57,7 @@ grid_map_filters:
           # Use the smoothed height map to make normals flatter on nominal ground.
           input_layer:              elevation_smooth
           output_layers_prefix:     normal_vectors_
-          radius:                   0.2
+          radius:                   0.4
           normal_vector_positive_axis: z
 
       filter5:  # 법선 벡터를 색상으로 시각화
@@ -90,7 +90,8 @@ grid_map_filters:
           output_layer: traversability
           # Actually, we define obstructiveness (Nav2 costmap range: 0 to 1):
           # Use element-wise operations (.*) to avoid matrix-dimension errors.
-          expression: 6.0 .* slope .* slope + 6.0 .* roughness .* roughness # NOTE: tune for real (#34)
+          # https://libeigen.gitlab.io/eigen/docs-nightly/group__CoeffwiseMathFunctions.html
+          expression: 0.5 * slope / 0.6 + 0.5 * roughness / 0.4 # NOTE: tune for real (#34)
 
       filter9:  # 하한(0) 클램핑
         name: traversability_lower_threshold

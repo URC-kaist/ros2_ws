@@ -116,8 +116,6 @@ controller_server:
       min_speed_xy: 0.0
       max_speed_xy: 2.0
       min_speed_theta: 0.0
-      # Add high threshold velocity for turtlebot 3 issue.
-      # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
       acc_lim_x: 2.5
       acc_lim_y: 0.0
       acc_lim_theta: 3.2
@@ -133,12 +131,15 @@ controller_server:
       transform_tolerance: 0.2
       xy_goal_tolerance: 0.25
       trans_stopped_velocity: 0.25
-      short_circuit_trajectory_evaluation: True
+      short_circuit_trajectory_evaluation: False
       stateful: True
       critics: ["BaseObstacle", "ObstacleFootprint", "PathAlign", "GoalAlign", "PathDist", "GoalDist", "RotateToGoal", "Oscillation"]
-      BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      PathAlign.forward_point_distance: 0.1
+      BaseObstacle.scale: 1.0 # bump it up!
+      # BaseObstacle.sum_scores: true
+      ObstacleFootprint.scale: 1.0
+      # ObstacleFootprint.sum_scores: true
+      PathAlign.scale: 16.0 # relaxed for less jagging
+      PathAlign.forward_point_distance: 1.0 # increased lookahead
       GoalAlign.scale: 24.0
       GoalAlign.forward_point_distance: 0.1
       PathDist.scale: 32.0
@@ -146,7 +147,7 @@ controller_server:
       RotateToGoal.scale: 32.0
       RotateToGoal.slowing_factor: 5.0
       RotateToGoal.lookahead_time: -1.0
-      publish_cost_grid_pc: true
+      publish_cost_grid_pc: true # what is this?
 
 local_costmap:
   local_costmap:
@@ -159,7 +160,9 @@ local_costmap:
       rolling_window: true
       width: 10
       height: 10
-      resolution: 0.1 # cells = width * height * resolution**-2
+      resolution: 0.1 # follow pc2_to_heightmap resolution
+      map_vis_z: 0
+      track_unknown_space: false
       footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]" # TODO: Actual geometry (#34)
       plugins: ["traversability_layer", "inflation_layer"]
       inflation_layer:
@@ -198,9 +201,6 @@ local_costmap:
         y_width_m: 4.0
         use_maximum: true # false then overwrite
         tf_timeout: 0.2
-        # qos_reliable: false
-        # qos_transient_local: false
-        # qos_depth: 1
       always_send_full_costmap: True
 
 global_costmap:
@@ -212,9 +212,10 @@ global_costmap:
       robot_base_frame: base_link
       use_sim_time: True
       footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]" # TODO: Actual geometry (#34)
-      resolution: 0.2 # follow map0p4.yaml resolution
+      resolution: 0.4 # follow map0p4.yaml resolution
+      map_vis_z: -0.47
       track_unknown_space: true
-      plugins: ["static_layer", "inflation_layer"] # ["static_layer", "traversability_layer", "inflation_layer"]
+      plugins: ["static_layer", "traversability_layer", "inflation_layer"]
       # obstacle_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/obstacle.html
       #   plugin: "nav2_costmap_2d::ObstacleLayer"
       #   enabled: True
@@ -232,6 +233,7 @@ global_costmap:
       traversability_layer:
         plugin: "mr2_nav2_plugins::TraversabilityLayer"
         enabled: true
+        publish_private_costmap: false # topic: /traversability_private (always)
         clearable: true
         gridmap_topic: "/traversability_gridmap"
         gridmap_layer: "traversability"
@@ -240,9 +242,6 @@ global_costmap:
         y_width_m: 4.0
         use_maximum: true # false then overwrite
         tf_timeout: 0.2
-        # qos_reliable: false
-        # qos_transient_local: false
-        # qos_depth: 1
       static_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/static.html
         plugin: "nav2_costmap_2d::StaticLayer"
         map_topic: "/map"
@@ -252,7 +251,7 @@ global_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.55
-      always_send_full_costmap: True # False?
+      always_send_full_costmap: False
 
 map_server: # https://docs.nav2.org/configuration/packages/map_server/configuring-map-server.html
   ros__parameters:

@@ -284,11 +284,14 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it) {
-      const float value = map.at(gridmap_layer_, *it);
+  for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it) {
+    const float value = map.at(gridmap_layer_, *it);
+    if (std::isnan(value)) {
+      continue; // leave existing costmap data intact for unknown cells
+    }
 
-      grid_map::Position pos_in_map;
-      map.getPosition(*it, pos_in_map);
+    grid_map::Position pos_in_map;
+    map.getPosition(*it, pos_in_map);
 
       geometry_msgs::msg::PointStamped p_in, p_out;
       p_in.header.frame_id = map.getFrameId();
@@ -352,10 +355,10 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
     private_costmap_pub_->publish(std::move(out));
   }
 
-  RCLCPP_INFO_THROTTLE(
-    node->get_logger(), *log_clock_, 5000,
-    "TraversabilityLayer wrote data: bounds [%.2f, %.2f] to [%.2f, %.2f]",
-    min_x, min_y, max_x, max_y);
+  // RCLCPP_INFO_THROTTLE(
+  //   node->get_logger(), *log_clock_, 5000,
+  //   "TraversabilityLayer wrote data: bounds [%.2f, %.2f] to [%.2f, %.2f]",
+  //   min_x, min_y, max_x, max_y);
 }
 
 unsigned char TraversabilityLayer::convertToCost(float value) const
