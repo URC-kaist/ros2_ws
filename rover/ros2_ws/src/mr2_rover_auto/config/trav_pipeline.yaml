@@ -48,16 +48,16 @@ grid_map_filters:
         params:
           input_layer:  elevation # do not use inpaint
           output_layer: elevation_smooth
-          radius: 0.4
+          radius: 0.1
 
       filter4:  # 표면 법선 벡터 계산
         name: surface_normals
         type: gridMapFilters/NormalVectorsFilter
         params:
           # Use the smoothed height map to make normals flatter on nominal ground.
-          input_layer:              elevation_smooth
+          input_layer:              elevation_smooth # use inpaintedelevation directly
           output_layers_prefix:     normal_vectors_
-          radius:                   0.4
+          radius:                   0.1
           normal_vector_positive_axis: z
 
       filter5:  # 법선 벡터를 색상으로 시각화
@@ -89,9 +89,7 @@ grid_map_filters:
         params:
           output_layer: traversability
           # Actually, we define obstructiveness (Nav2 costmap range: 0 to 1):
-          # Use element-wise operations (.*) to avoid matrix-dimension errors.
-          # https://libeigen.gitlab.io/eigen/docs-nightly/group__CoeffwiseMathFunctions.html
-          expression: 0.5 * slope / 0.6 + 0.5 * roughness / 0.4 # NOTE: tune for real (#34)
+          expression: 0.84 * (exp(slope)-1) + 0.5 * (exp(roughness)-1) # NOTE: tune for real (#34)
 
       filter9:  # 하한(0) 클램핑
         name: traversability_lower_threshold

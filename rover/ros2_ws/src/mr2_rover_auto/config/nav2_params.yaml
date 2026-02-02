@@ -104,55 +104,87 @@ controller_server:
       xy_goal_tolerance: 0.4
       yaw_goal_tolerance: 0.25
     # DWB parameters
+    # FollowPath:
+    #   plugin: "dwb_core::DWBLocalPlanner" # Or, consider MPPI if tuning / cost allows.
+    #   # https://docs.nav2.org/configuration/packages/dwb-params/controller.html
+    #   debug_trajectory_details: True
+    #   min_vel_x: 0.0 # NOTE: MUST follow actual rover specification (#34)
+    #   min_vel_y: 0.0
+    #   max_vel_x: 2.0
+    #   max_vel_y: 0.0   # non-holonomic; suppress lateral commands
+    #   max_vel_theta: 1.0
+    #   min_speed_xy: 0.0
+    #   max_speed_xy: 2.0
+    #   min_speed_theta: 0.0
+    #   acc_lim_x: 2.5
+    #   acc_lim_y: 0.0
+    #   acc_lim_theta: 3.2
+    #   decel_lim_x: -2.5
+    #   decel_lim_y: 0.0
+    #   decel_lim_theta: -3.2
+    #   vx_samples: 20
+    #   vy_samples: 1    # only vy=0
+    #   vtheta_samples: 20
+    #   sim_time: 1.7 # Time to simulate ahead by (s)
+    #   linear_granularity: 0.05
+    #   angular_granularity: 0.025
+    #   transform_tolerance: 0.2
+    #   xy_goal_tolerance: 0.25
+    #   trans_stopped_velocity: 0.25
+    #   short_circuit_trajectory_evaluation: False
+    #   stateful: True
+    #   critics: ["BaseObstacle", "ObstacleFootprint", "PathAlign", "GoalAlign", "PathDist", "GoalDist", "RotateToGoal", "Oscillation"]
+    #   BaseObstacle.scale: 1.0 # bump it up!
+    #   # BaseObstacle.sum_scores: true
+    #   ObstacleFootprint.scale: 1.0
+    #   # ObstacleFootprint.sum_scores: true
+    #   PathAlign.scale: 16.0 # relaxed for less jagging
+    #   PathAlign.forward_point_distance: 1.0 # increased lookahead
+    #   GoalAlign.scale: 24.0
+    #   GoalAlign.forward_point_distance: 0.1
+    #   PathDist.scale: 32.0
+    #   GoalDist.scale: 24.0
+    #   RotateToGoal.scale: 32.0
+    #   RotateToGoal.slowing_factor: 5.0
+    #   RotateToGoal.lookahead_time: -1.0
+    #   publish_cost_grid_pc: true # /cost_cloud topic for monitoring cost
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner" # Or, consider MPPI if tuning / cost allows.
-      # https://docs.nav2.org/configuration/packages/dwb-params/controller.html
-      debug_trajectory_details: True
-      min_vel_x: 0.0 # NOTE: MUST follow actual rover specification (#34)
-      min_vel_y: 0.0
-      max_vel_x: 2.0
-      max_vel_y: 0.0   # non-holonomic; suppress lateral commands
-      max_vel_theta: 1.0
-      min_speed_xy: 0.0
-      max_speed_xy: 2.0
-      min_speed_theta: 0.0
-      acc_lim_x: 2.5
-      acc_lim_y: 0.0
-      acc_lim_theta: 3.2
-      decel_lim_x: -2.5
-      decel_lim_y: 0.0
-      decel_lim_theta: -3.2
-      vx_samples: 20
-      vy_samples: 1    # only vy=0
-      vtheta_samples: 20
-      sim_time: 1.7 # Time to simulate ahead by (s)
-      linear_granularity: 0.05
-      angular_granularity: 0.025
-      transform_tolerance: 0.2
-      xy_goal_tolerance: 0.25
-      trans_stopped_velocity: 0.25
-      short_circuit_trajectory_evaluation: False
-      stateful: True
-      critics: ["BaseObstacle", "ObstacleFootprint", "PathAlign", "GoalAlign", "PathDist", "GoalDist", "RotateToGoal", "Oscillation"]
-      BaseObstacle.scale: 1.0 # bump it up!
-      # BaseObstacle.sum_scores: true
-      ObstacleFootprint.scale: 1.0
-      # ObstacleFootprint.sum_scores: true
-      PathAlign.scale: 16.0 # relaxed for less jagging
-      PathAlign.forward_point_distance: 1.0 # increased lookahead
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 32.0
-      GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
-      publish_cost_grid_pc: true # what is this?
+      plugin: "vector_pursuit_controller::VectorPursuitController"
+      k: 5.0
+      desired_linear_vel: 0.5
+      min_turning_radius: 0.25
+      lookahead_dist: 1.0
+      min_lookahead_dist: 0.5
+      max_lookahead_dist: 1.5
+      lookahead_time: 1.5
+      rotate_to_heading_angular_vel: 0.5
+      transform_tolerance: 0.1
+      use_velocity_scaled_lookahead_dist: false
+      min_linear_velocity: 0.0
+      min_approach_linear_velocity: 0.05
+      approach_velocity_scaling_dist: 0.5
+      max_allowed_time_to_collision_up_to_target: 1.0
+      use_collision_detection: true
+      use_cost_regulated_linear_velocity_scaling: true
+      cost_scaling_dist: 0.5
+      cost_scaling_gain: 1.0
+      inflation_cost_scaling_factor: 3.0
+      use_rotate_to_heading: true
+      allow_reversing: false
+      rotate_to_heading_min_angle: 0.5
+      max_angular_accel: 3.0
+      max_linear_accel: 2.0
+      max_lateral_accel: 0.2
+      max_robot_pose_search_dist: 10.0
+      use_interpolation: true
+      use_heading_from_path: false
+      approach_velocity_scaling_dist: 1.0
+
 
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 5.0
+      update_frequency: 20.0
       publish_frequency: 2.0
       global_frame: odom
       robot_base_frame: base_link
@@ -162,8 +194,8 @@ local_costmap:
       height: 10
       resolution: 0.1 # follow pc2_to_heightmap resolution
       map_vis_z: 0
-      track_unknown_space: false
-      footprint: "[[0.6, 0.48], [0.6, -0.48], [-0.6, -0.48], [-0.6, 0.48]]" # TODO: Actual geometry (#34)
+      track_unknown_space: false  
+      footprint: "[[0.7, 0.58], [0.7, -0.58], [-0.7, -0.58], [-0.7, 0.58]]" # TODO: Actual geometry (#34)
       plugins: ["traversability_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
@@ -273,15 +305,16 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
     expected_planner_frequency: 1.0 # calculate once per second
     use_sim_time: True
     planner_plugins: ["GridBased"]
-    # Smac2D:
-    #   plugin: "nav2_smac_planner/SmacPlanner2D"
-    #   allow_unknown: true
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner" # Correct for 4WS4WD
+      plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.4
       use_astar: true
       allow_unknown: true
       use_final_approach_orientation: true
+    # Smac2D:
+    #   plugin: "nav2_smac_planner/SmacPlannerHybrid"
+    #   allow_unknown: true
+    #   tolerance: 0.4
 
 
 smoother_server:
