@@ -29,7 +29,7 @@ rover_controller:
     track_width: 0.6504
     wheel_radius: 0.125
     max_steer: 2.35619  # +/- 135 degrees
-    solver_error_alpha: 0.7   # EMA factor for steering cmd; Lower = More "Memory" (#34)
+    solver_error_alpha: 0.8   # EMA factor for steering cmd; Lower = More "Memory" (#34)
     solver_gain_k: 4.0        # EMA weight sharpness; Higher = more responsive to error magnitude (#34)
     solver_cmd_deadzone_lin: 0.001  # m/s
     solver_cmd_deadzone_ang: 0.001  # rad/s

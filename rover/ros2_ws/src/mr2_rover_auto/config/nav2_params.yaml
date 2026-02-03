@@ -201,8 +201,8 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 20.0
-      publish_frequency: 2.0
+      update_frequency: 5.0 # internal computation
+      publish_frequency: 5.0 # topic
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: True
@@ -237,8 +237,8 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
-      publish_frequency: 1.0
+      update_frequency: 5.0 # internal computation
+      publish_frequency: 1.0 # topic
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
