@@ -5,7 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Map1/Topic1
-        - /Path1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 378
   - Class: rviz_common/Selection
@@ -280,19 +279,6 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
-    - Alpha: 1
-      Class: rviz_default_plugins/Polygon
-      Color: 25; 255; 0
-      Enabled: true
-      Name: Polygon
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /global_costmap/published_footprint
-      Value: true
     - Class: rviz_default_plugins/Camera
       Enabled: false
       Far Plane Distance: 100
@@ -386,6 +372,19 @@ Visualization Manager:
       Use Timestamp: false
       Value: true
     - Alpha: 1
+      Class: rviz_default_plugins/Polygon
+      Color: 25; 255; 0
+      Enabled: true
+      Name: Polygon
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_costmap/published_footprint
+      Value: true
+    - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.10000000149011612
       Class: rviz_default_plugins/Pose
@@ -431,7 +430,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /plan
+        Value: /plan_smoothed
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -507,7 +506,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 31.9444522857666
+      Distance: 44.87965393066406
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -522,10 +521,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8997968435287476
+      Pitch: 0.6597970724105835
       Target Frame: base_link
       Value: Orbit (rviz_default_plugins)
-      Yaw: 1.324203610420227
+      Yaw: 2.1592040061950684
     Saved: ~
 Window Geometry:
   Camera:

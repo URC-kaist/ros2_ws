@@ -152,8 +152,8 @@ controller_server:
       # https://github.com/ros-navigation/navigation2/tree/main/nav2_mppi_controller
       plugin: "nav2_mppi_controller::MPPIController"
       time_steps: 56 # time_steps * model_dt = total lookup time
-      model_dt: 0.05
-      batch_size: 2000
+      model_dt: 0.05 # less or equal to controller frequency
+      batch_size: 2000 # "... with 30 Hz seems to produce good results."
       vx_std: 0.2
       vy_std: 0.2
       wz_std: 0.4
@@ -164,13 +164,15 @@ controller_server:
       iteration_count: 1
       temperature: 0.3
       gamma: 0.015
-      motion_model: "Ackermann"
-      visualize: false
-      TrajectoryVisualizer:
-        trajectory_step: 5
-        time_step: 3
+      motion_model: "Ackermann" # Omni works but the rover drifts Tokyo style
       AckermannConstraints:
-        min_turning_r: 0.1 # actually holonomic but yea
+        min_turning_r: 0.1
+      visualize: false # Cool MPPI demonstration (costly)
+      publish_optimal_trajectory: true
+      TrajectoryValidator:
+        plugin: "mppi::DefaultOptimalTrajectoryValidator"
+        collision_lookahead_time: 1.0 # half window (7m) / max vel (2m/s)
+        consider_footprint: true
       critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
       ConstraintCritic:
         enabled: true
@@ -180,57 +182,58 @@ controller_server:
         enabled: true
         cost_power: 1
         cost_weight: 5.0
-        threshold_to_consider: 1.4
+        threshold_to_consider: 3.0
       GoalAngleCritic:
         enabled: true
         cost_power: 1
         cost_weight: 3.0
-        threshold_to_consider: 0.5
+        threshold_to_consider: 3.0
       PreferForwardCritic:
         enabled: true
         cost_power: 1
         cost_weight: 5.0
-        threshold_to_consider: 0.5
+        threshold_to_consider: 3.0
       # Option to replace Cost and use Obstacles instead
-      ObstaclesCritic:
-        enabled: true
-        cost_power: 1
-        repulsion_weight: 1.5
-        critical_weight: 20.0
-        consider_footprint: true
-        collision_cost: 10000.0
-        collision_margin_distance: 0.1
-        near_goal_distance: 0.5
-      # CostCritic:
+      # ObstaclesCritic:
       #   enabled: true
       #   cost_power: 1
-      #   cost_weight: 3.81
-      #   critical_cost: 300.0
+      #   repulsion_weight: 1.5
+      #   critical_weight: 20.0
       #   consider_footprint: true
-      #   collision_cost: 1000000.0
-      #   near_goal_distance: 1.0
-      #   trajectory_point_step: 2
+      #   collision_cost: 10000.0
+      #   collision_margin_distance: 0.1
+      #   near_goal_distance: 0.5
+      #   # inflation_radius: equal to local_costmap's last inflation layer (Humble) 
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.81
+        critical_cost: 300.0
+        consider_footprint: true # computation cost
+        collision_cost: 1000000.0
+        near_goal_distance: 1.0
+        trajectory_point_step: 2
       PathAlignCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 14.0
+        cost_weight: 8.0
         max_path_occupancy_ratio: 0.05
         trajectory_point_step: 4
-        threshold_to_consider: 0.5
+        threshold_to_consider: 3.0
         offset_from_furthest: 20
         use_path_orientations: false
       PathFollowCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 10.0 # bumped to be relaxed (less timid) with velocity (but it did not work...)
+        cost_weight: 15.0 # bumped to be relaxed (less timid) with velocity
         offset_from_furthest: 5
-        threshold_to_consider: 1.4
+        threshold_to_consider: 3.0
       PathAngleCritic:
         enabled: true
         cost_power: 1
         cost_weight: 2.0
-        offset_from_furthest: 4
-        threshold_to_consider: 0.5
+        offset_from_furthest: 6
+        threshold_to_consider: 3.0
         max_angle_to_furthest: 1.0
         forward_preference: true
       # VelocityDeadbandCritic:
@@ -370,7 +373,7 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
   ros__parameters:
     expected_planner_frequency: 1.0 # calculate once per second
     use_sim_time: True
-    planner_plugins: ["GridBased", "Smac2D", "SmacHybrid"]
+    planner_plugins: ["GridBased", "Smac2D", "SmacHybrid", "Theta"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.4
@@ -381,11 +384,18 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
       plugin: "nav2_smac_planner/SmacPlanner2D"
       allow_unknown: true
       tolerance: 0.4
+      smoother.max_iterations: 1 # I don't need your iterative smoother
     SmacHybrid: # Non-holonomic planning
       plugin: "nav2_smac_planner/SmacPlannerHybrid"
       allow_unknown: true
       tolerance: 0.4
       minimum_turning_radius: 0.4 # >= global_costmap resolution (or else fail!)
+    Theta:
+      plugin: "nav2_theta_star_planner/ThetaStarPlanner" # In Iron and older versions, "/" was used instead of "::"
+      how_many_corners: 8
+      w_euc_cost: 1.0
+      w_traversal_cost: 2.0
+      use_final_approach_orientation: true
 
 
 smoother_server:
@@ -399,7 +409,7 @@ smoother_server:
       do_refinement: True
     curvature_smoother:
       plugin: "nav2_smoother::SavitzkyGolaySmoother"
-      window_size: 14
+      refinement_num: 4
       enforce_path_inversion: False
 
 behavior_server:
@@ -450,8 +460,8 @@ velocity_smoother:
     feedback: "OPEN_LOOP"
     max_velocity: [2.0, 2.0, 1.0] # NOTE: MUST follow actual rover specification (#34)
     min_velocity: [-2.0, -2.0, -1.0]
-    max_accel: [2.5, 0.0, 3.2]
-    max_decel: [-2.5, 0.0, -3.2]
+    max_accel: [2.5, 2.5, 3.2]
+    max_decel: [-2.5, -2.5, -3.2]
     odom_topic: "odom"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
