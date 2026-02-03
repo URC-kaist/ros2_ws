@@ -17,6 +17,10 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/GnssOnly.action"
   "action/CoverVision.action"
+  "msg/MissionSpec.msg"
+  "msg/MissionList.msg"
+  "msg/MissionControl.msg"
+  "msg/MissionStatus.msg"
   DEPENDENCIES builtin_interfaces geometry_msgs action_msgs
 )
 

@@ -88,6 +88,11 @@ ament_target_dependencies(cover_vision_client
 rclcpp rclcpp_action mr2_action_interface
 )
 
+add_executable(mission_master src/mission_master.cpp)
+ament_target_dependencies(mission_master
+  rclcpp rclcpp_action nav2_msgs mr2_action_interface
+)
+
 add_executable(pc2_to_heightmap_node src/pc2_to_heightmap_node.cpp)
 ament_target_dependencies(pc2_to_heightmap_node
   rclcpp sensor_msgs grid_map_msgs grid_map_core grid_map_ros tf2 tf2_ros tf2_eigen pcl_conversions Eigen3
@@ -120,6 +125,7 @@ install(TARGETS
   cover_vision_server
   gnss_only_client
   cover_vision_client
+  mission_master
   base_datum_setter
   pc2_to_heightmap_node
   traversability_filter_node

@@ -1,29 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root BTCPP_format="3">
-  <BehaviorTree ID="CoverVision">
-    <Sequence>
-      <NavigateToPose goal="{goal}"
-                      server_name="{navtopose_server}"
-                      server_timeout="{server_timeout}"
-                      behavior_tree="{navtopose_bt}"/>
-      <ReactiveSequence>
-        <Inverter>
-          <ObjectDetected isdetected="false"/>
-        </Inverter>
-        <NavigateThroughPoses goals="{goals}"
-                              server_name="{navtoposes_bt}"
-                              server_timeout="{server_timeout}"
-                              behavior_tree="{navtoposes_bt}"/>
-      </ReactiveSequence>
-      <NavigateToPose goal="{goal}"
-                      server_name="{navtopose_bt}"
-                      server_timeout="{server_timeout}"
-                      behavior_tree="{navtopose_bt}"/>
+  <BehaviorTree ID="CoverVisionMission">
+    <Sequence name="CoverVisionRoot">
+      <BuildCoverageGoals mission="{mission}" goals="{coverage_goals}"/>
+      <ReactiveFallback name="CoverOrApproach">
+        <Sequence name="ApproachIfDetected">
+          <ObjectDetected detection_method="{mission.detection_method}"/>
+          <GetObjectPose pose="{object_pose}"/>
+          <NavigateToPose goal="{object_pose}"
+                          server_name="{navtopose_server}"
+                          server_timeout="{server_timeout}"
+                          behavior_tree="{navtopose_bt}"/>
+          <GenerateOrbitGoals center="{object_pose}" goals="{orbit_goals}"/>
+          <NavigateThroughPoses goals="{orbit_goals}"
+                                server_name="{navthroughposes_server}"
+                                server_timeout="{server_timeout}"
+                                behavior_tree="{navthroughposes_bt}"/>
+          <HaltMission/>
+        </Sequence>
+        <Sequence name="CoverageLoop">
+          <NavigateThroughPoses goals="{coverage_goals}"
+                                server_name="{navthroughposes_server}"
+                                server_timeout="{server_timeout}"
+                                behavior_tree="{navthroughposes_bt}"/>
+        </Sequence>
+      </ReactiveFallback>
     </Sequence>
   </BehaviorTree>
 
   <!-- Description of Node Models (used by Groot) -->
   <TreeNodesModel>
+    <Action ID="BuildCoverageGoals">
+      <input_port name="mission">Mission spec</input_port>
+      <output_port name="goals">Coverage goals</output_port>
+    </Action>
+    <Condition ID="ObjectDetected" editable="true">
+      <input_port name="detection_method">Detection method</input_port>
+    </Condition>
+    <Action ID="GetObjectPose">
+      <output_port name="pose">Object pose</output_port>
+    </Action>
+    <Action ID="GenerateOrbitGoals">
+      <input_port name="center">Object pose</input_port>
+      <output_port name="goals">Orbit goals</output_port>
+    </Action>
+    <Action ID="HaltMission"/>
     <Action ID="NavigateThroughPoses">
       <input_port name="goals">Goals</input_port>
       <input_port name="server_name">Server name</input_port>
@@ -36,10 +57,5 @@
       <input_port name="server_timeout">Server timeout</input_port>
       <input_port name="behavior_tree">Behavior tree to run</input_port>
     </Action>
-    <Condition ID="ObjectDetected"
-               editable="true">
-      <input_port name="isdetected">true if object is detected</input_port>
-    </Condition>
   </TreeNodesModel>
-
 </root>

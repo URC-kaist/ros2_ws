@@ -2,6 +2,7 @@
 <root BTCPP_format="3" project_name="Project">
     <include path="GnssOnly.xml"/>
     <include path="CoverVision.xml"/>
+    <include path="MissionMaster.xml"/>
     <!-- Description of Node Models (used by Groot) -->
     <TreeNodesModel>
         <Action ID="AssistedTeleop">
@@ -238,5 +239,34 @@
             <input_port name="server_name">Server name</input_port>
             <input_port name="server_timeout">Server timeout</input_port>
         </Action>
+        <Action ID="WaitForMissionList"/>
+        <Action ID="SelectNextMission">
+            <output_port name="mission">Next mission spec</output_port>
+        </Action>
+        <Condition ID="IsMissionType">
+            <input_port name="mission">Mission spec</input_port>
+            <input_port name="expected">Expected mission type</input_port>
+        </Condition>
+        <Condition ID="PauseRequested"/>
+        <Action ID="PauseActiveMission">
+            <input_port name="clear_costmap">Clear costmap on pause</input_port>
+        </Action>
+        <Condition ID="WaitForResume"/>
+        <Action ID="MissionGoalToPose">
+            <input_port name="mission">Mission spec</input_port>
+            <output_port name="goal">Converted map pose</output_port>
+        </Action>
+        <Action ID="BuildCoverageGoals">
+            <input_port name="mission">Mission spec</input_port>
+            <output_port name="goals">Coverage goals</output_port>
+        </Action>
+        <Action ID="GetObjectPose">
+            <output_port name="pose">Object pose</output_port>
+        </Action>
+        <Action ID="GenerateOrbitGoals">
+            <input_port name="center">Object pose</input_port>
+            <output_port name="goals">Orbit goals</output_port>
+        </Action>
+        <Action ID="HaltMission"/>
     </TreeNodesModel>
 </root>
