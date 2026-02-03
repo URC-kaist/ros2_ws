@@ -29,6 +29,10 @@ rover_controller:
     track_width: 0.6504
     wheel_radius: 0.125
     max_steer: 2.35619  # +/- 135 degrees
+    # cmd_vel slew-rate limits (preserved from controller defaults)
+    rate_limit_linear_x: 1.5   # m/s^2
+    rate_limit_linear_y: 1.5   # m/s^2
+    rate_limit_angular_z: 1.0  # rad/s^2
     solver_error_alpha: 0.8   # EMA factor for steering cmd; Lower = More "Memory" (#34)
     solver_gain_k: 4.0        # EMA weight sharpness; Higher = more responsive to error magnitude (#34)
     solver_cmd_deadzone_lin: 0.001  # m/s
