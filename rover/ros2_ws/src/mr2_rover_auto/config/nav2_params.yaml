@@ -103,51 +103,6 @@ controller_server:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.4
       yaw_goal_tolerance: 0.25
-    # DWB parameters
-    # FollowPath:
-    #   plugin: "dwb_core::DWBLocalPlanner" # Or, consider MPPI if tuning / cost allows.
-    #   # https://docs.nav2.org/configuration/packages/dwb-params/controller.html
-    #   debug_trajectory_details: True
-    #   min_vel_x: 0.0 # NOTE: MUST follow actual rover specification (#34)
-    #   min_vel_y: 0.0
-    #   max_vel_x: 2.0
-    #   max_vel_y: 0.0   # non-holonomic; suppress lateral commands
-    #   max_vel_theta: 1.0
-    #   min_speed_xy: 0.0
-    #   max_speed_xy: 2.0
-    #   min_speed_theta: 0.0
-    #   acc_lim_x: 2.5
-    #   acc_lim_y: 0.0
-    #   acc_lim_theta: 3.2
-    #   decel_lim_x: -2.5
-    #   decel_lim_y: 0.0
-    #   decel_lim_theta: -3.2
-    #   vx_samples: 20
-    #   vy_samples: 1    # only vy=0
-    #   vtheta_samples: 20
-    #   sim_time: 1.7 # Time to simulate ahead by (s)
-    #   linear_granularity: 0.05
-    #   angular_granularity: 0.025
-    #   transform_tolerance: 0.2
-    #   xy_goal_tolerance: 0.25
-    #   trans_stopped_velocity: 0.25
-    #   short_circuit_trajectory_evaluation: False
-    #   stateful: True
-    #   critics: ["BaseObstacle", "ObstacleFootprint", "PathAlign", "GoalAlign", "PathDist", "GoalDist", "RotateToGoal", "Oscillation"]
-    #   BaseObstacle.scale: 1.0 # bump it up!
-    #   # BaseObstacle.sum_scores: true
-    #   ObstacleFootprint.scale: 1.0
-    #   # ObstacleFootprint.sum_scores: true
-    #   PathAlign.scale: 16.0 # relaxed for less jagging
-    #   PathAlign.forward_point_distance: 1.0 # increased lookahead
-    #   GoalAlign.scale: 24.0
-    #   GoalAlign.forward_point_distance: 0.1
-    #   PathDist.scale: 32.0
-    #   GoalDist.scale: 24.0
-    #   RotateToGoal.scale: 32.0
-    #   RotateToGoal.slowing_factor: 5.0
-    #   RotateToGoal.lookahead_time: -1.0
-    #   publish_cost_grid_pc: true # /cost_cloud topic for monitoring cost
     FollowPath:
       # https://github.com/ros-navigation/navigation2/tree/main/nav2_mppi_controller
       plugin: "nav2_mppi_controller::MPPIController"
@@ -312,20 +267,6 @@ global_costmap:
       map_vis_z: -0.47
       track_unknown_space: true
       plugins: ["static_layer", "traversability_layer", "inflation_layer"]
-      # obstacle_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/obstacle.html
-      #   plugin: "nav2_costmap_2d::ObstacleLayer"
-      #   enabled: True
-      #   observation_sources: cloud
-      #   cloud:
-      #     topic: /traversability_cloud
-      #     max_obstacle_height: 2.0
-      #     clearing: True
-      #     marking: True
-      #     data_type: "PointCloud2"
-      #     raytrace_max_range: 3.0
-      #     raytrace_min_range: 0.0
-      #     obstacle_max_range: 2.5
-      #     obstacle_min_range: 0.0
       traversability_layer:
         plugin: "mr2_nav2_plugins::TraversabilityLayer"
         enabled: true
