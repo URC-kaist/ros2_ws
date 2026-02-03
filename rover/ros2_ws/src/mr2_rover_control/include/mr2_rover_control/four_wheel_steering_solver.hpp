@@ -22,12 +22,15 @@ public:
         double track_width;       // Distance between L/R wheels
         double wheel_base;        // Distance between F/R wheels
         double error_alpha;       // Filter factor [0.0 - 1.0]. Lower = More "Memory" (sluggish but smooth)
-        double gain_k;            // Sharpness of the velocity drop-off. Higher = Stop harder on error.
+        double gain_k;            // Sharpness of EMA weighting vs steering error. Higher = more responsive.
         double max_steer_angle;   // Physical limit of the servo (rad)
+        double cmd_deadzone_lin;  // Command deadzone for linear speed (m/s)
+        double cmd_deadzone_ang;  // Command deadzone for angular speed (rad/s)
+        double vel_eps;           // Wheel speed epsilon for undefined direction (m/s)
     };
 
-    FourWheelSteeringSolver(Config cfg) 
-        : cfg_(cfg), filtered_system_error_(0.0) {}
+    FourWheelSteeringSolver(Config cfg)
+        : cfg_(cfg), filtered_steer_{0.0, 0.0, 0.0, 0.0}, steer_initialized_(false) {}
 
     /**
      * @brief The Core Update Loop
@@ -39,7 +42,6 @@ public:
                                     const std::array<double, 4>& current_steering) {
         
         std::array<WheelState, 4> targets;
-        double max_instant_error = 0.0;
 
         // 1. Calculate Geometry (Lever Arms)
         // FL (+x, +y), FR (+x, -y), RL (-x, +y), RR (-x, -y)
@@ -49,7 +51,14 @@ public:
         const double y_signs[4] = {1, -1, 1, -1};
 
         // Check if command is effectively zero (Deadzone)
-        bool is_command_zero = (std::hypot(cmd.vx, cmd.vy) < 1e-3) && (std::abs(cmd.wz) < 1e-3);
+        const bool is_command_zero =
+            (std::hypot(cmd.vx, cmd.vy) < cfg_.cmd_deadzone_lin) &&
+            (std::abs(cmd.wz) < cfg_.cmd_deadzone_ang);
+
+        if (!steer_initialized_) {
+            filtered_steer_ = current_steering;
+            steer_initialized_ = true;
+        }
 
         for (int i = 0; i < 4; ++i) {
             // --- STEP A: Pure Inverse Kinematics ---
@@ -64,57 +73,40 @@ public:
             if (is_command_zero) {
                 // If robot is commanded to stop, DO NOT snap wheels to 0.0.
                 // Lock them to their current angle. This prevents "jitter" at rest.
-                targets[i].angle = current_steering[i]; 
+                targets[i].angle = current_steering[i];
                 targets[i].speed = 0.0;
-            } else {
-                // --- STEP C: Optimization (The "Flip" Logic) ---
-                // We want to avoid turning the wheel 180 degrees if we can just reverse the motor.
-                
-                // 1. Normalize angle difference to range [-pi, pi]
-                double diff = normalizeAngle(raw_angle - current_steering[i]);
+                filtered_steer_[i] = current_steering[i];
+                continue;
+            }
 
-                // 2. Check if the "Reverse" solution is closer
-                // If the target is > 90 degrees away, it's faster to flip the wheel 180 deg
-                // and reverse the speed.
+            // --- STEP C: Undefined atan2 handling ---
+            // If the wheel velocity is effectively zero, keep prior steering.
+            const bool undefined_dir = (raw_speed < cfg_.vel_eps);
+            if (undefined_dir) {
+                raw_angle = filtered_steer_[i];
+            }
+
+            // --- STEP D: Optimization (The "Flip" Logic) ---
+            // We want to avoid turning the wheel 180 degrees if we can just reverse the motor.
+            if (!undefined_dir) {
+                double diff = normalizeAngle(raw_angle - current_steering[i]);
                 if (std::abs(diff) > M_PI_2) { // > 90 degrees
                     raw_angle = normalizeAngle(raw_angle + M_PI);
                     raw_speed *= -1.0;
                 }
-
-                targets[i].angle = raw_angle;
-                targets[i].speed = raw_speed;
             }
 
-            // --- STEP D: Track the "Suffering" ---
-            // How far is the wheel from where it needs to be?
-            // This time, we calculate the error of the *optimized* angle.
-            double current_diff = std::abs(normalizeAngle(targets[i].angle - current_steering[i]));
-            if (current_diff > max_instant_error) {
-                max_instant_error = current_diff;
-            }
-        }
+            // --- STEP E: Per-wheel weighted EMA on steering command ---
+            const double steer_err =
+                std::abs(normalizeAngle(raw_angle - current_steering[i]));
+            const double weight =
+                (cfg_.gain_k > 0.0) ? (1.0 - std::exp(-cfg_.gain_k * steer_err)) : 1.0;
+            const double alpha = std::clamp(cfg_.error_alpha * weight, 0.0, 1.0);
+            const double delta = normalizeAngle(raw_angle - filtered_steer_[i]);
+            filtered_steer_[i] = normalizeAngle(filtered_steer_[i] + alpha * delta);
 
-        // --- STEP E: The Memory Filter (Control System Logic) ---
-        // Instead of reacting to the instant error (which causes jitter), 
-        // we feed the error into a Low Pass Filter (Exponential Moving Average).
-        // If the robot makes a sudden move, this error spikes and decays slowly.
-        filtered_system_error_ = (1.0 - cfg_.error_alpha) * filtered_system_error_ 
-                               + cfg_.error_alpha * max_instant_error;
-
-        // --- STEP F: The Drive Gain (Gating) ---
-        // Calculate a scalar [0.0 to 1.0] based on the filtered error.
-        // Formula: Gain = e^(-k * error)
-        // If error is 0, Gain = 1.0. If error is high, Gain approaches 0.0.
-        double drive_gain = std::exp(-cfg_.gain_k * filtered_system_error_);
-
-        // Apply gain ONLY to speed. Steering servos always get full authority.
-        for (int i = 0; i < 4; ++i) {
-            targets[i].speed *= drive_gain;
-            
-            // Optional: Hard clamp for safety (prevent driving while steering is totally wrong)
-            if (filtered_system_error_ > (45.0 * M_PI / 180.0)) {
-                targets[i].speed = 0.0;
-            }
+            targets[i].angle = filtered_steer_[i];
+            targets[i].speed = raw_speed;
         }
 
         return targets;
@@ -122,7 +114,8 @@ public:
 
 private:
     Config cfg_;
-    double filtered_system_error_;
+    std::array<double, 4> filtered_steer_;
+    bool steer_initialized_;
 
     // Helper: Normalize angle to [-pi, pi]
     double normalizeAngle(double angle) {

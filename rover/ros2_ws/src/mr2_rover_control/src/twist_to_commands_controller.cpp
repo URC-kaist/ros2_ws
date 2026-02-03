@@ -20,8 +20,11 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<double>("rate_limit_linear_y", 1.5); // m/s^2
   auto_declare<double>("rate_limit_angular_z",
                        1.0); // rad/s^2 (tighter yaw slew)
-  auto_declare<double>("solver_error_alpha", 0.1); // EMA factor for steer error
-  auto_declare<double>("solver_gain_k", 4.0);      // Drive gain sharpness
+  auto_declare<double>("solver_error_alpha", 0.1); // EMA factor for steering cmd
+  auto_declare<double>("solver_gain_k", 4.0);      // EMA weight sharpness
+  auto_declare<double>("solver_cmd_deadzone_lin", 1e-3); // m/s
+  auto_declare<double>("solver_cmd_deadzone_ang", 1e-3); // rad/s
+  auto_declare<double>("solver_vel_eps", 1e-4);          // m/s
   auto_declare<double>("steering_error_ratio_deg",
                        40.0); // drive scale->0 around 30 deg
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
@@ -91,12 +94,21 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   solver_error_alpha_ = std::clamp(solver_error_alpha_, 0.0, 1.0);
   solver_gain_k_ = get_node()->get_parameter("solver_gain_k").as_double();
   solver_gain_k_ = std::max(0.0, solver_gain_k_);
+  const double solver_cmd_deadzone_lin =
+      get_node()->get_parameter("solver_cmd_deadzone_lin").as_double();
+  const double solver_cmd_deadzone_ang =
+      get_node()->get_parameter("solver_cmd_deadzone_ang").as_double();
+  const double solver_vel_eps =
+      get_node()->get_parameter("solver_vel_eps").as_double();
 
   solver_cfg_.track_width = track_width_;
   solver_cfg_.wheel_base = wheel_base_;
   solver_cfg_.error_alpha = solver_error_alpha_;
   solver_cfg_.gain_k = solver_gain_k_;
   solver_cfg_.max_steer_angle = max_steer_;
+  solver_cfg_.cmd_deadzone_lin = std::max(0.0, solver_cmd_deadzone_lin);
+  solver_cfg_.cmd_deadzone_ang = std::max(0.0, solver_cmd_deadzone_ang);
+  solver_cfg_.vel_eps = std::max(0.0, solver_vel_eps);
   solver_.emplace(solver_cfg_);
   odom_frame_id_ = get_node()->get_parameter("odom_frame_id").as_string();
   base_frame_id_ = get_node()->get_parameter("base_frame_id").as_string();
