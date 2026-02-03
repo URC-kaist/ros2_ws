@@ -151,28 +151,26 @@ controller_server:
     FollowPath:
       # https://github.com/ros-navigation/navigation2/tree/main/nav2_mppi_controller
       plugin: "nav2_mppi_controller::MPPIController"
-      time_steps: 56 # time_steps * model_dt = total lookup time
-      model_dt: 0.05 # less or equal to controller frequency
-      batch_size: 2000 # "... with 30 Hz seems to produce good results."
+      time_steps: 56
+      model_dt: 0.05
+      batch_size: 2000
       vx_std: 0.2
       vy_std: 0.2
       wz_std: 0.4
       vx_max: 2.0
-      vx_min: -0.2
-      vy_max: 0.5
+      vx_min: -0.35
+      vy_max: 2.0
       wz_max: 1.0
       iteration_count: 1
       temperature: 0.3
       gamma: 0.015
-      motion_model: "Ackermann" # Omni works but the rover drifts Tokyo style
+      motion_model: "Ackermann"
+      visualize: false
+      TrajectoryVisualizer:
+        trajectory_step: 5
+        time_step: 3
       AckermannConstraints:
-        min_turning_r: 0.1
-      visualize: false # Cool MPPI demonstration (costly)
-      publish_optimal_trajectory: true
-      TrajectoryValidator:
-        plugin: "mppi::DefaultOptimalTrajectoryValidator"
-        collision_lookahead_time: 1.0 # half window (7m) / max vel (2m/s)
-        consider_footprint: true
+        min_turning_r: 0.0
       critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
       ConstraintCritic:
         enabled: true
@@ -182,58 +180,57 @@ controller_server:
         enabled: true
         cost_power: 1
         cost_weight: 5.0
-        threshold_to_consider: 3.0
+        threshold_to_consider: 1.4
       GoalAngleCritic:
         enabled: true
         cost_power: 1
         cost_weight: 3.0
-        threshold_to_consider: 3.0
+        threshold_to_consider: 0.5
       PreferForwardCritic:
         enabled: true
         cost_power: 1
         cost_weight: 5.0
-        threshold_to_consider: 3.0
+        threshold_to_consider: 0.5
       # Option to replace Cost and use Obstacles instead
       # ObstaclesCritic:
       #   enabled: true
       #   cost_power: 1
       #   repulsion_weight: 1.5
       #   critical_weight: 20.0
-      #   consider_footprint: true
+      #   consider_footprint: false
       #   collision_cost: 10000.0
       #   collision_margin_distance: 0.1
       #   near_goal_distance: 0.5
-      #   # inflation_radius: equal to local_costmap's last inflation layer (Humble) 
       CostCritic:
         enabled: true
         cost_power: 1
         cost_weight: 3.81
         critical_cost: 300.0
-        consider_footprint: true # computation cost
+        consider_footprint: true
         collision_cost: 1000000.0
         near_goal_distance: 1.0
         trajectory_point_step: 2
       PathAlignCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 8.0
+        cost_weight: 14.0
         max_path_occupancy_ratio: 0.05
         trajectory_point_step: 4
-        threshold_to_consider: 3.0
+        threshold_to_consider: 0.5
         offset_from_furthest: 20
         use_path_orientations: false
       PathFollowCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 15.0 # bumped to be relaxed (less timid) with velocity
+        cost_weight: 5.0
         offset_from_furthest: 5
-        threshold_to_consider: 3.0
+        threshold_to_consider: 1.4
       PathAngleCritic:
         enabled: true
         cost_power: 1
         cost_weight: 2.0
-        offset_from_furthest: 6
-        threshold_to_consider: 3.0
+        offset_from_furthest: 4
+        threshold_to_consider: 0.5
         max_angle_to_furthest: 1.0
         forward_preference: true
       # VelocityDeadbandCritic:
