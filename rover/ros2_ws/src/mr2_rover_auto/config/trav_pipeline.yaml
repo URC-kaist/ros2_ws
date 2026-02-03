@@ -87,9 +87,12 @@ grid_map_filters:
         name: traversability
         type: gridMapFilters/MathExpressionFilter
         params:
-          output_layer: traversability
+          output_layer: traversability # NOTE: tune for real (#34)
           # Actually, we define obstructiveness (Nav2 costmap range: 0 to 1):
-          expression: 0.84 * (exp(slope)-1) + 0.5 * (exp(roughness)-1) # NOTE: tune for real (#34)
+          # The 0.84 comes from 45 degree limit.
+          expression: 0.84 * (exp(slope)-1) + 0.5 * (exp(roughness)-1)
+          # Or let's try gamma profile than this one.
+          # expression: ( slope ./ 0,7854 ) .^ 10.0 + ( roughness ./ 1.0 ) .^ 1.0
 
       filter9:  # 하한(0) 클램핑
         name: traversability_lower_threshold

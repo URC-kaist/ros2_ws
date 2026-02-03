@@ -80,12 +80,16 @@ private:
   void gridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg);
   unsigned char convertToCost(float value) const;
 
+  enum class PersistenceMode { EMA, MAX, OVERWRITE };
+
   std::string gridmap_topic_;
   std::string gridmap_layer_;
   std::string rectangle_frame_;
   double x_forward_m_;
   double y_width_m_;
   bool use_maximum_;
+  PersistenceMode persistence_mode_;
+  double ema_alpha_;
   double tf_timeout_;
   bool publish_private_costmap_;
   // Debug logging throttling

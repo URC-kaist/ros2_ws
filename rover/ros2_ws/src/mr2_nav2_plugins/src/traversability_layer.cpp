@@ -68,6 +68,8 @@ TraversabilityLayer::TraversabilityLayer()
   x_forward_m_(3.0),
   y_width_m_(4.0),
   use_maximum_(true),
+  persistence_mode_(PersistenceMode::EMA),
+  ema_alpha_(0.1),
   tf_timeout_(0.1),
   publish_private_costmap_(false),
   has_data_(false),
@@ -96,6 +98,8 @@ TraversabilityLayer::onInitialize()
   declareParameter("x_forward_m", rclcpp::ParameterValue(x_forward_m_));
   declareParameter("y_width_m", rclcpp::ParameterValue(y_width_m_));
   declareParameter("use_maximum", rclcpp::ParameterValue(use_maximum_));
+  declareParameter("persistence_mode", rclcpp::ParameterValue(std::string("ema")));
+  declareParameter("ema_alpha", rclcpp::ParameterValue(ema_alpha_));
   declareParameter("tf_timeout", rclcpp::ParameterValue(tf_timeout_));
   declareParameter("publish_private_costmap", rclcpp::ParameterValue(publish_private_costmap_));
 
@@ -105,6 +109,22 @@ TraversabilityLayer::onInitialize()
   node->get_parameter(getFullName("x_forward_m"), x_forward_m_);
   node->get_parameter(getFullName("y_width_m"), y_width_m_);
   node->get_parameter(getFullName("use_maximum"), use_maximum_);
+  node->get_parameter(getFullName("ema_alpha"), ema_alpha_);
+  std::string persistence_mode_str = "ema";
+  node->get_parameter(getFullName("persistence_mode"), persistence_mode_str);
+  if (persistence_mode_str == "ema") {
+    persistence_mode_ = PersistenceMode::EMA;
+  } else if (persistence_mode_str == "max") {
+    persistence_mode_ = PersistenceMode::MAX;
+  } else if (persistence_mode_str == "overwrite") {
+    persistence_mode_ = PersistenceMode::OVERWRITE;
+  } else {
+    RCLCPP_WARN(node->get_logger(),
+      "TraversabilityLayer: unknown persistence_mode '%s', defaulting to 'ema'",
+      persistence_mode_str.c_str());
+    persistence_mode_ = PersistenceMode::EMA;
+  }
+  ema_alpha_ = std::clamp(ema_alpha_, 0.0, 1.0);
   node->get_parameter(getFullName("tf_timeout"), tf_timeout_);
   node->get_parameter(getFullName("publish_private_costmap"), publish_private_costmap_);
 
@@ -286,9 +306,6 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
 
   for (grid_map::GridMapIterator it(map); !it.isPastEnd(); ++it) {
     const float value = map.at(gridmap_layer_, *it);
-    if (std::isnan(value)) {
-      continue; // leave existing costmap data intact for unknown cells
-    }
 
     grid_map::Position pos_in_map;
     map.getPosition(*it, pos_in_map);
@@ -309,7 +326,35 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
 
       unsigned int mx, my;
       if (worldToMap(p_out.point.x, p_out.point.y, mx, my)) {
-        setCost(mx, my, convertToCost(value));
+        // Skip NaNs: keep old cost to preserve past obstacle evidence.
+        if (std::isnan(value)) {
+          continue;
+        }
+
+        unsigned char new_cost = convertToCost(value);
+        const unsigned char old_cost = getCost(mx, my);
+
+        unsigned char fused = new_cost;
+        if (persistence_mode_ == PersistenceMode::EMA) {
+          if (old_cost == nav2_costmap_2d::NO_INFORMATION) {
+            fused = new_cost;
+          } else if (new_cost > old_cost) {
+            fused = new_cost;  // rise quickly on new obstacle evidence
+          } else {
+            fused = static_cast<unsigned char>(
+              std::round(ema_alpha_ * static_cast<double>(new_cost) +
+              (1.0 - ema_alpha_) * static_cast<double>(old_cost)));
+          }
+        } else if (persistence_mode_ == PersistenceMode::MAX) {
+          // Treat NO_INFORMATION as absence of data so we don't lock in 255.
+          fused = (old_cost == nav2_costmap_2d::NO_INFORMATION)
+                    ? new_cost
+                    : std::max(old_cost, new_cost);
+        } else { // OVERWRITE
+          fused = new_cost;
+        }
+
+        setCost(mx, my, fused);
         touch(p_out.point.x, p_out.point.y, &min_x, &min_y, &max_x, &max_y);
       }
     }
