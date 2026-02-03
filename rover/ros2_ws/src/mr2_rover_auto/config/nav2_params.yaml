@@ -370,18 +370,22 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
   ros__parameters:
     expected_planner_frequency: 1.0 # calculate once per second
     use_sim_time: True
-    planner_plugins: ["GridBased", "Smac"]
+    planner_plugins: ["GridBased", "Smac2D", "SmacHybrid"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.4
       use_astar: true
       allow_unknown: true
       use_final_approach_orientation: true
-    Smac: # Incompatible with current costmap?
+    Smac2D: # Modern Navfn
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      allow_unknown: true
+      tolerance: 0.4
+    SmacHybrid: # Non-holonomic planning
       plugin: "nav2_smac_planner/SmacPlannerHybrid"
       allow_unknown: true
       tolerance: 0.4
-      minimum_turning_radius: 0.1 # positive number
+      minimum_turning_radius: 0.4 # >= global_costmap resolution (or else fail!)
 
 
 smoother_server:
