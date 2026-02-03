@@ -96,13 +96,24 @@ private:
   void on_mission_list(const MissionList::SharedPtr msg)
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (state_ == STATE_RUNNING || state_ == STATE_PAUSED) {
-      RCLCPP_WARN(get_logger(), "Mission list received while busy; ignoring for now");
-      return;
-    }
     missions_ = msg->missions;
     current_index_ = 0;
+    active_mission_ = MissionSpec{};
     last_detail_.clear();
+    abort_requested_ = false;
+    pending_restart_ = true;
+
+    if (active_action_ != ActiveAction::NONE) {
+      cancel_active_goal_locked();
+      return;
+    }
+
+    if (pause_requested_ || state_ == STATE_PAUSED) {
+      state_ = STATE_PAUSED;
+      return;
+    }
+
+    pending_restart_ = false;
     start_current_mission_locked();
   }
 
@@ -132,6 +143,7 @@ private:
 
     if (msg->command == CMD_ABORT) {
       abort_requested_ = true;
+      pending_restart_ = false;
       cancel_active_goal_locked();
       state_ = STATE_FAILED;
       missions_.clear();
@@ -218,25 +230,37 @@ private:
       [this](const rclcpp_action::ClientGoalHandle<GnssOnly>::WrappedResult & result)
       {
         bool start_next = false;
+        bool restart_now = false;
         {
           std::lock_guard<std::mutex> lock(mutex_);
           active_action_ = ActiveAction::NONE;
-          if (pause_requested_ && result.code == rclcpp_action::ResultCode::CANCELED) {
-            state_ = STATE_PAUSED;
-            return;
+          if (pending_restart_ && !pause_requested_) {
+            pending_restart_ = false;
+            restart_now = true;
           }
-          if (abort_requested_) {
-            return;
-          }
-          pause_requested_ = false;
+          if (!restart_now) {
+            if (pause_requested_ && result.code == rclcpp_action::ResultCode::CANCELED) {
+              state_ = STATE_PAUSED;
+              return;
+            }
+            if (abort_requested_) {
+              return;
+            }
+            pause_requested_ = false;
 
-          if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-            current_index_++;
-            start_next = true;
-          } else {
-            state_ = STATE_FAILED;
-            last_detail_ = "GnssOnly mission failed";
+            if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+              current_index_++;
+              start_next = true;
+            } else {
+              state_ = STATE_FAILED;
+              last_detail_ = "GnssOnly mission failed";
+            }
           }
+        }
+        if (restart_now) {
+          std::lock_guard<std::mutex> lock(mutex_);
+          start_current_mission_locked();
+          return;
         }
         if (start_next) {
           std::lock_guard<std::mutex> lock(mutex_);
@@ -288,25 +312,37 @@ private:
       [this](const rclcpp_action::ClientGoalHandle<CoverVision>::WrappedResult & result)
       {
         bool start_next = false;
+        bool restart_now = false;
         {
           std::lock_guard<std::mutex> lock(mutex_);
           active_action_ = ActiveAction::NONE;
-          if (pause_requested_ && result.code == rclcpp_action::ResultCode::CANCELED) {
-            state_ = STATE_PAUSED;
-            return;
+          if (pending_restart_ && !pause_requested_) {
+            pending_restart_ = false;
+            restart_now = true;
           }
-          if (abort_requested_) {
-            return;
-          }
-          pause_requested_ = false;
+          if (!restart_now) {
+            if (pause_requested_ && result.code == rclcpp_action::ResultCode::CANCELED) {
+              state_ = STATE_PAUSED;
+              return;
+            }
+            if (abort_requested_) {
+              return;
+            }
+            pause_requested_ = false;
 
-          if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-            current_index_++;
-            start_next = true;
-          } else {
-            state_ = STATE_FAILED;
-            last_detail_ = "CoverVision mission failed";
+            if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+              current_index_++;
+              start_next = true;
+            } else {
+              state_ = STATE_FAILED;
+              last_detail_ = "CoverVision mission failed";
+            }
           }
+        }
+        if (restart_now) {
+          std::lock_guard<std::mutex> lock(mutex_);
+          start_current_mission_locked();
+          return;
         }
         if (start_next) {
           std::lock_guard<std::mutex> lock(mutex_);
@@ -366,6 +402,7 @@ private:
   uint8_t state_{STATE_IDLE};
   bool pause_requested_{false};
   bool abort_requested_{false};
+  bool pending_restart_{false};
 
   uint32_t current_waypoint_index_{0};
   uint32_t total_waypoints_{0};

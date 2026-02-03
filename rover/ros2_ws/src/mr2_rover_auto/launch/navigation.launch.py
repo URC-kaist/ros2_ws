@@ -29,8 +29,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "launch_actions",
-            default_value="false",
-            description="Launch action servers (currently experimental)",
+            default_value="true",
+            description="Launch mission/action servers",
         ),
         DeclareLaunchArgument(
             "map",
