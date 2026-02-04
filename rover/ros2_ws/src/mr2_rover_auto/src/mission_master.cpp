@@ -10,6 +10,7 @@
 #include <mr2_action_interface/msg/mission_status.hpp>
 
 #include <cstdint>
+#include <chrono>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -26,6 +27,8 @@ public:
 
     gnss_action_name_ = this->declare_parameter<std::string>("gnss_action_name", "gnss_only");
     cover_action_name_ = this->declare_parameter<std::string>("cover_action_name", "cover_vision");
+
+    arrival_delay_sec_ = this->declare_parameter<double>("arrival_delay_sec", 10.0);
 
     clear_global_costmap_service_ = this->declare_parameter<std::string>(
       "clear_global_costmap_service",
@@ -96,6 +99,7 @@ private:
   void on_mission_list(const MissionList::SharedPtr msg)
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    cancel_arrival_delay_locked();
     missions_ = msg->missions;
     current_index_ = 0;
     active_mission_ = MissionSpec{};
@@ -121,6 +125,7 @@ private:
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (msg->command == CMD_PAUSE) {
+      cancel_arrival_delay_locked();
       pause_requested_ = true;
       if (state_ == STATE_RUNNING) {
         state_ = STATE_PAUSED;
@@ -134,6 +139,7 @@ private:
 
     if (msg->command == CMD_RESUME) {
       if (state_ == STATE_PAUSED) {
+        cancel_arrival_delay_locked();
         pause_requested_ = false;
         last_detail_.clear();
         start_current_mission_locked();
@@ -142,6 +148,7 @@ private:
     }
 
     if (msg->command == CMD_ABORT) {
+      cancel_arrival_delay_locked();
       abort_requested_ = true;
       pending_restart_ = false;
       cancel_active_goal_locked();
@@ -229,8 +236,8 @@ private:
     opts.result_callback =
       [this](const rclcpp_action::ClientGoalHandle<GnssOnly>::WrappedResult & result)
       {
-        bool start_next = false;
         bool restart_now = false;
+        bool success = false;
         {
           std::lock_guard<std::mutex> lock(mutex_);
           active_action_ = ActiveAction::NONE;
@@ -250,8 +257,9 @@ private:
 
             if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
               current_index_++;
-              start_next = true;
+              success = true;
             } else {
+              cancel_arrival_delay_locked();
               state_ = STATE_FAILED;
               last_detail_ = "GnssOnly mission failed";
             }
@@ -259,12 +267,13 @@ private:
         }
         if (restart_now) {
           std::lock_guard<std::mutex> lock(mutex_);
+          cancel_arrival_delay_locked();
           start_current_mission_locked();
           return;
         }
-        if (start_next) {
+        if (success) {
           std::lock_guard<std::mutex> lock(mutex_);
-          start_current_mission_locked();
+          schedule_arrival_delay_locked();
         }
       };
 
@@ -312,8 +321,8 @@ private:
     opts.result_callback =
       [this](const rclcpp_action::ClientGoalHandle<CoverVision>::WrappedResult & result)
       {
-        bool start_next = false;
         bool restart_now = false;
+        bool success = false;
         {
           std::lock_guard<std::mutex> lock(mutex_);
           active_action_ = ActiveAction::NONE;
@@ -333,8 +342,9 @@ private:
 
             if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
               current_index_++;
-              start_next = true;
+              success = true;
             } else {
+              cancel_arrival_delay_locked();
               state_ = STATE_FAILED;
               last_detail_ = "CoverVision mission failed";
             }
@@ -342,12 +352,13 @@ private:
         }
         if (restart_now) {
           std::lock_guard<std::mutex> lock(mutex_);
+          cancel_arrival_delay_locked();
           start_current_mission_locked();
           return;
         }
-        if (start_next) {
+        if (success) {
           std::lock_guard<std::mutex> lock(mutex_);
-          start_current_mission_locked();
+          schedule_arrival_delay_locked();
         }
       };
 
@@ -386,6 +397,7 @@ private:
       status.stamp = this->now();
       status.active_mission = active_mission_;
       status.state = state_;
+      status.arrival = arrival_active_;
       status.current_waypoint_index = current_waypoint_index_;
       status.total_waypoints = total_waypoints_;
       status.distance_remaining = distance_remaining_;
@@ -404,11 +416,15 @@ private:
   bool pause_requested_{false};
   bool abort_requested_{false};
   bool pending_restart_{false};
+  bool arrival_active_{false};
 
   uint32_t current_waypoint_index_{0};
   uint32_t total_waypoints_{0};
   float distance_remaining_{-1.0f};
   std::string last_detail_;
+  rclcpp::Time arrival_until_{0, 0, RCL_ROS_TIME};
+  rclcpp::TimerBase::SharedPtr arrival_timer_;
+  double arrival_delay_sec_{10.0};
 
   ActiveAction active_action_{ActiveAction::NONE};
   rclcpp_action::ClientGoalHandle<GnssOnly>::SharedPtr gnss_goal_handle_;
@@ -431,6 +447,51 @@ private:
   std::string cover_action_name_;
   std::string clear_global_costmap_service_;
   std::string clear_local_costmap_service_;
+
+  void cancel_arrival_delay_locked()
+  {
+    arrival_active_ = false;
+    arrival_until_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+    if (arrival_timer_) {
+      arrival_timer_->cancel();
+      arrival_timer_.reset();
+    }
+  }
+
+  void schedule_arrival_delay_locked()
+  {
+    if (arrival_delay_sec_ <= 0.0) {
+      start_current_mission_locked();
+      return;
+    }
+
+    arrival_active_ = true;
+    arrival_until_ = this->now() + rclcpp::Duration::from_seconds(arrival_delay_sec_);
+
+    if (arrival_timer_) {
+      arrival_timer_->cancel();
+      arrival_timer_.reset();
+    }
+
+    const auto delay = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::duration<double>(arrival_delay_sec_));
+    arrival_timer_ = this->create_wall_timer(
+      delay,
+      [this]()
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        arrival_active_ = false;
+        arrival_until_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+        if (arrival_timer_) {
+          arrival_timer_->cancel();
+          arrival_timer_.reset();
+        }
+        if (pause_requested_ || abort_requested_ || pending_restart_) {
+          return;
+        }
+        start_current_mission_locked();
+      });
+  }
 };
 
 int main(int argc, char ** argv)

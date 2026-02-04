@@ -3,6 +3,7 @@
 builtin_interfaces/Time stamp
 MissionSpec active_mission
 uint8 state
+bool arrival
 
 # Coverage progress (optional)
 uint32 current_waypoint_index

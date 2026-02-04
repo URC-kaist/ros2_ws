@@ -44,6 +44,32 @@ Example:
 ros2 service call /set_led_mode mr2_led/srv/SetLedMode "{mode: 1}"
 ```
 
+## Mission status bridge
+
+`mission_status_led_node` subscribes to `/mission_status` and calls
+`/set_led_mode` to reflect Mission Master state.
+
+Mapping:
+
+| Condition                                  | LED mode    |
+|--------------------------------------------|-------------|
+| No `/mission_status` (timeout)             | OFF         |
+| `state` = IDLE (0) or COMPLETED (3)        | OFF         |
+| `state` = RUNNING (1)                      | AUTONOMOUS  |
+| `state` = PAUSED (2)                       | MANUAL      |
+| `arrival` = true                           | SUCCESS     |
+
+Parameters:
+- `mission_status_topic` (string, default: `/mission_status`)
+- `led_service_name` (string, default: `set_led_mode`)
+- `status_timeout_sec` (double, default: `1.0`)
+
+Run:
+
+```sh
+ros2 run mr2_led mission_status_led_node
+```
+
 ## Parameters
 
 - `can_iface` (string, default: `can0`) SocketCAN interface.
