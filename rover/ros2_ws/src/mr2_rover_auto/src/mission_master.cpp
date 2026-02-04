@@ -284,6 +284,7 @@ private:
     goal.target_longitude = spec.target_longitude;
     goal.target_radius = spec.target_radius;
     goal.detection_method = spec.detection_method;
+    goal.object_type = spec.object_type;
 
     auto opts = rclcpp_action::Client<CoverVision>::SendGoalOptions();
     opts.goal_response_callback =

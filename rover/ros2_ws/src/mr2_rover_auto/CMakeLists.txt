@@ -32,6 +32,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geographic_msgs REQUIRED)
 find_package(robot_localization REQUIRED)
+find_package(aruco_opencv_msgs REQUIRED)
 find_package(ublox_ubx_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
@@ -64,13 +65,13 @@ ament_target_dependencies(gps_heading_gps_node
 add_executable(gnss_only_server src/gnss_only_server.cpp)
 ament_target_dependencies(gnss_only_server
 rclcpp rclcpp_action nav2_msgs geometry_msgs nav_msgs sensor_msgs
-tf2_ros tf2_geometry_msgs mr2_action_interface
+tf2_ros tf2_geometry_msgs mr2_action_interface robot_localization
 )
 
 add_executable(cover_vision_server src/cover_vision_server.cpp)
 ament_target_dependencies(cover_vision_server
 rclcpp rclcpp_action nav2_msgs geometry_msgs nav_msgs sensor_msgs
-tf2_ros tf2_geometry_msgs mr2_action_interface
+tf2 tf2_ros tf2_geometry_msgs mr2_action_interface robot_localization
 )
 
 add_executable(gnss_only_client src/gnss_only_client.cpp)
@@ -86,6 +87,16 @@ ament_target_dependencies(base_datum_setter
 add_executable(cover_vision_client src/cover_vision_client.cpp)
 ament_target_dependencies(cover_vision_client
 rclcpp rclcpp_action mr2_action_interface
+)
+
+add_executable(cover_vision_yolo_adapter src/cover_vision_yolo_adapter.cpp)
+ament_target_dependencies(cover_vision_yolo_adapter
+  rclcpp geometry_msgs mr2_action_interface tf2 tf2_ros tf2_geometry_msgs
+)
+
+add_executable(cover_vision_aruco_adapter src/cover_vision_aruco_adapter.cpp)
+ament_target_dependencies(cover_vision_aruco_adapter
+  rclcpp geometry_msgs mr2_action_interface tf2 tf2_ros tf2_geometry_msgs aruco_opencv_msgs
 )
 
 add_executable(mission_master src/mission_master.cpp)
@@ -125,6 +136,8 @@ install(TARGETS
   cover_vision_server
   gnss_only_client
   cover_vision_client
+  cover_vision_yolo_adapter
+  cover_vision_aruco_adapter
   mission_master
   base_datum_setter
   pc2_to_heightmap_node

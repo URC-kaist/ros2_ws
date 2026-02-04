@@ -37,6 +37,26 @@ def generate_launch_description():
 
         Node(
             package='mr2_rover_auto',
+            executable='cover_vision_yolo_adapter',
+            name='cover_vision_yolo_adapter',
+            output='screen',
+            parameters=[
+                {"use_sim_time": LaunchConfiguration("use_sim_time")}
+            ],
+        ),
+
+        Node(
+            package='mr2_rover_auto',
+            executable='cover_vision_aruco_adapter',
+            name='cover_vision_aruco_adapter',
+            output='screen',
+            parameters=[
+                {"use_sim_time": LaunchConfiguration("use_sim_time")}
+            ],
+        ),
+
+        Node(
+            package='mr2_rover_auto',
             executable='mission_master',
             name='mission_master',
             output='screen',

@@ -1,6 +1,6 @@
 # CoverVision.action definitions
 # Goal - GPS coordinate, radius, detection method
-uint8 detection_method  # 0 = NONE, 1 = YOLO, 2 = ARUCO
+uint8 detection_method  # 0 = NONE, 1 = ARUCO, 2 = YOLO
 float64 target_latitude
 float64 target_longitude
 float64 target_radius       # in meters

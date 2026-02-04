@@ -1,147 +1,476 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
-#include <nav2_msgs/action/navigate_to_pose.hpp>
-#include <mr2_action_interface/action/cover_vision.hpp>
+
 #include <geometry_msgs/msg/pose_stamped.hpp>
-#include <thread>
+#include <nav_msgs/msg/path.hpp>
+#include <nav2_msgs/action/follow_path.hpp>
+#include <nav2_msgs/action/navigate_to_pose.hpp>
+
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
+#include <mr2_action_interface/action/cover_vision.hpp>
+
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+
 #include "mr2_rover_auto/gps_to_map.hpp"
+
+using namespace std::chrono_literals;
 
 using CoverVision = mr2_action_interface::action::CoverVision;
 using NavToPose = nav2_msgs::action::NavigateToPose;
-using GH_NavToPose = rclcpp_action::ClientGoalHandle<NavToPose>;
+using FollowPath = nav2_msgs::action::FollowPath;
 
-static std::vector<geometry_msgs::msg::PoseStamped>
-make_ring(const geometry_msgs::msg::PoseStamped & center, double radius, int n)
+static geometry_msgs::msg::Quaternion yaw_to_quat(double yaw)
 {
-  std::vector<geometry_msgs::msg::PoseStamped> v; v.reserve(n);
-  for (int k = 0; k < n; ++k) {
-    const double th = 2.0 * M_PI * (static_cast<double>(k) / static_cast<double>(n));
-    geometry_msgs::msg::PoseStamped p;
-    p.header = center.header;
-    p.pose.position.x = center.pose.position.x + radius * std::cos(th);
-    p.pose.position.y = center.pose.position.y + radius * std::sin(th);
-    p.pose.position.z = center.pose.position.z;
-    p.pose.orientation = center.pose.orientation; // yaw-align later if desired
-    v.push_back(p);
-  }
-  return v;
+  tf2::Quaternion q;
+  q.setRPY(0.0, 0.0, yaw);
+  return tf2::toMsg(q);
 }
 
-class CoverVisionServer : public rclcpp::Node {
+static void assign_tangent_orientations(std::vector<geometry_msgs::msg::PoseStamped> & poses)
+{
+  if (poses.size() < 2) {
+    return;
+  }
+  for (size_t i = 0; i + 1 < poses.size(); ++i) {
+    const double dx = poses[i + 1].pose.position.x - poses[i].pose.position.x;
+    const double dy = poses[i + 1].pose.position.y - poses[i].pose.position.y;
+    poses[i].pose.orientation = yaw_to_quat(std::atan2(dy, dx));
+  }
+  poses.back().pose.orientation = poses[poses.size() - 2].pose.orientation;
+}
+
+static std::vector<geometry_msgs::msg::PoseStamped> make_archimedean_spiral(
+  const geometry_msgs::msg::PoseStamped & center,
+  double pitch_m,
+  double max_radius_m,
+  double point_spacing_m,
+  size_t max_points)
+{
+  std::vector<geometry_msgs::msg::PoseStamped> poses;
+
+  if (!(std::isfinite(pitch_m) && pitch_m > 0.0 &&
+        std::isfinite(max_radius_m) && max_radius_m >= 0.0 &&
+        std::isfinite(point_spacing_m) && point_spacing_m > 0.0)) {
+    return poses;
+  }
+
+  // r = a * theta where a = pitch / (2*pi). pitch is the radial spacing after 2*pi.
+  const double a = pitch_m / (2.0 * M_PI);
+  const double theta_max = max_radius_m / a;
+
+  poses.reserve(std::min(max_points, static_cast<size_t>(std::ceil(theta_max * 10.0)) + 2));
+
+  geometry_msgs::msg::PoseStamped p0 = center;
+  p0.pose.position.z = 0.0;
+  poses.push_back(p0);
+
+  double theta = 0.0;
+  double r = 0.0;
+  while (poses.size() < max_points) {
+    const double denom = std::sqrt(r * r + a * a);
+    const double dtheta = point_spacing_m / std::max(denom, 1e-6);
+    theta += dtheta;
+    if (theta > theta_max) {
+      break;
+    }
+
+    r = a * theta;
+    geometry_msgs::msg::PoseStamped p = center;
+    p.pose.position.x = center.pose.position.x + r * std::cos(theta);
+    p.pose.position.y = center.pose.position.y + r * std::sin(theta);
+    p.pose.position.z = 0.0;
+    p.pose.orientation.w = 1.0;
+    poses.push_back(p);
+  }
+
+  assign_tangent_orientations(poses);
+  return poses;
+}
+
+struct DetectionState
+{
+  std::mutex mutex;
+  bool detected{false};
+  rclcpp::Time stamp{0, 0, RCL_ROS_TIME};
+  geometry_msgs::msg::PoseStamped pose_map{};
+};
+
+class CoverVisionServer : public rclcpp::Node
+{
 public:
-  CoverVisionServer() : rclcpp::Node("cover_vision_server"), gps_conv_(this) {
-    nav_client_ = rclcpp_action::create_client<NavToPose>(this, "navigate_to_pose");
+  CoverVisionServer()
+  : rclcpp::Node("cover_vision_server"),
+    gps_conv_(this)
+  {
+    map_frame_ = this->declare_parameter<std::string>("map_frame", "map");
+
+    nav_action_name_ = this->declare_parameter<std::string>("navigate_action_name", "navigate_to_pose");
+    follow_action_name_ = this->declare_parameter<std::string>("follow_action_name", "follow_path");
+
+    follow_controller_id_ = this->declare_parameter<std::string>("follow_controller_id", "FollowPath");
+    follow_goal_checker_id_ =
+      this->declare_parameter<std::string>("follow_goal_checker_id", "general_goal_checker");
+
+    spiral_pitch_m_ = this->declare_parameter<double>("spiral_pitch_m", 3.0);
+    spiral_point_spacing_m_ = this->declare_parameter<double>("spiral_point_spacing_m", 0.5);
+    spiral_max_points_ = static_cast<size_t>(this->declare_parameter<int>("spiral_max_points", 5000));
+
+    detection_stale_sec_ = this->declare_parameter<double>("detection_stale_sec", 0.75);
+    detection_pose_topic_ =
+      this->declare_parameter<std::string>("detection_pose_topic", "cover_vision/object_pose");
+
+    nav_client_ = rclcpp_action::create_client<NavToPose>(this, nav_action_name_);
+    follow_client_ = rclcpp_action::create_client<FollowPath>(this, follow_action_name_);
+
     server_ = rclcpp_action::create_server<CoverVision>(
-      this, "cover_vision",
-      std::bind(&CoverVisionServer::on_goal, this, std::placeholders::_1, std::placeholders::_2),
-      std::bind(&CoverVisionServer::on_cancel, this, std::placeholders::_1),
-      std::bind(&CoverVisionServer::on_accept, this, std::placeholders::_1));
-    bt_path_ = this->declare_parameter<std::string>(
-      "cover_vision_bt_xml",
-      "install/mr2_rover_auto/share/mr2_rover_auto/behavior_trees/cover_vision.xml");
+      this,
+      "cover_vision",
+      std::bind(&CoverVisionServer::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&CoverVisionServer::handle_cancel, this, std::placeholders::_1),
+      std::bind(&CoverVisionServer::handle_accepted, this, std::placeholders::_1));
+
+    RCLCPP_INFO(get_logger(), "CoverVision action server is up. Waiting for goals...");
   }
 
 private:
+  using GoalHandleCV = rclcpp_action::ServerGoalHandle<CoverVision>;
+
+  enum DetectionMethod : uint8_t {
+    DET_NONE = 0,
+    DET_ARUCO = 1,
+    DET_YOLO = 2
+  };
+
   rclcpp_action::Server<CoverVision>::SharedPtr server_;
   rclcpp_action::Client<NavToPose>::SharedPtr nav_client_;
+  rclcpp_action::Client<FollowPath>::SharedPtr follow_client_;
   GpsConverter gps_conv_;
-  std::string bt_path_;
 
-  rclcpp_action::GoalResponse on_goal(const rclcpp_action::GoalUUID &,
-                                      std::shared_ptr<const CoverVision::Goal> g) {
-    if (!(std::isfinite(g->target_latitude) && std::isfinite(g->target_longitude) &&
-          std::isfinite(g->target_radius) && g->target_radius > 0.0)) {
+  std::string map_frame_;
+  std::string nav_action_name_;
+  std::string follow_action_name_;
+  std::string follow_controller_id_;
+  std::string follow_goal_checker_id_;
+  double spiral_pitch_m_{3.0};
+  double spiral_point_spacing_m_{0.5};
+  size_t spiral_max_points_{5000};
+  double detection_stale_sec_{0.75};
+  std::string detection_pose_topic_;
+
+  static bool is_fresh(const rclcpp::Time & stamp, const rclcpp::Time & now, double max_age_sec)
+  {
+    if (stamp.nanoseconds() == 0) {
+      return false;
+    }
+    const double age = (now - stamp).seconds();
+    return std::isfinite(age) && age >= 0.0 && age <= max_age_sec;
+  }
+
+  bool try_get_detection_map_pose(
+    const std::shared_ptr<DetectionState> & det,
+    const rclcpp::Time & now,
+    geometry_msgs::msg::PoseStamped & out_pose_map)
+  {
+    std::lock_guard<std::mutex> lock(det->mutex);
+    if (!det->detected) {
+      return false;
+    }
+    if (!is_fresh(det->stamp, now, detection_stale_sec_)) {
+      return false;
+    }
+    out_pose_map = det->pose_map;
+    return true;
+  }
+
+  rclcpp_action::GoalResponse handle_goal(
+    const rclcpp_action::GoalUUID &,
+    std::shared_ptr<const CoverVision::Goal> goal)
+  {
+    if (!std::isfinite(goal->target_latitude) || !std::isfinite(goal->target_longitude)) {
+      RCLCPP_WARN(get_logger(), "Rejecting CoverVision goal: non-finite lat/lon");
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+    if (!std::isfinite(goal->target_radius) || goal->target_radius < 0.0) {
+      RCLCPP_WARN(get_logger(), "Rejecting CoverVision goal: invalid target_radius");
       return rclcpp_action::GoalResponse::REJECT;
     }
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
   }
 
-  rclcpp_action::CancelResponse on_cancel(
-      const std::shared_ptr<rclcpp_action::ServerGoalHandle<CoverVision>>) {
+  rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandleCV>)
+  {
+    RCLCPP_INFO(get_logger(), "Received request to cancel CoverVision goal.");
     return rclcpp_action::CancelResponse::ACCEPT;
   }
 
-  void on_accept(const std::shared_ptr<rclcpp_action::ServerGoalHandle<CoverVision>> gh) {
-    std::thread([this, gh]() {
-      auto res = std::make_shared<CoverVision::Result>();
-      CoverVision::Feedback fb;
-      fb.bt_status = 1; fb.total_waypoints = 0; fb.current_waypoint_index = -1;
-      gh->publish_feedback(std::make_shared<CoverVision::Feedback>(fb));
+  void handle_accepted(const std::shared_ptr<GoalHandleCV> goal_handle)
+  {
+    std::thread{std::bind(&CoverVisionServer::execute, this, std::placeholders::_1), goal_handle}.detach();
+  }
 
-      // 1) Center pose
-      geometry_msgs::msg::PoseStamped center;
-      if (!gps_conv_.to_map_pose(gh->get_goal()->target_latitude,
-                                 gh->get_goal()->target_longitude, center)) {
-        res->mission_result = 0; res->waypoints_completed = 0; gh->abort(res); return;
+  bool wait_for_action_servers()
+  {
+    if (!nav_client_->wait_for_action_server(5s)) {
+      RCLCPP_ERROR(get_logger(), "navigate_to_pose action server unavailable");
+      return false;
+    }
+    if (!follow_client_->wait_for_action_server(5s)) {
+      RCLCPP_ERROR(get_logger(), "follow_path action server unavailable");
+      return false;
+    }
+    return true;
+  }
+
+  rclcpp_action::ResultCode run_navigate_to_pose(
+    const std::shared_ptr<GoalHandleCV> & goal_handle,
+    const geometry_msgs::msg::PoseStamped & pose_map)
+  {
+    NavToPose::Goal nav_goal;
+    nav_goal.pose = pose_map;
+
+    auto gh_future = nav_client_->async_send_goal(nav_goal);
+    if (gh_future.wait_for(5s) != std::future_status::ready) {
+      RCLCPP_ERROR(get_logger(), "NavigateToPose goal handle timeout");
+      return rclcpp_action::ResultCode::ABORTED;
+    }
+
+    auto nav_gh = gh_future.get();
+    if (!nav_gh) {
+      RCLCPP_ERROR(get_logger(), "NavigateToPose goal rejected");
+      return rclcpp_action::ResultCode::ABORTED;
+    }
+
+    auto res_future = nav_client_->async_get_result(nav_gh);
+    while (rclcpp::ok()) {
+      if (goal_handle->is_canceling()) {
+        nav_client_->async_cancel_goal(nav_gh);
+        return rclcpp_action::ResultCode::CANCELED;
       }
-      // 2) Build coverage waypoint set (start with ring-only; you can add lawnmower later)
-      auto waypoints = make_ring(center, gh->get_goal()->target_radius, 12);
-      fb.total_waypoints = static_cast<int32_t>(waypoints.size());
-      gh->publish_feedback(std::make_shared<CoverVision::Feedback>(fb));
 
-      // 3) Iterate waypoints with Nav2
-      if (!nav_client_->wait_for_action_server(std::chrono::seconds(5))) {
-        RCLCPP_ERROR(this->get_logger(), "navigate_to_pose server unavailable");
-        res->mission_result = 0; res->waypoints_completed = 0; gh->abort(res); return;
+      if (res_future.wait_for(50ms) == std::future_status::ready) {
+        return res_future.get().code;
       }
+      rclcpp::sleep_for(50ms);
+    }
+    return rclcpp_action::ResultCode::ABORTED;
+  }
 
-      int completed = 0;
-      for (size_t i = 0; i < waypoints.size(); ++i) {
-        if (gh->is_canceling()) {
-          res->mission_result = 0; res->waypoints_completed = completed; gh->canceled(res); return;
-        }
+  void execute(const std::shared_ptr<GoalHandleCV> goal_handle)
+  {
+    const auto goal = goal_handle->get_goal();
+    auto result = std::make_shared<CoverVision::Result>();
 
-        fb.current_waypoint_index = static_cast<int32_t>(i);
-        gh->publish_feedback(std::make_shared<CoverVision::Feedback>(fb));
+    auto det = std::make_shared<DetectionState>();
 
-        NavToPose::Goal g; g.pose = waypoints[i]; g.behavior_tree = bt_path_;
-
-        rclcpp_action::Client<NavToPose>::SendGoalOptions opts;
-        opts.goal_response_callback =
-          [this](std::shared_ptr<GH_NavToPose> gh_nav) {
-            if (!gh_nav) RCLCPP_ERROR(this->get_logger(), "Nav goal rejected");
-          };
-        opts.feedback_callback =
-          [this, gh](std::shared_ptr<GH_NavToPose>, const std::shared_ptr<const NavToPose::Feedback> &) {
-            CoverVision::Feedback f; f.bt_status = 1; gh->publish_feedback(std::make_shared<CoverVision::Feedback>(f));
-          };
-        opts.result_callback =
-          [](const GH_NavToPose::WrappedResult &) {};
-
-        auto gh_future = nav_client_->async_send_goal(g, opts);
-        if (gh_future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
-          RCLCPP_ERROR(this->get_logger(), "Nav goal_handle timeout");
-          continue;
-        }
-        auto gh_nav = gh_future.get();
-        if (!gh_nav) { continue; }
-
-        auto res_future = nav_client_->async_get_result(gh_nav);
-        while (rclcpp::ok()) {
-          if (gh->is_canceling()) {
-            nav_client_->async_cancel_goal(gh_nav);
-            res->mission_result = 0; res->waypoints_completed = completed; gh->canceled(res); return;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr detection_sub;
+    if (goal->detection_method != DET_NONE) {
+      detection_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+        detection_pose_topic_, 10,
+        [this, det](const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+        {
+          if (!msg) {
+            return;
           }
-          if (res_future.wait_for(std::chrono::milliseconds(50)) == std::future_status::ready) {
-            auto wr = res_future.get();
-            if (wr.code == rclcpp_action::ResultCode::SUCCEEDED) ++completed;
-            break;
+          if (msg->header.frame_id != map_frame_) {
+            RCLCPP_WARN_THROTTLE(
+              this->get_logger(), *this->get_clock(), 2000,
+              "Ignoring detection pose in frame '%s' (expected '%s')",
+              msg->header.frame_id.c_str(), map_frame_.c_str());
+            return;
           }
-          rclcpp::sleep_for(std::chrono::milliseconds(50));
-        }
 
-        // TODO: early-exit switch to object pose when your OpenCV node asserts a detection
+          geometry_msgs::msg::PoseStamped pose_map = *msg;
+          pose_map.pose.position.z = 0.0;
+          pose_map.pose.orientation.w = 1.0;
+
+          std::lock_guard<std::mutex> lock(det->mutex);
+          det->detected = true;
+          det->stamp = rclcpp::Time(msg->header.stamp);
+          det->pose_map = pose_map;
+        });
+      RCLCPP_INFO(get_logger(), "CoverVision: listening for mission detection pose on %s",
+                  detection_pose_topic_.c_str());
+    }
+
+    CoverVision::Feedback fb;
+    fb.bt_status = 1;
+    fb.total_waypoints = 0;
+    fb.current_waypoint_index = -1;
+    goal_handle->publish_feedback(std::make_shared<CoverVision::Feedback>(fb));
+
+    if (!wait_for_action_servers()) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
+
+    // 1) Convert GNSS center to map pose
+    geometry_msgs::msg::PoseStamped center;
+    if (!gps_conv_.to_map_pose(goal->target_latitude, goal->target_longitude, center, map_frame_)) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
+
+    // 2) NavigateToPose to center
+    const auto nav_center_rc = run_navigate_to_pose(goal_handle, center);
+    if (nav_center_rc == rclcpp_action::ResultCode::CANCELED) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->canceled(result);
+      return;
+    }
+    if (nav_center_rc != rclcpp_action::ResultCode::SUCCEEDED) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
+
+    // 3) Generate spiral path in map frame and FollowPath it.
+    const double max_radius_m = std::max(0.0, goal->target_radius) + spiral_pitch_m_;
+    const auto poses =
+      make_archimedean_spiral(center, spiral_pitch_m_, max_radius_m, spiral_point_spacing_m_, spiral_max_points_);
+
+    fb.total_waypoints = static_cast<int32_t>(poses.size());
+    fb.current_waypoint_index = -1;  // FollowPath doesn't expose a waypoint index.
+    goal_handle->publish_feedback(std::make_shared<CoverVision::Feedback>(fb));
+
+    if (poses.size() < 2) {
+      // Treat "no coverage" as success per mission policy.
+      result->mission_result = 1;
+      result->waypoints_completed = 0;
+      goal_handle->succeed(result);
+      return;
+    }
+
+    nav_msgs::msg::Path path;
+    path.header.stamp = this->now();
+    path.header.frame_id = map_frame_;
+    path.poses = poses;
+
+    geometry_msgs::msg::PoseStamped detected_pose_map;
+
+    // FollowPath loop with mission-level detection checks.
+    auto follow_goal = FollowPath::Goal{};
+    follow_goal.path = path;
+    follow_goal.controller_id = follow_controller_id_;
+    follow_goal.goal_checker_id = follow_goal_checker_id_;
+
+    auto gh_future = follow_client_->async_send_goal(follow_goal);
+    if (gh_future.wait_for(5s) != std::future_status::ready) {
+      RCLCPP_ERROR(get_logger(), "FollowPath goal handle timeout");
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
+
+    auto fp_gh = gh_future.get();
+    if (!fp_gh) {
+      RCLCPP_ERROR(get_logger(), "FollowPath goal rejected");
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
+
+    auto res_future = follow_client_->async_get_result(fp_gh);
+    bool detected = false;
+    while (rclcpp::ok()) {
+      if (goal_handle->is_canceling()) {
+        follow_client_->async_cancel_goal(fp_gh);
+        result->mission_result = 0;
+        result->waypoints_completed = 0;
+        goal_handle->canceled(result);
+        return;
       }
 
-      res->mission_result = 1;  // success-of-mission policy is yours; this assumes completion
-      res->waypoints_completed = completed;
-      gh->succeed(res);
-    }).detach();
+      const auto now = this->now();
+      if (!detected) {
+        detected = try_get_detection_map_pose(det, now, detected_pose_map);
+        if (detected) {
+          RCLCPP_INFO(get_logger(), "CoverVision: object detected, canceling coverage FollowPath");
+          follow_client_->async_cancel_goal(fp_gh);
+        }
+      }
+
+      if (res_future.wait_for(50ms) == std::future_status::ready) {
+        const auto wr = res_future.get();
+        if (!detected) {
+          if (wr.code == rclcpp_action::ResultCode::SUCCEEDED) {
+            // Coverage completed without detection => SUCCESS per mission policy.
+            result->mission_result = 1;
+            result->waypoints_completed = static_cast<int32_t>(poses.size());
+            goal_handle->succeed(result);
+            return;
+          }
+          if (wr.code == rclcpp_action::ResultCode::CANCELED) {
+            result->mission_result = 0;
+            result->waypoints_completed = 0;
+            goal_handle->canceled(result);
+            return;
+          }
+          result->mission_result = 0;
+          result->waypoints_completed = 0;
+          goal_handle->abort(result);
+          return;
+        }
+
+        // Detected object: regardless of FollowPath result, attempt approach.
+        break;
+      }
+
+      rclcpp::sleep_for(50ms);
+    }
+
+    if (!detected) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
+
+    // 4) Approach detected pose (NavigateToPose).
+    detected_pose_map.header.stamp = this->now();
+    detected_pose_map.header.frame_id = map_frame_;
+    detected_pose_map.pose.position.z = 0.0;
+    detected_pose_map.pose.orientation.w = 1.0;
+
+    const auto nav_obj_rc = run_navigate_to_pose(goal_handle, detected_pose_map);
+    if (nav_obj_rc == rclcpp_action::ResultCode::CANCELED) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->canceled(result);
+      return;
+    }
+    if (nav_obj_rc != rclcpp_action::ResultCode::SUCCEEDED) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
+
+    result->mission_result = 1;
+    result->waypoints_completed = static_cast<int32_t>(poses.size());
+    goal_handle->succeed(result);
   }
 };
 
-int main(int argc, char ** argv) {
+int main(int argc, char ** argv)
+{
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<CoverVisionServer>());
   rclcpp::shutdown();

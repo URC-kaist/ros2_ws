@@ -38,6 +38,19 @@ Scripts to host and recieve web:
 npm start -- --device /tmp/sik_sim1 --baud 57600 --port 8081
 ```
 
+### WGS84 Shift Helper (East/North meters -> lat/lon)
+
+For quick/rough coordinate offsets on the WGS84 ellipsoid:
+
+```bash
+./scripts/wgs84_shift.py 38.4065 -110.7919 100 100
+# azimuth_deg=45.000000 distance_m=141.421
+# lat_deg=38.40740086 lon_deg=-110.79075511
+
+# or
+./scripts/wgs84_shift.py --wgs84 "38.4065,-110.7919" 100 100 --format json
+```
+
 ### Mission Master Topics (Publish + Monitor)
 
 Mission Master subscribes to:
@@ -49,30 +62,45 @@ Mission Master publishes:
 
 Enums:
 - `mission_type`: `0=UNKNOWN`, `1=GNSS_ONLY`, `2=COVER_VISION`
-- `detection_method`: `0=NONE`, `1=YOLO`, `2=ARUCO`
+- `detection_method`: `0=NONE`, `1=ARUCO`, `2=YOLO`
+- `object_type` (YOLO): `0=MALLET`, `1=PICK`, `2=BOTTLE`
 - `command`: `0=NOOP`, `1=PAUSE`, `2=RESUME`, `3=ABORT`
 
 Publish a GNSS-only mission list (single mission):
 ```bash
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
-    {mission_id: 1, mission_type: 1, detection_method: 0,
+    {mission_id: 1, mission_type: 1, detection_method: 0, object_type: 0,
+     target_latitude: 38.4074, target_longitude: -110.7919,
+     target_radius: 0.0, waypoint_count: 0}
+  ]
+}"
+```
+
+Publish a GNSS-only mission list (two missions):
+```bash
+ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
+  missions: [
+    {mission_id: 2, mission_type: 1, detection_method: 0, object_type: 0,
+     target_latitude: 38.4074, target_longitude: -110.7908,
+     target_radius: 0.0, waypoint_count: 0},
+    {mission_id: 3, mission_type: 1, detection_method: 0, object_type: 0,
      target_latitude: 38.4065, target_longitude: -110.7919,
      target_radius: 0.0, waypoint_count: 0}
   ]
 }"
 ```
 
-Publish a mixed mission list (GNSS-only, then CoverVision with YOLO):
+Publish a CoverVision mission with ArUco and then YOLO:
 ```bash
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
-    {mission_id: 10, mission_type: 1, detection_method: 0,
+    {mission_id: 4, mission_type: 2, detection_method: 1, object_type: 0,
+     target_latitude: 38.4074, target_longitude: -110.7908,
+     target_radius: 10.0, waypoint_count: 0},
+    {mission_id: 5, mission_type: 2, detection_method: 2, object_type: 0,
      target_latitude: 38.4065, target_longitude: -110.7919,
-     target_radius: 0.0, waypoint_count: 0},
-    {mission_id: 11, mission_type: 2, detection_method: 1,
-     target_latitude: 38.4066, target_longitude: -110.7921,
-     target_radius: 5.0, waypoint_count: 12}
+     target_radius: 10.0, waypoint_count: 0}
   ]
 }"
 ```
@@ -86,23 +114,34 @@ ros2 topic pub -1 /mission_control mr2_action_interface/msg/MissionControl "{com
 
 Monitor Mission Master:
 ```bash
+# state: 0=IDLE, 1=RUNNING, 2=PAUSED, 3=COMPLETED, 4=FAILED
 ros2 topic echo /mission_status
 ros2 topic hz /mission_status
 ```
 
-### Vision Topics (YOLO + ArUco)
-
-YOLO RGBD detector (`mr2_yolo_perception/yolo_rgbd_detector.py`) topic defaults:
-- Inputs (params): `rgb_topic=/rgbd_camera/color/image_raw`, `depth_topic=/rgbd_camera/depth/image_rect_raw`, `camera_info_topic=/rgbd_camera/color/camera_info`
-- Outputs (params): `annotated_topic=yolo/annotated_image`, `pose_topic=yolo/object_pose`
-- Published poses are per class: `yolo/object_pose/class_<id>` (`geometry_msgs/PoseStamped`)
-- TF frames published per class: `yolo/class_<id>`
-
-Useful checks:
+Notes:
+- Missions execute in the order listed in `missions: [...]` (Mission Master does not loop the list).
+- `mission_id` is currently used for status/debug correlation only (not ordering).
+- `target_radius` / `waypoint_count` are only used by `COVER_VISION` missions; set them to `0` for `GNSS_ONLY`.
+- `object_type` is used by `COVER_VISION` + `YOLO` (class id). For `GNSS_ONLY` or `ARUCO`, set to `0`.
+- GNSS missions rely on `robot_localization/srv/FromLL` (WGS84 -> map) from `navsat_transform_node`. Debug:
 ```bash
-ros2 param get /yolo_rgbd_detector rgb_topic
-ros2 topic echo /yolo/object_pose/class_0
-ros2 topic echo /yolo/annotated_image
+ros2 service list | rg fromLL
+ros2 service call /fromLL robot_localization/srv/FromLL "{ll_point: {latitude: 38.5, longitude: -110.8, altitude: 0.0}}"
+```
+
+### Vision Topics (ArUco + YOLO)
+
+CoverVision mission consumes a single "mission-level" detection topic:
+- `cover_vision/object_pose` (`geometry_msgs/PoseStamped`, **must be in `map` frame**)
+
+Adapters (launched by `mr2_rover_auto/launch/action.launch.py`) bridge perception into that topic:
+- YOLO adapter node: `cover_vision_yolo_adapter` subscribes `yolo/object_pose/class_<object_type>` -> publishes `cover_vision/object_pose`
+- ArUco adapter node: `cover_vision_aruco_adapter` subscribes `aruco_detections` -> publishes `cover_vision/object_pose`
+
+Monitor mission-level detection:
+```bash
+ros2 topic echo /cover_vision/object_pose
 ```
 
 ArUco tracker (`aruco_opencv/aruco_tracker_autostart`) notes:
@@ -116,4 +155,17 @@ ros2 topic list | rg aruco
 - If `publish_tf` is enabled in `aruco_opencv` config, TF frames are published for detected markers/boards:
 ```bash
 ros2 run tf2_tools view_frames
+```
+
+YOLO RGBD detector (`mr2_yolo_perception/yolo_rgbd_detector.py`) topic defaults:
+- Inputs (params): `rgb_topic=/rgbd_camera/color/image_raw`, `depth_topic=/rgbd_camera/depth/image_rect_raw`, `camera_info_topic=/rgbd_camera/color/camera_info`
+- Outputs (params): `annotated_topic=yolo/annotated_image`, `pose_topic=yolo/object_pose`
+- Published poses are per class: `yolo/object_pose/class_<id>` (`geometry_msgs/PoseStamped`)
+- TF frames published per class: `yolo/class_<id>`
+
+Useful checks:
+```bash
+ros2 param get /yolo_rgbd_detector rgb_topic
+ros2 topic echo /yolo/object_pose/class_0
+ros2 topic echo /yolo/annotated_image
 ```
