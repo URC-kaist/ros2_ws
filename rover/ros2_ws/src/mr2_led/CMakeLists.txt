@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(mr2_led LANGUAGES CXX)
+project(mr2_led LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 17)
