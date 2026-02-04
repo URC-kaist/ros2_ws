@@ -113,6 +113,8 @@ public:
     gps_conv_(this)
   {
     map_frame_ = this->declare_parameter<std::string>("map_frame", "map");
+    coverage_path_topic_ =
+      this->declare_parameter<std::string>("coverage_path_topic", "cover_vision/coverage_path");
 
     nav_action_name_ = this->declare_parameter<std::string>("navigate_action_name", "navigate_to_pose");
     follow_action_name_ = this->declare_parameter<std::string>("follow_action_name", "follow_path");
@@ -131,6 +133,10 @@ public:
 
     nav_client_ = rclcpp_action::create_client<NavToPose>(this, nav_action_name_);
     follow_client_ = rclcpp_action::create_client<FollowPath>(this, follow_action_name_);
+
+    coverage_path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
+      coverage_path_topic_,
+      rclcpp::QoS(1).transient_local().reliable());
 
     server_ = rclcpp_action::create_server<CoverVision>(
       this,
@@ -157,6 +163,7 @@ private:
   GpsConverter gps_conv_;
 
   std::string map_frame_;
+  std::string coverage_path_topic_;
   std::string nav_action_name_;
   std::string follow_action_name_;
   std::string follow_controller_id_;
@@ -166,6 +173,8 @@ private:
   size_t spiral_max_points_{5000};
   double detection_stale_sec_{0.75};
   std::string detection_pose_topic_;
+
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr coverage_path_pub_;
 
   static bool is_fresh(const rclcpp::Time & stamp, const rclcpp::Time & now, double max_age_sec)
   {
@@ -324,25 +333,16 @@ private:
       return;
     }
 
-    // 2) NavigateToPose to center
-    const auto nav_center_rc = run_navigate_to_pose(goal_handle, center);
-    if (nav_center_rc == rclcpp_action::ResultCode::CANCELED) {
-      result->mission_result = 0;
-      result->waypoints_completed = 0;
-      goal_handle->canceled(result);
-      return;
-    }
-    if (nav_center_rc != rclcpp_action::ResultCode::SUCCEEDED) {
-      result->mission_result = 0;
-      result->waypoints_completed = 0;
-      goal_handle->abort(result);
-      return;
-    }
-
-    // 3) Generate spiral path in map frame and FollowPath it.
-    const double max_radius_m = std::max(0.0, goal->target_radius) + spiral_pitch_m_;
+    // 2) Generate spiral path in map frame (publish for RViz/debug) and FollowPath it.
+    const double max_radius_m = std::max(0.0, goal->target_radius) + 0.5 * spiral_pitch_m_;
     const auto poses =
       make_archimedean_spiral(center, spiral_pitch_m_, max_radius_m, spiral_point_spacing_m_, spiral_max_points_);
+
+    nav_msgs::msg::Path path;
+    path.header.stamp = this->now();
+    path.header.frame_id = map_frame_;
+    path.poses = poses;
+    coverage_path_pub_->publish(path);
 
     fb.total_waypoints = static_cast<int32_t>(poses.size());
     fb.current_waypoint_index = -1;  // FollowPath doesn't expose a waypoint index.
@@ -356,10 +356,20 @@ private:
       return;
     }
 
-    nav_msgs::msg::Path path;
-    path.header.stamp = this->now();
-    path.header.frame_id = map_frame_;
-    path.poses = poses;
+    // 3) NavigateToPose to center
+    const auto nav_center_rc = run_navigate_to_pose(goal_handle, center);
+    if (nav_center_rc == rclcpp_action::ResultCode::CANCELED) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->canceled(result);
+      return;
+    }
+    if (nav_center_rc != rclcpp_action::ResultCode::SUCCEEDED) {
+      result->mission_result = 0;
+      result->waypoints_completed = 0;
+      goal_handle->abort(result);
+      return;
+    }
 
     geometry_msgs::msg::PoseStamped detected_pose_map;
 

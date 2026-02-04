@@ -82,7 +82,7 @@ Publish a GNSS-only mission list (two missions):
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
     {mission_id: 2, mission_type: 1, detection_method: 0, object_type: 0,
-     target_latitude: 38.4074, target_longitude: -110.7908,
+     target_latitude: 38.4067, target_longitude: -110.7916,
      target_radius: 0.0, waypoint_count: 0},
     {mission_id: 3, mission_type: 1, detection_method: 0, object_type: 0,
      target_latitude: 38.4065, target_longitude: -110.7919,
@@ -91,16 +91,27 @@ ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
 }"
 ```
 
+Publish a CoverVision mission with ArUco:
+```bash
+ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
+  missions: [
+    {mission_id: 5, mission_type: 2, detection_method: 2, object_type: 0,
+     target_latitude: 38.4065, target_longitude: -110.7919,
+     target_radius: 5.0, waypoint_count: 0}
+  ]
+}"
+```
+
 Publish a CoverVision mission with ArUco and then YOLO:
 ```bash
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
-    {mission_id: 4, mission_type: 2, detection_method: 1, object_type: 0,
-     target_latitude: 38.4074, target_longitude: -110.7908,
-     target_radius: 10.0, waypoint_count: 0},
+    {mission_id: 4, mission_type: 1, detection_method: 1, object_type: 0,
+     target_latitude: 38.40645496, target_longitude: -110.79195724,
+     target_radius: 0.0, waypoint_count: 0},
     {mission_id: 5, mission_type: 2, detection_method: 2, object_type: 0,
      target_latitude: 38.4065, target_longitude: -110.7919,
-     target_radius: 10.0, waypoint_count: 0}
+     target_radius: 5.0, waypoint_count: 0}
   ]
 }"
 ```
@@ -139,9 +150,13 @@ Adapters (launched by `mr2_rover_auto/launch/action.launch.py`) bridge perceptio
 - YOLO adapter node: `cover_vision_yolo_adapter` subscribes `yolo/object_pose/class_<object_type>` -> publishes `cover_vision/object_pose`
 - ArUco adapter node: `cover_vision_aruco_adapter` subscribes `aruco_detections` -> publishes `cover_vision/object_pose`
 
+CoverVision coverage path (for RViz/debug):
+- `cover_vision/coverage_path` (`nav_msgs/Path`, latched / transient-local)
+
 Monitor mission-level detection:
 ```bash
 ros2 topic echo /cover_vision/object_pose
+ros2 topic echo /cover_vision/coverage_path
 ```
 
 ArUco tracker (`aruco_opencv/aruco_tracker_autostart`) notes:
