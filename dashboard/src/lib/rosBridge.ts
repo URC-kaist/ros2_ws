@@ -67,6 +67,10 @@ class RosBridgeClient {
     this.ros.connect(this.url)
   }
 
+  isConnected() {
+    return this.connected
+  }
+
   onConnectionStatus(handler: MessageHandler<boolean>) {
     this.connectionListeners.add(handler)
     return () => this.connectionListeners.delete(handler)
@@ -101,6 +105,38 @@ class RosBridgeClient {
   ) {
     const entry = this.getOrCreateTopic<T>(name, messageType, options)
     entry.topic.publish(message)
+  }
+
+  callService<TRequest, TResponse>(
+    name: string,
+    serviceType: string,
+    request: TRequest
+  ): Promise<TResponse> {
+    if (!this.connected) {
+      return Promise.reject(new Error('ROS bridge is not connected'))
+    }
+    const roslib = this.getRosLib()
+    const service = new roslib.Service({
+      ros: this.ros,
+      name,
+      serviceType,
+    })
+    const serviceRequest = new roslib.ServiceRequest(request as Record<string, unknown>)
+    return new Promise((resolve, reject) => {
+      service.callService(
+        serviceRequest,
+        (response: TResponse) => resolve(response),
+        (error?: unknown) => {
+          if (error instanceof Error) {
+            reject(error)
+          } else if (typeof error === 'string') {
+            reject(new Error(error))
+          } else {
+            reject(new Error('Service call failed'))
+          }
+        }
+      )
+    })
   }
 
   private emitConnectionStatus(connected: boolean) {

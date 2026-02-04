@@ -1,0 +1,13 @@
+.rocket-m2-card .status-list {
+  margin-top: 4px;
+}
+
+.status-good {
+  color: var(--accent);
+}
+
+.rocket-m2-error {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--accent-2);
+}

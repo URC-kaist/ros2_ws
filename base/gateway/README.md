@@ -61,6 +61,12 @@ You can also configure with environment variables:
 - `BASE_ANTENNA_STATUS_MS` (default 1000, broadcast base_status interval)
 - `BASE_ANTENNA_ALLOW_PROVISIONAL` (true/false, default true; use survey-in mean before valid)
 - `BASE_HEADING_OFFSET_DEG` (default 0, can be overridden by `base_heading`)
+- `ROCKET_M2_ENABLE` (true/false, default false; auto-enables when IP/user/pass are set)
+- `ROCKET_M2_IP` (Rocket M2 management IP)
+- `ROCKET_M2_USER`
+- `ROCKET_M2_PASS`
+- `ROCKET_M2_POLL_MS` (default 5000, polling interval)
+- `ROCKET_M2_TIMEOUT_MS` (default 4000, curl timeout)
 
 ## WebSocket API
 
@@ -75,6 +81,7 @@ Outgoing (gateway -> dashboard):
 - `link_status` { `connected`, `last_rx_ms`, `last_tx_ms` }
 - `telem_nav` { `timestamp_ms`, `latitude_deg`, `longitude_deg`, `altitude_m`, `heading_deg`, `cov_x_var`, `cov_y_var`, `cov_yaw_var` }
 - `base_status` { `enabled`, `antenna_ready`, `auto_home`, `heading_offset_deg`, `base_lat_deg`, `base_lon_deg`, `base_alt_m`, `antenna_heading_deg`, `last_cmd_heading_deg`, `last_cmd_age_ms`, `base_fix_age_ms`, `rover_nav_age_ms`, `base_fix_valid`, `rover_nav_valid`, `idle_reason` }
+- `rocket_m2_status` { `connected`, `updated_at_ms`, `last_success_ms`, `signal`, `rssi`, `noisef`, `chwidth`, `rx_chainmask`, `chainrssi`, `chainrssimgmt`, `chainrssiext`, `error` }
 
 `battery_id` is `1` or `2`, mapped from SiK message IDs `0x10`/`0x11`.
 
@@ -87,6 +94,12 @@ Link status uses recent heartbeat frames from the ROS bridge; it will report
 The gateway can mint Transitive JWTs for the dashboard at:
 
 - `GET /transitive/token`
+
+## Rocket M2 status endpoint
+
+The gateway can proxy the Rocket M2 LAN status at:
+
+- `GET /rocket-m2/status`
 
 Environment variables (required on the gateway host):
 - `TRANSITIVE_JWT_SECRET` (required)

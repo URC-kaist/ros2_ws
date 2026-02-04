@@ -1,0 +1,19 @@
+{
+  "coefficients": [
+    -9.073188045215239e-06,
+    0.4546338858470046,
+    401.8180073852851
+  ],
+  "pixel_centers": [
+    7.0,
+    288.0,
+    525.0
+  ],
+  "known_wavelengths": [
+    405.0,
+    532.0,
+    638.0
+  ],
+  "poly_order": 2,
+  "note": "Web calibration"
+}

@@ -1,0 +1,12 @@
+spectrophotometer_node:
+  ros__parameters:
+    camera_index: 0
+    band_height: 40
+    y_center: -1
+    smooth_kernel: 5
+    frame_average: 3
+    frame_width: 640
+    frame_height: 480
+    frame_id: spectrophotometer
+    service_name: get_spectrum
+    spectrum_topic: spectrum
