@@ -1,12 +1,14 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "controller_interface/controller_interface.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "mr2_action_interface/msg/mission_status.hpp"
 #include "mr2_rover_control/four_wheel_steering_solver.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -36,6 +38,8 @@ public:
 
 private:
   void twistCb(const geometry_msgs::msg::Twist::SharedPtr msg);
+  void missionStatusCb(
+      const mr2_action_interface::msg::MissionStatus::SharedPtr msg);
   void publishZeros();
   bool fillWheelStates(std::array<double, 4> &wheel_ang_vel,
                        std::array<double, 4> &steer_angle) const;
@@ -67,11 +71,15 @@ private:
   std::optional<FourWheelSteeringSolver> solver_;
 
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_twist_;
+  rclcpp::Subscription<mr2_action_interface::msg::MissionStatus>::SharedPtr
+      sub_mission_status_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Time last_twist_time_;
   rclcpp::Time last_odom_pub_time_;
   geometry_msgs::msg::Twist last_twist_;
   geometry_msgs::msg::Twist limited_twist_;
+
+  std::optional<uint8_t> mission_state_;
 };
 
 } // namespace mr2_rover_control

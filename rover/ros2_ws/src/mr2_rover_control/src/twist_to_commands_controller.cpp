@@ -31,6 +31,7 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<std::string>("odom_frame_id", "odom");
   auto_declare<std::string>("base_frame_id", "base_link");
   auto_declare<std::string>("cmd_vel_topic", "/cmd_vel");
+  auto_declare<std::string>("mission_status_topic", "/mission_status");
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -113,6 +114,8 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   odom_frame_id_ = get_node()->get_parameter("odom_frame_id").as_string();
   base_frame_id_ = get_node()->get_parameter("base_frame_id").as_string();
   const auto cmd_topic = get_node()->get_parameter("cmd_vel_topic").as_string();
+  const auto mission_status_topic =
+      get_node()->get_parameter("mission_status_topic").as_string();
   const auto odom_topic =
       get_node()->get_parameter("wheel_odom_topic").as_string();
 
@@ -120,6 +123,12 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
       cmd_topic, rclcpp::SystemDefaultsQoS(),
       std::bind(&TwistToCommandsController::twistCb, this,
                 std::placeholders::_1));
+
+  sub_mission_status_ =
+      get_node()->create_subscription<mr2_action_interface::msg::MissionStatus>(
+          mission_status_topic, 10,
+          std::bind(&TwistToCommandsController::missionStatusCb, this,
+                    std::placeholders::_1));
 
   odom_pub_ =
       get_node()->create_publisher<nav_msgs::msg::Odometry>(odom_topic, 10);
@@ -132,6 +141,7 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   last_twist_time_ = get_node()->now();
   last_odom_pub_time_ =
       rclcpp::Time(0, 0, get_node()->get_clock()->get_clock_type());
+  mission_state_.reset();
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -157,6 +167,11 @@ void TwistToCommandsController::twistCb(
     const geometry_msgs::msg::Twist::SharedPtr msg) {
   last_twist_ = *msg;
   last_twist_time_ = get_node()->now();
+}
+
+void TwistToCommandsController::missionStatusCb(
+    const mr2_action_interface::msg::MissionStatus::SharedPtr msg) {
+  mission_state_ = msg->state;
 }
 
 void TwistToCommandsController::publishZeros() {
@@ -314,6 +329,13 @@ TwistToCommandsController::update(const rclcpp::Time &,
     publishZeros();
     return controller_interface::return_type::OK;
   }
+
+  constexpr uint8_t kMissionStateRunning = 1;
+  const double effective_error_alpha =
+      (mission_state_.has_value() && mission_state_.value() == kMissionStateRunning)
+          ? solver_error_alpha_
+          : 1.0;
+  solver_->setErrorAlpha(effective_error_alpha);
 
   if (state_interfaces_.size() < 8) {
     RCLCPP_WARN_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(),

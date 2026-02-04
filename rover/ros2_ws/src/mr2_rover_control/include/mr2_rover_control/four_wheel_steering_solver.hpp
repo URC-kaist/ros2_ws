@@ -32,6 +32,8 @@ public:
     FourWheelSteeringSolver(Config cfg)
         : cfg_(cfg), filtered_steer_{0.0, 0.0, 0.0, 0.0}, steer_initialized_(false) {}
 
+    void setErrorAlpha(double error_alpha) { cfg_.error_alpha = std::clamp(error_alpha, 0.0, 1.0); }
+
     /**
      * @brief The Core Update Loop
      * @param cmd The desired body twist (filtered cmd_vel)
@@ -101,7 +103,9 @@ public:
                 std::abs(normalizeAngle(raw_angle - current_steering[i]));
             const double weight =
                 (cfg_.gain_k > 0.0) ? (1.0 - std::exp(-cfg_.gain_k * steer_err)) : 1.0;
-            const double alpha = std::clamp(cfg_.error_alpha * weight, 0.0, 1.0);
+            const double alpha = (cfg_.error_alpha >= 1.0)
+                                     ? 1.0
+                                     : std::clamp(cfg_.error_alpha * weight, 0.0, 1.0);
             const double delta = normalizeAngle(raw_angle - filtered_steer_[i]);
             filtered_steer_[i] = normalizeAngle(filtered_steer_[i] + alpha * delta);
 
