@@ -37,7 +37,10 @@ public:
   update(const rclcpp::Time &time, const rclcpp::Duration &period) override;
 
 private:
-  void twistCb(const geometry_msgs::msg::Twist::SharedPtr msg);
+  static constexpr uint8_t kMissionStateRunning = 1;
+
+  void twistNominalCb(const geometry_msgs::msg::Twist::SharedPtr msg);
+  void twistRunningCb(const geometry_msgs::msg::Twist::SharedPtr msg);
   void missionStatusCb(
       const mr2_action_interface::msg::MissionStatus::SharedPtr msg);
   void publishZeros();
@@ -70,7 +73,8 @@ private:
   FourWheelSteeringSolver::Config solver_cfg_;
   std::optional<FourWheelSteeringSolver> solver_;
 
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_twist_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_twist_nominal_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_twist_running_;
   rclcpp::Subscription<mr2_action_interface::msg::MissionStatus>::SharedPtr
       sub_mission_status_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;

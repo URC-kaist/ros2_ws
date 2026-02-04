@@ -30,7 +30,8 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
   auto_declare<std::string>("odom_frame_id", "odom");
   auto_declare<std::string>("base_frame_id", "base_link");
-  auto_declare<std::string>("cmd_vel_topic", "/cmd_vel");
+  auto_declare<std::string>("cmd_vel_topic_nominal", "/base/cmd_vel");
+  auto_declare<std::string>("cmd_vel_topic_running", "/cmd_vel");
   auto_declare<std::string>("mission_status_topic", "/mission_status");
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -113,15 +114,23 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   solver_.emplace(solver_cfg_);
   odom_frame_id_ = get_node()->get_parameter("odom_frame_id").as_string();
   base_frame_id_ = get_node()->get_parameter("base_frame_id").as_string();
-  const auto cmd_topic = get_node()->get_parameter("cmd_vel_topic").as_string();
+  const auto cmd_topic_nominal =
+      get_node()->get_parameter("cmd_vel_topic_nominal").as_string();
+  const auto cmd_topic_running =
+      get_node()->get_parameter("cmd_vel_topic_running").as_string();
   const auto mission_status_topic =
       get_node()->get_parameter("mission_status_topic").as_string();
   const auto odom_topic =
       get_node()->get_parameter("wheel_odom_topic").as_string();
 
-  sub_twist_ = get_node()->create_subscription<geometry_msgs::msg::Twist>(
-      cmd_topic, rclcpp::SystemDefaultsQoS(),
-      std::bind(&TwistToCommandsController::twistCb, this,
+  sub_twist_nominal_ = get_node()->create_subscription<geometry_msgs::msg::Twist>(
+      cmd_topic_nominal, rclcpp::SystemDefaultsQoS(),
+      std::bind(&TwistToCommandsController::twistNominalCb, this,
+                std::placeholders::_1));
+
+  sub_twist_running_ = get_node()->create_subscription<geometry_msgs::msg::Twist>(
+      cmd_topic_running, rclcpp::SystemDefaultsQoS(),
+      std::bind(&TwistToCommandsController::twistRunningCb, this,
                 std::placeholders::_1));
 
   sub_mission_status_ =
@@ -163,8 +172,24 @@ TwistToCommandsController::on_deactivate(const rclcpp_lifecycle::State &) {
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-void TwistToCommandsController::twistCb(
+void TwistToCommandsController::twistNominalCb(
     const geometry_msgs::msg::Twist::SharedPtr msg) {
+  const bool running =
+      (mission_state_.has_value() && mission_state_.value() == kMissionStateRunning);
+  if (running) {
+    return;
+  }
+  last_twist_ = *msg;
+  last_twist_time_ = get_node()->now();
+}
+
+void TwistToCommandsController::twistRunningCb(
+    const geometry_msgs::msg::Twist::SharedPtr msg) {
+  const bool running =
+      (mission_state_.has_value() && mission_state_.value() == kMissionStateRunning);
+  if (!running) {
+    return;
+  }
   last_twist_ = *msg;
   last_twist_time_ = get_node()->now();
 }
@@ -330,7 +355,6 @@ TwistToCommandsController::update(const rclcpp::Time &,
     return controller_interface::return_type::OK;
   }
 
-  constexpr uint8_t kMissionStateRunning = 1;
   const double effective_error_alpha =
       (mission_state_.has_value() && mission_state_.value() == kMissionStateRunning)
           ? solver_error_alpha_
