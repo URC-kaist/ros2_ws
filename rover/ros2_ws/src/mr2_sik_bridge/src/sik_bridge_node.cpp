@@ -53,7 +53,7 @@ class SikBridgeNode : public rclcpp::Node {
             declare_parameter<double>("heartbeat_tx_rate_hz", 2.0)),
         nav_tx_rate_hz_(declare_parameter<double>("nav_tx_rate_hz", 2.0)),
         cmd_vel_topic_(
-            declare_parameter<std::string>("cmd_vel_topic", "/cmd_vel")),
+            declare_parameter<std::string>("cmd_vel_topic", "/base/cmd_vel")),
         arm_twist_topic_(declare_parameter<std::string>(
             "arm_twist_topic", "/moveit_servo/delta_twist_cmds")),
         arm_frame_id_(declare_parameter<std::string>("arm_frame_id", "base_link")),

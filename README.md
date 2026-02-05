@@ -10,7 +10,7 @@ ros2 doctor --report > doctor.log # detect QoS mode mismatch failure
 Launch ros2_ws (please change sim to real for rover.):
 
 ```bash
-# under rover/ros2-ws/
+# under rover/ros2_ws/
 source install/setup.bash
 
 # General entry
@@ -26,12 +26,12 @@ ros2 launch mr2_rover_auto navigation.launch.py mode:=sim \
 
 ```
 
-Scripts to host and recieve web:
+Scripts to host and receive web:
 
 ``` bash
 # Rover hosting:
-# under rover/
-. scripts/deploy_dashboard.bash 2> dashboard_err
+# under scripts/ (requires sudo; installs nginx if missing)
+. deploy_dashboard.bash 2> dashboard_err.log
 
 # Base station SIK interface:
 # under base/gateway/
@@ -41,11 +41,9 @@ npm start -- --device /tmp/sik_sim1 --baud 57600 --port 8081
 ### WGS84 Shift Helper (East/North meters -> lat/lon)
 
 For quick/rough coordinate offsets on the WGS84 ellipsoid:
-
+Note: sim datum is (38.406738, -110.791397)... I think?
 ```bash
-./scripts/wgs84_shift.py 38.4065 -110.7919 100 100
-# azimuth_deg=45.000000 distance_m=141.421
-# lat_deg=38.40740086 lon_deg=-110.79075511
+./scripts/wgs84_shift.py 38.406738 --110.791397 100 100
 
 # or
 ./scripts/wgs84_shift.py --wgs84 "38.4065,-110.7919" 100 100 --format json
@@ -71,7 +69,7 @@ Publish a GNSS-only mission list (single mission):
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
     {mission_id: 1, mission_type: 1, detection_method: 0, object_type: 0,
-     target_latitude: 38.4074, target_longitude: -110.7919,
+     target_latitude: 38.4065, target_longitude: -110.7919,
      target_radius: 0.0, waypoint_count: 0}
   ]
 }"
