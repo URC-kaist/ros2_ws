@@ -14,8 +14,18 @@ type PoseStamped = {
   }
 }
 
-type PathMsg = {
-  poses?: PoseStamped[]
+type GeoPoseStamped = {
+  pose?: {
+    position?: {
+      latitude?: number
+      longitude?: number
+      altitude?: number
+    }
+  }
+}
+
+type GeoPathMsg = {
+  poses?: GeoPoseStamped[]
 }
 
 type MissionSpec = {
@@ -58,14 +68,10 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
   const [smoothedPath, setSmoothedPath] = useState<[number, number][]>([])
   const [coveragePath, setCoveragePath] = useState<[number, number][]>([])
   const [objectPose, setObjectPose] = useState<[number, number] | null>(null)
-  const smoothedRawRef = useRef<PathMsg | null>(null)
-  const coverageRawRef = useRef<PathMsg | null>(null)
+  const smoothedGeoRawRef = useRef<GeoPathMsg | null>(null)
+  const coverageGeoRawRef = useRef<GeoPathMsg | null>(null)
   const objectRawRef = useRef<PoseStamped | null>(null)
   const toLLCacheRef = useRef<Map<string, [number, number]>>(new Map())
-  const smoothedLatestRef = useRef<PathMsg | null>(null)
-  const smoothedBusyRef = useRef(false)
-  const smoothedVersionRef = useRef(0)
-  const coverageReqRef = useRef(0)
   const objectReqRef = useRef(0)
 
   type ToLLRequest = {
@@ -107,10 +113,7 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
     }
   }
 
-  const convertPath = async (
-    msg: PathMsg | null,
-    maxPoints: number
-  ): Promise<[number, number][]> => {
+  const convertGeoPath = (msg: GeoPathMsg | null, maxPoints: number): [number, number][] => {
     const poses = msg?.poses ?? []
     if (poses.length === 0) return []
     const step =
@@ -118,12 +121,10 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
     const coords: [number, number][] = []
     for (let i = 0; i < poses.length; i += step) {
       const position = poses[i]?.pose?.position
-      const x = Number(position?.x)
-      const y = Number(position?.y)
-      const z = Number(position?.z ?? 0)
-      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
-      const ll = await toLL(x, y, Number.isFinite(z) ? z : 0)
-      if (ll) coords.push(ll)
+      const lat = Number(position?.latitude)
+      const lon = Number(position?.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+      coords.push([lon, lat])
     }
     return coords
   }
@@ -135,27 +136,6 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
     const z = Number(position?.z ?? 0)
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null
     return toLL(x, y, Number.isFinite(z) ? z : 0)
-  }
-
-  const processLatestSmoothed = () => {
-    if (smoothedBusyRef.current) return
-    const latest = smoothedLatestRef.current
-    if (!latest) return
-    smoothedBusyRef.current = true
-    const versionAtStart = smoothedVersionRef.current
-    const poseCount = latest.poses?.length ?? 0
-    void convertPath(latest, MAX_SMOOTHED_POINTS)
-      .then((coords) => {
-        if (coords.length > 0 || poseCount === 0) {
-          setSmoothedPath(coords)
-        }
-      })
-      .finally(() => {
-        smoothedBusyRef.current = false
-        if (smoothedVersionRef.current !== versionAtStart) {
-          processLatestSmoothed()
-        }
-      })
   }
 
   const buildMissionPointFeatures = (missions: MissionSpec[]) => {
@@ -484,31 +464,29 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
   useEffect(() => {
     const ros = getRosBridgeClient()
     ros.connect()
-    const handleSmoothedPath = (msg: PathMsg) => {
-      smoothedRawRef.current = msg
-      smoothedLatestRef.current = msg
-      smoothedVersionRef.current += 1
-      processLatestSmoothed()
-    }
-    const unsubPlanSmoothed = ros.subscribe<PathMsg>(
-      '/plan_smoothed',
-      'nav_msgs/msg/Path',
-      handleSmoothedPath,
+    const unsubPlanSmoothedGeo = ros.subscribe<GeoPathMsg>(
+      '/plan_smoothed/geo',
+      'geographic_msgs/msg/GeoPath',
+      (msg) => {
+        smoothedGeoRawRef.current = msg
+        const poseCount = msg?.poses?.length ?? 0
+        const coords = convertGeoPath(msg, MAX_SMOOTHED_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setSmoothedPath(coords)
+        }
+      },
       { throttleRate: 250 }
     )
-    const unsubCoverage = ros.subscribe<PathMsg>(
-      '/cover_vision/coverage_path',
-      'nav_msgs/msg/Path',
+    const unsubCoverageGeo = ros.subscribe<GeoPathMsg>(
+      '/cover_vision/coverage_path/geo',
+      'geographic_msgs/msg/GeoPath',
       (msg) => {
-        coverageRawRef.current = msg
+        coverageGeoRawRef.current = msg
         const poseCount = msg?.poses?.length ?? 0
-        const reqId = ++coverageReqRef.current
-        void convertPath(msg, MAX_COVERAGE_POINTS).then((coords) => {
-          if (reqId !== coverageReqRef.current) return
-          if (coords.length > 0 || poseCount === 0) {
-            setCoveragePath(coords)
-          }
-        })
+        const coords = convertGeoPath(msg, MAX_COVERAGE_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setCoveragePath(coords)
+        }
       },
       { throttleRate: 250 }
     )
@@ -526,8 +504,8 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
       { throttleRate: 250 }
     )
     return () => {
-      unsubPlanSmoothed()
-      unsubCoverage()
+      unsubPlanSmoothedGeo()
+      unsubCoverageGeo()
       unsubObject()
     }
   }, [])
@@ -536,20 +514,19 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
     const ros = getRosBridgeClient()
     ros.connect()
     const resync = () => {
-      if (smoothedRawRef.current) {
-        smoothedLatestRef.current = smoothedRawRef.current
-        smoothedVersionRef.current += 1
-        processLatestSmoothed()
+      if (smoothedGeoRawRef.current) {
+        const poseCount = smoothedGeoRawRef.current.poses?.length ?? 0
+        const coords = convertGeoPath(smoothedGeoRawRef.current, MAX_SMOOTHED_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setSmoothedPath(coords)
+        }
       }
-      if (coverageRawRef.current) {
-        const poseCount = coverageRawRef.current.poses?.length ?? 0
-        const reqId = ++coverageReqRef.current
-        void convertPath(coverageRawRef.current, MAX_COVERAGE_POINTS).then((coords) => {
-          if (reqId !== coverageReqRef.current) return
-          if (coords.length > 0 || poseCount === 0) {
-            setCoveragePath(coords)
-          }
-        })
+      if (coverageGeoRawRef.current) {
+        const poseCount = coverageGeoRawRef.current.poses?.length ?? 0
+        const coords = convertGeoPath(coverageGeoRawRef.current, MAX_COVERAGE_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setCoveragePath(coords)
+        }
       }
       if (objectRawRef.current) {
         const reqId = ++objectReqRef.current
@@ -742,49 +719,50 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
   }, [objectPose, mapReady])
 
   return (
-    <div className="map" ref={mapRef}>
-      <button
-        type="button"
-        onClick={() => {
-          setFollowRover(true)
-          const map = mapInstanceRef.current
-          if (map && fix) {
-            map.easeTo({ center: fix, zoom: Math.max(map.getZoom(), 17), duration: 300 })
-          }
-        }}
-        style={{
-          position: 'absolute',
-          top: 10,
-          right: 10,
-          zIndex: 2,
-          background: followRover ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
-          color: followRover ? '#0b1220' : '#cdd6f4',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 10,
-          padding: '8px 12px',
-          fontSize: '12px',
-          cursor: 'pointer',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
-        }}
-      >
-        {followRover ? 'Following rover' : 'Follow rover'}
-      </button>
-      <div
-        style={{
-          position: 'absolute',
-          top: 8,
-          left: 8,
-          background: 'rgba(11, 18, 32, 0.8)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 8,
-          padding: '6px 10px',
-          fontSize: '12px',
-          color: '#cdd6f4',
-          zIndex: 1,
-          pointerEvents: 'none',
-          minWidth: 170,
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div className="map" ref={mapRef}>
+        <button
+          type="button"
+          onClick={() => {
+            setFollowRover(true)
+            const map = mapInstanceRef.current
+            if (map && fix) {
+              map.easeTo({ center: fix, zoom: Math.max(map.getZoom(), 17), duration: 300 })
+            }
+          }}
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            zIndex: 2,
+            background: followRover ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
+            color: followRover ? '#0b1220' : '#cdd6f4',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 10,
+            padding: '8px 12px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+          }}
+        >
+          {followRover ? 'Following rover' : 'Follow rover'}
+        </button>
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            background: 'rgba(11, 18, 32, 0.8)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 8,
+            padding: '6px 10px',
+            fontSize: '12px',
+            color: '#cdd6f4',
+            zIndex: 1,
+            pointerEvents: 'none',
+            minWidth: 170,
+          }}
+        >
         <div><strong>Lat/Lon:</strong> {fix ? `${fix[1].toFixed(6)}, ${fix[0].toFixed(6)}` : '—'}</div>
         <div><strong>Heading:</strong> {headingDeg != null ? `${headingDeg.toFixed(1)}°` : '—'}</div>
         <div>
@@ -846,6 +824,16 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
             {baseHeadingApplied != null ? `${baseHeadingApplied.toFixed(1)}°` : '—'}
           </span>
         </div>
+      </div>
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: '12px',
+          color: '#a9b8d0',
+        }}
+      >
+        Make sure `mr2_base/path_to_geopath` is launched to stream GeoPath overlays.
       </div>
     </div>
   )

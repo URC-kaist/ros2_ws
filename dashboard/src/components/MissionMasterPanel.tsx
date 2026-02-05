@@ -387,16 +387,24 @@ const MissionMasterPanel = ({
                 placeholder="mission_id"
                 min={0}
               />
-              {COMMANDS.map((cmd) => (
-                <button
-                  key={cmd.id}
-                  type="button"
-                  className="mission-master__button"
-                  onClick={() => handleSendControl(cmd.id)}
-                >
-                  {cmd.label}
-                </button>
-              ))}
+              <div className="mission-master__control-buttons">
+                {COMMANDS.map((cmd) => (
+                  <button
+                    key={cmd.id}
+                    type="button"
+                    className={`mission-master__button ${
+                      cmd.label === 'Pause'
+                        ? 'mission-master__button--pause'
+                        : cmd.label === 'Resume'
+                        ? 'mission-master__button--resume'
+                        : 'mission-master__button--abort'
+                    }`}
+                    onClick={() => handleSendControl(cmd.id)}
+                  >
+                    {cmd.label}
+                  </button>
+                ))}
+              </div>
               <span className="mission-master__note">Send via SiK</span>
             </div>
           </section>

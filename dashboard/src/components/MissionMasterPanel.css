@@ -54,6 +54,22 @@
   color: #cdd6f4;
 }
 
+.mission-master__button--pause {
+  background: #4f8ff7;
+  color: #0b1220;
+}
+
+.mission-master__button--resume {
+  background: #ff6b6b;
+  color: #0b1220;
+}
+
+.mission-master__button--abort {
+  background: #0b1220;
+  color: #cdd6f4;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .mission-master__error {
   margin: 8px 0 0;
   color: #f88f7a;
@@ -174,6 +190,12 @@
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.mission-master__control-buttons {
+  display: flex;
+  gap: 24px;
+  align-items: center;
 }
 
 .mission-master__checkbox {

@@ -143,7 +143,7 @@ navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
     delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0 # 0 for north
-    broadcast_cartesian_transform: false # we do not use UTM
+    broadcast_cartesian_transform: true # we do use UTM (dashboard "toLL" conversion)
     publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: true
     wait_for_datum: true
@@ -159,7 +159,7 @@ navsat_transform_query: # copied configuration from navsat_transform
     delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0
-    broadcast_cartesian_transform: false # we do not use UTM
+    broadcast_cartesian_transform: true # we do use UTM (dashboard "toLL" conversion)
     publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: true
     wait_for_datum: true
