@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(mr2_action_interface REQUIRED)
 find_package(mr2_battery_monitor REQUIRED)
 find_package(ublox_ubx_msgs REQUIRED)
 find_package(rtcm_msgs REQUIRED)
@@ -28,6 +29,7 @@ ament_target_dependencies(
   geometry_msgs
   nav_msgs
   sensor_msgs
+  mr2_action_interface
   mr2_battery_monitor
   ublox_ubx_msgs
   rtcm_msgs

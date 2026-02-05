@@ -74,6 +74,7 @@ Incoming (dashboard -> gateway):
 - `cmd_drive` { `linear_x_m_s`, `linear_y_m_s`, `angular_z_rad_s` } (aliases: `x`, `y`, `yaw`)
 - `cmd_arm_twist` { `lin_x_m_s`, `lin_y_m_s`, `lin_z_m_s`, `ang_x_rad_s`, `ang_y_rad_s`, `ang_z_rad_s` }
 - `heartbeat` { }
+- `mission_control` { `command`, `clear_costmap`, `mission_id` }
 - `base_heading` { `heading_deg` } (compass heading of base antenna zero, degrees from true north)
 
 Outgoing (gateway -> dashboard):

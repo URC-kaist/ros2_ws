@@ -27,6 +27,7 @@ Notes:
 - `0x01` CMD_DRIVE
 - `0x02` CMD_ARM_TWIST
 - `0x03` HEARTBEAT
+- `0x04` MISSION_CONTROL
 - `0x10` TELEM_BATTERY_1
 - `0x11` TELEM_BATTERY_2
 - `0x20` TELEM_NAV
@@ -79,6 +80,16 @@ Expected behavior in higher-level code:
   window, publish zero drive and arm twist commands continuously until they resume.
 - The ROS bridge also emits heartbeats back over the SiK link to indicate the
   bridge is alive (used by the gateway/UI link status).
+
+### MISSION_CONTROL (msg_id 0x04)
+Payload size: 6 bytes
+
+- `uint8 command` (0=NOOP, 1=PAUSE, 2=RESUME, 3=ABORT)
+- `uint8 clear_costmap` (0/1)
+- `uint32 mission_id` (0 = current mission)
+
+ROS mapping: `mr2_action_interface/MissionControl`
+- `command`, `clear_costmap`, `mission_id` mapped 1:1.
 
 ### TELEM_BATTERY_1 / TELEM_BATTERY_2 (msg_id 0x10 / 0x11)
 Payload size: 16 bytes
@@ -154,11 +165,11 @@ Header: `mr2_sik_bridge/packets.hpp`
 
 Key functions:
 - `encode_cmd_drive`, `encode_cmd_arm_twist`, `encode_heartbeat`,
-  `encode_telem_battery` (battery 1 by default) / `encode_telem_battery` with
-  `battery_id`, `encode_telem_nav`
+  `encode_mission_control`, `encode_telem_battery` (battery 1 by default) /
+  `encode_telem_battery` with `battery_id`, `encode_telem_nav`
 - `decode_frame` (validates magic, size, CRC)
 - `decode_cmd_drive`, `decode_cmd_arm_twist`, `decode_heartbeat`,
-  `decode_telem_battery`, `decode_telem_nav`
+  `decode_mission_control`, `decode_telem_battery`, `decode_telem_nav`
 
 ## Behavior Expectations (out of scope for this package)
 

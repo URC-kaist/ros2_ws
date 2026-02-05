@@ -198,6 +198,24 @@ std::vector<uint8_t> encode_heartbeat(uint8_t seq, const Heartbeat &hb) {
   return finalize_frame(header, payload);
 }
 
+std::vector<uint8_t> encode_mission_control(uint8_t seq,
+                                            const MissionControl &ctrl) {
+  std::vector<uint8_t> payload;
+  payload.reserve(6);
+  ByteWriter writer(&payload);
+  writer.write_u8(ctrl.command);
+  writer.write_u8(static_cast<uint8_t>(ctrl.clear_costmap ? 1 : 0));
+  writer.write_u32(ctrl.mission_id);
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kMissionControl;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
 std::vector<uint8_t> encode_telem_battery(uint8_t seq,
                                           const TelemBattery &telem) {
   return encode_telem_battery(seq, telem, 1);
@@ -385,6 +403,23 @@ std::optional<Heartbeat> decode_heartbeat(const Frame &frame) {
     return std::nullopt;
   }
   return hb;
+}
+
+std::optional<MissionControl> decode_mission_control(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kMissionControl ||
+      frame.payload.size() != 6) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  MissionControl ctrl;
+  uint8_t clear = 0;
+  if (!reader.read_u8(&ctrl.command) || !reader.read_u8(&clear) ||
+      !reader.read_u32(&ctrl.mission_id)) {
+    return std::nullopt;
+  }
+  ctrl.clear_costmap = (clear != 0);
+  return ctrl;
 }
 
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame) {

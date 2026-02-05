@@ -20,6 +20,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
+#include "mr2_action_interface/msg/mission_control.hpp"
 #include "mr2_battery_monitor/msg/pack_telemetry.hpp"
 #include "mr2_sik_bridge/packets.hpp"
 #include "rclcpp/qos.hpp"
@@ -34,6 +35,7 @@ using mr2_sik_bridge::CmdArmTwist;
 using mr2_sik_bridge::CmdDrive;
 using mr2_sik_bridge::Frame;
 using mr2_sik_bridge::Heartbeat;
+using mr2_sik_bridge::MissionControl;
 using mr2_sik_bridge::TelemBattery;
 using mr2_sik_bridge::TelemNav;
 
@@ -54,6 +56,8 @@ class SikBridgeNode : public rclcpp::Node {
         nav_tx_rate_hz_(declare_parameter<double>("nav_tx_rate_hz", 2.0)),
         cmd_vel_topic_(
             declare_parameter<std::string>("cmd_vel_topic", "/base/cmd_vel")),
+        mission_control_topic_(declare_parameter<std::string>(
+            "mission_control_topic", "/mission_control")),
         arm_twist_topic_(declare_parameter<std::string>(
             "arm_twist_topic", "/moveit_servo/delta_twist_cmds")),
         arm_frame_id_(declare_parameter<std::string>("arm_frame_id", "base_link")),
@@ -71,6 +75,9 @@ class SikBridgeNode : public rclcpp::Node {
             "base_rtcm_topic", "/base/rtcm")),
         log_frames_(declare_parameter<bool>("log_frames", false)) {
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
+    mission_control_pub_ =
+        create_publisher<mr2_action_interface::msg::MissionControl>(
+            mission_control_topic_, 10);
     arm_twist_pub_ =
         create_publisher<geometry_msgs::msg::TwistStamped>(arm_twist_topic_, 10);
     base_svin_pub_ = create_publisher<ublox_ubx_msgs::msg::UBXNavSvin>(
@@ -271,6 +278,13 @@ class SikBridgeNode : public rclcpp::Node {
         }
         break;
       }
+      case mr2_sik_bridge::MsgId::kMissionControl: {
+        auto ctrl = mr2_sik_bridge::decode_mission_control(frame);
+        if (ctrl) {
+          handle_mission_control_(*ctrl);
+        }
+        break;
+      }
       case mr2_sik_bridge::MsgId::kBaseSvin: {
         auto svin = mr2_sik_bridge::decode_base_svin(frame);
         if (svin && base_svin_pub_) {
@@ -310,6 +324,20 @@ class SikBridgeNode : public rclcpp::Node {
       }
       default:
         break;
+    }
+  }
+
+  void handle_mission_control_(const MissionControl &ctrl) {
+    mr2_action_interface::msg::MissionControl msg;
+    msg.command = ctrl.command;
+    msg.clear_costmap = ctrl.clear_costmap;
+    msg.mission_id = ctrl.mission_id;
+    mission_control_pub_->publish(msg);
+    if (log_frames_) {
+      RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+                           "MISSION_CONTROL cmd=%u clear=%s mission_id=%u",
+                           ctrl.command, ctrl.clear_costmap ? "true" : "false",
+                           ctrl.mission_id);
     }
   }
 
@@ -566,6 +594,7 @@ class SikBridgeNode : public rclcpp::Node {
   double heartbeat_tx_rate_hz_;
   double nav_tx_rate_hz_;
   std::string cmd_vel_topic_;
+  std::string mission_control_topic_;
   std::string arm_twist_topic_;
   std::string arm_frame_id_;
   std::string nav_fix_topic_;
@@ -578,6 +607,8 @@ class SikBridgeNode : public rclcpp::Node {
 
   // ROS interfaces
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
+  rclcpp::Publisher<mr2_action_interface::msg::MissionControl>::SharedPtr
+      mission_control_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr arm_twist_pub_;
   rclcpp::Publisher<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr base_svin_pub_;
   rclcpp::Publisher<rtcm_msgs::msg::Message>::SharedPtr base_rtcm_pub_;

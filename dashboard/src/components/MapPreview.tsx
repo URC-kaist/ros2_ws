@@ -1,9 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { getRosBridgeClient } from '../lib/rosBridge'
 import { getSikGatewayClient } from '../lib/sikGateway'
 
-const MapPreview = () => {
+type PoseStamped = {
+  pose?: {
+    position?: {
+      x?: number
+      y?: number
+      z?: number
+    }
+  }
+}
+
+type PathMsg = {
+  poses?: PoseStamped[]
+}
+
+type MissionSpec = {
+  mission_id: number
+  mission_type: number
+  detection_method: number
+  object_type: number
+  target_latitude: number
+  target_longitude: number
+  target_radius: number
+  waypoint_count: number
+}
+
+const MAX_SMOOTHED_POINTS = 120
+const MAX_COVERAGE_POINTS = 300
+const MISSION_CIRCLE_STEPS = 64
+const WGS84_A = 6378137
+const RAD_TO_DEG = 180 / Math.PI
+const DEG_TO_RAD = Math.PI / 180
+
+type MapPreviewProps = {
+  missionList?: MissionSpec[]
+}
+
+const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
@@ -18,6 +55,192 @@ const MapPreview = () => {
   const [baseHeadingDeg, setBaseHeadingDeg] = useState<number | null>(null)
   const [baseHeadingInput, setBaseHeadingInput] = useState('')
   const [baseHeadingApplied, setBaseHeadingApplied] = useState<number | null>(null)
+  const [smoothedPath, setSmoothedPath] = useState<[number, number][]>([])
+  const [coveragePath, setCoveragePath] = useState<[number, number][]>([])
+  const [objectPose, setObjectPose] = useState<[number, number] | null>(null)
+  const smoothedRawRef = useRef<PathMsg | null>(null)
+  const coverageRawRef = useRef<PathMsg | null>(null)
+  const objectRawRef = useRef<PoseStamped | null>(null)
+  const toLLCacheRef = useRef<Map<string, [number, number]>>(new Map())
+  const smoothedLatestRef = useRef<PathMsg | null>(null)
+  const smoothedBusyRef = useRef(false)
+  const smoothedVersionRef = useRef(0)
+  const coverageReqRef = useRef(0)
+  const objectReqRef = useRef(0)
+
+  type ToLLRequest = {
+    map_point: {
+      x: number
+      y: number
+      z: number
+    }
+  }
+
+  type ToLLResponse = {
+    ll_point?: {
+      latitude?: number
+      longitude?: number
+      altitude?: number
+    }
+  }
+
+  const toLL = async (x: number, y: number, z = 0): Promise<[number, number] | null> => {
+    const key = `${x},${y},${z}`
+    const cached = toLLCacheRef.current.get(key)
+    if (cached) return cached
+    const ros = getRosBridgeClient()
+    if (!ros.isConnected()) return null
+    try {
+      const res = await ros.callService<ToLLRequest, ToLLResponse>(
+        '/toLL',
+        'robot_localization/srv/ToLL',
+        { map_point: { x, y, z } }
+      )
+      const lat = Number(res?.ll_point?.latitude)
+      const lon = Number(res?.ll_point?.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+      const coord: [number, number] = [lon, lat]
+      toLLCacheRef.current.set(key, coord)
+      return coord
+    } catch {
+      return null
+    }
+  }
+
+  const convertPath = async (
+    msg: PathMsg | null,
+    maxPoints: number
+  ): Promise<[number, number][]> => {
+    const poses = msg?.poses ?? []
+    if (poses.length === 0) return []
+    const step =
+      poses.length > maxPoints ? Math.ceil(poses.length / maxPoints) : 1
+    const coords: [number, number][] = []
+    for (let i = 0; i < poses.length; i += step) {
+      const position = poses[i]?.pose?.position
+      const x = Number(position?.x)
+      const y = Number(position?.y)
+      const z = Number(position?.z ?? 0)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      const ll = await toLL(x, y, Number.isFinite(z) ? z : 0)
+      if (ll) coords.push(ll)
+    }
+    return coords
+  }
+
+  const convertPose = async (msg: PoseStamped | null): Promise<[number, number] | null> => {
+    const position = msg?.pose?.position
+    const x = Number(position?.x)
+    const y = Number(position?.y)
+    const z = Number(position?.z ?? 0)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+    return toLL(x, y, Number.isFinite(z) ? z : 0)
+  }
+
+  const processLatestSmoothed = () => {
+    if (smoothedBusyRef.current) return
+    const latest = smoothedLatestRef.current
+    if (!latest) return
+    smoothedBusyRef.current = true
+    const versionAtStart = smoothedVersionRef.current
+    const poseCount = latest.poses?.length ?? 0
+    void convertPath(latest, MAX_SMOOTHED_POINTS)
+      .then((coords) => {
+        if (coords.length > 0 || poseCount === 0) {
+          setSmoothedPath(coords)
+        }
+      })
+      .finally(() => {
+        smoothedBusyRef.current = false
+        if (smoothedVersionRef.current !== versionAtStart) {
+          processLatestSmoothed()
+        }
+      })
+  }
+
+  const buildMissionPointFeatures = (missions: MissionSpec[]) => {
+    const total = missions.length
+    const toColor = (index: number) => {
+      if (total <= 1) return '#ff4d4d'
+      const t = index / (total - 1)
+      let r = 0
+      let g = 0
+      let b = 0
+      if (t <= 0.5) {
+        const local = t / 0.5
+        r = Math.round(255 * (1 - local))
+        g = Math.round(255 * local)
+      } else {
+        const local = (t - 0.5) / 0.5
+        g = Math.round(255 * (1 - local))
+        b = Math.round(255 * local)
+      }
+      return `#${r.toString(16).padStart(2, '0')}${g
+        .toString(16)
+        .padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+    }
+
+    return missions
+      .filter(
+        (mission) =>
+          Number.isFinite(mission.target_longitude) &&
+          Number.isFinite(mission.target_latitude)
+      )
+      .map((mission, index) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [mission.target_longitude, mission.target_latitude],
+        },
+        properties: {
+          order_color: toColor(index),
+          mission_id: mission.mission_id,
+          mission_type: mission.mission_type,
+          detection_method: mission.detection_method,
+          object_type: mission.object_type,
+          target_radius: mission.target_radius,
+        },
+      }))
+  }
+
+  const buildMissionCircle = (lon: number, lat: number, radius: number) => {
+    const latRad = lat * DEG_TO_RAD
+    const coords: [number, number][] = []
+    for (let i = 0; i <= MISSION_CIRCLE_STEPS; i += 1) {
+      const theta = (2 * Math.PI * i) / MISSION_CIRCLE_STEPS
+      const dLat = (radius * Math.sin(theta)) / WGS84_A
+      const dLon = (radius * Math.cos(theta)) / (WGS84_A * Math.cos(latRad))
+      coords.push([lon + dLon * RAD_TO_DEG, lat + dLat * RAD_TO_DEG])
+    }
+    return coords
+  }
+
+  const buildMissionCircleFeatures = (missions: MissionSpec[]) =>
+    missions
+      .filter(
+        (mission) =>
+          Number.isFinite(mission.target_longitude) &&
+          Number.isFinite(mission.target_latitude) &&
+          Number.isFinite(mission.target_radius) &&
+          mission.target_radius > 0
+      )
+      .map((mission) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: [
+            buildMissionCircle(
+              mission.target_longitude,
+              mission.target_latitude,
+              mission.target_radius
+            ),
+          ],
+        },
+        properties: {
+          mission_id: mission.mission_id,
+          mission_type: mission.mission_type,
+        },
+      }))
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -66,6 +289,121 @@ const MapPreview = () => {
         paint: {
           'line-color': '#35d3c3',
           'line-width': 3,
+          'line-opacity': 0.7,
+        },
+      })
+      map.addSource('smoothed-path', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [] },
+          properties: {},
+        },
+      })
+      map.addLayer({
+        id: 'smoothed-path-line',
+        type: 'line',
+        source: 'smoothed-path',
+        paint: {
+          'line-color': '#4f8ff7',
+          'line-width': 2,
+          'line-opacity': 0.8,
+        },
+      })
+      map.addSource('coverage-path', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [] },
+          properties: {},
+        },
+      })
+      map.addLayer({
+        id: 'coverage-path-line',
+        type: 'line',
+        source: 'coverage-path',
+        paint: {
+          'line-color': '#f4d35e',
+          'line-width': 2,
+          'line-opacity': 0.8,
+        },
+      })
+      map.addSource('cover-object', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [] },
+          properties: {},
+        },
+      })
+      map.addLayer({
+        id: 'cover-object-point',
+        type: 'circle',
+        source: 'cover-object',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#ff7a59',
+          'circle-stroke-color': '#0b1220',
+          'circle-stroke-width': 1.5,
+        },
+      })
+      map.addSource('mission-targets', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
+      })
+      map.addLayer({
+        id: 'mission-targets-point',
+        type: 'circle',
+        source: 'mission-targets',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': ['get', 'order_color'],
+          'circle-stroke-color': '#0b1220',
+          'circle-stroke-width': 1.5,
+        },
+      })
+      map.addSource('mission-radii', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
+      })
+      map.addLayer({
+        id: 'mission-radii-fill',
+        type: 'fill',
+        source: 'mission-radii',
+        paint: {
+          'fill-color': [
+            'match',
+            ['get', 'mission_type'],
+            1,
+            'rgba(53, 211, 195, 0.15)',
+            2,
+            'rgba(244, 211, 94, 0.18)',
+            'rgba(255, 122, 89, 0.18)',
+          ],
+          'fill-opacity': 0,
+        },
+      })
+      map.addLayer({
+        id: 'mission-radii-outline',
+        type: 'line',
+        source: 'mission-radii',
+        paint: {
+          'line-color': [
+            'match',
+            ['get', 'mission_type'],
+            1,
+            '#35d3c3',
+            2,
+            '#f4d35e',
+            '#ff7a59',
+          ],
+          'line-width': 1.5,
           'line-opacity': 0.7,
         },
       })
@@ -141,6 +479,99 @@ const MapPreview = () => {
     const sik = getSikGatewayClient()
     sik.connect()
     sik.sendBaseHeading(normalized)
+  }, [])
+
+  useEffect(() => {
+    const ros = getRosBridgeClient()
+    ros.connect()
+    const handleSmoothedPath = (msg: PathMsg) => {
+      smoothedRawRef.current = msg
+      smoothedLatestRef.current = msg
+      smoothedVersionRef.current += 1
+      processLatestSmoothed()
+    }
+    const unsubPlanSmoothed = ros.subscribe<PathMsg>(
+      '/plan_smoothed',
+      'nav_msgs/msg/Path',
+      handleSmoothedPath,
+      { throttleRate: 250 }
+    )
+    const unsubCoverage = ros.subscribe<PathMsg>(
+      '/cover_vision/coverage_path',
+      'nav_msgs/msg/Path',
+      (msg) => {
+        coverageRawRef.current = msg
+        const poseCount = msg?.poses?.length ?? 0
+        const reqId = ++coverageReqRef.current
+        void convertPath(msg, MAX_COVERAGE_POINTS).then((coords) => {
+          if (reqId !== coverageReqRef.current) return
+          if (coords.length > 0 || poseCount === 0) {
+            setCoveragePath(coords)
+          }
+        })
+      },
+      { throttleRate: 250 }
+    )
+    const unsubObject = ros.subscribe<PoseStamped>(
+      '/cover_vision/object_pose',
+      'geometry_msgs/msg/PoseStamped',
+      (msg) => {
+        objectRawRef.current = msg
+        const reqId = ++objectReqRef.current
+        void convertPose(msg).then((coord) => {
+          if (reqId !== objectReqRef.current) return
+          if (coord) setObjectPose(coord)
+        })
+      },
+      { throttleRate: 250 }
+    )
+    return () => {
+      unsubPlanSmoothed()
+      unsubCoverage()
+      unsubObject()
+    }
+  }, [])
+
+  useEffect(() => {
+    const ros = getRosBridgeClient()
+    ros.connect()
+    const resync = () => {
+      if (smoothedRawRef.current) {
+        smoothedLatestRef.current = smoothedRawRef.current
+        smoothedVersionRef.current += 1
+        processLatestSmoothed()
+      }
+      if (coverageRawRef.current) {
+        const poseCount = coverageRawRef.current.poses?.length ?? 0
+        const reqId = ++coverageReqRef.current
+        void convertPath(coverageRawRef.current, MAX_COVERAGE_POINTS).then((coords) => {
+          if (reqId !== coverageReqRef.current) return
+          if (coords.length > 0 || poseCount === 0) {
+            setCoveragePath(coords)
+          }
+        })
+      }
+      if (objectRawRef.current) {
+        const reqId = ++objectReqRef.current
+        void convertPose(objectRawRef.current).then((coord) => {
+          if (reqId !== objectReqRef.current) return
+          if (coord) setObjectPose(coord)
+        })
+      }
+    }
+
+    const unsubscribe = ros.onConnectionStatus((connected) => {
+      if (!connected) return
+      resync()
+    })
+
+    if (ros.isConnected()) {
+      resync()
+    }
+
+    return () => {
+      unsubscribe()
+    }
   }, [])
 
   // Update marker + view when a fix arrives
@@ -250,6 +681,65 @@ const MapPreview = () => {
       properties: {},
     })
   }, [trail, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const pointSource = map.getSource('mission-targets') as
+      | maplibregl.GeoJSONSource
+      | undefined
+    if (pointSource) {
+      pointSource.setData({
+        type: 'FeatureCollection',
+        features: buildMissionPointFeatures(missionList),
+      })
+    }
+    const radiusSource = map.getSource('mission-radii') as
+      | maplibregl.GeoJSONSource
+      | undefined
+    if (radiusSource) {
+      radiusSource.setData({
+        type: 'FeatureCollection',
+        features: buildMissionCircleFeatures(missionList),
+      })
+    }
+  }, [missionList, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const source = map.getSource('smoothed-path') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: smoothedPath },
+      properties: {},
+    })
+  }, [smoothedPath, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const source = map.getSource('coverage-path') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: coveragePath },
+      properties: {},
+    })
+  }, [coveragePath, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const source = map.getSource('cover-object') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: objectPose ?? [] },
+      properties: {},
+    })
+  }, [objectPose, mapReady])
 
   return (
     <div className="map" ref={mapRef}>
@@ -361,4 +851,5 @@ const MapPreview = () => {
   )
 }
 
+export type { MissionSpec }
 export default MapPreview

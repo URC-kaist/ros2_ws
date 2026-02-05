@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import DeliveryPanel from './DeliveryPanel'
 import MapPreview from './MapPreview'
+import MissionMasterPanel from './MissionMasterPanel'
+import type { MissionSpec } from './MapPreview'
 import SystemStatusPanel from './SystemStatusPanel'
 import ArmServoCard from './ArmServoCard'
 import RocketM2Card from './RocketM2Card'
@@ -11,6 +14,8 @@ type MissionPanelsProps = {
 }
 
 const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
+  const [missionList, setMissionList] = useState<MissionSpec[]>([])
+  const [previewMissions, setPreviewMissions] = useState<MissionSpec[]>([])
   return (
     <section className="tab-panels">
       {activeTab === 'status' && <SystemStatusPanel />}
@@ -36,19 +41,35 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
       )}
 
       {activeTab === 'autonomous' && (
-        <div className="panel-grid" role="tabpanel">
-          <article className="card card--span-2 card--map">
-            <MapPreview />
-          </article>
-          <article className="card">
-            <h3>Autonomy Health</h3>
-            <p>Planner status, localization, and perception.</p>
-            <ul className="list">
-              <li>Localization: Green</li>
-              <li>Planner: Green</li>
-              <li>Perception: Yellow</li>
-            </ul>
-          </article>
+        <div className="autonomy-layout" role="tabpanel">
+          <div className="autonomy-left">
+            <article className="card card--map">
+              <MapPreview missionList={previewMissions} />
+            </article>
+            <article className="card">
+              <h3>Autonomy Health</h3>
+              <p>Planner status, localization, and perception.</p>
+              <div className="autonomy-health-table">
+                <div className="autonomy-health-row autonomy-health-header">
+                  <span>Localization</span>
+                  <span>Planner</span>
+                  <span>Perception</span>
+                </div>
+                <div className="autonomy-health-row">
+                  <span className="autonomy-health-cell autonomy-health-good">Green</span>
+                  <span className="autonomy-health-cell autonomy-health-good">Green</span>
+                  <span className="autonomy-health-cell autonomy-health-warn">Yellow</span>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div className="autonomy-right">
+            <MissionMasterPanel
+              missionList={missionList}
+              onMissionListChange={setMissionList}
+              onMissionPreview={setPreviewMissions}
+            />
+          </div>
         </div>
       )}
 

@@ -41,7 +41,7 @@ npm start -- --device /tmp/sik_sim1 --baud 57600 --port 8081
 ### WGS84 Shift Helper (East/North meters -> lat/lon)
 
 For quick/rough coordinate offsets on the WGS84 ellipsoid:
-Note: sim datum is (38.406738, -110.791397)... I think?
+Note: rover initial coordinate in sim is (38.406738, -110.791397)... I think?
 ```bash
 ./scripts/wgs84_shift.py 38.406738 --110.791397 100 100
 
@@ -69,7 +69,7 @@ Publish a GNSS-only mission list (single mission):
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
     {mission_id: 1, mission_type: 1, detection_method: 0, object_type: 0,
-     target_latitude: 38.4065, target_longitude: -110.7919,
+     target_latitude: 38.4065, target_longitude: -110.7900,
      target_radius: 0.0, waypoint_count: 0}
   ]
 }"
@@ -80,10 +80,10 @@ Publish a GNSS-only mission list (two missions):
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
     {mission_id: 2, mission_type: 1, detection_method: 0, object_type: 0,
-     target_latitude: 38.4067, target_longitude: -110.7916,
+     target_latitude: 38.4067, target_longitude: -110.7900,
      target_radius: 0.0, waypoint_count: 0},
     {mission_id: 3, mission_type: 1, detection_method: 0, object_type: 0,
-     target_latitude: 38.4065, target_longitude: -110.7919,
+     target_latitude: 38.4065, target_longitude: -110.7900,
      target_radius: 0.0, waypoint_count: 0}
   ]
 }"
@@ -94,7 +94,7 @@ Publish a CoverVision mission with ArUco:
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
     {mission_id: 5, mission_type: 2, detection_method: 2, object_type: 0,
-     target_latitude: 38.4065, target_longitude: -110.7919,
+     target_latitude: 38.4065, target_longitude: -110.7900,
      target_radius: 5.0, waypoint_count: 0}
   ]
 }"
@@ -105,16 +105,16 @@ Publish a CoverVision mission with ArUco and then YOLO:
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
     {mission_id: 4, mission_type: 1, detection_method: 1, object_type: 0,
-     target_latitude: 38.40645496, target_longitude: -110.79195724,
+     target_latitude: 38.40645496, target_longitude: -110.7900,
      target_radius: 0.0, waypoint_count: 0},
     {mission_id: 5, mission_type: 2, detection_method: 2, object_type: 0,
-     target_latitude: 38.4065, target_longitude: -110.7919,
+     target_latitude: 38.4065, target_longitude: -110.7900,
      target_radius: 5.0, waypoint_count: 0}
   ]
 }"
 ```
 
-Pause (optionally clear costmaps), resume, abort:
+Pause (optionally clear costmaps), resume, abort: (Sent via Sik!)
 ```bash
 ros2 topic pub -1 /mission_control mr2_action_interface/msg/MissionControl "{command: 1, clear_costmap: true, mission_id: 0}"
 ros2 topic pub -1 /mission_control mr2_action_interface/msg/MissionControl "{command: 2, clear_costmap: false, mission_id: 0}"
