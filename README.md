@@ -19,7 +19,9 @@ Launch ros2_ws (please change sim to real for rover.):
 source install/setup.bash
 
 # General entry
-ros2 launch mr2_launch rover.launch.py mode:=sim
+ros2 launch mr2_launch rover_sim.launch.py
+
+ros2 launch mr2_launch rover_real.launch.py enable_manipulator:=false enable_sik_sim:=false
 
 # Autonomous mission entry
 # You MUST ensure that EVERYTHING is brought up by rover.launch.py beforehand.
