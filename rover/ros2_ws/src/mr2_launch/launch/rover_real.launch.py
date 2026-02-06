@@ -119,12 +119,12 @@ def generate_launch_description():
     )
     left_gnss_serial_arg = DeclareLaunchArgument(
         "left_gnss_serial",
-        default_value="TowerRx_",
+        default_value="NorthRx_",
         description="USB serial string for the left F9P (empty selects first match)",
     )
     right_gnss_serial_arg = DeclareLaunchArgument(
         "right_gnss_serial",
-        default_value="NorthRx_",
+        default_value="TowerRx_",
         description="USB serial string for the right F9P (empty selects first match)",
     )
     left_gnss_frame_arg = DeclareLaunchArgument(
