@@ -826,15 +826,6 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
         </div>
       </div>
       </div>
-      <div
-        style={{
-          marginTop: 8,
-          fontSize: '12px',
-          color: '#a9b8d0',
-        }}
-      >
-        Make sure `mr2_base/path_to_geopath` is launched to stream GeoPath overlays.
-      </div>
     </div>
   )
 }
