@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="rover_gazebo_ros2_control" params="name ros2_control_config">
+  <xacro:macro name="rover_gazebo_ros2_control" params="name ros2_control_config enable_manipulator:=true">
+    <xacro:property name="enable_manipulator_value" value="${enable_manipulator}"/>
     <ros2_control name="${name}" type="system">
       <hardware>
         <plugin>gz_ros2_control/GazeboSimSystem</plugin>
@@ -65,36 +66,38 @@
       </joint>
 
       <!-- Arm joint interfaces -->
-      <joint name="arm_j1">
-        <command_interface name="position"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
-      <joint name="arm_j2">
-        <command_interface name="position"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
-      <joint name="arm_j3">
-        <command_interface name="position"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
-      <joint name="arm_j4">
-        <command_interface name="position"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
-      <joint name="arm_j5">
-        <command_interface name="position"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
-      <joint name="arm_j6">
-        <command_interface name="position"/>
-        <state_interface name="position"/>
-        <state_interface name="velocity"/>
-      </joint>
+      <xacro:if value="${enable_manipulator_value}">
+        <joint name="arm_j1">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </joint>
+        <joint name="arm_j2">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </joint>
+        <joint name="arm_j3">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </joint>
+        <joint name="arm_j4">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </joint>
+        <joint name="arm_j5">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </joint>
+        <joint name="arm_j6">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </joint>
+      </xacro:if>
     </ros2_control>
   </xacro:macro>
 

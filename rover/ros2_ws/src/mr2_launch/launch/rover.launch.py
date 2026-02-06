@@ -67,6 +67,11 @@ def generate_launch_description():
         default_value="false",
         description="Start mock AK servo nodes instead of hardware interfaces (real mode)",
     )
+    enable_manipulator_arg = DeclareLaunchArgument(
+        "enable_manipulator",
+        default_value="true",
+        description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
+    )
     use_servo_arg = DeclareLaunchArgument(
         "use_servo",
         default_value="false",
@@ -110,6 +115,7 @@ def generate_launch_description():
     real_condition = IfCondition(
         PythonExpression(["'", LaunchConfiguration("mode"), "' == 'real'"])
     )
+    enable_manipulator = LaunchConfiguration("enable_manipulator")
     sik_sim_condition = sim_condition
     use_sim_time_param = SetParameter(
         name="use_sim_time", value=LaunchConfiguration("use_sim_time")
@@ -161,6 +167,7 @@ def generate_launch_description():
             "controller_config": LaunchConfiguration("controller_config"),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
+            "enable_manipulator": enable_manipulator,
         }.items(),
         condition=real_condition,
     )
@@ -216,7 +223,17 @@ def generate_launch_description():
         launch_arguments={
             "use_sim_time": LaunchConfiguration("use_sim_time"),
         }.items(),
-        condition=UnlessCondition(LaunchConfiguration("use_servo")),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    enable_manipulator,
+                    "' == 'true' and '",
+                    LaunchConfiguration("use_servo"),
+                    "' != 'true'",
+                ]
+            )
+        ),
     )
 
     servo_launch = IncludeLaunchDescription(
@@ -228,7 +245,17 @@ def generate_launch_description():
         launch_arguments={
             "use_sim_time": LaunchConfiguration("use_sim_time"),
         }.items(),
-        condition=IfCondition(LaunchConfiguration("use_servo")),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    enable_manipulator,
+                    "' == 'true' and '",
+                    LaunchConfiguration("use_servo"),
+                    "' == 'true'",
+                ]
+            )
+        ),
     )
 
     rviz2 = Node(
@@ -330,6 +357,7 @@ def generate_launch_description():
         can_iface_arg,
         controller_config_arg,
         use_mock_servos_arg,
+        enable_manipulator_arg,
         use_servo_arg,
         sik_sim_device_arg,
         sik_sim_peer_arg,

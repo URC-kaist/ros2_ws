@@ -1,7 +1,7 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -26,10 +26,16 @@ def generate_launch_description():
     )
 
     use_sim_time = LaunchConfiguration("use_sim_time")
+    enable_manipulator = LaunchConfiguration("enable_manipulator")
     use_sim_time_arg = DeclareLaunchArgument(
         "use_sim_time",
         default_value="false",
         description="Use simulation time; normally false for hardware",
+    )
+    enable_manipulator_arg = DeclareLaunchArgument(
+        "enable_manipulator",
+        default_value="true",
+        description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
     )
 
     can_iface, can_iface_arg = declare_can_iface(
@@ -51,6 +57,7 @@ def generate_launch_description():
             "ros2_control_mode": "real_hardware",
             "can_iface": can_iface,
             "ros2_control_config": controller_config,
+            "enable_manipulator": enable_manipulator,
         },
     )
 
@@ -59,16 +66,30 @@ def generate_launch_description():
     mock_servos = mock_servo_nodes(
         can_iface,
         motor_ids=range(1, 7),
-        condition=IfCondition(use_mock_servos),
+        condition=IfCondition(
+            PythonExpression(
+                ["'", enable_manipulator, "' == 'true' and '", use_mock_servos, "' == 'true'"]
+            )
+        ),
     )
 
     ros2_control = ros2_control_node(controller_config, robot_description, use_sim_time)
     spawners = controller_spawners(
-        # ["joint_state_broadcaster", "rover_controller", "manipulator_controller", "gripper_position_controller"],
-        ["joint_state_broadcaster", "rover_controller", "manipulator_controller"],
+        ["joint_state_broadcaster", "rover_controller"],
         start_after=2.0,
         interval=2.0,
-        inactive_controllers=["manipulator_controller"],
+    )
+    manipulator_spawner = TimerAction(
+        period=6.0,
+        actions=[
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=["manipulator_controller", "--inactive"],
+                output="screen",
+                condition=IfCondition(enable_manipulator),
+            )
+        ],
     )
 
     battery_monitor = Node(
@@ -105,6 +126,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_sim_time_arg,
+            enable_manipulator_arg,
             can_iface_arg,
             controller_config_arg,
             use_mock_servos_arg,
@@ -112,6 +134,7 @@ def generate_launch_description():
             *mock_servos,
             ros2_control,
             *spawners,
+            manipulator_spawner,
             battery_monitor,
             battery_monitor_secondary,
         ]
