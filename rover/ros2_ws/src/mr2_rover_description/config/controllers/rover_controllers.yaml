@@ -13,6 +13,9 @@ controller_manager:
     manipulator_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    gripper_position_controller:
+      type: position_controllers/JointGroupPositionController
+
 rover_controller:
   ros__parameters:
     wheel_joints:
@@ -59,3 +62,9 @@ manipulator_controller:
     state_interfaces:
       - position
       - velocity
+
+gripper_position_controller:
+  ros__parameters:
+    joints:
+      - arm_gripper
+    interface_name: position

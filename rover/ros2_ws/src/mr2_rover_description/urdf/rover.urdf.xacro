@@ -3,9 +3,11 @@
   <xacro:arg name="can_iface" default="can0"/>
   <xacro:arg name="ros2_control_mode" default="gazebo"/>
   <xacro:arg name="ros2_control_config" default="$(find mr2_rover_description)/config/controllers/rover_controllers.yaml"/>
+  <xacro:arg name="enable_manipulator" default="true"/>
   <xacro:property name="ros2_control_mode_value" value="$(arg ros2_control_mode)"/>
   <xacro:property name="ros2_control_config_value" value="$(arg ros2_control_config)"/>
   <xacro:property name="can_iface_value" value="$(arg can_iface)"/>
+  <xacro:property name="enable_manipulator_value" value="$(arg enable_manipulator)"/>
   <xacro:property name="rover_mesh_prefix" value="file://$(find mr2_rover_description)/meshes/rover"/>
   <xacro:property name="rover_mesh_scale" value="0.01"/>
   <material name="Rubber">
@@ -27,13 +29,15 @@
   <xacro:swerve_module prefix="rr" parent="right_rocker" xyz="-0.476931 -0.0797 -0.18" direction="1"/>
   <xacro:swerve_module prefix="rl" parent="left_rocker" xyz="-0.476931 0.0797 -0.18" direction="-1"/>
   <!-- Manipulator -->
-  <xacro:manipulator/>
+  <xacro:if value="${enable_manipulator_value}">
+    <xacro:manipulator/>
+  </xacro:if>
 
   <xacro:if value="${ros2_control_mode_value == 'gazebo'}">
     <xacro:rover_gazebo_sensors ros2_control_config="${ros2_control_config_value}"/>
-    <xacro:rover_gazebo_ros2_control name="GazeboSimSystem" ros2_control_config="${ros2_control_config_value}"/>
+    <xacro:rover_gazebo_ros2_control name="GazeboSimSystem" ros2_control_config="${ros2_control_config_value}" enable_manipulator="${enable_manipulator_value}"/>
   </xacro:if>
   <xacro:if value="${ros2_control_mode_value == 'real_hardware'}">
-    <xacro:rover_can_ros2_control name="RoverCanSystem" can_iface="${can_iface_value}"/>
+    <xacro:rover_can_ros2_control name="RoverCanSystem" can_iface="${can_iface_value}" enable_manipulator="${enable_manipulator_value}"/>
   </xacro:if>
 </robot>
