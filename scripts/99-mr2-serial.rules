@@ -9,7 +9,10 @@
 # SUBSYSTEM=="tty", KERNEL=="ttyACM*", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", MODE:="0666", GROUP:="plugdev"
 #######################################################################
 SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="D30K21VR", MODE:="0666", GROUP:="dialout", SYMLINK+="ttySIK"
-SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{serial}=="200910120001", MODE:="0666", GROUP:="video", SYMLINK+="videoTOP"
+# Front camera (Suyin rev 0x5805)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", MODE:="0666", GROUP:="video", SYMLINK+="videoFRONT"
+# Top mast camera (Suyin rev 0x5801)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", MODE:="0666", GROUP:="video", SYMLINK+="videoTOP"
 
 # UBLOX ZED-F9P/F9R (CDC-ACM)
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", MODE="0666", GROUP="plugdev", ENV{ID_MM_DEVICE_IGNORE}="1"
