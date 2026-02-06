@@ -4,7 +4,10 @@
 ros2 run tf2_tools view_frames
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ros2 doctor --report > doctor.log # detect QoS mode mismatch failure
-rosdep install --from-paths src -y --ignore-src --rosdistro humble # under ros2_ws
+# under ros2_ws:
+rosdep install --from-paths src -y --ignore-src --rosdistro humble
+# But this will not solve every dependency issue.
+# ex: geographiclib, ros-humble-aruco-opencv-msgs, ...
 ros2 pkg create --build-type ament_cmake <package_name>
 ```
 
@@ -29,15 +32,29 @@ ros2 launch mr2_rover_auto navigation.launch.py mode:=sim \
 ```
 
 Scripts to host and receive web:
+Please install Node.js and npm!
 
 ``` bash
 # Rover hosting:
 # under scripts/ (requires sudo; installs nginx if missing)
+# please set  
 . deploy_dashboard.bash 2> dashboard_err.log
 
 # Base station SIK interface:
 # under base/gateway/
+# run `npm install` to install dependencies
 npm start -- --device /tmp/sik_sim1 --baud 57600 --port 8081
+```
+
+Nginx host mapping (for upstream like `mr2-ubuntu.local`):
+
+```bash
+# pick the correct IP for the upstream host (example: 192.168.1.50)
+sudo sh -c 'printf "\n127.0.0.1 mr2-ubuntu.local\n" >> /etc/hosts'
+
+# verify and reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 ### WGS84 Shift Helper (East/North meters -> lat/lon)
