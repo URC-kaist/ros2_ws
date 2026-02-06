@@ -13,6 +13,7 @@ def generate_launch_description():
     nav2_launch = os.path.join(pkg_share, "launch", "nav2.launch.py")
     pipeline_launch = os.path.join(pkg_share, "launch", "traversability_pipeline.launch.py")
     action_launch = os.path.join(pkg_share, "launch", "action.launch.py")
+    path_to_geopath_launch = os.path.join(pkg_share, "launch", "path_to_geopath.launch.py")
 
     launch_args = [
         DeclareLaunchArgument(
@@ -71,4 +72,13 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("launch_actions")),
     )
 
-    return LaunchDescription(launch_args + [pipeline_include, nav2_include, action_include])
+    path_to_geopath_include = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(path_to_geopath_launch),
+        launch_arguments={
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
+        }.items(),
+    )
+
+    return LaunchDescription(
+        launch_args + [pipeline_include, nav2_include, action_include, path_to_geopath_include]
+    )

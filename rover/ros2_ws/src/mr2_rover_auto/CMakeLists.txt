@@ -31,6 +31,9 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geographic_msgs REQUIRED)
+# https://stackoverflow.com/questions/48169653/finding-geographiclib-in-cmake-on-debian
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};/usr/share/cmake/geographiclib")
+find_package(GeographicLib REQUIRED)
 find_package(robot_localization REQUIRED)
 find_package(aruco_opencv_msgs REQUIRED)
 find_package(ublox_ubx_msgs REQUIRED)
@@ -130,6 +133,19 @@ ament_target_dependencies(mr2_rover_auto_gridmap_layer
   rclcpp nav2_costmap_2d grid_map_ros grid_map_core grid_map_msgs pluginlib
 )
 
+add_executable(path_to_geopath_node src/path_to_geopath_node.cpp)
+ament_target_dependencies(path_to_geopath_node
+  rclcpp nav_msgs sensor_msgs geographic_msgs tf2 tf2_ros tf2_geometry_msgs
+)
+if(TARGET GeographicLib::GeographicLib)
+  set(GEOGRAPHICLIB_LINK_TARGET GeographicLib::GeographicLib)
+else()
+  set(GEOGRAPHICLIB_LINK_TARGET ${GeographicLib_LIBRARIES})
+  target_include_directories(path_to_geopath_node PRIVATE ${GeographicLib_INCLUDE_DIRS})
+endif()
+# Use plain signature to match ament_target_dependencies linkage.
+target_link_libraries(path_to_geopath_node ${GEOGRAPHICLIB_LINK_TARGET})
+
 install(TARGETS
   gps_heading_gps_node
   gnss_only_server
@@ -144,6 +160,7 @@ install(TARGETS
   traversability_filter_node
   gridmap_to_occupancy_node
   gridmap_to_pointcloud_node
+  path_to_geopath_node
   DESTINATION lib/${PROJECT_NAME}/
 )
 
