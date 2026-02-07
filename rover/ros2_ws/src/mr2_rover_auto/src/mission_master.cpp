@@ -124,15 +124,15 @@ private:
   void on_mission_control(const MissionControl::SharedPtr msg)
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (msg->clear_costmap) {
+      clear_costmaps_locked();
+    }
     if (msg->command == CMD_PAUSE) {
       cancel_arrival_delay_locked();
       pause_requested_ = true;
       if (state_ == STATE_RUNNING) {
         state_ = STATE_PAUSED;
         cancel_active_goal_locked();
-      }
-      if (msg->clear_costmap) {
-        clear_costmaps_locked();
       }
       return;
     }
