@@ -216,6 +216,41 @@ std::vector<uint8_t> encode_mission_control(uint8_t seq,
   return finalize_frame(header, payload);
 }
 
+std::vector<uint8_t> encode_can_estop_request(uint8_t seq,
+                                              const CanEstopRequest &req) {
+  std::vector<uint8_t> payload;
+  payload.reserve(2);
+  ByteWriter writer(&payload);
+  writer.write_u8(req.request_id);
+  writer.write_u8(static_cast<uint8_t>(req.enable ? 1 : 0));
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kCanEstopRequest;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
+std::vector<uint8_t> encode_can_estop_response(uint8_t seq,
+                                               const CanEstopResponse &resp) {
+  std::vector<uint8_t> payload;
+  payload.reserve(3);
+  ByteWriter writer(&payload);
+  writer.write_u8(resp.request_id);
+  writer.write_u8(static_cast<uint8_t>(resp.enable ? 1 : 0));
+  writer.write_u8(static_cast<uint8_t>(resp.success ? 1 : 0));
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kCanEstopResponse;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
 std::vector<uint8_t> encode_telem_battery(uint8_t seq,
                                           const TelemBattery &telem) {
   return encode_telem_battery(seq, telem, 1);
@@ -420,6 +455,41 @@ std::optional<MissionControl> decode_mission_control(const Frame &frame) {
   }
   ctrl.clear_costmap = (clear != 0);
   return ctrl;
+}
+
+std::optional<CanEstopRequest> decode_can_estop_request(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kCanEstopRequest ||
+      frame.payload.size() != 2) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  CanEstopRequest req;
+  uint8_t enable = 0;
+  if (!reader.read_u8(&req.request_id) || !reader.read_u8(&enable)) {
+    return std::nullopt;
+  }
+  req.enable = (enable != 0);
+  return req;
+}
+
+std::optional<CanEstopResponse> decode_can_estop_response(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kCanEstopResponse ||
+      frame.payload.size() != 3) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  CanEstopResponse resp;
+  uint8_t enable = 0;
+  uint8_t success = 0;
+  if (!reader.read_u8(&resp.request_id) || !reader.read_u8(&enable) ||
+      !reader.read_u8(&success)) {
+    return std::nullopt;
+  }
+  resp.enable = (enable != 0);
+  resp.success = (success != 0);
+  return resp;
 }
 
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame) {

@@ -14,6 +14,8 @@ enum class MsgId : uint8_t {
   kCmdArmTwist = 0x02,
   kHeartbeat = 0x03,
   kMissionControl = 0x04,
+  kCanEstopRequest = 0x05,
+  kCanEstopResponse = 0x06,
   kTelemBattery1 = 0x10,
   kTelemBattery2 = 0x11,
   kTelemNav = 0x20,
@@ -55,6 +57,17 @@ struct MissionControl {
   uint8_t command{0};
   bool clear_costmap{false};
   uint32_t mission_id{0};
+};
+
+struct CanEstopRequest {
+  uint8_t request_id{0};
+  bool enable{false};
+};
+
+struct CanEstopResponse {
+  uint8_t request_id{0};
+  bool enable{false};
+  bool success{false};
 };
 
 struct TelemBattery {
@@ -111,6 +124,10 @@ std::vector<uint8_t> encode_cmd_arm_twist(uint8_t seq, const CmdArmTwist &cmd);
 std::vector<uint8_t> encode_heartbeat(uint8_t seq, const Heartbeat &hb);
 std::vector<uint8_t> encode_mission_control(uint8_t seq,
                                             const MissionControl &ctrl);
+std::vector<uint8_t> encode_can_estop_request(uint8_t seq,
+                                              const CanEstopRequest &req);
+std::vector<uint8_t> encode_can_estop_response(uint8_t seq,
+                                               const CanEstopResponse &resp);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem,
                                           uint8_t battery_id);
@@ -124,6 +141,8 @@ std::optional<CmdDrive> decode_cmd_drive(const Frame &frame);
 std::optional<CmdArmTwist> decode_cmd_arm_twist(const Frame &frame);
 std::optional<Heartbeat> decode_heartbeat(const Frame &frame);
 std::optional<MissionControl> decode_mission_control(const Frame &frame);
+std::optional<CanEstopRequest> decode_can_estop_request(const Frame &frame);
+std::optional<CanEstopResponse> decode_can_estop_response(const Frame &frame);
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame);
 std::optional<TelemNav> decode_telem_nav(const Frame &frame);
 std::optional<BaseSvin> decode_base_svin(const Frame &frame);

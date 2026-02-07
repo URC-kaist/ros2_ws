@@ -28,6 +28,8 @@ Notes:
 - `0x02` CMD_ARM_TWIST
 - `0x03` HEARTBEAT
 - `0x04` MISSION_CONTROL
+- `0x05` CAN_ESTOP_REQUEST
+- `0x06` CAN_ESTOP_RESPONSE
 - `0x10` TELEM_BATTERY_1
 - `0x11` TELEM_BATTERY_2
 - `0x20` TELEM_NAV
@@ -90,6 +92,21 @@ Payload size: 6 bytes
 
 ROS mapping: `mr2_action_interface/MissionControl`
 - `command`, `clear_costmap`, `mission_id` mapped 1:1.
+
+### CAN_ESTOP_REQUEST (msg_id 0x05)
+Payload size: 2 bytes
+
+- `uint8 request_id`
+- `uint8 enable` (0/1)
+
+Requests the rover to toggle `/can_hw/estop` via `std_srvs/SetBool`.
+
+### CAN_ESTOP_RESPONSE (msg_id 0x06)
+Payload size: 3 bytes
+
+- `uint8 request_id`
+- `uint8 enable` (0/1)
+- `uint8 success` (0/1)
 
 ### TELEM_BATTERY_1 / TELEM_BATTERY_2 (msg_id 0x10 / 0x11)
 Payload size: 16 bytes

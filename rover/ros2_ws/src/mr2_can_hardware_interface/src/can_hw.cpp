@@ -1,8 +1,10 @@
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <limits>
 #include <memory>
 #include <rclcpp/logging.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -39,6 +41,16 @@ public:
     }
 
     node_ = rclcpp::Node::make_shared("can_hw");
+    estop_srv_ = node_->create_service<std_srvs::srv::SetBool>(
+        "can_hw/estop",
+        [this](const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+               std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+          estop_active_.store(request->data, std::memory_order_relaxed);
+          response->success = true;
+          response->message.clear();
+          RCLCPP_WARN(node_->get_logger(), "E-stop %s",
+                      request->data ? "active" : "cleared");
+        });
 
     try {
       loader_ = std::make_shared<pluginlib::ClassLoader<CanDevice>>(
@@ -653,8 +665,10 @@ public:
       }
     }
 
-    for (auto &dev : devs_) {
-      dev->process(now);
+    if (!estop_active_.load(std::memory_order_relaxed)) { // E-Stop toggle (Jaeuk)
+      for (auto &dev : devs_) {
+        dev->process(now);
+      }
     }
 
     return return_type::OK;
@@ -751,8 +765,10 @@ private:
   bool homed_{false};
   bool homing_failed_{false};
   std::string homing_error_message_;
+  std::atomic<bool> estop_active_{false};
 
   rclcpp::Node::SharedPtr node_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr estop_srv_;
 };
 
 } // namespace mr2_can_hardware_interface

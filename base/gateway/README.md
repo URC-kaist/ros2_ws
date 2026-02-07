@@ -75,12 +75,14 @@ Incoming (dashboard -> gateway):
 - `cmd_arm_twist` { `lin_x_m_s`, `lin_y_m_s`, `lin_z_m_s`, `ang_x_rad_s`, `ang_y_rad_s`, `ang_z_rad_s` }
 - `heartbeat` { }
 - `mission_control` { `command`, `clear_costmap`, `mission_id` }
+- `can_estop` { `request_id`, `enable` } (`request_id` optional uint8; gateway will assign if omitted)
 - `base_heading` { `heading_deg` } (compass heading of base antenna zero, degrees from true north)
 
 Outgoing (gateway -> dashboard):
 - `telem_battery` { `battery_id`, `total_capacity_mah`, `available_capacity_mah`, `temperature_c`, `pack_voltage_v` }
 - `link_status` { `connected`, `last_rx_ms`, `last_tx_ms` }
 - `telem_nav` { `timestamp_ms`, `latitude_deg`, `longitude_deg`, `altitude_m`, `heading_deg`, `cov_x_var`, `cov_y_var`, `cov_yaw_var` }
+- `can_estop` { `request_id`, `enabled`, `success` }
 - `base_status` { `enabled`, `antenna_ready`, `auto_home`, `heading_offset_deg`, `base_lat_deg`, `base_lon_deg`, `base_alt_m`, `antenna_heading_deg`, `last_cmd_heading_deg`, `last_cmd_age_ms`, `base_fix_age_ms`, `rover_nav_age_ms`, `base_fix_valid`, `rover_nav_valid`, `idle_reason` }
 - `rocket_m2_status` { `connected`, `updated_at_ms`, `last_success_ms`, `signal`, `rssi`, `noisef`, `chwidth`, `rx_chainmask`, `chainrssi`, `chainrssimgmt`, `chainrssiext`, `error` }
 

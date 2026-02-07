@@ -26,6 +26,7 @@
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "ublox_ubx_msgs/msg/ubx_nav_svin.hpp"
 #include "rtcm_msgs/msg/message.hpp"
 
@@ -33,6 +34,8 @@ namespace mr2_sik_bridge {
 
 using mr2_sik_bridge::CmdArmTwist;
 using mr2_sik_bridge::CmdDrive;
+using mr2_sik_bridge::CanEstopRequest;
+using mr2_sik_bridge::CanEstopResponse;
 using mr2_sik_bridge::Frame;
 using mr2_sik_bridge::Heartbeat;
 using mr2_sik_bridge::MissionControl;
@@ -84,6 +87,7 @@ class SikBridgeNode : public rclcpp::Node {
         base_svin_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
     base_rtcm_pub_ = create_publisher<rtcm_msgs::msg::Message>(
         base_rtcm_topic_, rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
+    estop_client_ = create_client<std_srvs::srv::SetBool>("/can_hw/estop");
 
     battery_sub_1_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
         battery_1_topic_, rclcpp::SensorDataQoS(),
@@ -285,6 +289,13 @@ class SikBridgeNode : public rclcpp::Node {
         }
         break;
       }
+      case mr2_sik_bridge::MsgId::kCanEstopRequest: {
+        auto req = mr2_sik_bridge::decode_can_estop_request(frame);
+        if (req) {
+          handle_can_estop_(*req);
+        }
+        break;
+      }
       case mr2_sik_bridge::MsgId::kBaseSvin: {
         auto svin = mr2_sik_bridge::decode_base_svin(frame);
         if (svin && base_svin_pub_) {
@@ -372,6 +383,39 @@ class SikBridgeNode : public rclcpp::Node {
                            cmd.lin_x_m_s, cmd.lin_y_m_s, cmd.lin_z_m_s,
                            cmd.ang_x_rad_s, cmd.ang_y_rad_s, cmd.ang_z_rad_s);
     }
+  }
+
+  void handle_can_estop_(const CanEstopRequest &req) {
+    if (!estop_client_ || !estop_client_->service_is_ready()) {
+      CanEstopResponse resp;
+      resp.request_id = req.request_id;
+      resp.enable = req.enable;
+      resp.success = false;
+      send_can_estop_response_(resp);
+      return;
+    }
+
+    auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+    request->data = req.enable;
+    auto future = estop_client_->async_send_request(
+        request, [this, req](rclcpp::Client<std_srvs::srv::SetBool>::SharedFuture f) {
+          CanEstopResponse resp;
+          resp.request_id = req.request_id;
+          resp.enable = req.enable;
+          try {
+            const auto result = f.get();
+            resp.success = result->success;
+          } catch (const std::exception &e) {
+            resp.success = false;
+          }
+          send_can_estop_response_(resp);
+        });
+    (void)future;
+  }
+
+  void send_can_estop_response_(const CanEstopResponse &resp) {
+    auto frame = mr2_sik_bridge::encode_can_estop_response(next_seq_(), resp);
+    write_frame_(frame);
   }
 
   void handle_base_rtcm_frag_(uint8_t seq, const BaseRtcmFrag &frag) {
@@ -612,6 +656,7 @@ class SikBridgeNode : public rclcpp::Node {
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr arm_twist_pub_;
   rclcpp::Publisher<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr base_svin_pub_;
   rclcpp::Publisher<rtcm_msgs::msg::Message>::SharedPtr base_rtcm_pub_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr estop_client_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
       battery_sub_1_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr

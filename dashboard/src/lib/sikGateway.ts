@@ -79,6 +79,12 @@ export type RocketM2Status = {
   error: string | null
 }
 
+export type CanEstopResponse = {
+  request_id: number
+  enabled: boolean
+  success: boolean
+}
+
 type MessageHandler<T> = (payload: T) => void
 
 type RawTelemBattery = {
@@ -116,6 +122,7 @@ type GatewayMessage =
   | RawBaseStatus
   | RawRocketM2Status
   | ({ type: 'link_status' } & LinkStatus)
+  | ({ type: 'can_estop' } & CanEstopResponse)
 
 const DEFAULT_PATH = '/sik-ws'
 const HEARTBEAT_TIMEOUT_MS = 2000
@@ -151,7 +158,9 @@ class SikGatewayClient {
   private navListeners = new Set<MessageHandler<TelemNav>>()
   private baseStatusListeners = new Set<MessageHandler<BaseStatus>>()
   private rocketM2Listeners = new Set<MessageHandler<RocketM2Status>>()
+  private canEstopListeners = new Set<MessageHandler<CanEstopResponse>>()
   private pendingBaseHeading: number | null = null
+  private canEstopSeq = 0
   private url: string
 
   constructor(url: string) {
@@ -224,6 +233,10 @@ class SikGatewayClient {
         for (const listener of this.rocketM2Listeners) {
           listener(message)
         }
+      } else if (message.type === 'can_estop') {
+        for (const listener of this.canEstopListeners) {
+          listener(message)
+        }
       } else if (message.type === 'link_status') {
         this.lastLinkStatus = message
         this.linkConnected = message.connected
@@ -264,6 +277,11 @@ class SikGatewayClient {
     return () => this.rocketM2Listeners.delete(handler)
   }
 
+  onCanEstop(handler: MessageHandler<CanEstopResponse>) {
+    this.canEstopListeners.add(handler)
+    return () => this.canEstopListeners.delete(handler)
+  }
+
   sendCmdDrive(cmd: CmdDrive) {
     this.send({
       type: 'cmd_drive',
@@ -291,6 +309,19 @@ class SikGatewayClient {
       clear_costmap: control.clear_costmap,
       mission_id: control.mission_id,
     })
+  }
+
+  sendCanEstop(enable: boolean, requestId?: number) {
+    const id =
+      requestId != null
+        ? Math.min(255, Math.max(0, Math.floor(requestId)))
+        : this.nextCanEstopId()
+    this.send({
+      type: 'can_estop',
+      request_id: id,
+      enable,
+    })
+    return id
   }
 
   sendBaseHeading(headingDeg: number) {
@@ -354,6 +385,12 @@ class SikGatewayClient {
     for (const listener of this.connectionListeners) {
       listener(connected)
     }
+  }
+
+  private nextCanEstopId() {
+    const id = this.canEstopSeq
+    this.canEstopSeq = (this.canEstopSeq + 1) & 0xff
+    return id
   }
 
   private scheduleReconnect() {

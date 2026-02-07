@@ -12,6 +12,7 @@ find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(mr2_action_interface REQUIRED)
 find_package(mr2_battery_monitor REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(ublox_ubx_msgs REQUIRED)
 find_package(rtcm_msgs REQUIRED)
 add_library(${PROJECT_NAME} src/packets.cpp)
@@ -31,6 +32,7 @@ ament_target_dependencies(
   sensor_msgs
   mr2_action_interface
   mr2_battery_monitor
+  std_srvs
   ublox_ubx_msgs
   rtcm_msgs
 )

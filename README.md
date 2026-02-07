@@ -70,6 +70,17 @@ Note: rover initial coordinate in sim is (38.406738, -110.791397)... I think?
 ./scripts/wgs84_shift.py --wgs84 "38.4065,-110.7919" 100 100 --format json
 ```
 
+### CAN E-Stop (ros2_control)
+
+The CAN hardware interface exposes a simple E-stop toggle service. When enabled, `can_hw` stops sending all outbound CAN commands (motors will timeout on the bus). Use:
+```bash
+ros2 service call /can_hw/estop std_srvs/srv/SetBool "{data: true}"  # enable
+ros2 service call /can_hw/estop std_srvs/srv/SetBool "{data: false}" # clear
+```
+Return format (`std_srvs/srv/SetBool`):
+- `success` (bool): `true` if the request was accepted.
+- `message` (string): unused (empty).
+
 ### Mission Master Topics (Publish + Monitor)
 
 Mission Master subscribes to:

@@ -11,6 +11,7 @@ find_package(mr2_can_bus_core REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(transmission_interface REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
@@ -30,6 +31,7 @@ ament_target_dependencies(${PROJECT_NAME}
   hardware_interface
   pluginlib
   rclcpp
+  std_srvs
   transmission_interface)
 
 pluginlib_export_plugin_description_file(hardware_interface plugin.xml)

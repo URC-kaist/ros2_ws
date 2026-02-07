@@ -166,6 +166,8 @@ const MsgId = {
   CMD_ARM_TWIST: 0x02,
   HEARTBEAT: 0x03,
   MISSION_CONTROL: 0x04,
+  CAN_ESTOP_REQUEST: 0x05,
+  CAN_ESTOP_RESPONSE: 0x06,
   TELEM_BATTERY_1: 0x10,
   TELEM_BATTERY_2: 0x11,
   TELEM_NAV: 0x20,
@@ -195,6 +197,7 @@ let rocketM2PollTimer = null
 let rocketM2PollInFlight = false
 let rocketM2CookiePath = null
 let rocketM2LastError = null
+let estopRequestSeq = 0
 
 function schedulePortReconnect() {
   if (portReconnectTimer) return
@@ -645,6 +648,13 @@ function encodeMissionControl(cmd) {
   return encodeFrame(MsgId.MISSION_CONTROL, nextSeq(), payload)
 }
 
+function encodeCanEstopRequest(cmd) {
+  const payload = Buffer.alloc(2)
+  payload.writeUInt8(cmd.request_id & 0xff, 0)
+  payload.writeUInt8(cmd.enable ? 1 : 0, 1)
+  return encodeFrame(MsgId.CAN_ESTOP_REQUEST, nextSeq(), payload)
+}
+
 function encodeBaseSvin(msg) {
   // Payload: int32 mean_x/y/z cm (12), int8 mean_xhp/mean_yhp/mean_zhp (3),
   // uint8 valid, uint8 active (2), uint32 mean_acc_0p1mm, uint32 obs (8) => 25 bytes
@@ -720,6 +730,14 @@ function decodeTelemNav(payload) {
     cov_y_var: payload.readFloatLE(24),
     cov_yaw_var: payload.readFloatLE(28),
   }
+}
+
+function decodeCanEstopResponse(payload) {
+  if (payload.length !== 3) return null
+  const requestId = payload.readUInt8(0)
+  const enabled = payload.readUInt8(1) !== 0
+  const success = payload.readUInt8(2) !== 0
+  return { request_id: requestId, enabled, success }
 }
 
 function writeFrame(frame) {
@@ -798,6 +816,21 @@ function handleDashboardMessage(msg) {
       clear_costmap: clearCostmap,
       mission_id: missionId,
     })
+    writeFrame(frame)
+    return
+  }
+
+  if (type === 'can_estop') {
+    let requestId = 0
+    if (msg.request_id != null) {
+      const requestIdRaw = coerceNumber(msg.request_id)
+      requestId = Math.min(255, Math.max(0, Math.floor(requestIdRaw)))
+    } else {
+      requestId = estopRequestSeq
+      estopRequestSeq = (estopRequestSeq + 1) & 0xff
+    }
+    const enable = Boolean(msg.enable)
+    const frame = encodeCanEstopRequest({ request_id: requestId, enable })
     writeFrame(frame)
     return
   }
@@ -921,6 +954,14 @@ function handleFrame(msgId, payload) {
       antennaTracker.updateRoverNav(nav)
     }
     broadcast({ type: 'telem_nav', ...nav })
+    return
+  }
+
+  if (msgId === MsgId.CAN_ESTOP_RESPONSE) {
+    const resp = decodeCanEstopResponse(payload)
+    if (!resp) return
+    broadcast({ type: 'can_estop', ...resp })
+    return
   }
 }
 

@@ -14,6 +14,7 @@
   <depend>sensor_msgs</depend>
   <depend>mr2_action_interface</depend>
   <depend>mr2_battery_monitor</depend>
+  <depend>std_srvs</depend>
   <depend>ublox_ubx_msgs</depend>
   <depend>rtcm_msgs</depend>
 
