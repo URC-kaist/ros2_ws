@@ -37,7 +37,7 @@ Scripts to host and receive web:
 Please install Node.js and npm!
 
 ``` bash
-# Rover hosting:
+# Building dashboard:
 # under scripts/ (requires sudo; installs nginx if missing)
 # please set  
 . deploy_dashboard.bash 2> dashboard_err.log

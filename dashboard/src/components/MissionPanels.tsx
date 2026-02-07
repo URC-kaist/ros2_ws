@@ -7,6 +7,7 @@ import SystemStatusPanel from './SystemStatusPanel'
 import ArmServoCard from './ArmServoCard'
 import RocketM2Card from './RocketM2Card'
 import SpectrophotometerCard from './SpectrophotometerCard'
+import AutonomyHealthCard from './AutonomyHealthCard'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -46,22 +47,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
             <article className="card card--map">
               <MapPreview missionList={previewMissions} />
             </article>
-            <article className="card">
-              <h3>Autonomy Health</h3>
-              <p>Planner status, localization, and perception.</p>
-              <div className="autonomy-health-table">
-                <div className="autonomy-health-row autonomy-health-header">
-                  <span>Localization</span>
-                  <span>Planner</span>
-                  <span>Perception</span>
-                </div>
-                <div className="autonomy-health-row">
-                  <span className="autonomy-health-cell autonomy-health-good">Green</span>
-                  <span className="autonomy-health-cell autonomy-health-good">Green</span>
-                  <span className="autonomy-health-cell autonomy-health-warn">Yellow</span>
-                </div>
-              </div>
-            </article>
+            <AutonomyHealthCard />
           </div>
           <div className="autonomy-right">
             <MissionMasterPanel
