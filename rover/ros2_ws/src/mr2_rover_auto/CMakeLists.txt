@@ -19,7 +19,6 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_bringup REQUIRED)
-find_package(nav2_costmap_2d REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_behavior_tree REQUIRED)
 find_package(tf2 REQUIRED)
@@ -77,19 +76,9 @@ rclcpp rclcpp_action nav2_msgs geometry_msgs nav_msgs sensor_msgs
 tf2 tf2_ros tf2_geometry_msgs mr2_action_interface robot_localization
 )
 
-add_executable(gnss_only_client src/gnss_only_client.cpp)
-ament_target_dependencies(gnss_only_client
-rclcpp rclcpp_action mr2_action_interface
-)
-
 add_executable(base_datum_setter src/base_datum_setter.cpp)
 ament_target_dependencies(base_datum_setter
   rclcpp geographic_msgs robot_localization ublox_ubx_msgs
-)
-
-add_executable(cover_vision_client src/cover_vision_client.cpp)
-ament_target_dependencies(cover_vision_client
-rclcpp rclcpp_action mr2_action_interface
 )
 
 add_executable(cover_vision_yolo_adapter src/cover_vision_yolo_adapter.cpp)
@@ -128,11 +117,6 @@ ament_target_dependencies(gridmap_to_pointcloud_node
   rclcpp grid_map_msgs grid_map_core grid_map_ros sensor_msgs
 )
 
-add_library(mr2_rover_auto_gridmap_layer SHARED src/gridmap_traversability_layer.cpp)
-ament_target_dependencies(mr2_rover_auto_gridmap_layer
-  rclcpp nav2_costmap_2d grid_map_ros grid_map_core grid_map_msgs pluginlib
-)
-
 add_executable(path_to_geopath_node src/path_to_geopath_node.cpp)
 ament_target_dependencies(path_to_geopath_node
   rclcpp nav_msgs sensor_msgs geographic_msgs tf2 tf2_ros tf2_geometry_msgs
@@ -150,8 +134,6 @@ install(TARGETS
   gps_heading_gps_node
   gnss_only_server
   cover_vision_server
-  gnss_only_client
-  cover_vision_client
   cover_vision_yolo_adapter
   cover_vision_aruco_adapter
   mission_master
@@ -164,17 +146,10 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}/
 )
 
-install(TARGETS mr2_rover_auto_gridmap_layer
-  LIBRARY DESTINATION lib
-)
-
 install( DIRECTORY include DESTINATION include )
 install( DIRECTORY launch DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY config DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY behavior_trees DESTINATION share/${PROJECT_NAME}/)
 install( DIRECTORY maps DESTINATION share/${PROJECT_NAME}/ )
-install( FILES mr2_rover_auto_plugins.xml DESTINATION share/${PROJECT_NAME}/ )
-
-pluginlib_export_plugin_description_file(nav2_costmap_2d mr2_rover_auto_plugins.xml)
 
 ament_package()
