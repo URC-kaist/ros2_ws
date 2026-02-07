@@ -64,14 +64,75 @@ const OBJECT_TYPE_VALUES = new Set(OBJECT_TYPES.map((item) => item.value))
 
 type InvalidFieldMap = Record<number, Record<string, boolean>>
 
+const STORAGE_SLOT_COUNT = 3
+const STORAGE_PREFIX = 'missionListSlot'
+const CSV_HEADERS = [
+  'mission_id',
+  'mission_type',
+  'detection_method',
+  'object_type',
+  'target_latitude',
+  'target_longitude',
+  'target_radius',
+  'waypoint_count',
+] as const
+
+const missionListToCsv = (missions: MissionSpec[]) => {
+  const header = CSV_HEADERS.join(',')
+  const rows = missions.map((mission) => {
+    const record = mission as Record<string, number>
+    return CSV_HEADERS.map((key) =>
+      Number.isFinite(record[key]) ? String(record[key]) : ''
+    ).join(',')
+  })
+  return [header, ...rows].join('\n')
+}
+
+const csvToMissionList = (csv: string) => {
+  const rows = csv
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+  if (!rows.length) return []
+  const firstCells = rows[0].split(',').map((cell) => cell.trim().toLowerCase())
+  const hasHeader = CSV_HEADERS.every(
+    (header, index) => firstCells[index] === header.toLowerCase()
+  )
+  const start = hasHeader ? 1 : 0
+  const missions: MissionSpec[] = []
+  for (let i = start; i < rows.length; i += 1) {
+    const cells = rows[i].split(',').map((cell) => cell.trim())
+    if (cells.length < CSV_HEADERS.length) continue
+    const values = cells
+      .slice(0, CSV_HEADERS.length)
+      .map((value) => Number.parseFloat(value))
+    if (values.some((value) => !Number.isFinite(value))) continue
+    missions.push({
+      mission_id: values[0],
+      mission_type: values[1],
+      detection_method: values[2],
+      object_type: values[3],
+      target_latitude: values[4],
+      target_longitude: values[5],
+      target_radius: values[6],
+      waypoint_count: values[7],
+    })
+  }
+  return missions
+}
+
 type MissionMasterPanelProps = {
   missionList: MissionSpec[]
+  grabFromMap: boolean
+  onGrabFromMapChange: (enabled: boolean) => void
   onMissionListChange: (missions: MissionSpec[]) => void
   onMissionPreview: (missions: MissionSpec[]) => void
 }
 
 const MissionMasterPanel = ({
   missionList,
+  grabFromMap,
+  onGrabFromMapChange,
   onMissionListChange,
   onMissionPreview,
 }: MissionMasterPanelProps) => {
@@ -85,6 +146,10 @@ const MissionMasterPanel = ({
   const [invalidFields, setInvalidFields] = useState<InvalidFieldMap>({})
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [storageSlot, setStorageSlot] = useState(1)
+  const [storageNote, setStorageNote] = useState<{ message: string; isError: boolean } | null>(
+    null
+  )
 
   useEffect(() => {
     const ros = rosRef.current
@@ -296,10 +361,16 @@ const MissionMasterPanel = ({
   }
 
   const addMission = () => {
+    const nextId =
+      missionList.reduce(
+        (max, mission) =>
+          Number.isFinite(mission.mission_id) ? Math.max(max, mission.mission_id) : max,
+        0
+      ) + 1
     onMissionListChange([
       ...missionList,
       {
-        mission_id: missionList.length + 1,
+        mission_id: nextId,
         mission_type: 1,
         detection_method: 0,
         object_type: 0,
@@ -313,6 +384,40 @@ const MissionMasterPanel = ({
 
   const removeMission = (index: number) => {
     onMissionListChange(missionList.filter((_, i) => i !== index))
+  }
+
+  const handleSaveTable = () => {
+    if (typeof window === 'undefined') return
+    const key = `${STORAGE_PREFIX}${storageSlot}`
+    window.localStorage.setItem(key, missionListToCsv(missionList))
+    setStorageNote({
+      message: `Saved ${missionList.length} missions to slot ${storageSlot}.`,
+      isError: false,
+    })
+  }
+
+  const handleLoadTable = () => {
+    if (typeof window === 'undefined') return
+    const key = `${STORAGE_PREFIX}${storageSlot}`
+    const stored = window.localStorage.getItem(key)
+    if (!stored) {
+      setStorageNote({ message: `Slot ${storageSlot} is empty.`, isError: true })
+      return
+    }
+    const missions = csvToMissionList(stored)
+    if (missions.length === 0) {
+      setStorageNote({
+        message: `Slot ${storageSlot} has no readable missions.`,
+        isError: true,
+      })
+      return
+    }
+    onMissionListChange(missions)
+    setInvalidFields({})
+    setStorageNote({
+      message: `Loaded ${missions.length} missions from slot ${storageSlot}.`,
+      isError: false,
+    })
   }
 
   return (
@@ -417,6 +522,16 @@ const MissionMasterPanel = ({
               </button>
               <button
                 type="button"
+                className={`mission-master__button mission-master__button--toggle ${
+                  grabFromMap ? 'mission-master__button--toggle-active' : ''
+                }`}
+                onClick={() => onGrabFromMapChange(!grabFromMap)}
+                aria-pressed={grabFromMap}
+              >
+                Grab from map
+              </button>
+              <button
+                type="button"
                 className="mission-master__button mission-master__button--ghost"
                 onClick={handlePreviewMissionList}
               >
@@ -429,6 +544,53 @@ const MissionMasterPanel = ({
               >
                 Send MissionList
               </button>
+            </div>
+            <div className="mission-master__storage">
+              <div className="mission-master__storage-row">
+                <span className="mission-master__storage-label">Table slots</span>
+                <div className="mission-master__slot-group">
+                  {Array.from({ length: STORAGE_SLOT_COUNT }, (_, index) => {
+                    const slot = index + 1
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        className={`mission-master__slot-button ${
+                          storageSlot === slot ? 'mission-master__slot-button--active' : ''
+                        }`}
+                        onClick={() => setStorageSlot(slot)}
+                      >
+                        Slot {slot}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mission-master__storage-actions">
+                  <button
+                    type="button"
+                    className="mission-master__button mission-master__button--ghost"
+                    onClick={handleSaveTable}
+                  >
+                    Save table
+                  </button>
+                  <button
+                    type="button"
+                    className="mission-master__button mission-master__button--ghost"
+                    onClick={handleLoadTable}
+                  >
+                    Load table
+                  </button>
+                </div>
+              </div>
+              {storageNote ? (
+                <p
+                  className={`mission-master__storage-note ${
+                    storageNote.isError ? 'mission-master__storage-note--error' : ''
+                  }`}
+                >
+                  {storageNote.message}
+                </p>
+              ) : null}
             </div>
             <div className="mission-master__table">
               <div className="mission-master__table-row mission-master__table-row--header">

@@ -54,6 +54,17 @@
   color: #cdd6f4;
 }
 
+.mission-master__button--toggle {
+  background: rgba(15, 23, 36, 0.8);
+  color: #cdd6f4;
+}
+
+.mission-master__button--toggle-active {
+  background: rgba(244, 211, 94, 0.95);
+  color: #0b1220;
+  border-color: rgba(244, 211, 94, 0.4);
+}
+
 .mission-master__button--pause {
   background: #4f8ff7;
   color: #0b1220;
@@ -80,6 +91,62 @@
   margin: 8px 0 0;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.mission-master__storage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mission-master__storage-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.mission-master__storage-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.mission-master__slot-group {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mission-master__slot-button {
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(9, 14, 24, 0.7);
+  color: #cdd6f4;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.mission-master__slot-button--active {
+  background: rgba(53, 211, 195, 0.9);
+  color: #0b1220;
+}
+
+.mission-master__storage-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.mission-master__storage-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.mission-master__storage-note--error {
+  color: #f88f7a;
 }
 
 .mission-master__table {

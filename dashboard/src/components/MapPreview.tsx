@@ -48,9 +48,15 @@ const DEG_TO_RAD = Math.PI / 180
 
 type MapPreviewProps = {
   missionList?: MissionSpec[]
+  grabFromMap?: boolean
+  onGrabCoordinate?: (coord: { lat: number; lon: number }) => void
 }
 
-const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
+const MapPreview = ({
+  missionList = [],
+  grabFromMap = false,
+  onGrabCoordinate,
+}: MapPreviewProps) => {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
@@ -401,6 +407,29 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
     }
   }, [])
 
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const handler = (event: maplibregl.MapMouseEvent & maplibregl.EventData) => {
+      if (!grabFromMap || !onGrabCoordinate) return
+      onGrabCoordinate({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+    }
+    map.on('click', handler)
+    return () => {
+      map.off('click', handler)
+    }
+  }, [grabFromMap, onGrabCoordinate, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map) return
+    map.getCanvas().style.cursor = grabFromMap ? 'crosshair' : ''
+    return () => {
+      if (!map) return
+      map.getCanvas().style.cursor = ''
+    }
+  }, [grabFromMap])
+
   // Subscribe to GNSS + heading via SiK gateway
   useEffect(() => {
     const sik = getSikGatewayClient()
@@ -747,6 +776,27 @@ const MapPreview = ({ missionList = [] }: MapPreviewProps) => {
         >
           {followRover ? 'Following rover' : 'Follow rover'}
         </button>
+        {grabFromMap ? (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 12,
+              left: 12,
+              zIndex: 2,
+              background: 'rgba(53, 211, 195, 0.9)',
+              color: '#0b1220',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: '12px',
+              fontWeight: 600,
+              boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+              pointerEvents: 'none',
+            }}
+          >
+            Grab from map enabled. Click to add a mission.
+          </div>
+        ) : null}
         <div
           style={{
             position: 'absolute',
