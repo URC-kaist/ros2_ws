@@ -104,7 +104,8 @@ target_link_libraries(pc2_to_heightmap_node ${PCL_LIBRARIES})
 
 add_executable(traversability_filter_node src/traversability_filter_node.cpp)
 ament_target_dependencies(traversability_filter_node
-  rclcpp grid_map_ros grid_map_core grid_map_filters filters pluginlib
+  rclcpp sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs
+  grid_map_ros grid_map_core grid_map_filters filters pluginlib
 )
 
 add_executable(gridmap_to_occupancy_node src/gridmap_to_occupancy_node.cpp)

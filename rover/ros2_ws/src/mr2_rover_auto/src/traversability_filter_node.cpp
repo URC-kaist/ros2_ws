@@ -3,9 +3,17 @@
 #include <grid_map_msgs/msg/grid_map.hpp>
 #include <filters/filter_chain.hpp>
 #include <pluginlib/class_loader.hpp>
+#include <geometry_msgs/msg/vector3_stamped.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
+#include <array>
+#include <cmath>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -20,11 +28,15 @@ public:
       "grid_map_filters",
       rclcpp::NodeOptions()
         .allow_undeclared_parameters(true)),
-    filter_chain_("grid_map::GridMap")
+    filter_chain_("grid_map::GridMap"),
+    tf_buffer_(this->get_clock()),
+    tf_listener_(tf_buffer_)
   {
     input_topic_ = this->declare_parameter<std::string>("input_topic", "/height_gridmap");
     output_topic_ = this->declare_parameter<std::string>("output_topic", "/traversability_gridmap");
     filter_chain_prefix_ = this->declare_parameter<std::string>("filter_chain_prefix", "filters");
+    gravity_topic_ = this->declare_parameter<std::string>("gravity_topic", "gravity");
+    gravity_target_frame_ = this->declare_parameter<std::string>("gravity_target_frame", "base_link");
 
     if (!filter_chain_.configure(
         filter_chain_prefix_, this->get_node_logging_interface(),
@@ -34,6 +46,9 @@ public:
     }
 
     auto qos = rclcpp::SensorDataQoS();  // Match depth→height publisher and Nav2 consumers.
+    gravity_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+      gravity_topic_, qos,
+      std::bind(&TraversabilityFilterNode::gravityCallback, this, std::placeholders::_1));
     sub_ = this->create_subscription<grid_map_msgs::msg::GridMap>(
       input_topic_, qos,
       std::bind(&TraversabilityFilterNode::gridMapCallback, this, std::placeholders::_1));
@@ -45,6 +60,66 @@ public:
   }
 
 private:
+  void gravityCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
+  {
+    geometry_msgs::msg::Vector3Stamped accel_in;
+    accel_in.header = msg->header;
+    accel_in.vector = msg->linear_acceleration;
+
+    geometry_msgs::msg::Vector3Stamped accel_out;
+    if (accel_in.header.frame_id.empty() ||
+      accel_in.header.frame_id == gravity_target_frame_)
+    {
+      accel_out = accel_in;
+    } else {
+      try {
+        const auto tf = tf_buffer_.lookupTransform(
+          gravity_target_frame_, accel_in.header.frame_id,
+          accel_in.header.stamp, tf_timeout_);
+        tf2::doTransform(accel_in, accel_out, tf);
+      } catch (const tf2::TransformException & ex) {
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 2000,
+          "Gravity TF lookup failed: %s", ex.what());
+        return;
+      }
+    }
+
+    const auto & a = accel_out.vector;
+    const double norm = std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    if (norm < 1e-6) {
+      return;
+    }
+    const std::array<double, 3> g = {a.x / norm, a.y / norm, a.z / norm};
+    {
+      std::lock_guard<std::mutex> lock(gravity_mutex_);
+      gravity_up_ = g;
+    }
+  }
+
+  void injectGravityLayers(grid_map::GridMap & map)
+  {
+    std::array<double, 3> g;
+    {
+      std::lock_guard<std::mutex> lock(gravity_mutex_);
+      g = gravity_up_;
+    }
+
+    if (!map.exists("gravity_x")) {
+      map.add("gravity_x");
+    }
+    if (!map.exists("gravity_y")) {
+      map.add("gravity_y");
+    }
+    if (!map.exists("gravity_z")) {
+      map.add("gravity_z");
+    }
+
+    map["gravity_x"].setConstant(static_cast<float>(g[0]));
+    map["gravity_y"].setConstant(static_cast<float>(g[1]));
+    map["gravity_z"].setConstant(static_cast<float>(g[2]));
+  }
+
   void gridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg)
   {
     grid_map::GridMap input_map;
@@ -52,6 +127,9 @@ private:
       RCLCPP_WARN(this->get_logger(), "Failed to convert GridMap message to object.");
       return;
     }
+
+    // Provide gravity direction (unit vector) for slope computation.
+    injectGravityLayers(input_map);
 
     grid_map::GridMap output_map;
     if (!filter_chain_.update(input_map, output_map)) {
@@ -75,11 +153,20 @@ private:
   }
 
   filters::FilterChain<grid_map::GridMap> filter_chain_;
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener tf_listener_;
+  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr gravity_sub_;
   rclcpp::Subscription<grid_map_msgs::msg::GridMap>::SharedPtr sub_;
   rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr pub_;
   std::string input_topic_;
   std::string output_topic_;
   std::string filter_chain_prefix_;
+  std::string gravity_topic_;
+  std::string gravity_target_frame_;
+  const rclcpp::Duration tf_timeout_{rclcpp::Duration::from_seconds(0.05)};
+
+  std::mutex gravity_mutex_;
+  std::array<double, 3> gravity_up_{0.0, 0.0, 1.0};
 };
 
 }  // namespace

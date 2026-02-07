@@ -43,6 +43,17 @@ def generate_launch_description():
             params_file_arg,
             use_sim_time_arg,
             Node(
+                package="imu_filter_madgwick",
+                executable="imu_filter_madgwick_node",
+                name="imu_gravity_filter",
+                output="screen",
+                parameters=[configured_params],
+                remappings=[
+                    ("imu/data_raw", "/rgbd_camera/imu"),
+                    ("imu/data", "gravity"),
+                ],
+            ),
+            Node(
                 package="mr2_rover_auto",
                 executable="pc2_to_heightmap_node",
                 name="pc2_to_heightmap",

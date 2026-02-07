@@ -53,6 +53,7 @@
   <exec_depend>filters</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>pcl_conversions</exec_depend>
+  <exec_depend>imu_filter_madgwick</exec_depend>
   
   <export>
     <build_type>ament_cmake</build_type>

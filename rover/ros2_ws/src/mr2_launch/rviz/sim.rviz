@@ -48,103 +48,19 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz_default_plugins/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        arm_l1:
-          Value: true
-        arm_l2:
-          Value: true
-        arm_l3:
-          Value: true
-        arm_l4:
-          Value: true
-        arm_l5:
-          Value: true
-        arm_l6:
-          Value: true
-        base_chassis:
-          Value: true
-        base_link:
-          Value: true
-        dummy_link:
-          Value: true
-        fl_mount:
-          Value: true
-        fl_wheel:
-          Value: true
-        fr_mount:
-          Value: true
-        fr_wheel:
-          Value: true
-        front_camera:
-          Value: true
-        imu_link:
-          Value: true
-        left_gnss:
-          Value: true
-        left_rocker:
-          Value: true
-        map:
-          Value: true
-        odom:
-          Value: true
-        right_gnss:
-          Value: true
-        right_rocker:
-          Value: true
-        rl_mount:
-          Value: true
-        rl_wheel:
-          Value: true
-        rr_mount:
-          Value: true
-        rr_wheel:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: false
       Tree:
-        map:
-          odom:
-            base_link:
-              arm_l1:
-                arm_l2:
-                  arm_l3:
-                    arm_l4:
-                      arm_l5:
-                        arm_l6:
-                          {}
-              base_chassis:
-                dummy_link:
-                  {}
-                front_camera:
-                  {}
-                imu_link:
-                  {}
-                left_gnss:
-                  {}
-                left_rocker:
-                  fl_mount:
-                    fl_wheel:
-                      {}
-                  rl_mount:
-                    rl_wheel:
-                      {}
-                right_gnss:
-                  {}
-                right_rocker:
-                  fr_mount:
-                    fr_wheel:
-                      {}
-                  rr_mount:
-                    rr_wheel:
-                      {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
       Collision Enabled: false
@@ -535,7 +451,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 90.73067474365234
+      Distance: 0.8465133905410767
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -550,10 +466,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.2647976875305176
+      Pitch: 0.9597979784011841
       Target Frame: base_link
       Value: Orbit (rviz_default_plugins)
-      Yaw: 4.551051139831543
+      Yaw: 4.4910502433776855
     Saved: ~
 Window Geometry:
   Camera:
