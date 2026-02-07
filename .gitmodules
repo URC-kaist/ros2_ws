@@ -1,6 +1,3 @@
-[submodule "rover/ros2_ws/src/iahrs_driver_ros2"]
-	path = rover/ros2_ws/src/iahrs_driver_ros2
-	url = https://github.com/URC-kaist/iahrs_driver_ros2
 [submodule "rover/ros2_ws/src/rtcm_msgs"]
 	path = rover/ros2_ws/src/rtcm_msgs
 	url = https://github.com/tilk/rtcm_msgs
