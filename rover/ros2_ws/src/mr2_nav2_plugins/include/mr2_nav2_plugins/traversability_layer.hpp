@@ -48,10 +48,12 @@
 
 #include <string>
 #include <mutex>
+#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 #include <nav2_costmap_2d/costmap_layer.hpp>
 #include <nav2_costmap_2d/layered_costmap.hpp>
+#include <geometry_msgs/msg/point.hpp>
 #include <grid_map_msgs/msg/grid_map.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 
@@ -79,6 +81,9 @@ public:
 private:
   void gridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg);
   unsigned char convertToCost(float value) const;
+  void updateFootprint(
+    double robot_x, double robot_y, double robot_yaw,
+    double * min_x, double * min_y, double * max_x, double * max_y);
 
   enum class PersistenceMode { EMA, MAX, OVERWRITE };
 
@@ -92,6 +97,8 @@ private:
   double ema_alpha_;
   double tf_timeout_;
   bool publish_private_costmap_;
+  bool footprint_clearing_enabled_;
+  std::vector<geometry_msgs::msg::Point> transformed_footprint_;
   // Debug logging throttling
   rclcpp::Clock::SharedPtr log_clock_;
 

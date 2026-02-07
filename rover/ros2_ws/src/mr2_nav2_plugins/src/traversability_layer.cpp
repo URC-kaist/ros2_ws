@@ -56,6 +56,7 @@
 #include "grid_map_core/iterators/GridMapIterator.hpp"
 #include "grid_map_ros/GridMapRosConverter.hpp"
 #include "nav2_costmap_2d/cost_values.hpp"
+#include "nav2_costmap_2d/footprint.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 namespace mr2_nav2_plugins
@@ -72,6 +73,7 @@ TraversabilityLayer::TraversabilityLayer()
   ema_alpha_(0.1),
   tf_timeout_(0.1),
   publish_private_costmap_(false),
+  footprint_clearing_enabled_(true),
   has_data_(false),
   pending_bounds_(false),
   pending_min_x_(0.0),
@@ -102,6 +104,7 @@ TraversabilityLayer::onInitialize()
   declareParameter("ema_alpha", rclcpp::ParameterValue(ema_alpha_));
   declareParameter("tf_timeout", rclcpp::ParameterValue(tf_timeout_));
   declareParameter("publish_private_costmap", rclcpp::ParameterValue(publish_private_costmap_));
+  declareParameter("footprint_clearing_enabled", rclcpp::ParameterValue(footprint_clearing_enabled_));
 
   node->get_parameter(getFullName("gridmap_topic"), gridmap_topic_);
   node->get_parameter(getFullName("gridmap_layer"), gridmap_layer_);
@@ -127,6 +130,7 @@ TraversabilityLayer::onInitialize()
   ema_alpha_ = std::clamp(ema_alpha_, 0.0, 1.0);
   node->get_parameter(getFullName("tf_timeout"), tf_timeout_);
   node->get_parameter(getFullName("publish_private_costmap"), publish_private_costmap_);
+  node->get_parameter(getFullName("footprint_clearing_enabled"), footprint_clearing_enabled_);
 
   auto qos = rclcpp::SensorDataQoS();
   gridmap_sub_ = node->create_subscription<grid_map_msgs::msg::GridMap>(
@@ -216,6 +220,8 @@ TraversabilityLayer::updateBounds(
       return;
     }
   }
+
+  updateFootprint(robot_x, robot_y, robot_yaw, min_x, min_y, max_x, max_y);
 }
 
 void
@@ -226,6 +232,10 @@ TraversabilityLayer::updateCosts(
   std::lock_guard<std::mutex> lock(mutex_);
   if (!enabled_ || !has_data_) {
     return;
+  }
+
+  if (footprint_clearing_enabled_ && !transformed_footprint_.empty()) {
+    setConvexPolygonCost(transformed_footprint_, nav2_costmap_2d::FREE_SPACE);
   }
 
   if (use_maximum_) {
@@ -338,8 +348,6 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
         if (persistence_mode_ == PersistenceMode::EMA) {
           if (old_cost == nav2_costmap_2d::NO_INFORMATION) {
             fused = new_cost;
-          } else if (new_cost > old_cost) {
-            fused = new_cost;  // rise quickly on new obstacle evidence
           } else {
             fused = static_cast<unsigned char>(
               std::round(ema_alpha_ * static_cast<double>(new_cost) +
@@ -404,6 +412,24 @@ void TraversabilityLayer::gridMapCallback(const grid_map_msgs::msg::GridMap::Sha
   //   node->get_logger(), *log_clock_, 5000,
   //   "TraversabilityLayer wrote data: bounds [%.2f, %.2f] to [%.2f, %.2f]",
   //   min_x, min_y, max_x, max_y);
+}
+
+void
+TraversabilityLayer::updateFootprint(
+  double robot_x, double robot_y, double robot_yaw,
+  double * min_x, double * min_y, double * max_x, double * max_y)
+{
+  if (!footprint_clearing_enabled_) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  transformed_footprint_.clear();
+  nav2_costmap_2d::transformFootprint(
+    robot_x, robot_y, robot_yaw, getFootprint(), transformed_footprint_);
+  for (const auto & pt : transformed_footprint_) {
+    touch(pt.x, pt.y, min_x, min_y, max_x, max_y);
+  }
 }
 
 unsigned char TraversabilityLayer::convertToCost(float value) const
