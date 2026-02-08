@@ -101,15 +101,15 @@ controller_server:
       yaw_goal_tolerance: 0.25
     PathHandler:
       plugin: "nav2_controller::FeasiblePathHandler"
-      prune_distance: 5.6 # MPPI: v_max * N * dt
-    FollowPath: # RPP versus MPPI?
+      prune_distance: 6.0 # MPPI; > v_max * N * dt
+    FollowPath: # MPPI
       # https://github.com/ros-navigation/navigation2/tree/main/nav2_mppi_controller
       plugin: "nav2_mppi_controller::MPPIController"
       visualize: true # expensive visualization; /trajectories
       publish_optimal_trajectory: false # for debugging
       time_steps: 56
       model_dt: 0.05
-      prune_distance: 5.6 # MPPI: v_max * N * dt
+      prune_distance: 6.0 # MPPI: > v_max * N * dt
       batch_size: 2000
       vx_std: 0.2
       vy_std: 0.2
@@ -121,7 +121,7 @@ controller_server:
       iteration_count: 1
       temperature: 0.3
       gamma: 0.015
-      motion_model: "Ackermann"
+      motion_model: "DiffDrive"
       TrajectoryVisualizer:
         trajectory_step: 5
         time_step: 3
@@ -148,26 +148,26 @@ controller_server:
         cost_weight: 5.0
         threshold_to_consider: 0.5
       # Option to replace Cost and use Obstacles instead
-      # ObstaclesCritic:
-      #   enabled: true
-      #   cost_power: 1
-      #   repulsion_weight: 1.5
-      #   critical_weight: 20.0
-      #   consider_footprint: true
-      #   collision_cost: 10000.0
-      #   collision_margin_distance: 0.1
-      #   near_goal_distance: 0.5
-      #   cost_scaling_Factor: 1.95 # match costmap's last inflation layer
-      #   inflation_radius: 3.2 # match costmap's last inflation layer
-      CostCritic:
+      ObstaclesCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.81
-        critical_cost: 300.0
+        repulsion_weight: 1.5
+        critical_weight: 20.0
         consider_footprint: true
-        collision_cost: 1000000.0
-        near_goal_distance: 1.0
-        trajectory_point_step: 2
+        collision_cost: 10000.0
+        collision_margin_distance: 0.1
+        near_goal_distance: 0.5
+        cost_scaling_Factor: 1.9386 # match costmap's last inflation layer
+        inflation_radius: 3.6 # match costmap's last inflation layer
+      # CostCritic:
+      #   enabled: true
+      #   cost_power: 1
+      #   cost_weight: 3.81
+      #   critical_cost: 300.0
+      #   consider_footprint: true
+      #   collision_cost: 1000000.0
+      #   near_goal_distance: 1.0
+      #   trajectory_point_step: 2
       PathAlignCritic:
         enabled: true
         cost_power: 1
@@ -210,8 +210,8 @@ local_costmap:
       robot_base_frame: base_link
       use_sim_time: True
       rolling_window: true
-      width: 8 # increased from 10 for MPPI flexibility
-      height: 8
+      width: 12 # > prune_distance * 2
+      height: 12
       resolution: 0.1 # follow pc2_to_heightmap resolution
       map_vis_z: -0.235
       track_unknown_space: false  
@@ -219,8 +219,8 @@ local_costmap:
       plugins: ["traversability_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 1.95 # 128 = 253 * e ^ (-f *(1.2-r_i)); r_i = 1.2 / sqrt(2) = 0.85
-        inflation_radius: 3.2 # > r_c = 1.2 * sqrt(2) = 1.7
+        cost_scaling_factor: 1.9386 # 128 = 253 * e ^ (-f *(1.2-r_i)); r_i = r_c = 0.8485
+        inflation_radius: 3.6 # > r_c = 1.2 * sqrt(2) = 0.8485
       traversability_layer:
         plugin: "mr2_nav2_plugins::TraversabilityLayer"
         enabled: true
@@ -273,8 +273,8 @@ global_costmap:
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 1.95 # 128 = 253 * e ^ (-f *(1.2-r_i)); r_i = 1.2 / sqrt(2) = 0.85
-        inflation_radius: 3.2 # > r_c = 1.2 * sqrt(2) = 1.7
+        cost_scaling_factor: 1.9386 # 128 = 253 * e ^ (-f *(1.2-r_i)); r_i = r_c = 0.8485
+        inflation_radius: 10.0 # > r_c = 1.2 * sqrt(2) = 0.8485
       always_send_full_costmap: False
 
 map_server: # https://docs.nav2.org/configuration/packages/map_server/configuring-map-server.html
