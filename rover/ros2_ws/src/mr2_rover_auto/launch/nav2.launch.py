@@ -68,7 +68,9 @@ def generate_launch_description():
         'use_sim_time': use_sim_time,
         'yaml_filename': map_yaml_file, # No longer machine-specific!
         'default_nav_to_pose_bt_xml': os.path.join(
-            pkg_share, 'behavior_trees', 'my_navigate_to_pose.xml')}
+            pkg_share, 'behavior_trees', 'my_navigate_to_pose.xml'),
+        'default_nav_through_poses_bt_xml': os.path.join(
+            pkg_share, 'behavior_trees', 'my_navigate_through_poses.xml')}
 
     # Only it applys when `use_namespace` is True.
     # '<robot_namespace>' keyword shall be replaced by 'namespace' launch argument

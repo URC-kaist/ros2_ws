@@ -7,7 +7,7 @@ ros2 doctor --report > doctor.log # detect QoS mode mismatch failure
 # under ros2_ws:
 rosdep install --from-paths src -y --ignore-src --rosdistro humble
 # But this will not solve every dependency issue.
-# ex: geographiclib, ros-humble-aruco-opencv-msgs, ...
+# ex: ros-humble-aruco-opencv, ros-humble-foxglove-bridge, socat, ...
 ros2 pkg create --build-type ament_cmake <package_name>
 ```
 
@@ -39,7 +39,7 @@ Please install Node.js and npm!
 ``` bash
 # Building dashboard:
 # under scripts/ (requires sudo; installs nginx if missing)
-# please set  
+# Refer to "Nginx host mapping"
 . deploy_dashboard.bash 2> dashboard_err.log
 
 # Base station SIK interface:
@@ -56,6 +56,7 @@ sudo sh -c 'printf "\n127.0.0.1 mr2-ubuntu.local\n" >> /etc/hosts'
 
 # verify and reload nginx
 sudo nginx -t
+sudo systemctl restart nginx
 sudo systemctl reload nginx
 ```
 
