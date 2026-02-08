@@ -71,6 +71,11 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
+    enable_front_camera_arg = DeclareLaunchArgument(
+        "enable_front_camera",
+        default_value="true",
+        description="Launch the front UVC camera (/dev/videoFRONT) and use it for ArUco detection",
+    )
     enable_sik_sim_arg = DeclareLaunchArgument(
         "enable_sik_sim",
         default_value="false",
@@ -208,6 +213,25 @@ def generate_launch_description():
                 [FindPackageShare("mr2_launch"), "launch", "realsense_rgbd.launch.py"]
             )
         ),
+        launch_arguments={
+            "camera_name": "rgbd_camera",
+            "camera_namespace": "",
+            "base_frame_id": "rgbd_camera",
+            "urdf_mount_frame": "rgbd_camera",
+        }.items(),
+    )
+
+    front_uvc_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_launch"), "launch", "front_uvc_camera.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "camera_name": "front_camera",
+            "camera_namespace": "front_camera",
+        }.items(),
+        condition=IfCondition(LaunchConfiguration("enable_front_camera")),
     )
 
     traversability_launch = IncludeLaunchDescription(
@@ -259,6 +283,8 @@ def generate_launch_description():
             "sik_sim_device": LaunchConfiguration("sik_sim_device"),
             "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
             "sik_sim_baud": LaunchConfiguration("sik_sim_baud"),
+            "enable_aruco": LaunchConfiguration("enable_front_camera"),
+            "aruco_cam_topic": "/front_camera/image_raw",
         }.items(),
     )
 
@@ -402,6 +428,7 @@ def generate_launch_description():
             sik_sim_baud_arg,
             sik_device_arg,
             sik_baud_arg,
+            enable_front_camera_arg,
             left_gnss_serial_arg,
             right_gnss_serial_arg,
             left_gnss_frame_arg,
@@ -418,6 +445,7 @@ def generate_launch_description():
             ntrip_maxage_conn_arg,
             sik_sim_launch,
             realsense_launch,
+            front_uvc_launch,
             traversability_launch,
             ntrip_client_launch,
             rover_launch,
