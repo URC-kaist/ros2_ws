@@ -3,6 +3,7 @@
 // =============================================================
 #pragma once
 
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
@@ -12,6 +13,7 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <functional>
@@ -156,13 +158,37 @@ inline void CanBusManager::io_loop_() {
   while (running_) {
     flush_tx_();
     int n = poll(pfds, 2, 10);
-    if (n <= 0)
+    if (n < 0) {
+      if (errno != EINTR) {
+        // Back off on driver/socket faults to avoid spinning an entire core.
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      }
       continue;
-    if (pfds[0].revents & POLLIN)
+    }
+    if (n == 0)
+      continue;
+
+    bool handled = false;
+    if (pfds[0].revents & POLLIN) {
       rx_once_();
+      handled = true;
+    }
+    if (pfds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+      handled = true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
     if (pfds[1].revents & POLLIN) {
       char buf[16];
-      read(wake_pipe_[0], buf, sizeof(buf));
+      while (read(wake_pipe_[0], buf, sizeof(buf)) > 0) {
+      }
+      handled = true;
+    }
+    if (pfds[1].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+      handled = true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    if (!handled) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }
 }
