@@ -101,7 +101,8 @@ navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
     base_link_frame: base_link
     world_frame: map
     frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
-    delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
+    # Prevent early conversions while datum is still being set at startup.
+    delay: 3.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0 # 0 for north
     broadcast_cartesian_transform: false # we do not use UTM
@@ -116,7 +117,8 @@ navsat_transform_query: # copied configuration from navsat_transform
     base_link_frame: base_link
     world_frame: map # Purposed for query
     frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
-    delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
+    # Prevent early conversions while datum is still being set at startup.
+    delay: 3.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
     yaw_offset: 0.0
     broadcast_cartesian_transform: false # we do not use UTM

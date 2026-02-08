@@ -5,8 +5,7 @@ Wrapper launch for ublox fixed-base + rover setup with unique container names.
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, TextSubstitution
-from launch_ros.actions import ComposableNodeContainer
-from launch_ros.descriptions import ComposableNode
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -59,40 +58,28 @@ def generate_launch_description():
         {"CFG_MSGOUT_UBX_NAV_SOL_USB": 1},
     ]
 
-    container1 = ComposableNodeContainer(
-        name=[namespace, TextSubstitution(text="_ublox_dgnss_container")],
-        namespace="",
-        package="rclcpp_components",
-        executable="component_container_mt",
+    # Run as standalone executables instead of components to avoid
+    # component_container_mt shutdown/runtime segfaults under rapid restarts.
+    dgnss_node = Node(
+        package="ublox_dgnss_node",
+        executable="ublox_dgnss_node",
+        name="ublox_dgnss",
+        namespace=namespace,
+        output="screen",
         arguments=["--ros-args", "--log-level", log_level],
-        composable_node_descriptions=[
-            ComposableNode(
-                package="ublox_dgnss_node",
-                plugin="ublox_dgnss::UbloxDGNSSNode",
-                name="ublox_dgnss",
-                namespace=namespace,
-                parameters=params,
-                remappings=[
-                    ("/ntrip_client/rtcm", rtcm_input_topic),
-                ],
-            )
+        parameters=params,
+        remappings=[
+            ("/ntrip_client/rtcm", rtcm_input_topic),
         ],
     )
 
-    container2 = ComposableNodeContainer(
-        name=[namespace, TextSubstitution(text="_ublox_nav_sat_fix_hp_container")],
-        namespace="",
-        package="rclcpp_components",
-        executable="component_container_mt",
+    nav_sat_fix_hp_node = Node(
+        package="ublox_nav_sat_fix_hp_node",
+        executable="ublox_nav_sat_fix_hp",
+        name="ublox_nav_sat_fix_hp",
+        namespace=namespace,
+        output="screen",
         arguments=["--ros-args", "--log-level", log_level],
-        composable_node_descriptions=[
-            ComposableNode(
-                package="ublox_nav_sat_fix_hp_node",
-                plugin="ublox_nav_sat_fix_hp::UbloxNavSatHpFixNode",
-                name="ublox_nav_sat_fix_hp",
-                namespace=namespace,
-            )
-        ],
     )
 
     return LaunchDescription(
@@ -103,7 +90,7 @@ def generate_launch_description():
             device_serial_string_arg,
             frame_id_arg,
             rtcm_input_topic_arg,
-            container1,
-            container2,
+            dgnss_node,
+            nav_sat_fix_hp_node,
         ]
     )

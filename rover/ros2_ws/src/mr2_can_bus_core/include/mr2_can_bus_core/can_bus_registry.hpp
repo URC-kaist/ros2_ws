@@ -14,13 +14,13 @@ public:
   /** Get or create manager for given interface name. */
   static std::shared_ptr<CanBusManager> get(const std::string &iface,
                                             int bitrate = 1'000'000) {
-    std::lock_guard<std::mutex> lk(map_mtx_);
-    auto &weak = map_[iface];
+    std::lock_guard<std::mutex> lk(map_mtx());
+    auto &weak = map()[iface];
     auto sp = weak.lock();
     if (!sp) {
       sp = std::make_shared<CanBusManager>();
       if (!sp->start(iface, bitrate)) {
-        map_.erase(iface);
+        map().erase(iface);
         return {};
       }
       weak = sp;
@@ -29,7 +29,16 @@ public:
   }
 
 private:
-  static inline std::unordered_map<std::string, std::weak_ptr<CanBusManager>>
-      map_{};
-  static inline std::mutex map_mtx_;
+  // Intentionally heap-allocate process-lifetime statics to avoid deinit-order
+  // crashes when plugin/shared-library teardown happens at process exit.
+  static std::unordered_map<std::string, std::weak_ptr<CanBusManager>> &map() {
+    static auto *instance =
+        new std::unordered_map<std::string, std::weak_ptr<CanBusManager>>();
+    return *instance;
+  }
+
+  static std::mutex &map_mtx() {
+    static auto *instance = new std::mutex();
+    return *instance;
+  }
 };

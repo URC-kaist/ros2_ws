@@ -42,8 +42,10 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
                 {"require_svin_complete": False},
                 {"allow_provisional": True},
-                {"navsat_service": "/datum"},
-                {"navsat_query_service": "/datum"},
+                {"allow_fix_fallback": True},
+                {"fallback_fix_topic": "/left_gnss/navsat"},
+                {"navsat_service": "/navsat_transform/datum"},
+                {"navsat_query_service": "/navsat_transform_query/datum"},
             ],
             condition=UnlessCondition(LaunchConfiguration("use_sim_time")),
         ),
@@ -67,7 +69,8 @@ def generate_launch_description():
             remappings=[
                 ("/gps/fix", "/left_gnss/navsat"),
                 ("/odometry/gps", "/odometry/gps/raw"),
-                ('/odometry/filtered', '/odometry/filtered/global')
+                ('/odometry/filtered', '/odometry/filtered/global'),
+                ("datum", "/navsat_transform/datum"),
             ],
         ),
 
@@ -116,7 +119,8 @@ def generate_launch_description():
             remappings=[
                 ("/gps/fix", "query/fix"),
                 ("/odometry/gps", "query/gps"),
-                ('/odometry/filtered', '/odometry/filtered/global')
+                ('/odometry/filtered', '/odometry/filtered/global'),
+                ("datum", "/navsat_transform_query/datum"),
             ],
         )
         ],
@@ -135,7 +139,8 @@ def generate_launch_description():
             remappings=[
                 ("/gps/fix", "/left_gnss/navsat"),
                 ("/odometry/gps", "/odometry/gps/raw"),
-                ('/odometry/filtered', '/odometry/filtered/global')
+                ('/odometry/filtered', '/odometry/filtered/global'),
+                ("datum", "/navsat_transform/datum"),
             ],
         ),
 
@@ -184,7 +189,8 @@ def generate_launch_description():
             remappings=[
                 ("/gps/fix", "query/fix"),
                 ("/odometry/gps", "query/gps"),
-                ('/odometry/filtered', '/odometry/filtered/global')
+                ('/odometry/filtered', '/odometry/filtered/global'),
+                ("datum", "/navsat_transform_query/datum"),
             ],
         )
         ],

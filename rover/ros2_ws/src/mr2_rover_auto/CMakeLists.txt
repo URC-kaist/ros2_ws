@@ -80,7 +80,7 @@ rclcpp rclcpp_action mr2_action_interface
 
 add_executable(base_datum_setter src/base_datum_setter.cpp)
 ament_target_dependencies(base_datum_setter
-  rclcpp geographic_msgs robot_localization ublox_ubx_msgs
+  rclcpp geographic_msgs robot_localization sensor_msgs ublox_ubx_msgs
 )
 
 add_executable(cover_vision_client src/cover_vision_client.cpp)

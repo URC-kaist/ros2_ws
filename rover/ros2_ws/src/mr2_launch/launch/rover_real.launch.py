@@ -44,6 +44,11 @@ def generate_launch_description():
         ),
         description="Full path to RViz2 config file",
     )
+    headless_arg = DeclareLaunchArgument(
+        "headless",
+        default_value="true",
+        description="Run without GUI components (disables RViz)",
+    )
     controller_config_arg = DeclareLaunchArgument(
         "controller_config",
         default_value=PathJoinSubstitution(
@@ -273,6 +278,7 @@ def generate_launch_description():
         launch_arguments={
             "mode": "real",
             "rviz_config": LaunchConfiguration("rviz_config"),
+            "headless": LaunchConfiguration("headless"),
             "controller_config": LaunchConfiguration("controller_config"),
             "can_iface": LaunchConfiguration("can_iface"),
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
@@ -318,14 +324,15 @@ def generate_launch_description():
         }.items(),
     )
 
-    # Stagger GNSS init to avoid simultaneous USB enumeration timeouts
+    # Stagger GNSS init to avoid simultaneous USB enumeration timeouts.
+    # Start left first, then right after a short delay.
     ublox_left_launch_delayed = TimerAction(
-        period=40.0,
+        period=0.0,
         actions=[ublox_left_launch],
     )
 
     ublox_right_launch_delayed = TimerAction(
-        period=20.0,
+        period=3.0,
         actions=[ublox_right_launch],
     )
 
@@ -350,14 +357,48 @@ def generate_launch_description():
         package="tf2_ros",
         executable="static_transform_publisher",
         name="left_rocker_static_tf",
-        arguments=["0", "0.2455", "0.06", "0", "0", "0", "base_chassis", "left_rocker"],
+        arguments=[
+            "--x",
+            "0",
+            "--y",
+            "0.2455",
+            "--z",
+            "0.06",
+            "--roll",
+            "0",
+            "--pitch",
+            "0",
+            "--yaw",
+            "0",
+            "--frame-id",
+            "base_chassis",
+            "--child-frame-id",
+            "left_rocker",
+        ],
     )
 
     right_rocker_static_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="right_rocker_static_tf",
-        arguments=["0", "-0.2455", "0.06", "0", "0", "0", "base_chassis", "right_rocker"],
+        arguments=[
+            "--x",
+            "0",
+            "--y",
+            "-0.2455",
+            "--z",
+            "0.06",
+            "--roll",
+            "0",
+            "--pitch",
+            "0",
+            "--yaw",
+            "0",
+            "--frame-id",
+            "base_chassis",
+            "--child-frame-id",
+            "right_rocker",
+        ],
     )
 
     # Manually set navsat datum if requested (after navsat_transform nodes start)
@@ -369,7 +410,7 @@ def generate_launch_description():
                     "ros2",
                     "service",
                     "call",
-                    "/datum",
+                    "/navsat_transform/datum",
                     "robot_localization/srv/SetDatum",
                     PythonExpression(
                         [
@@ -390,7 +431,7 @@ def generate_launch_description():
                     "ros2",
                     "service",
                     "call",
-                    "/datum",
+                    "/navsat_transform_query/datum",
                     "robot_localization/srv/SetDatum",
                     PythonExpression(
                         [
@@ -417,6 +458,7 @@ def generate_launch_description():
             datum_lon_arg,
             datum_alt_arg,
             rviz_arg,
+            headless_arg,
             controller_config_arg,
             can_iface_arg,
             use_mock_servos_arg,

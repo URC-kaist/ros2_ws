@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -129,16 +130,35 @@ class SikBridgeNode : public rclcpp::Node {
   }
 
   ~SikBridgeNode() override {
-    shutting_down_ = true;
+    request_shutdown_();
     if (reader_thread_.joinable()) {
       reader_thread_.join();
-    }
-    if (fd_ >= 0) {
-      ::close(fd_);
     }
   }
 
  private:
+  void request_shutdown_() {
+    bool expected = false;
+    if (!shutting_down_.compare_exchange_strong(expected, true)) {
+      return;
+    }
+
+    auto cancel_timer = [](const rclcpp::TimerBase::SharedPtr & timer) {
+        if (timer) {
+          timer->cancel();
+        }
+      };
+
+    cancel_timer(zero_timer_);
+    cancel_timer(heartbeat_tx_timer_);
+    cancel_timer(nav_tx_timer_);
+
+    {
+      std::lock_guard<std::mutex> lock(write_mutex_);
+      fd_ = -1;
+    }
+  }
+
   void open_serial_() {
     fd_ = ::open(device_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd_ < 0) {
@@ -192,21 +212,30 @@ class SikBridgeNode : public rclcpp::Node {
     std::vector<uint8_t> buffer;
     buffer.reserve(512);
 
-    while (rclcpp::ok() && !shutting_down_) {
+    while (rclcpp::ok() && !shutting_down_.load()) {
+      int local_fd = -1;
+      {
+        std::lock_guard<std::mutex> lock(write_mutex_);
+        local_fd = fd_;
+      }
+      if (local_fd < 0) {
+        return;
+      }
+
       fd_set readfds;
       FD_ZERO(&readfds);
-      FD_SET(fd_, &readfds);
+      FD_SET(local_fd, &readfds);
       timeval timeout{};
       timeout.tv_sec = 0;
       timeout.tv_usec = 100000;
 
-      const int ready = select(fd_ + 1, &readfds, nullptr, nullptr, &timeout);
+      const int ready = select(local_fd + 1, &readfds, nullptr, nullptr, &timeout);
       if (ready <= 0) {
         continue;
       }
 
       uint8_t temp[256];
-      const ssize_t count = ::read(fd_, temp, sizeof(temp));
+      const ssize_t count = ::read(local_fd, temp, sizeof(temp));
       if (count <= 0) {
         continue;
       }
@@ -217,35 +246,49 @@ class SikBridgeNode : public rclcpp::Node {
   }
 
   void parse_frames_(std::vector<uint8_t> &buffer) {
+    size_t offset = 0;
     while (true) {
-      if (buffer.size() < 4) {
-        return;
+      if (shutting_down_.load()) {
+        break;
       }
 
-      if (buffer.front() != mr2_sik_bridge::kMagic) {
-        buffer.erase(buffer.begin());
+      if (buffer.size() - offset < 4) {
+        break;
+      }
+
+      if (buffer[offset] != mr2_sik_bridge::kMagic) {
+        ++offset;
         continue;
       }
 
-      const uint8_t length = buffer[2];
+      const uint8_t length = buffer[offset + 2];
       const size_t frame_size = 4 + static_cast<size_t>(length) + 2;
-      if (buffer.size() < frame_size) {
-        return;
+      if (buffer.size() - offset < frame_size) {
+        break;
       }
 
-      auto frame = mr2_sik_bridge::decode_frame(buffer.data(), frame_size);
+      auto frame = mr2_sik_bridge::decode_frame(buffer.data() + offset, frame_size);
       if (!frame) {
         if (log_frames_) {
           RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
                                "Invalid SiK frame dropped");
         }
-        buffer.erase(buffer.begin());
+        ++offset;
         continue;
       }
 
       handle_frame_(*frame);
-      buffer.erase(buffer.begin(), buffer.begin() + frame_size);
+      offset += frame_size;
     }
+
+    if (offset == 0) {
+      return;
+    }
+    if (offset >= buffer.size()) {
+      buffer.clear();
+      return;
+    }
+    buffer.erase(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(offset));
   }
 
   void handle_frame_(const Frame &frame) {
@@ -537,7 +580,7 @@ class SikBridgeNode : public rclcpp::Node {
 
   void write_frame_(const std::vector<uint8_t> &frame) {
     std::lock_guard<std::mutex> lock(write_mutex_);
-    if (fd_ < 0) {
+    if (fd_ < 0 || shutting_down_.load()) {
       return;
     }
     ssize_t total = 0;
@@ -595,7 +638,7 @@ class SikBridgeNode : public rclcpp::Node {
   int fd_{-1};
   std::thread reader_thread_;
   std::mutex write_mutex_;
-  bool shutting_down_{false};
+  std::atomic<bool> shutting_down_{false};
   uint8_t seq_{0};
 
   // State

@@ -189,10 +189,9 @@ const GnssStatusCard = () => {
   )
 
   return (
-    <article className="card card--span-2 gnss-card">
+    <article className="card card--span-2x1 gnss-card">
       <header className="gnss-card__header">
         <h3>GNSS Status</h3>
-        <p className="gnss-card__subtitle">Left / right sensors (RTK)</p>
       </header>
       <div className="gnss-card__grid">
         {sides.map((side) => (
