@@ -102,6 +102,11 @@ def generate_launch_description():
         default_value="57600",
         description="Baud rate for the real SiK bridge",
     )
+    enable_aruco_arg = DeclareLaunchArgument(
+        "enable_aruco",
+        default_value="true",
+        description="Start ArUco tracker node",
+    )
     aruco_cam_topic_arg = DeclareLaunchArgument(
         "aruco_cam_topic",
         default_value="/rgbd_camera/color/image_raw",
@@ -193,20 +198,14 @@ def generate_launch_description():
         executable="aruco_tracker_autostart",
         name="aruco_tracker",
         output="screen",
+        condition=IfCondition(LaunchConfiguration("enable_aruco")),
         parameters=[
             PathJoinSubstitution(
                 [FindPackageShare("aruco_opencv"), "config", "aruco_tracker.yaml"]
             ),
             {
-                "board_descriptions_path": PathJoinSubstitution(
-                    [
-                        FindPackageShare("mr2_launch"),
-                        "config",
-                        "board_descriptions.yaml",
-                    ]
-                ),
                 "cam_base_topic": LaunchConfiguration("aruco_cam_topic"),
-                "marker_size": 0.20,  # 20 cm face as observed on the post
+                "marker_size": 0.15,
                 "image_is_rectified": False,
                 "aruco.detectInvertedMarker": True,
                 "use_sim_time": LaunchConfiguration("use_sim_time"),
@@ -364,6 +363,7 @@ def generate_launch_description():
         sik_sim_baud_arg,
         sik_device_arg,
         sik_baud_arg,
+        enable_aruco_arg,
         aruco_cam_topic_arg,
         use_sim_time_param,
         rover_launch,
