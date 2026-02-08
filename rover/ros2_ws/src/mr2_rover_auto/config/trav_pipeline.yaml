@@ -21,12 +21,15 @@ pc2_to_heightmap:
     layer_name: elevation
     voxel_size_m: 0.01
     roi_z_max_m: 3.0
-    publish_rate_hz: 5.0
+    publish_rate_hz: 20.0
     height_rank: 5 # std:nth_rank for binning
 
 grid_map_filters:
   ros__parameters:
     use_sim_time: true
+    gravity_source: tf
+    gravity_reference_frame: map
+    gravity_target_frame: base_link
 
     algorithm: area
     parallelization_enabled: false # true for CPU multi-core
@@ -48,24 +51,24 @@ grid_map_filters:
         params:
           input_layer:  elevation
           output_layer: elevation_inpainted
-          radius: 0.4
+          radius: 0.2
 
       filter3:  # 반경 평균화로 노이즈 저감
         name: mean_in_radius
         type: gridMapFilters/MeanInRadiusFilter
         params:
-          input_layer:  elevation # do not use inpaint
+          input_layer:  elevation_inpainted
           output_layer: elevation_smooth
-          radius: 0.1
+          radius: 0.2
 
       filter4:  # 표면 법선 벡터 계산
         name: surface_normals
         type: gridMapFilters/NormalVectorsFilter
         params:
           # Use the smoothed height map to make normals flatter on nominal ground.
-          input_layer:              elevation_smooth # use inpaintedelevation directly
+          input_layer:              elevation_smooth
           output_layers_prefix:     normal_vectors_
-          radius:                   0.1
+          radius:                   0.2
           normal_vector_positive_axis: z
 
       filter5:  # 법선 벡터를 색상으로 시각화
@@ -96,11 +99,9 @@ grid_map_filters:
         type: gridMapFilters/MathExpressionFilter
         params:
           output_layer: traversability # NOTE: tune for real (#34)
-          # Actually, we define obstructiveness (Nav2 costmap range: 0 to 1):
-          # The 0.84 comes from 45 degree limit.
-          expression: 0.84 * (exp(slope)-1) + 0.5 * (exp(roughness)-1)
-          # Or let's try gamma profile than this one.
-          # expression: ( slope ./ 0,7854 ) .^ 10.0 + ( roughness ./ 1.0 ) .^ 1.0
+          # We define step obstructiveness as a criteria for lethal obstacle:
+          # slope: >0.4 radian is lethal. roughness: >0.1 is lethal.
+          expression: "2.0 ./ (1 + exp(-50 * (slope - 0.4))) + 2.0 ./ (1 + exp(-50 * (roughness - 0.1)))"
 
       filter9:  # 하한(0) 클램핑
         name: traversability_lower_threshold

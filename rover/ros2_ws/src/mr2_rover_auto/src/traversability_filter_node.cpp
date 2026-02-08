@@ -10,6 +10,7 @@
 #include <tf2_ros/transform_listener.h>
 
 #include <array>
+#include <cstdint>
 #include <cmath>
 #include <functional>
 #include <memory>
@@ -35,7 +36,9 @@ public:
     input_topic_ = this->declare_parameter<std::string>("input_topic", "/height_gridmap");
     output_topic_ = this->declare_parameter<std::string>("output_topic", "/traversability_gridmap");
     filter_chain_prefix_ = this->declare_parameter<std::string>("filter_chain_prefix", "filters");
+    gravity_source_ = this->declare_parameter<std::string>("gravity_source", "imu");
     gravity_topic_ = this->declare_parameter<std::string>("gravity_topic", "gravity");
+    gravity_reference_frame_ = this->declare_parameter<std::string>("gravity_reference_frame", "map");
     gravity_target_frame_ = this->declare_parameter<std::string>("gravity_target_frame", "base_link");
 
     if (!filter_chain_.configure(
@@ -46,9 +49,11 @@ public:
     }
 
     auto qos = rclcpp::SensorDataQoS();  // Match depth→height publisher and Nav2 consumers.
-    gravity_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
-      gravity_topic_, qos,
-      std::bind(&TraversabilityFilterNode::gravityCallback, this, std::placeholders::_1));
+    if (gravity_source_ == "imu") {
+      gravity_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+        gravity_topic_, qos,
+        std::bind(&TraversabilityFilterNode::gravityCallback, this, std::placeholders::_1));
+    }
     sub_ = this->create_subscription<grid_map_msgs::msg::GridMap>(
       input_topic_, qos,
       std::bind(&TraversabilityFilterNode::gridMapCallback, this, std::placeholders::_1));
@@ -99,11 +104,7 @@ private:
 
   void injectGravityLayers(grid_map::GridMap & map)
   {
-    std::array<double, 3> g;
-    {
-      std::lock_guard<std::mutex> lock(gravity_mutex_);
-      g = gravity_up_;
-    }
+    std::array<double, 3> g = gravityFromSource(map.getTimestamp());
 
     if (!map.exists("gravity_x")) {
       map.add("gravity_x");
@@ -118,6 +119,61 @@ private:
     map["gravity_x"].setConstant(static_cast<float>(g[0]));
     map["gravity_y"].setConstant(static_cast<float>(g[1]));
     map["gravity_z"].setConstant(static_cast<float>(g[2]));
+  }
+
+  std::array<double, 3> gravityFromSource(const int64_t stamp_ns)
+  {
+    if (gravity_source_ != "tf") {
+      std::lock_guard<std::mutex> lock(gravity_mutex_);
+      return gravity_up_;
+    }
+
+    rclcpp::Time stamp(stamp_ns, this->get_clock()->get_clock_type());
+    if (stamp.nanoseconds() == 0) {
+      stamp = this->get_clock()->now();
+    }
+
+    if (gravity_reference_frame_.empty() ||
+      gravity_reference_frame_ == gravity_target_frame_)
+    {
+      const std::array<double, 3> g = {0.0, 0.0, 1.0};
+      std::lock_guard<std::mutex> lock(gravity_mutex_);
+      gravity_up_ = g;
+      return g;
+    }
+
+    geometry_msgs::msg::Vector3Stamped up_in;
+    up_in.header.frame_id = gravity_reference_frame_;
+    up_in.header.stamp = stamp;
+    up_in.vector.x = 0.0;
+    up_in.vector.y = 0.0;
+    up_in.vector.z = 1.0;
+
+    geometry_msgs::msg::Vector3Stamped up_out;
+    try {
+      const auto tf = tf_buffer_.lookupTransform(
+        gravity_target_frame_, gravity_reference_frame_, stamp, tf_timeout_);
+      tf2::doTransform(up_in, up_out, tf);
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN_THROTTLE(
+        this->get_logger(), *this->get_clock(), 2000,
+        "Gravity TF lookup failed: %s", ex.what());
+      std::lock_guard<std::mutex> lock(gravity_mutex_);
+      return gravity_up_;
+    }
+
+    const auto & v = up_out.vector;
+    const double norm = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (norm < 1e-6) {
+      std::lock_guard<std::mutex> lock(gravity_mutex_);
+      return gravity_up_;
+    }
+    const std::array<double, 3> g = {v.x / norm, v.y / norm, v.z / norm};
+    {
+      std::lock_guard<std::mutex> lock(gravity_mutex_);
+      gravity_up_ = g;
+    }
+    return g;
   }
 
   void gridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg)
@@ -161,7 +217,9 @@ private:
   std::string input_topic_;
   std::string output_topic_;
   std::string filter_chain_prefix_;
+  std::string gravity_source_;
   std::string gravity_topic_;
+  std::string gravity_reference_frame_;
   std::string gravity_target_frame_;
   const rclcpp::Duration tf_timeout_{rclcpp::Duration::from_seconds(0.05)};
 

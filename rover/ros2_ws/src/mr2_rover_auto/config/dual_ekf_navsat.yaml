@@ -2,7 +2,7 @@ ekf_local:
   ros__parameters:
     frequency: 30.0 # filter Hz
     sensor_timeout: 2.0
-    two_d_mode: true # Do not consider in 3D
+    two_d_mode: false # Consider in 3D; testing
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
@@ -17,12 +17,12 @@ ekf_local:
     imu0_differential: false # using navsat
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
-    gravitational_acceleration: 9.80665 # G_ACC; Value depends on where you are
+    gravitational_acceleration: 9.80393328 # G_ACC; Value depends on where you are
 
     # Wheel odometry
     odom0: /wheel_encoder/odometry
     odom0_config: [false, false, false, false, false, false,
-                   true,  true, false, false, false, true, # vX, vY and w_yaw
+                   true,  true, true, true, true, true, # vX, vY, and w_yaw
                    false, false, false]
     odom0_queue_size: 30 # <= 900 Hz
     odom0_differential: false # using navsat
@@ -47,13 +47,13 @@ ekf_local:
     process_noise_covariance: [ # XXX This has to be tuned properly.
       1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
       0.0,  1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
-      0.0,  0.0,  100.0,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
+      0.0,  0.0,  1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
       0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
       0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
       0.0,  0.0,  0.0,  0.0,  0.0,  1e-5, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # y; relatively smooth
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vx (m^2/s^2)
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vy
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  5e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vz
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vz
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  # wr (rad^2/s^2)
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  # wp
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  # wy
@@ -65,7 +65,7 @@ ekf_global: # with navsat gps
   ros__parameters:
     frequency: 30.0 # filter Hz
     sensor_timeout: 2.0
-    two_d_mode: true # Do not consider in 3d
+    two_d_mode: false # Consider in 3d; testing
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
@@ -80,12 +80,12 @@ ekf_global: # with navsat gps
     imu0_differential: false # using navsat
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
-    gravitational_acceleration: 9.80665 # G_ACC; Value depends on where you are
+    gravitational_acceleration: 9.80393328 # G_ACC; Value depends on where you are
 
     # Wheel odometry
     odom0: /wheel_encoder/odometry
     odom0_config: [false, false, false, false, false, false,
-                   true,  true, false, false, false, true, # vX, vY, and w_yaw
+                   true,  true, true, true, true, true, # vX, vY, and w_yaw
                    false, false, false]
     odom0_queue_size: 32 # <= 960 Hz
     odom0_differential: false # using navsat
@@ -117,15 +117,15 @@ ekf_global: # with navsat gps
     # Here we set Q, the metric of "how noizy the environment is"
     # Position, velocity, acceleration: high Q for rough terrain
     process_noise_covariance: [ # XXX This has to be tuned properly.
-      1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
-      0.0,  1e-1, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
-      0.0,  0.0,  100.0,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
+      1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # X (m^2)
+      0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Y
+      0.0,  0.0,  1e-2 ,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Z; elevation bump
       0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # r (rad^2)
       0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # p
-      0.0,  0.0,  0.0,  0.0,  0.0,  1e-5, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # y; relatively smooth
+      0.0,  0.0,  0.0,  0.0,  0.0,  3e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # y; relatively smooth
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vx (m^2/s^2)
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vy
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  5e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vz
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-2, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # Vz
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  0.0,  # wr (rad^2/s^2)
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  0.0,  # wp
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-3, 0.0,  0.0,  0.0,  # wy
@@ -147,7 +147,7 @@ navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
     publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: true
     wait_for_datum: true
-    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
+    datum: [38.406739, -110.791394, 0.12449754510850013]  # Where the rover spawns
 
 navsat_transform_query: # copied configuration from navsat_transform
   ros__parameters:
@@ -163,4 +163,4 @@ navsat_transform_query: # copied configuration from navsat_transform
     publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: true
     wait_for_datum: true
-    datum: [38.406739, -110.791394, 0.0]  # Where the rover spawns
+    datum: [38.406739, -110.791394, 0.12449754510850013]  # Where the rover spawns
