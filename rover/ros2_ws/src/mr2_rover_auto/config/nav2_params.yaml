@@ -109,7 +109,7 @@ controller_server:
       time_steps: 56
       model_dt: 0.05
       batch_size: 2000
-      vx_std: 0.2
+      vx_std: 0.4 # 0.2
       vy_std: 0.2
       wz_std: 0.4
       vx_max: 2.0
@@ -147,24 +147,24 @@ controller_server:
         cost_weight: 5.0
         threshold_to_consider: 0.5
       # Option to replace Cost and use Obstacles instead
-      # ObstaclesCritic:
-      #   enabled: true
-      #   cost_power: 1
-      #   repulsion_weight: 1.5
-      #   critical_weight: 20.0
-      #   consider_footprint: false
-      #   collision_cost: 10000.0
-      #   collision_margin_distance: 0.1
-      #   near_goal_distance: 0.5
-      CostCritic:
+      ObstaclesCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.81
-        critical_cost: 300.0
+        repulsion_weight: 1.5
+        critical_weight: 20.0
         consider_footprint: true
-        collision_cost: 1000000.0
-        near_goal_distance: 1.0
-        trajectory_point_step: 2
+        collision_cost: 10000.0
+        collision_margin_distance: 0.1
+        near_goal_distance: 0.5
+      # CostCritic:
+      #   enabled: true
+      #   cost_power: 1
+      #   cost_weight: 3.81
+      #   critical_cost: 300.0
+      #   consider_footprint: true
+      #   collision_cost: 1000000.0
+      #   near_goal_distance: 1.0
+      #   trajectory_point_step: 2
       PathAlignCritic:
         enabled: true
         cost_power: 1
@@ -183,7 +183,7 @@ controller_server:
       PathAngleCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 2.0
+        cost_weight: 1.0 # 2.0
         offset_from_furthest: 4
         threshold_to_consider: 0.5
         max_angle_to_furthest: 1.0
@@ -201,8 +201,8 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 5.0 # internal computation
-      publish_frequency: 5.0 # topic
+      update_frequency: 20.0 # internal computation
+      publish_frequency: 1.0 # nav2 etc
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: True
@@ -212,15 +212,16 @@ local_costmap:
       resolution: 0.1 # follow pc2_to_heightmap resolution
       map_vis_z: 0
       track_unknown_space: false  
-      footprint: "[[0.7, 0.58], [0.7, -0.58], [-0.7, -0.58], [-0.7, 0.58]]" # TODO: Actual geometry (#34)
+      footprint: "[[0.6, 0.6], [0.6, -0.6], [-0.6, -0.6], [-0.6, 0.6]]"
       plugins: ["traversability_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 1.0 # rover radius
+        cost_scaling_factor: 1.0
+        inflation_radius: 6.4
       traversability_layer:
         plugin: "mr2_nav2_plugins::TraversabilityLayer"
         enabled: true
+        footprint_clearing_enabled: true
         publish_private_costmap: false # topic: /traversability_private (always)
         clearable: true
         gridmap_topic: "/traversability_gridmap"
@@ -237,12 +238,12 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 5.0 # internal computation
-      publish_frequency: 1.0 # topic
+      update_frequency: 1.0 # internal computation
+      publish_frequency: 1.0 # nav2 etc
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
-      footprint: "[[0.7, 0.58], [0.7, -0.58], [-0.7, -0.58], [-0.7, 0.58]]" # TODO: Actual geometry (#34)
+      footprint: "[[0.6, 0.6], [0.6, -0.6], [-0.6, -0.6], [-0.6, 0.6]]"
       resolution: 0.4 # follow map0p4.yaml resolution
       map_vis_z: -0.47
       track_unknown_space: true
@@ -250,6 +251,7 @@ global_costmap:
       traversability_layer:
         plugin: "mr2_nav2_plugins::TraversabilityLayer"
         enabled: true
+        footprint_clearing_enabled: true
         publish_private_costmap: false # topic: /traversability_private (always)
         clearable: true
         gridmap_topic: "/traversability_gridmap"
@@ -259,7 +261,7 @@ global_costmap:
         y_width_m: 4.0
         use_maximum: true # false then overwrite
         persistence_mode: max # options: ema, max, overwrite
-        ema_alpha: 0.1 # for persistence_mode = ema (SLAM style fading)
+        ema_alpha: 0.05 # for persistence_mode = ema (SLAM style fading)
         tf_timeout: 0.2
       static_layer: # https://docs.nav2.org/configuration/packages/costmap-plugins/static.html
         plugin: "nav2_costmap_2d::StaticLayer"
@@ -268,8 +270,8 @@ global_costmap:
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 1.0 # rover radius
+        cost_scaling_factor: 1.0
+        inflation_radius: 6.4
       always_send_full_costmap: False
 
 map_server: # https://docs.nav2.org/configuration/packages/map_server/configuring-map-server.html
@@ -327,7 +329,7 @@ smoother_server:
       do_refinement: True
     curvature_smoother:
       plugin: "nav2_smoother::SavitzkyGolaySmoother"
-      refinement_num: 4
+      refinement_num: 1
       enforce_path_inversion: False
 
 behavior_server:
