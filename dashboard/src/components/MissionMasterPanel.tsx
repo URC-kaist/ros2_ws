@@ -257,6 +257,7 @@ const MissionMasterPanel = ({
   const lastStatusAge =
     statusAt != null ? `${((Date.now() - statusAt) / 1000).toFixed(1)}s ago` : '—'
   const statusStale = statusAt == null || Date.now() - statusAt > 1000
+  const statusFlash = !statusStale && !!status?.arrival
   const ledMode = (() => {
     if (statusStale || !status) return 'off'
     if (status.arrival) return 'success'
@@ -434,41 +435,47 @@ const MissionMasterPanel = ({
           <section className="mission-master__status">
             <label className="mission-master__label">MissionStatus</label>
             <div
-              className={`mission-master__status-row mission-master__status-${ledMode}`}
+              className={`mission-master__status-shell mission-master__status-${ledMode} ${
+                statusFlash ? 'mission-master__status-flash' : ''
+              }`}
             >
-              <div className="mission-master__status-item">
-                <span>State</span>
-                <strong>{statusLabel}</strong>
+              <div className="mission-master__status-row mission-master__status-row--primary">
+                <div className="mission-master__status-item">
+                  <span>State</span>
+                  <strong className="mission-master__status-state">{statusLabel}</strong>
+                </div>
+                <div className="mission-master__status-item">
+                  <span>Arrival</span>
+                  <strong>{arrivalLabel}</strong>
+                </div>
+                <div className="mission-master__status-item">
+                  <span>Last update</span>
+                  <strong>{lastStatusAge}</strong>
+                </div>
+                <div className="mission-master__status-item">
+                  <span>Active mission</span>
+                  <strong>{active ? `#${active.mission_id}` : '—'}</strong>
+                </div>
+                <div className="mission-master__status-item">
+                  <span>Waypoints</span>
+                  <strong>
+                    {status?.current_waypoint_index ?? '—'} / {status?.total_waypoints ?? '—'}
+                  </strong>
+                </div>
+                <div className="mission-master__status-item">
+                  <span>Distance</span>
+                  <strong>
+                    {Number.isFinite(status?.distance_remaining)
+                      ? `${status?.distance_remaining?.toFixed(2)} m`
+                      : '—'}
+                  </strong>
+                </div>
               </div>
-              <div className="mission-master__status-item">
-                <span>Arrival</span>
-                <strong>{arrivalLabel}</strong>
-              </div>
-              <div className="mission-master__status-item">
-                <span>Last update</span>
-                <strong>{lastStatusAge}</strong>
-              </div>
-              <div className="mission-master__status-item">
-                <span>Active mission</span>
-                <strong>{active ? `#${active.mission_id}` : '—'}</strong>
-              </div>
-              <div className="mission-master__status-item">
-                <span>Waypoints</span>
-                <strong>
-                  {status?.current_waypoint_index ?? '—'} / {status?.total_waypoints ?? '—'}
-                </strong>
-              </div>
-              <div className="mission-master__status-item">
-                <span>Distance</span>
-                <strong>
-                  {Number.isFinite(status?.distance_remaining)
-                    ? `${status?.distance_remaining?.toFixed(2)} m`
-                    : '—'}
-                </strong>
-              </div>
-              <div className="mission-master__status-item mission-master__detail">
-                <span>Detail</span>
-                <strong>{statusDetail}</strong>
+              <div className="mission-master__status-row mission-master__status-row--detail">
+                <div className="mission-master__status-item mission-master__detail">
+                  <span>Detail</span>
+                  <strong>{statusDetail}</strong>
+                </div>
               </div>
             </div>
           </section>

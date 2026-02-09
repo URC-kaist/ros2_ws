@@ -294,18 +294,24 @@
   gap: 8px;
 }
 
-.mission-master__status-row {
+.mission-master__status-shell {
   display: flex;
-  gap: 16px;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 10px;
   overflow-x: auto;
-  white-space: nowrap;
   font-size: 0.85rem;
   color: var(--muted);
   padding-bottom: 4px;
   border-radius: 10px;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mission-master__status-row {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  white-space: nowrap;
 }
 
 .mission-master__status-item {
@@ -318,8 +324,21 @@
   font-size: 0.95rem;
 }
 
+.mission-master__status-state {
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+
 .mission-master__detail {
   min-width: 200px;
+}
+
+.mission-master__status-row--detail {
+  white-space: normal;
+}
+
+.mission-master__status-row--detail .mission-master__detail {
+  min-width: 0;
 }
 
 .mission-master__table-row--invalid {
@@ -352,4 +371,22 @@
 
 .mission-master__status-success {
   background: rgba(76, 220, 120, 0.18);
+}
+
+.mission-master__status-flash {
+  animation: mission-master-flash 1s ease-in-out infinite;
+}
+
+@keyframes mission-master-flash {
+  0%,
+  100% {
+    box-shadow: none;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(76, 220, 120, 0.45),
+      0 0 18px rgba(76, 220, 120, 0.35);
+    border-color: rgba(76, 220, 120, 0.55);
+  }
 }
