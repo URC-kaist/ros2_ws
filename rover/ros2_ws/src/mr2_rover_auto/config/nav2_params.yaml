@@ -228,7 +228,7 @@ local_costmap:
         clearable: true
         gridmap_topic: "/traversability_gridmap"
         gridmap_layer: "traversability"
-        rectangle_frame: front_camera # frame of /rgbd_camera/depth/color/points
+        rectangle_frame: rgbd_camera # frame of /rgbd_camera/depth/color/points
         x_forward_m: 3.0
         y_width_m: 4.0
         use_maximum: true # false then overwrite
@@ -258,7 +258,7 @@ global_costmap:
         clearable: true
         gridmap_topic: "/traversability_gridmap"
         gridmap_layer: "traversability"
-        rectangle_frame: front_camera # frame of /rgbd_camera/depth/color/points
+        rectangle_frame: rgbd_camera # frame of /rgbd_camera/depth/color/points
         x_forward_m: 3.0
         y_width_m: 4.0
         use_maximum: true # false then overwrite

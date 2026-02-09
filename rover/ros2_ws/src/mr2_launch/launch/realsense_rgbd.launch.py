@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
@@ -32,17 +32,17 @@ def generate_launch_description():
     )
     base_frame_id_arg = DeclareLaunchArgument(
         "base_frame_id",
-        default_value="front_camera",
-        description="Attach camera TF tree to this frame",
+        default_value="rgbd_camera",
+        description="Base frame ID for the RealSense TF tree",
     )
-    camera_frame_id_arg = DeclareLaunchArgument(
-        "camera_frame_id",
-        default_value="rgbd_camera_front_camera",
-        description="Frame ID for the camera link (child of base_frame_id)",
+    urdf_mount_frame_arg = DeclareLaunchArgument(
+        "urdf_mount_frame",
+        default_value="rgbd_camera",
+        description="URDF frame the RealSense should be attached to",
     )
     color_profile_arg = DeclareLaunchArgument(
         "color_profile",
-        default_value="640x480x30",
+        default_value="640x480x6",
         description="Color stream profile (width x height x fps)",
     )
     enable_depth_arg = DeclareLaunchArgument(
@@ -106,12 +106,21 @@ def generate_launch_description():
         ],
         output="screen",
     )
-    camera_base_frame = LaunchConfiguration("base_frame_id")
-    camera_link_frame = LaunchConfiguration("camera_frame_id")
-    camera_tf_link = Node(
+    # RealSense frame naming uses camera_name-prefixed frame IDs.
+    # Bridge URDF mount frame -> RealSense base frame so depth/pointcloud TF is connected.
+    realsense_base_frame = PythonExpression(
+        [
+            "'",
+            LaunchConfiguration("camera_name"),
+            "_",
+            LaunchConfiguration("base_frame_id"),
+            "'",
+        ]
+    )
+    realsense_mount_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        name="rgbd_camera_front_camera_tf",
+        name="rgbd_camera_mount_tf",
         arguments=[
             "0",
             "0",
@@ -119,12 +128,11 @@ def generate_launch_description():
             "0",
             "0",
             "0",
-            camera_base_frame,
-            camera_link_frame,
+            LaunchConfiguration("urdf_mount_frame"),
+            realsense_base_frame,
         ],
         output="screen",
     )
-
     return LaunchDescription(
         [
             camera_name_arg,
@@ -133,7 +141,7 @@ def generate_launch_description():
             usb_port_id_arg,
             device_type_arg,
             base_frame_id_arg,
-            camera_frame_id_arg,
+            urdf_mount_frame_arg,
             color_profile_arg,
             enable_depth_arg,
             align_depth_arg,
@@ -143,6 +151,6 @@ def generate_launch_description():
             unite_imu_method_arg,
             log_level_arg,
             realsense_node,
-            camera_tf_link,
+            realsense_mount_tf,
         ]
     )

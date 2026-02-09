@@ -111,11 +111,26 @@
       <child link="left_gnss"/>
     </joint>
 
-    <link name="front_camera"/>
-    <joint name="base_to_front_camera" type="fixed">
+    <link name="rgbd_camera"/>
+    <joint name="base_to_rgbd_camera" type="fixed">
       <origin xyz="${length/2.0 + 0.14} 0 0" rpy="0 ${front_camera_pitch} 0"/>
       <parent link="base_chassis"/>
+      <child link="rgbd_camera"/>
+    </joint>
+
+    <link name="front_camera"/>
+    <joint name="base_to_front_camera" type="fixed">
+      <origin xyz="${length/2.0} 0 0.5" rpy="0 0 0"/>
+      <parent link="base_link"/>
       <child link="front_camera"/>
+    </joint>
+
+    <!-- Optical frame for the front UVC camera (REP 103): x right, y down, z forward -->
+    <link name="front_camera_optical_frame"/>
+    <joint name="front_camera_to_optical" type="fixed">
+      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+      <parent link="front_camera"/>
+      <child link="front_camera_optical_frame"/>
     </joint>
 
     <!-- IMU mounted at the top of the base box -->

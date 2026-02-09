@@ -38,6 +38,7 @@ sudo docker run -d \
   --restart unless-stopped \
   --privileged \
   --name "$CONTAINER_NAME" \
+  --network=host \
   --hostname "$HOSTNAME_IN_CONTAINER" \
   -v /dev/videoTOP:/dev/videoTOP \
   -v "$STATE_DIR:/root/.transitive" \
