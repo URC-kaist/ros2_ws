@@ -15,8 +15,8 @@ bt_navigator:
     # nav2_bt_navigator/navigate_to_pose_w_replanning_and_recovery.xml
     # nav2_bt_navigator/navigate_through_poses_w_replanning_and_recovery.xml
     # They can be set here or via a RewrittenYaml remap from a parent launch file to Nav2.
-    default_nav_to_pose_bt_xml: "/home/menny/mr2-stack/rover/ros2_ws/src/mr2_rover_auto/behavior_trees/my_navigate_to_pose.xml"
-    default_nav_through_poses_bt_xml: "/home/menny/mr2-stack/rover/ros2_ws/src/mr2_rover_auto/behavior_trees/my_navigate_through_poses.xml"
+    default_nav_to_pose_bt_xml: "/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_rover_auto/behavior_trees/my_navigate_to_pose.xml"
+    default_nav_through_poses_bt_xml: "/home/mr2/mr2-stack/rover/ros2_ws/src/mr2_rover_auto/behavior_trees/my_navigate_through_poses.xml"
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
@@ -296,7 +296,7 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
     expected_planner_frequency: 1.0 # calculate once per second
     use_sim_time: True
     planner_plugins: ["GridBased", "Smac2D", "SmacHybrid", "Theta"]
-    allow_partial_planning: true # in case of impossible goal, use quasi-goal.
+    allow_partial_planning: true # impossible goal = at least get close to it.
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.4

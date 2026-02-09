@@ -71,10 +71,6 @@ static std::vector<geometry_msgs::msg::PoseStamped> make_archimedean_spiral(
 
   poses.reserve(std::min(max_points, static_cast<size_t>(std::ceil(theta_max * 10.0)) + 2));
 
-  geometry_msgs::msg::PoseStamped p0 = center;
-  p0.pose.position.z = 0.0;
-  poses.push_back(p0);
-
   double theta = 0.0;
   double r = 0.0;
   while (poses.size() < max_points) {

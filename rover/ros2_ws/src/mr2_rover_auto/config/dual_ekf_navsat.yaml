@@ -148,19 +148,3 @@ navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
     use_odometry_yaw: true
     wait_for_datum: true
     datum: [38.406739, -110.791394, 0.12449754510850013]  # Where the rover spawns
-
-navsat_transform_query: # copied configuration from navsat_transform
-  ros__parameters:
-    map_frame: map
-    odom_frame: odom
-    base_link_frame: base_link
-    world_frame: map # Purposed for query
-    frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
-    delay: 0.0 # seconds to wait before anything for ekf or GPS to settle
-    magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS
-    yaw_offset: 0.0
-    broadcast_cartesian_transform: true # we do use UTM (dashboard "toLL" conversion)
-    publish_filtered_gps: true # publish estimation back to WGS84
-    use_odometry_yaw: true
-    wait_for_datum: true
-    datum: [38.406739, -110.791394, 0.12449754510850013]  # Where the rover spawns

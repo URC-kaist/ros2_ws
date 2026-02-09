@@ -1,0 +1,16 @@
+cover_vision_server:
+  ros__parameters:
+    use_sim_time: true
+    map_frame: map
+    coverage_path_topic: cover_vision/coverage_path
+    navigate_action_name: navigate_to_pose
+    navigate_through_poses_action_name: navigate_through_poses
+
+    # Spiral coverage tuning
+    spiral_pitch_m: 3.0
+    spiral_point_spacing_m: 3.0
+    spiral_max_points: 5000
+
+    # Detection handling
+    detection_stale_sec: 0.75
+    detection_pose_topic: cover_vision/object_pose
