@@ -98,14 +98,14 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j1_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j1_upper_limit}</param>
-        <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_offset">-4.70</param>
-        <param name="homing_split_angle">2.43</param>
-        <param name="homing_encoder_direction">1.0</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">201</param>
-        <param name="homing_device_ticks_per_rev">4096</param>
+        <!-- <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+        <!-- <param name="homing_device_can_iface">${can_iface}</param> -->
+        <!-- <param name="homing_offset">-4.70</param> -->
+        <!-- <param name="homing_split_angle">2.43</param> -->
+        <!-- <param name="homing_encoder_direction">1.0</param> -->
+        <!-- <param name="homing_device_can_iface">${can_iface}</param> -->
+        <!-- <param name="homing_device_can_id">201</param> -->
+        <!-- <param name="homing_device_ticks_per_rev">4096</param> -->
       </joint>
 
       <joint name="arm_j2">
@@ -119,15 +119,15 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j2_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j2_upper_limit}</param>
-        <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
-        <param name="homing_position">-0.69</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">202</param>
-        <param name="homing_device_active_high">true</param>
-        <param name="homing_search_direction">negative</param>
-        <param name="homing_approach_speed">0.1</param>
-        <param name="homing_fine_speed">0.02</param>
-        <param name="homing_backoff_distance">0.05</param>
+        <!-- <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
+        <!-- <param name="homing_position">-0.69</param> -->
+        <!-- <param name="homing_device_can_iface">${can_iface}</param> -->
+        <!-- <param name="homing_device_can_id">202</param> -->
+        <!-- <param name="homing_device_active_high">true</param> -->
+        <!-- <param name="homing_search_direction">negative</param> -->
+        <!-- <param name="homing_approach_speed">0.1</param> -->
+        <!-- <param name="homing_fine_speed">0.02</param> -->
+        <!-- <param name="homing_backoff_distance">0.05</param> -->
       </joint>
 
       <joint name="arm_j3">
@@ -141,13 +141,13 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j3_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j3_upper_limit}</param>
-        <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-        <param name="homing_offset">4.91</param>
-        <param name="homing_split_angle">3.4</param>
-        <param name="homing_encoder_direction">-1.0</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">203</param>
-        <param name="homing_device_ticks_per_rev">4096</param>
+        <!-- <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+        <!-- <param name="homing_offset">4.91</param> -->
+        <!-- <param name="homing_split_angle">3.4</param> -->
+        <!-- <param name="homing_encoder_direction">-1.0</param> -->
+        <!-- <param name="homing_device_can_iface">${can_iface}</param> -->
+        <!-- <param name="homing_device_can_id">203</param> -->
+        <!-- <param name="homing_device_ticks_per_rev">4096</param> -->
       </joint>
 
       <joint name="arm_j4">
@@ -161,15 +161,15 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j4_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j4_upper_limit}</param>
-        <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
-        <param name="homing_position">-2.55</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">204</param>
-        <param name="homing_device_active_high">true</param>
-        <param name="homing_search_direction">negative</param>
-        <param name="homing_approach_speed">0.35</param>
-        <param name="homing_fine_speed">0.05</param>
-        <param name="homing_backoff_distance">0.12</param>
+        <!-- <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
+        <!-- <param name="homing_position">-2.55</param> -->
+        <!-- <param name="homing_device_can_iface">${can_iface}</param> -->
+        <!-- <param name="homing_device_can_id">204</param> -->
+        <!-- <param name="homing_device_active_high">true</param> -->
+        <!-- <param name="homing_search_direction">negative</param> -->
+        <!-- <param name="homing_approach_speed">0.35</param> -->
+        <!-- <param name="homing_fine_speed">0.05</param> -->
+        <!-- <param name="homing_backoff_distance">0.12</param> -->
       </joint>
 
       <joint name="arm_j5">
@@ -183,13 +183,13 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j5_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j5_upper_limit}</param>
-        <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-        <param name="homing_offset">-2.46</param>
-        <param name="homing_split_angle">0.98</param>
-        <param name="homing_encoder_direction">1.0</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_device_can_id">205</param>
-        <param name="homing_device_ticks_per_rev">4096</param>
+        <!-- <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
+        <!-- <param name="homing_offset">-2.46</param> -->
+        <!-- <param name="homing_split_angle">0.98</param> -->
+        <!-- <param name="homing_encoder_direction">1.0</param> -->
+        <!-- <param name="homing_device_can_iface">${can_iface}</param> -->
+        <!-- <param name="homing_device_can_id">205</param> -->
+        <!-- <param name="homing_device_ticks_per_rev">4096</param> -->
       </joint>
 
       <joint name="arm_j6">
@@ -203,15 +203,15 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j6_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j6_upper_limit}</param>
-        <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
-        <param name="homing_device_can_id">206</param>
-        <param name="homing_device_can_iface">${can_iface}</param>
-        <param name="homing_position">-3.03</param>
-        <param name="homing_device_active_high">true</param>
-        <param name="homing_search_direction">negative</param>
-        <param name="homing_approach_speed">0.35</param>
-        <param name="homing_fine_speed">0.05</param>
-        <param name="homing_backoff_distance">0.12</param>
+        <!-- <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
+        <!-- <param name="homing_device_can_id">206</param> -->
+        <!-- <param name="homing_device_can_iface">${can_iface}</param> -->
+        <!-- <param name="homing_position">-3.03</param> -->
+        <!-- <param name="homing_device_active_high">true</param> -->
+        <!-- <param name="homing_search_direction">negative</param> -->
+        <!-- <param name="homing_approach_speed">0.35</param> -->
+        <!-- <param name="homing_fine_speed">0.05</param> -->
+        <!-- <param name="homing_backoff_distance">0.12</param> -->
       </joint>
 
       <!-- Gripper motor using steering-style centi-degree CAN protocol -->
