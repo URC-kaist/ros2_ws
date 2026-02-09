@@ -1,23 +1,35 @@
 # https://www.intel.com/content/www/us/en/products/sku/190004/intel-realsense-depth-camera-d435i/specifications.html
 
+imu_gravity_filter:
+  ros__parameters:
+    use_mag: false    # D435i has no compass
+    stateless: false  # Keep state between updates
+    fixed_frame: "base_link"
+    publish_tf: false
+    gain: 0.1         # Filter gain (lower = smoother)
+
 pc2_to_heightmap:
   ros__parameters:
     use_sim_time: true
     cloud_topic: /rgbd_camera/depth/color/points
     output_topic: /height_gridmap
     base_frame: base_link
-    map_frame: base_link
+    map_frame: base_link # Use base_link so the grid rotates with the robot; grid_map filters drop orientation.
     x_forward_m: 3.0
-    y_width_m: 2.84
+    y_width_m: 4.0
     resolution: 0.1
     layer_name: elevation
-    voxel_size_m: 0.05
+    voxel_size_m: 0.01
     roi_z_max_m: 3.0
-    publish_rate_hz: 5.0
+    publish_rate_hz: 20.0
+    height_rank: 5 # std:nth_rank for binning
 
 grid_map_filters:
   ros__parameters:
     use_sim_time: true
+    gravity_source: tf
+    gravity_reference_frame: map
+    gravity_target_frame: base_link
 
     algorithm: area
     parallelization_enabled: false # true for CPU multi-core
@@ -33,13 +45,13 @@ grid_map_filters:
         name: buffer_normalizer
         type: gridMapFilters/BufferNormalizerFilter
 
-      filter2:  # Inpainting으로 결측값 보간
+      filter2:  # Removes nan by inpaint operation (basically interpolation)
         name: inpaint
         type: gridMapCv/InpaintFilter
         params:
           input_layer:  elevation
           output_layer: elevation_inpainted
-          radius: 0.20
+          radius: 0.2
 
       filter3:  # 반경 평균화로 노이즈 저감
         name: mean_in_radius
@@ -47,15 +59,16 @@ grid_map_filters:
         params:
           input_layer:  elevation_inpainted
           output_layer: elevation_smooth
-          radius: 0.20
+          radius: 0.2
 
       filter4:  # 표면 법선 벡터 계산
         name: surface_normals
         type: gridMapFilters/NormalVectorsFilter
         params:
-          input_layer:              elevation_inpainted
+          # Use the smoothed height map to make normals flatter on nominal ground.
+          input_layer:              elevation_smooth
           output_layers_prefix:     normal_vectors_
-          radius:                   0.20
+          radius:                   0.2
           normal_vector_positive_axis: z
 
       filter5:  # 법선 벡터를 색상으로 시각화
@@ -70,8 +83,8 @@ grid_map_filters:
         type: gridMapFilters/MathExpressionFilter
         params:
           output_layer: slope
-          # NOTE: Tune in Field
-          expression: acos(normal_vectors_z)
+          # EigenLab supports element-wise acos; slope is angle to gravity "up".
+          expression: acos(normal_vectors_x .* gravity_x + normal_vectors_y .* gravity_y + normal_vectors_z .* gravity_z)
 
       filter7:  # 거칠기(roughness) 계산
         name: roughness
@@ -85,11 +98,10 @@ grid_map_filters:
         name: traversability
         type: gridMapFilters/MathExpressionFilter
         params:
-          output_layer: traversability
-          # NOTE: Tune in Field
-          expression: |
-            0.5 * (1.0 - (slope     / 0.6)) +
-            0.5 * (1.0 - (roughness / 0.1))
+          output_layer: traversability # NOTE: tune for real (#34)
+          # We define step obstructiveness as a criteria for lethal obstacle:
+          # slope: >0.5 radian is lethal. roughness: >0.1 is lethal.
+          expression: "2.0 ./ (1 + exp(-50 * (slope - 0.5))) + 2.0 ./ (1 + exp(-50 * (roughness - 0.1)))"
 
       filter9:  # 하한(0) 클램핑
         name: traversability_lower_threshold
@@ -117,3 +129,11 @@ gridmap_to_occupancy:
     max_value: 1.0
     invert: true
     unknown_value: 0
+
+gridmap_to_pointcloud:
+  ros__parameters:
+    use_sim_time: true
+    input_topic: /traversability_gridmap
+    output_topic: /traversability_cloud
+    layer: traversability
+    # TODO: configure on how to translate traversability as height.

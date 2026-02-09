@@ -19,7 +19,6 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_bringup REQUIRED)
-find_package(nav2_costmap_2d REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_behavior_tree REQUIRED)
 find_package(tf2 REQUIRED)
@@ -31,7 +30,11 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geographic_msgs REQUIRED)
+# https://stackoverflow.com/questions/48169653/finding-geographiclib-in-cmake-on-debian
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};/usr/share/cmake/geographiclib")
+find_package(GeographicLib REQUIRED)
 find_package(robot_localization REQUIRED)
+find_package(aruco_opencv_msgs REQUIRED)
 find_package(ublox_ubx_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
@@ -64,18 +67,13 @@ ament_target_dependencies(gps_heading_gps_node
 add_executable(gnss_only_server src/gnss_only_server.cpp)
 ament_target_dependencies(gnss_only_server
 rclcpp rclcpp_action nav2_msgs geometry_msgs nav_msgs sensor_msgs
-tf2_ros tf2_geometry_msgs mr2_action_interface
+tf2_ros tf2_geometry_msgs mr2_action_interface robot_localization
 )
 
 add_executable(cover_vision_server src/cover_vision_server.cpp)
 ament_target_dependencies(cover_vision_server
 rclcpp rclcpp_action nav2_msgs geometry_msgs nav_msgs sensor_msgs
-tf2_ros tf2_geometry_msgs mr2_action_interface
-)
-
-add_executable(gnss_only_client src/gnss_only_client.cpp)
-ament_target_dependencies(gnss_only_client
-rclcpp rclcpp_action mr2_action_interface
+tf2 tf2_ros tf2_geometry_msgs mr2_action_interface robot_localization
 )
 
 add_executable(base_datum_setter src/base_datum_setter.cpp)
@@ -83,9 +81,19 @@ ament_target_dependencies(base_datum_setter
   rclcpp geographic_msgs robot_localization ublox_ubx_msgs
 )
 
-add_executable(cover_vision_client src/cover_vision_client.cpp)
-ament_target_dependencies(cover_vision_client
-rclcpp rclcpp_action mr2_action_interface
+add_executable(cover_vision_yolo_adapter src/cover_vision_yolo_adapter.cpp)
+ament_target_dependencies(cover_vision_yolo_adapter
+  rclcpp geometry_msgs mr2_action_interface tf2 tf2_ros tf2_geometry_msgs
+)
+
+add_executable(cover_vision_aruco_adapter src/cover_vision_aruco_adapter.cpp)
+ament_target_dependencies(cover_vision_aruco_adapter
+  rclcpp geometry_msgs mr2_action_interface tf2 tf2_ros tf2_geometry_msgs aruco_opencv_msgs
+)
+
+add_executable(mission_master src/mission_master.cpp)
+ament_target_dependencies(mission_master
+  rclcpp rclcpp_action nav2_msgs mr2_action_interface
 )
 
 add_executable(pc2_to_heightmap_node src/pc2_to_heightmap_node.cpp)
@@ -96,7 +104,8 @@ target_link_libraries(pc2_to_heightmap_node ${PCL_LIBRARIES})
 
 add_executable(traversability_filter_node src/traversability_filter_node.cpp)
 ament_target_dependencies(traversability_filter_node
-  rclcpp grid_map_ros grid_map_core grid_map_filters filters pluginlib
+  rclcpp sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs
+  grid_map_ros grid_map_core grid_map_filters filters pluginlib
 )
 
 add_executable(gridmap_to_occupancy_node src/gridmap_to_occupancy_node.cpp)
@@ -104,26 +113,38 @@ ament_target_dependencies(gridmap_to_occupancy_node
   rclcpp grid_map_msgs grid_map_core grid_map_ros nav_msgs tf2 tf2_ros tf2_geometry_msgs
 )
 
-add_library(mr2_rover_auto_gridmap_layer SHARED src/gridmap_traversability_layer.cpp)
-ament_target_dependencies(mr2_rover_auto_gridmap_layer
-  rclcpp nav2_costmap_2d grid_map_ros grid_map_core grid_map_msgs pluginlib
+add_executable(gridmap_to_pointcloud_node src/gridmap_to_pointcloud_node.cpp)
+ament_target_dependencies(gridmap_to_pointcloud_node
+  rclcpp grid_map_msgs grid_map_core grid_map_ros sensor_msgs
 )
+
+add_executable(path_to_geopath_node src/path_to_geopath_node.cpp)
+ament_target_dependencies(path_to_geopath_node
+  rclcpp nav_msgs sensor_msgs geographic_msgs tf2 tf2_ros tf2_geometry_msgs
+)
+if(TARGET GeographicLib::GeographicLib)
+  set(GEOGRAPHICLIB_LINK_TARGET GeographicLib::GeographicLib)
+else()
+  set(GEOGRAPHICLIB_LINK_TARGET ${GeographicLib_LIBRARIES})
+  target_include_directories(path_to_geopath_node PRIVATE ${GeographicLib_INCLUDE_DIRS})
+endif()
+# Use plain signature to match ament_target_dependencies linkage.
+target_link_libraries(path_to_geopath_node ${GEOGRAPHICLIB_LINK_TARGET})
 
 install(TARGETS
   gps_heading_gps_node
   gnss_only_server
   cover_vision_server
-  gnss_only_client
-  cover_vision_client
+  cover_vision_yolo_adapter
+  cover_vision_aruco_adapter
+  mission_master
   base_datum_setter
   pc2_to_heightmap_node
   traversability_filter_node
   gridmap_to_occupancy_node
+  gridmap_to_pointcloud_node
+  path_to_geopath_node
   DESTINATION lib/${PROJECT_NAME}/
-)
-
-install(TARGETS mr2_rover_auto_gridmap_layer
-  LIBRARY DESTINATION lib
 )
 
 install( DIRECTORY include DESTINATION include )
@@ -131,8 +152,5 @@ install( DIRECTORY launch DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY config DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY behavior_trees DESTINATION share/${PROJECT_NAME}/)
 install( DIRECTORY maps DESTINATION share/${PROJECT_NAME}/ )
-install( FILES mr2_rover_auto_plugins.xml DESTINATION share/${PROJECT_NAME}/ )
-
-pluginlib_export_plugin_description_file(nav2_costmap_2d mr2_rover_auto_plugins.xml)
 
 ament_package()

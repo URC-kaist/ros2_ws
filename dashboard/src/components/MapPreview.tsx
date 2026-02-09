@@ -1,9 +1,62 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { getRosBridgeClient } from '../lib/rosBridge'
 import { getSikGatewayClient } from '../lib/sikGateway'
 
-const MapPreview = () => {
+type PoseStamped = {
+  pose?: {
+    position?: {
+      x?: number
+      y?: number
+      z?: number
+    }
+  }
+}
+
+type GeoPoseStamped = {
+  pose?: {
+    position?: {
+      latitude?: number
+      longitude?: number
+      altitude?: number
+    }
+  }
+}
+
+type GeoPathMsg = {
+  poses?: GeoPoseStamped[]
+}
+
+type MissionSpec = {
+  mission_id: number
+  mission_type: number
+  detection_method: number
+  object_type: number
+  target_latitude: number
+  target_longitude: number
+  target_radius: number
+  waypoint_count: number
+}
+
+const MAX_SMOOTHED_POINTS = 120
+const MAX_COVERAGE_POINTS = 300
+const MISSION_CIRCLE_STEPS = 64
+const WGS84_A = 6378137
+const RAD_TO_DEG = 180 / Math.PI
+const DEG_TO_RAD = Math.PI / 180
+
+type MapPreviewProps = {
+  missionList?: MissionSpec[]
+  grabFromMap?: boolean
+  onGrabCoordinate?: (coord: { lat: number; lon: number }) => void
+}
+
+const MapPreview = ({
+  missionList = [],
+  grabFromMap = false,
+  onGrabCoordinate,
+}: MapPreviewProps) => {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
@@ -18,6 +71,162 @@ const MapPreview = () => {
   const [baseHeadingDeg, setBaseHeadingDeg] = useState<number | null>(null)
   const [baseHeadingInput, setBaseHeadingInput] = useState('')
   const [baseHeadingApplied, setBaseHeadingApplied] = useState<number | null>(null)
+  const [smoothedPath, setSmoothedPath] = useState<[number, number][]>([])
+  const [coveragePath, setCoveragePath] = useState<[number, number][]>([])
+  const [objectPose, setObjectPose] = useState<[number, number] | null>(null)
+  const smoothedGeoRawRef = useRef<GeoPathMsg | null>(null)
+  const coverageGeoRawRef = useRef<GeoPathMsg | null>(null)
+  const objectRawRef = useRef<PoseStamped | null>(null)
+  const toLLCacheRef = useRef<Map<string, [number, number]>>(new Map())
+  const objectReqRef = useRef(0)
+
+  type ToLLRequest = {
+    map_point: {
+      x: number
+      y: number
+      z: number
+    }
+  }
+
+  type ToLLResponse = {
+    ll_point?: {
+      latitude?: number
+      longitude?: number
+      altitude?: number
+    }
+  }
+
+  const toLL = async (x: number, y: number, z = 0): Promise<[number, number] | null> => {
+    const key = `${x},${y},${z}`
+    const cached = toLLCacheRef.current.get(key)
+    if (cached) return cached
+    const ros = getRosBridgeClient()
+    if (!ros.isConnected()) return null
+    try {
+      const res = await ros.callService<ToLLRequest, ToLLResponse>(
+        '/toLL',
+        'robot_localization/srv/ToLL',
+        { map_point: { x, y, z } }
+      )
+      const lat = Number(res?.ll_point?.latitude)
+      const lon = Number(res?.ll_point?.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+      const coord: [number, number] = [lon, lat]
+      toLLCacheRef.current.set(key, coord)
+      return coord
+    } catch {
+      return null
+    }
+  }
+
+  const convertGeoPath = (msg: GeoPathMsg | null, maxPoints: number): [number, number][] => {
+    const poses = msg?.poses ?? []
+    if (poses.length === 0) return []
+    const step =
+      poses.length > maxPoints ? Math.ceil(poses.length / maxPoints) : 1
+    const coords: [number, number][] = []
+    for (let i = 0; i < poses.length; i += step) {
+      const position = poses[i]?.pose?.position
+      const lat = Number(position?.latitude)
+      const lon = Number(position?.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+      coords.push([lon, lat])
+    }
+    return coords
+  }
+
+  const convertPose = async (msg: PoseStamped | null): Promise<[number, number] | null> => {
+    const position = msg?.pose?.position
+    const x = Number(position?.x)
+    const y = Number(position?.y)
+    const z = Number(position?.z ?? 0)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+    return toLL(x, y, Number.isFinite(z) ? z : 0)
+  }
+
+  const buildMissionPointFeatures = (missions: MissionSpec[]) => {
+    const total = missions.length
+    const toColor = (index: number) => {
+      if (total <= 1) return '#ff4d4d'
+      const t = index / (total - 1)
+      let r = 0
+      let g = 0
+      let b = 0
+      if (t <= 0.5) {
+        const local = t / 0.5
+        r = Math.round(255 * (1 - local))
+        g = Math.round(255 * local)
+      } else {
+        const local = (t - 0.5) / 0.5
+        g = Math.round(255 * (1 - local))
+        b = Math.round(255 * local)
+      }
+      return `#${r.toString(16).padStart(2, '0')}${g
+        .toString(16)
+        .padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+    }
+
+    return missions
+      .filter(
+        (mission) =>
+          Number.isFinite(mission.target_longitude) &&
+          Number.isFinite(mission.target_latitude)
+      )
+      .map((mission, index) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [mission.target_longitude, mission.target_latitude],
+        },
+        properties: {
+          order_color: toColor(index),
+          mission_id: mission.mission_id,
+          mission_type: mission.mission_type,
+          detection_method: mission.detection_method,
+          object_type: mission.object_type,
+          target_radius: mission.target_radius,
+        },
+      }))
+  }
+
+  const buildMissionCircle = (lon: number, lat: number, radius: number) => {
+    const latRad = lat * DEG_TO_RAD
+    const coords: [number, number][] = []
+    for (let i = 0; i <= MISSION_CIRCLE_STEPS; i += 1) {
+      const theta = (2 * Math.PI * i) / MISSION_CIRCLE_STEPS
+      const dLat = (radius * Math.sin(theta)) / WGS84_A
+      const dLon = (radius * Math.cos(theta)) / (WGS84_A * Math.cos(latRad))
+      coords.push([lon + dLon * RAD_TO_DEG, lat + dLat * RAD_TO_DEG])
+    }
+    return coords
+  }
+
+  const buildMissionCircleFeatures = (missions: MissionSpec[]) =>
+    missions
+      .filter(
+        (mission) =>
+          Number.isFinite(mission.target_longitude) &&
+          Number.isFinite(mission.target_latitude) &&
+          Number.isFinite(mission.target_radius) &&
+          mission.target_radius > 0
+      )
+      .map((mission) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: [
+            buildMissionCircle(
+              mission.target_longitude,
+              mission.target_latitude,
+              mission.target_radius
+            ),
+          ],
+        },
+        properties: {
+          mission_id: mission.mission_id,
+          mission_type: mission.mission_type,
+        },
+      }))
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -69,6 +278,121 @@ const MapPreview = () => {
           'line-opacity': 0.7,
         },
       })
+      map.addSource('smoothed-path', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [] },
+          properties: {},
+        },
+      })
+      map.addLayer({
+        id: 'smoothed-path-line',
+        type: 'line',
+        source: 'smoothed-path',
+        paint: {
+          'line-color': '#4f8ff7',
+          'line-width': 2,
+          'line-opacity': 0.8,
+        },
+      })
+      map.addSource('coverage-path', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [] },
+          properties: {},
+        },
+      })
+      map.addLayer({
+        id: 'coverage-path-line',
+        type: 'line',
+        source: 'coverage-path',
+        paint: {
+          'line-color': '#f4d35e',
+          'line-width': 2,
+          'line-opacity': 0.8,
+        },
+      })
+      map.addSource('cover-object', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [] },
+          properties: {},
+        },
+      })
+      map.addLayer({
+        id: 'cover-object-point',
+        type: 'circle',
+        source: 'cover-object',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#ff7a59',
+          'circle-stroke-color': '#0b1220',
+          'circle-stroke-width': 1.5,
+        },
+      })
+      map.addSource('mission-targets', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
+      })
+      map.addLayer({
+        id: 'mission-targets-point',
+        type: 'circle',
+        source: 'mission-targets',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': ['get', 'order_color'],
+          'circle-stroke-color': '#0b1220',
+          'circle-stroke-width': 1.5,
+        },
+      })
+      map.addSource('mission-radii', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [],
+        },
+      })
+      map.addLayer({
+        id: 'mission-radii-fill',
+        type: 'fill',
+        source: 'mission-radii',
+        paint: {
+          'fill-color': [
+            'match',
+            ['get', 'mission_type'],
+            1,
+            'rgba(53, 211, 195, 0.15)',
+            2,
+            'rgba(244, 211, 94, 0.18)',
+            'rgba(255, 122, 89, 0.18)',
+          ],
+          'fill-opacity': 0,
+        },
+      })
+      map.addLayer({
+        id: 'mission-radii-outline',
+        type: 'line',
+        source: 'mission-radii',
+        paint: {
+          'line-color': [
+            'match',
+            ['get', 'mission_type'],
+            1,
+            '#35d3c3',
+            2,
+            '#f4d35e',
+            '#ff7a59',
+          ],
+          'line-width': 1.5,
+          'line-opacity': 0.7,
+        },
+      })
       setMapReady(true)
     })
 
@@ -82,6 +406,29 @@ const MapPreview = () => {
       mapInstanceRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const handler = (event: maplibregl.MapMouseEvent & maplibregl.EventData) => {
+      if (!grabFromMap || !onGrabCoordinate) return
+      onGrabCoordinate({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+    }
+    map.on('click', handler)
+    return () => {
+      map.off('click', handler)
+    }
+  }, [grabFromMap, onGrabCoordinate, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map) return
+    map.getCanvas().style.cursor = grabFromMap ? 'crosshair' : ''
+    return () => {
+      if (!map) return
+      map.getCanvas().style.cursor = ''
+    }
+  }, [grabFromMap])
 
   // Subscribe to GNSS + heading via SiK gateway
   useEffect(() => {
@@ -141,6 +488,96 @@ const MapPreview = () => {
     const sik = getSikGatewayClient()
     sik.connect()
     sik.sendBaseHeading(normalized)
+  }, [])
+
+  useEffect(() => {
+    const ros = getRosBridgeClient()
+    ros.connect()
+    const unsubPlanSmoothedGeo = ros.subscribe<GeoPathMsg>(
+      '/plan_smoothed/geo',
+      'geographic_msgs/msg/GeoPath',
+      (msg) => {
+        smoothedGeoRawRef.current = msg
+        const poseCount = msg?.poses?.length ?? 0
+        const coords = convertGeoPath(msg, MAX_SMOOTHED_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setSmoothedPath(coords)
+        }
+      },
+      { throttleRate: 250 }
+    )
+    const unsubCoverageGeo = ros.subscribe<GeoPathMsg>(
+      '/cover_vision/coverage_path/geo',
+      'geographic_msgs/msg/GeoPath',
+      (msg) => {
+        coverageGeoRawRef.current = msg
+        const poseCount = msg?.poses?.length ?? 0
+        const coords = convertGeoPath(msg, MAX_COVERAGE_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setCoveragePath(coords)
+        }
+      },
+      { throttleRate: 250 }
+    )
+    const unsubObject = ros.subscribe<PoseStamped>(
+      '/cover_vision/object_pose',
+      'geometry_msgs/msg/PoseStamped',
+      (msg) => {
+        objectRawRef.current = msg
+        const reqId = ++objectReqRef.current
+        void convertPose(msg).then((coord) => {
+          if (reqId !== objectReqRef.current) return
+          if (coord) setObjectPose(coord)
+        })
+      },
+      { throttleRate: 250 }
+    )
+    return () => {
+      unsubPlanSmoothedGeo()
+      unsubCoverageGeo()
+      unsubObject()
+    }
+  }, [])
+
+  useEffect(() => {
+    const ros = getRosBridgeClient()
+    ros.connect()
+    const resync = () => {
+      if (smoothedGeoRawRef.current) {
+        const poseCount = smoothedGeoRawRef.current.poses?.length ?? 0
+        const coords = convertGeoPath(smoothedGeoRawRef.current, MAX_SMOOTHED_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setSmoothedPath(coords)
+        }
+      }
+      if (coverageGeoRawRef.current) {
+        const poseCount = coverageGeoRawRef.current.poses?.length ?? 0
+        const coords = convertGeoPath(coverageGeoRawRef.current, MAX_COVERAGE_POINTS)
+        if (coords.length > 0 || poseCount === 0) {
+          setCoveragePath(coords)
+        }
+      }
+      if (objectRawRef.current) {
+        const reqId = ++objectReqRef.current
+        void convertPose(objectRawRef.current).then((coord) => {
+          if (reqId !== objectReqRef.current) return
+          if (coord) setObjectPose(coord)
+        })
+      }
+    }
+
+    const unsubscribe = ros.onConnectionStatus((connected) => {
+      if (!connected) return
+      resync()
+    })
+
+    if (ros.isConnected()) {
+      resync()
+    }
+
+    return () => {
+      unsubscribe()
+    }
   }, [])
 
   // Update marker + view when a fix arrives
@@ -251,50 +688,131 @@ const MapPreview = () => {
     })
   }, [trail, mapReady])
 
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const pointSource = map.getSource('mission-targets') as
+      | maplibregl.GeoJSONSource
+      | undefined
+    if (pointSource) {
+      pointSource.setData({
+        type: 'FeatureCollection',
+        features: buildMissionPointFeatures(missionList),
+      })
+    }
+    const radiusSource = map.getSource('mission-radii') as
+      | maplibregl.GeoJSONSource
+      | undefined
+    if (radiusSource) {
+      radiusSource.setData({
+        type: 'FeatureCollection',
+        features: buildMissionCircleFeatures(missionList),
+      })
+    }
+  }, [missionList, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const source = map.getSource('smoothed-path') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: smoothedPath },
+      properties: {},
+    })
+  }, [smoothedPath, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const source = map.getSource('coverage-path') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: coveragePath },
+      properties: {},
+    })
+  }, [coveragePath, mapReady])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const source = map.getSource('cover-object') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: objectPose ?? [] },
+      properties: {},
+    })
+  }, [objectPose, mapReady])
+
   return (
-    <div className="map" ref={mapRef}>
-      <button
-        type="button"
-        onClick={() => {
-          setFollowRover(true)
-          const map = mapInstanceRef.current
-          if (map && fix) {
-            map.easeTo({ center: fix, zoom: Math.max(map.getZoom(), 17), duration: 300 })
-          }
-        }}
-        style={{
-          position: 'absolute',
-          top: 10,
-          right: 10,
-          zIndex: 2,
-          background: followRover ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
-          color: followRover ? '#0b1220' : '#cdd6f4',
-          border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 10,
-          padding: '8px 12px',
-          fontSize: '12px',
-          cursor: 'pointer',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
-        }}
-      >
-        {followRover ? 'Following rover' : 'Follow rover'}
-      </button>
-      <div
-        style={{
-          position: 'absolute',
-          top: 8,
-          left: 8,
-          background: 'rgba(11, 18, 32, 0.8)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 8,
-          padding: '6px 10px',
-          fontSize: '12px',
-          color: '#cdd6f4',
-          zIndex: 1,
-          pointerEvents: 'none',
-          minWidth: 170,
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div className="map" ref={mapRef}>
+        <button
+          type="button"
+          onClick={() => {
+            setFollowRover(true)
+            const map = mapInstanceRef.current
+            if (map && fix) {
+              map.easeTo({ center: fix, zoom: Math.max(map.getZoom(), 17), duration: 300 })
+            }
+          }}
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            zIndex: 2,
+            background: followRover ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
+            color: followRover ? '#0b1220' : '#cdd6f4',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 10,
+            padding: '8px 12px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+          }}
+        >
+          {followRover ? 'Following rover' : 'Follow rover'}
+        </button>
+        {grabFromMap ? (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 12,
+              left: 12,
+              zIndex: 2,
+              background: 'rgba(53, 211, 195, 0.9)',
+              color: '#0b1220',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: '12px',
+              fontWeight: 600,
+              boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+              pointerEvents: 'none',
+            }}
+          >
+            Grab from map enabled. Click to add a mission.
+          </div>
+        ) : null}
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            background: 'rgba(11, 18, 32, 0.8)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 8,
+            padding: '6px 10px',
+            fontSize: '12px',
+            color: '#cdd6f4',
+            zIndex: 1,
+            pointerEvents: 'none',
+            minWidth: 170,
+          }}
+        >
         <div><strong>Lat/Lon:</strong> {fix ? `${fix[1].toFixed(6)}, ${fix[0].toFixed(6)}` : '—'}</div>
         <div><strong>Heading:</strong> {headingDeg != null ? `${headingDeg.toFixed(1)}°` : '—'}</div>
         <div>
@@ -357,8 +875,10 @@ const MapPreview = () => {
           </span>
         </div>
       </div>
+      </div>
     </div>
   )
 }
 
+export type { MissionSpec }
 export default MapPreview

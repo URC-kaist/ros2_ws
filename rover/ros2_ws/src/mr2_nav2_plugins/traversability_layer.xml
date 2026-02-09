@@ -1,0 +1,5 @@
+<library path="mr2_nav2_plugins_core">
+  <class type="mr2_nav2_plugins::TraversabilityLayer" base_class_type="nav2_costmap_2d::Layer">
+    <description>Nav2 costmap layer to take local traversability as GridMap.</description>
+  </class>
+</library>

@@ -38,6 +38,31 @@
   box-shadow: 0 0 8px rgba(93, 224, 137, 0.6);
 }
 
+.status-dot-success {
+  background: #4cdc78;
+  box-shadow: 0 0 8px rgba(76, 220, 120, 0.7);
+}
+
+.status-dot-autonomous {
+  background: #dc4c4c;
+  box-shadow: 0 0 8px rgba(220, 76, 76, 0.7);
+}
+
+.status-dot-manual {
+  background: #4682ff;
+  box-shadow: 0 0 8px rgba(70, 130, 255, 0.7);
+}
+
+.status-dot-off {
+  background: #0c1119;
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.status-dot-flash {
+  animation: status-dot-flash 1s ease-in-out infinite;
+}
+
 .status-dot-error {
   background: var(--danger);
   box-shadow: 0 0 8px rgba(242, 95, 92, 0.6);
@@ -46,6 +71,18 @@
 .status-dot-warn {
   background: var(--accent-2);
   box-shadow: 0 0 8px rgba(247, 178, 77, 0.6);
+}
+
+@keyframes status-dot-flash {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 .status-item.battery {
   display: grid;

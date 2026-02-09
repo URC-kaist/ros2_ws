@@ -12,10 +12,12 @@
   <build_depend>rosidl_default_generators</build_depend>
   <build_depend>rclcpp</build_depend>
   <build_depend>mr2_can_bus_core</build_depend>
+  <build_depend>mr2_action_interface</build_depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>
   <exec_depend>rclcpp</exec_depend>
   <exec_depend>mr2_can_bus_core</exec_depend>
+  <exec_depend>mr2_action_interface</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 

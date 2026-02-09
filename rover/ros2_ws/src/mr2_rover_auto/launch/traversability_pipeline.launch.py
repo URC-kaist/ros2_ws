@@ -13,8 +13,10 @@ def generate_launch_description():
     pkg_share = get_package_share_directory("mr2_rover_auto")
     default_params = os.path.join(pkg_share, "config", "trav_pipeline.yaml")
 
+    # Use a distinct launch argument name to avoid colliding with Nav2's
+    # `params_file` (which broke map_server earlier).
     params_file_arg = DeclareLaunchArgument(
-        "params_file",
+        "trav_params_file",
         default_value=default_params,
         description="Traversability pipeline parameters file",
     )
@@ -25,7 +27,7 @@ def generate_launch_description():
     )
 
     use_sim_time = LaunchConfiguration("use_sim_time")
-    params_file = LaunchConfiguration("params_file")
+    params_file = LaunchConfiguration("trav_params_file")
     param_substitutions = {"use_sim_time": use_sim_time}
     configured_params = ParameterFile(
         RewrittenYaml(
@@ -40,6 +42,17 @@ def generate_launch_description():
         [
             params_file_arg,
             use_sim_time_arg,
+            # Node(
+            #     package="imu_filter_madgwick",
+            #     executable="imu_filter_madgwick_node",
+            #     name="imu_gravity_filter",
+            #     output="screen",
+            #     parameters=[configured_params],
+            #     remappings=[
+            #         ("imu/data_raw", "/rgbd_camera/imu"),
+            #         ("imu/data", "gravity"),
+            #     ],
+            # ),
             Node(
                 package="mr2_rover_auto",
                 executable="pc2_to_heightmap_node",
@@ -54,12 +67,19 @@ def generate_launch_description():
                 output="screen",
                 parameters=[configured_params],
             ),
-            Node(
-                package="mr2_rover_auto",
-                executable="gridmap_to_occupancy_node",
-                name="gridmap_to_occupancy",
-                output="screen",
-                parameters=[configured_params],
-            ),
+            # Node(
+            #     package="mr2_rover_auto",
+            #     executable="gridmap_to_occupancy_node",
+            #     name="gridmap_to_occupancy",
+            #     output="screen",
+            #     parameters=[configured_params],
+            # ),
+            # Node(
+            #     package="mr2_rover_auto",
+            #     executable="gridmap_to_pointcloud_node",
+            #     name="gridmap_to_pointcloud",
+            #     output="screen",
+            #     parameters=[configured_params],
+            # ),
         ]
     )

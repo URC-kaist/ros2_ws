@@ -13,6 +13,12 @@ export type CmdArmTwist = {
   ang_z_rad_s: number
 }
 
+export type MissionControl = {
+  command: number
+  clear_costmap: boolean
+  mission_id: number
+}
+
 export type BatteryId = 1 | 2
 
 export type TelemBattery = {
@@ -276,6 +282,15 @@ class SikGatewayClient {
 
   sendHeartbeat() {
     this.send({ type: 'heartbeat' })
+  }
+
+  sendMissionControl(control: MissionControl) {
+    this.send({
+      type: 'mission_control',
+      command: control.command,
+      clear_costmap: control.clear_costmap,
+      mission_id: control.mission_id,
+    })
   }
 
   sendBaseHeading(headingDeg: number) {

@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(mr2_can_bus_core REQUIRED)
+find_package(mr2_action_interface REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetLedMode.srv")
@@ -27,7 +28,16 @@ if(typesupport_target)
 endif()
 add_dependencies(led_can_node ${PROJECT_NAME}__rosidl_generator_cpp)
 
-install(TARGETS led_can_node
+add_executable(mission_status_led_node src/mission_status_led_node.cpp)
+ament_target_dependencies(mission_status_led_node
+  rclcpp
+  mr2_action_interface)
+if(typesupport_target)
+  target_link_libraries(mission_status_led_node ${typesupport_target})
+endif()
+add_dependencies(mission_status_led_node ${PROJECT_NAME}__rosidl_generator_cpp)
+
+install(TARGETS led_can_node mission_status_led_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY srv

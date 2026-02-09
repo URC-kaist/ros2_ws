@@ -1,8 +1,8 @@
 # Consult gdalinfo for the map's origin and resolution.
-image: "new_filter_mean_slope_length_norm.png"    # 0~255 회색 PNG
+image: "new_filter_mean_slope_length_norm.png"  # Grayscale PNG (0~255)
 resolution: 0.783011944543186 # m/px
 origin: [-591.17401813, -591.565524102, 0.0] # image (width, height) * res / 2
-negate: 1 # 0: 흰색이 free, 1: 검은색이 free
-occupied_thresh: 1.0 # occupied if value >= occupied_thresh
-free_thresh: 0.0 # free if value <= free_thresh
-mode: "scale"                         # 그레이스케일 -> 확률 스케일링
+negate: 1             # 1 = Black is free in .png
+occupied_thresh: 0.65 # 100 (occupied) if >= occupied_thresh
+free_thresh: 0.196      # 0 (free) if <= free_thresh
+mode: "scale"         # Grayscale -> Probability scale (0.0~1.0)

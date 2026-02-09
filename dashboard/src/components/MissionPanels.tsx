@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import DeliveryPanel from './DeliveryPanel'
 import MapPreview from './MapPreview'
+import MissionMasterPanel from './MissionMasterPanel'
+import type { MissionSpec } from './MapPreview'
 import SystemStatusPanel from './SystemStatusPanel'
 import ArmServoCard from './ArmServoCard'
 import RocketM2Card from './RocketM2Card'
 import SpectrophotometerCard from './SpectrophotometerCard'
+import AutonomyHealthCard from './AutonomyHealthCard'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -11,6 +15,35 @@ type MissionPanelsProps = {
 }
 
 const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
+  const [missionList, setMissionList] = useState<MissionSpec[]>([])
+  const [previewMissions, setPreviewMissions] = useState<MissionSpec[]>([])
+  const [grabFromMap, setGrabFromMap] = useState(false)
+
+  const handleGrabFromMap = ({ lat, lon }: { lat: number; lon: number }) => {
+    setMissionList((prev) => {
+      const nextId =
+        prev.reduce(
+          (max, mission) =>
+            Number.isFinite(mission.mission_id) ? Math.max(max, mission.mission_id) : max,
+          0
+        ) + 1
+      return [
+        ...prev,
+        {
+          mission_id: nextId,
+          mission_type: 1,
+          detection_method: 0,
+          object_type: 0,
+          target_latitude: lat,
+          target_longitude: lon,
+          target_radius: 0,
+          waypoint_count: 0,
+        },
+      ]
+    })
+  }
+
+  const missionsForMap = grabFromMap ? missionList : previewMissions
   return (
     <section className="tab-panels">
       {activeTab === 'status' && <SystemStatusPanel />}
@@ -36,19 +69,26 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
       )}
 
       {activeTab === 'autonomous' && (
-        <div className="panel-grid" role="tabpanel">
-          <article className="card card--span-2 card--map">
-            <MapPreview />
-          </article>
-          <article className="card">
-            <h3>Autonomy Health</h3>
-            <p>Planner status, localization, and perception.</p>
-            <ul className="list">
-              <li>Localization: Green</li>
-              <li>Planner: Green</li>
-              <li>Perception: Yellow</li>
-            </ul>
-          </article>
+        <div className="autonomy-layout" role="tabpanel">
+          <div className="autonomy-left">
+            <article className="card card--map">
+              <MapPreview
+                missionList={missionsForMap}
+                grabFromMap={grabFromMap}
+                onGrabCoordinate={handleGrabFromMap}
+              />
+            </article>
+            <AutonomyHealthCard />
+          </div>
+          <div className="autonomy-right">
+            <MissionMasterPanel
+              missionList={missionList}
+              grabFromMap={grabFromMap}
+              onGrabFromMapChange={setGrabFromMap}
+              onMissionListChange={setMissionList}
+              onMissionPreview={setPreviewMissions}
+            />
+          </div>
         </div>
       )}
 

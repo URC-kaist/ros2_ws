@@ -275,6 +275,7 @@ def generate_launch_description():
             {"device": LaunchConfiguration("sik_device")},
             {"baud": LaunchConfiguration("sik_baud")},
             {"heartbeat_timeout_ms": 500},
+            {"cmd_vel_topic": "/base/cmd_vel"},
         ],
         condition=real_condition,
     )
@@ -288,6 +289,7 @@ def generate_launch_description():
             {"baud": LaunchConfiguration("sik_sim_baud")},
             {"heartbeat_timeout_ms": 500},
             {"log_frames": False},
+            {"cmd_vel_topic": "/base/cmd_vel"},
         ],
         condition=sik_sim_condition,
     )

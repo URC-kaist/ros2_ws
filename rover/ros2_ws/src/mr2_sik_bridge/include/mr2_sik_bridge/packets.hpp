@@ -13,6 +13,7 @@ enum class MsgId : uint8_t {
   kCmdDrive = 0x01,
   kCmdArmTwist = 0x02,
   kHeartbeat = 0x03,
+  kMissionControl = 0x04,
   kTelemBattery1 = 0x10,
   kTelemBattery2 = 0x11,
   kTelemNav = 0x20,
@@ -48,6 +49,12 @@ struct CmdArmTwist {
 
 struct Heartbeat {
   uint32_t timestamp_ms{0};
+};
+
+struct MissionControl {
+  uint8_t command{0};
+  bool clear_costmap{false};
+  uint32_t mission_id{0};
 };
 
 struct TelemBattery {
@@ -102,6 +109,8 @@ uint16_t crc16_ccitt_false(const uint8_t *data, size_t length);
 std::vector<uint8_t> encode_cmd_drive(uint8_t seq, const CmdDrive &cmd);
 std::vector<uint8_t> encode_cmd_arm_twist(uint8_t seq, const CmdArmTwist &cmd);
 std::vector<uint8_t> encode_heartbeat(uint8_t seq, const Heartbeat &hb);
+std::vector<uint8_t> encode_mission_control(uint8_t seq,
+                                            const MissionControl &ctrl);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem,
                                           uint8_t battery_id);
@@ -114,6 +123,7 @@ std::optional<Frame> decode_frame(const uint8_t *data, size_t length);
 std::optional<CmdDrive> decode_cmd_drive(const Frame &frame);
 std::optional<CmdArmTwist> decode_cmd_arm_twist(const Frame &frame);
 std::optional<Heartbeat> decode_heartbeat(const Frame &frame);
+std::optional<MissionControl> decode_mission_control(const Frame &frame);
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame);
 std::optional<TelemNav> decode_telem_nav(const Frame &frame);
 std::optional<BaseSvin> decode_base_svin(const Frame &frame);

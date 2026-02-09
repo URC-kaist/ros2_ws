@@ -165,6 +165,7 @@ const MsgId = {
   CMD_DRIVE: 0x01,
   CMD_ARM_TWIST: 0x02,
   HEARTBEAT: 0x03,
+  MISSION_CONTROL: 0x04,
   TELEM_BATTERY_1: 0x10,
   TELEM_BATTERY_2: 0x11,
   TELEM_NAV: 0x20,
@@ -636,6 +637,14 @@ function encodeHeartbeat(cmd) {
   return encodeFrame(MsgId.HEARTBEAT, nextSeq(), payload)
 }
 
+function encodeMissionControl(cmd) {
+  const payload = Buffer.alloc(6)
+  payload.writeUInt8(cmd.command & 0xff, 0)
+  payload.writeUInt8(cmd.clear_costmap ? 1 : 0, 1)
+  payload.writeUInt32LE(cmd.mission_id >>> 0, 2)
+  return encodeFrame(MsgId.MISSION_CONTROL, nextSeq(), payload)
+}
+
 function encodeBaseSvin(msg) {
   // Payload: int32 mean_x/y/z cm (12), int8 mean_xhp/mean_yhp/mean_zhp (3),
   // uint8 valid, uint8 active (2), uint32 mean_acc_0p1mm, uint32 obs (8) => 25 bytes
@@ -769,6 +778,25 @@ function handleDashboardMessage(msg) {
   if (type === 'heartbeat') {
     const frame = encodeHeartbeat({
       timestamp_ms: Date.now() >>> 0,
+    })
+    writeFrame(frame)
+    return
+  }
+
+  if (type === 'mission_control') {
+    const command = Math.min(255, Math.max(0, Math.floor(coerceNumber(msg.command))))
+    const missionId = Math.min(
+      0xffffffff,
+      Math.max(0, Math.floor(coerceNumber(msg.mission_id)))
+    )
+    const clearCostmap = Boolean(msg.clear_costmap)
+    log(
+      `mission_control rx cmd=${command} clear=${clearCostmap ? 'true' : 'false'} mission_id=${missionId}`
+    )
+    const frame = encodeMissionControl({
+      command,
+      clear_costmap: clearCostmap,
+      mission_id: missionId,
     })
     writeFrame(frame)
     return

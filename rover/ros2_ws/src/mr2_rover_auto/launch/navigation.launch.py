@@ -13,6 +13,7 @@ def generate_launch_description():
     nav2_launch = os.path.join(pkg_share, "launch", "nav2.launch.py")
     pipeline_launch = os.path.join(pkg_share, "launch", "traversability_pipeline.launch.py")
     action_launch = os.path.join(pkg_share, "launch", "action.launch.py")
+    path_to_geopath_launch = os.path.join(pkg_share, "launch", "path_to_geopath.launch.py")
 
     launch_args = [
         DeclareLaunchArgument(
@@ -29,15 +30,28 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "launch_actions",
-            default_value="false",
-            description="Launch action servers (currently experimental)",
-        )
+            default_value="true",
+            description="Launch mission/action servers",
+        ),
+        DeclareLaunchArgument(
+            "map",
+            default_value=os.path.join(pkg_share, "maps", "map0p4.yaml"),
+            description="Occupancy grid YAML passed to Nav2 map_server",
+        ),
+        DeclareLaunchArgument(
+            "params_file",
+            default_value=os.path.join(pkg_share, "config", "nav2_params.yaml"),
+            description="Nav2 parameters file",
+        ),
     ]
 
     pipeline_include = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(pipeline_launch),
         launch_arguments={
             "use_sim_time": LaunchConfiguration("use_sim_time"),
+            # Dedicated arg name in traversability_pipeline.launch.py to avoid
+            # clashing with Nav2's params_file.
+            "trav_params_file": os.path.join(pkg_share, "config", "trav_pipeline.yaml"),
         }.items(),
     )
 
@@ -45,6 +59,8 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(nav2_launch),
         launch_arguments={
             "use_sim_time": LaunchConfiguration("use_sim_time"),
+            "map": LaunchConfiguration("map"),
+            "params_file": LaunchConfiguration("params_file"),
         }.items(),
     )
 
@@ -56,4 +72,13 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("launch_actions")),
     )
 
-    return LaunchDescription(launch_args + [pipeline_include, nav2_include, action_include])
+    path_to_geopath_include = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(path_to_geopath_launch),
+        launch_arguments={
+            "use_sim_time": LaunchConfiguration("use_sim_time"),
+        }.items(),
+    )
+
+    return LaunchDescription(
+        launch_args + [pipeline_include, nav2_include, action_include, path_to_geopath_include]
+    )

@@ -3,11 +3,26 @@ import { getRosBridgeClient } from '../../lib/rosBridge'
 import { type LinkStatus, type TelemBattery, getSikGatewayClient } from '../../lib/sikGateway'
 import './ControlStatusList.css'
 
+type MissionStatusMsg = {
+  state?: number
+  detail?: string
+  arrival?: boolean
+}
+
+const MISSION_STATE_LABELS: Record<number, string> = {
+  0: 'IDLE',
+  1: 'RUNNING',
+  2: 'PAUSED',
+  3: 'COMPLETED',
+  4: 'FAILED',
+}
+
 const ControlStatusList = () => {
-  const isNormal = true
   const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
   const [wsConnected, setWsConnected] = useState(false)
   const [rosConnected, setRosConnected] = useState(false)
+  const [missionStatus, setMissionStatus] = useState<MissionStatusMsg | null>(null)
+  const [missionStatusAt, setMissionStatusAt] = useState<number | null>(null)
   const [battery1, setBattery1] = useState<TelemBattery | null>(null)
   const [battery2, setBattery2] = useState<TelemBattery | null>(null)
   const [battery1UpdatedAt, setBattery1UpdatedAt] = useState(0)
@@ -58,6 +73,23 @@ const ControlStatusList = () => {
     }
   }, [])
 
+  useEffect(() => {
+    const rosBridge = getRosBridgeClient()
+    rosBridge.connect()
+    const offMission = rosBridge.subscribe<MissionStatusMsg>(
+      '/mission_status',
+      'mr2_action_interface/msg/MissionStatus',
+      (msg) => {
+        setMissionStatus(msg)
+        setMissionStatusAt(Date.now())
+      },
+      { throttleRate: 500 }
+    )
+    return () => {
+      offMission()
+    }
+  }, [])
+
   const getBatteryPercent = (battery: TelemBattery | null) => {
     if (!battery || battery.total_capacity_mah <= 0) {
       return 0
@@ -91,6 +123,29 @@ const ControlStatusList = () => {
   const rosState = rosConnected ? 'Up' : 'Down'
   const rosDotClass = rosConnected ? '' : 'status-dot-error'
 
+  const missionStaleMs = 1000
+  const missionStale = missionStatusAt == null || nowMs - missionStatusAt > missionStaleMs
+  const ledMode = (() => {
+    if (missionStale || !missionStatus) return 'off'
+    if (missionStatus.arrival) return 'success'
+    if (missionStatus.state === 1) return 'autonomous'
+    if (missionStatus.state === 2) return 'manual'
+    return 'off'
+  })()
+  const missionLabel = missionStatus?.arrival
+    ? 'ARRIVAL'
+    : missionStatus?.state != null
+      ? MISSION_STATE_LABELS[missionStatus.state] ?? 'UNKNOWN'
+      : '—'
+  const missionDotClass =
+    ledMode === 'success'
+      ? 'status-dot-success status-dot-flash'
+      : ledMode === 'autonomous'
+        ? 'status-dot-autonomous'
+        : ledMode === 'manual'
+          ? 'status-dot-manual'
+          : 'status-dot-off'
+
   return (
     <>
       <section className="panel-section">
@@ -115,11 +170,11 @@ const ControlStatusList = () => {
           </div>
           <div className="status-item status-softstop">
             <span className="status-label">
-              <span className={`status-dot ${isNormal ? '' : 'status-dot-error'}`} aria-hidden="true" />
-              Status
+              <span className={`status-dot ${missionDotClass}`} aria-hidden="true" />
+              Auto Mission
             </span>
             <div className="status-pill">
-              <strong>{isNormal ? 'Normal' : 'E-Stop'}</strong>
+              <strong>{missionLabel}</strong>
             </div>
           </div>
         </div>

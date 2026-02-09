@@ -101,24 +101,6 @@ def generate_launch_description():
             ],
         ),
 
-        #### Query node for goal pose coordinate conversion.
-        # 5) Query for tf: GPS -> odometry/gps ((lat, long) -> ENU) with datum
-        # XXX MUST share same datum!!!
-        Node(
-            package="robot_localization",
-            executable="navsat_transform_node",
-            name="navsat_transform_query",
-            output="screen",
-            parameters=[
-                params_file_sim,
-                {"use_sim_time": LaunchConfiguration("use_sim_time")}
-            ],
-            remappings=[
-                ("/gps/fix", "query/fix"),
-                ("/odometry/gps", "query/gps"),
-                ('/odometry/filtered', '/odometry/filtered/global')
-            ],
-        )
         ],
         condition=IfCondition(LaunchConfiguration("use_sim_time"))),
 
@@ -169,24 +151,6 @@ def generate_launch_description():
             ],
         ),
 
-        #### Query node for goal pose coordinate conversion.
-        # 5) Query for tf: GPS -> odometry/gps ((lat, long) -> ENU) with datum
-        # XXX MUST share same datum!!!
-        Node(
-            package="robot_localization",
-            executable="navsat_transform_node",
-            name="navsat_transform_query",
-            output="screen",
-            parameters=[
-                params_file_real,
-                {"use_sim_time": LaunchConfiguration("use_sim_time")}
-            ],
-            remappings=[
-                ("/gps/fix", "query/fix"),
-                ("/odometry/gps", "query/gps"),
-                ('/odometry/filtered', '/odometry/filtered/global')
-            ],
-        )
         ],
         condition=UnlessCondition(LaunchConfiguration("use_sim_time"))),
     ])

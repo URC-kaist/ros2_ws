@@ -10,6 +10,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
 
+#include <algorithm>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
@@ -43,17 +44,23 @@ public:
     voxel_size_ = this->declare_parameter<double>("voxel_size_m", 0.05);
     roi_z_max_ = this->declare_parameter<double>("roi_z_max_m", 3.0);
     publish_rate_hz_ = this->declare_parameter<double>("publish_rate_hz", 5.0);
+    const int default_height_rank = 5;
+    height_rank_ = this->declare_parameter<int>("height_rank", default_height_rank);
+    if (height_rank_ <= 0) {
+      RCLCPP_WARN(this->get_logger(), "height_rank must be >= 1; clamping to 1");
+      height_rank_ = 1;
+    }
 
     grid_cols_ = static_cast<int>(std::ceil(x_forward_ / resolution_));
     grid_rows_ = static_cast<int>(std::ceil(y_width_ / resolution_));
-    y_min_ = -y_width_ / 2.0;
     total_cells_ = static_cast<std::size_t>(grid_cols_ * grid_rows_);
 
-    sum_bins_.assign(total_cells_, 0.0f);
-    count_bins_.assign(total_cells_, 0U);
+    bins_z_.assign(total_cells_, {});
     heightmap_buffer_.assign(total_cells_, std::numeric_limits<float>::quiet_NaN());
 
-    gridmap_pub_ = this->create_publisher<grid_map_msgs::msg::GridMap>(output_topic_, 1);
+    // Best-effort, volatile; matches downstream filter node subscription.
+    gridmap_pub_ = this->create_publisher<grid_map_msgs::msg::GridMap>(
+      output_topic_, rclcpp::SensorDataQoS());
     cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
       cloud_topic_, rclcpp::SensorDataQoS(),
       std::bind(&Pc2ToHeightmapNode::cloudCallback, this, std::placeholders::_1));
@@ -110,7 +117,7 @@ private:
       if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) {
         continue;
       }
-      if (roi_z_max_ > 0.0 && p.z >= roi_z_max_) {
+      if (roi_z_max_ > 0.0 && p.z >= roi_z_max_) { // p.z the camera frame depth.
         continue;
       }
       filtered.push_back(p);
@@ -139,8 +146,9 @@ private:
       return;
     }
 
-    std::fill(sum_bins_.begin(), sum_bins_.end(), 0.0f);
-    std::fill(count_bins_.begin(), count_bins_.end(), 0U);
+    for (auto & bin : bins_z_) {
+      bin.clear();
+    }
     std::fill(
       heightmap_buffer_.begin(), heightmap_buffer_.end(),
       std::numeric_limits<float>::quiet_NaN());
@@ -148,6 +156,7 @@ private:
     const Eigen::Isometry3d T_cam_map = tf2::transformToEigen(tf_cam_map);
     const Eigen::Isometry3d T_cam_base = tf2::transformToEigen(tf_cam_base);
     const Eigen::Isometry3d T_base_map = tf2::transformToEigen(tf_base_map);
+    cam_origin_base_ = T_cam_base.translation();
 
     for (const auto & p : filtered) {
       const Eigen::Vector3d p_cam(p.x, p.y, p.z);
@@ -155,15 +164,18 @@ private:
 
       const double x = p_base.x();
       const double y = p_base.y();
-      if (x <= 0.0) {
+      // ROI anchored at camera position (expressed in base frame), orientation ignored.
+      const double x_min = cam_origin_base_.x();
+      const double y_min = cam_origin_base_.y() - y_width_ / 2.0;
+      if (x < x_min || x >= (x_min + x_forward_)) {
         continue;
       }
-      if (y < y_min_ || y >= (y_min_ + y_width_)) {
+      if (y < y_min || y >= (y_min + y_width_)) {
         continue;
       }
 
-      const int ix = static_cast<int>(std::floor(x / resolution_));
-      const int iy = static_cast<int>(std::floor((y - y_min_) / resolution_));
+      const int ix = static_cast<int>(std::floor((x - x_min) / resolution_));
+      const int iy = static_cast<int>(std::floor((y - y_min) / resolution_));
       if (ix < 0 || ix >= grid_cols_ || iy < 0 || iy >= grid_rows_) {
         continue;
       }
@@ -172,8 +184,7 @@ private:
       const float z = static_cast<float>(p_map.z());
       const std::size_t flat = static_cast<std::size_t>(iy) * grid_cols_ +
         static_cast<std::size_t>(ix);
-      sum_bins_[flat] += z;
-      count_bins_[flat] += 1U;
+      bins_z_[flat].push_back(z);
     }
 
     std::size_t filled_cells = 0;
@@ -181,22 +192,31 @@ private:
       for (int ix = 0; ix < grid_cols_; ++ix) {
         const std::size_t flat = static_cast<std::size_t>(iy) * grid_cols_ +
           static_cast<std::size_t>(ix);
-        const auto count = count_bins_[flat];
-        if (count == 0U) {
+        auto & bin = bins_z_[flat];
+        if (bin.empty()) {
           continue;
         }
         ++filled_cells;
-        const float mean = sum_bins_[flat] / static_cast<float>(count);
+        const std::size_t k = std::min<std::size_t>(static_cast<std::size_t>(height_rank_), bin.size());
+        auto nth_it = bin.begin() + static_cast<std::ptrdiff_t>(k - 1);
+        std::nth_element(bin.begin(), nth_it, bin.end(), [](float a, float b) {
+          return a > b;  // sort descending for kth-highest
+        });
+        const float kth_height = *nth_it;
         const int flip_r = grid_rows_ - 1 - iy;
         const int flip_c = grid_cols_ - 1 - ix;
         const std::size_t flip_idx =
           static_cast<std::size_t>(flip_r) * grid_cols_ +
           static_cast<std::size_t>(flip_c);
-        heightmap_buffer_[flip_idx] = mean;
+        heightmap_buffer_[flip_idx] = kth_height;
       }
     }
 
-    publishGridMap(T_base_map, tf_base_map.transform.rotation, msg->header.stamp);
+    cam_origin_base_ = T_cam_base.translation();
+
+    publishGridMap(
+      T_base_map, tf_base_map.transform.rotation,
+      cam_origin_base_, msg->header.stamp);
 
     RCLCPP_DEBUG(
       this->get_logger(), "pc2 -> heightmap: pts %zu, cells %zu / %zu",
@@ -206,9 +226,13 @@ private:
   void publishGridMap(
     const Eigen::Isometry3d & T_base_map,
     const geometry_msgs::msg::Quaternion & orientation,
+    const Eigen::Vector3d & cam_origin_base,
     const rclcpp::Time & stamp)
   {
-    const Eigen::Vector3d center_base(x_forward_ / 2.0, y_width_ / 2.0 + y_min_, 0.0);
+    const Eigen::Vector3d center_base(
+      cam_origin_base.x() + x_forward_ / 2.0,
+      cam_origin_base.y(),
+      0.0);
     const Eigen::Vector3d center_map = T_base_map * center_base;
 
     grid_map::GridMap map({layer_name_});
@@ -268,16 +292,17 @@ private:
   double voxel_size_;
   double roi_z_max_;
   double publish_rate_hz_;
-  double y_min_;
+  int height_rank_;
   int grid_cols_;
   int grid_rows_;
   std::size_t total_cells_;
   const rclcpp::Duration tf_timeout_{rclcpp::Duration::from_seconds(0.1)};
 
-  std::vector<float> sum_bins_;
-  std::vector<uint32_t> count_bins_;
+  std::vector<std::vector<float>> bins_z_;
   std::vector<float> heightmap_buffer_;
   rclcpp::Time last_publish_time_;
+
+  Eigen::Vector3d cam_origin_base_{Eigen::Vector3d::Zero()};
 };
 
 }  // namespace

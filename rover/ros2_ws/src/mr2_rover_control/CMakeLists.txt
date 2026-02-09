@@ -16,6 +16,7 @@ find_package(controller_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(mr2_action_interface REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/twist_to_commands_controller.cpp
@@ -23,7 +24,7 @@ add_library(${PROJECT_NAME} SHARED
 
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp rclcpp_lifecycle controller_interface pluginlib geometry_msgs
-  nav_msgs)
+  nav_msgs mr2_action_interface)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
   include
