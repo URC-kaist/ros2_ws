@@ -3,7 +3,7 @@
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
-#include <nav2_msgs/action/follow_path.hpp>
+#include <nav2_msgs/action/navigate_through_poses.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 
 #include <tf2/LinearMath/Quaternion.h>
@@ -12,6 +12,7 @@
 #include <mr2_action_interface/action/cover_vision.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -27,7 +28,7 @@ using namespace std::chrono_literals;
 
 using CoverVision = mr2_action_interface::action::CoverVision;
 using NavToPose = nav2_msgs::action::NavigateToPose;
-using FollowPath = nav2_msgs::action::FollowPath;
+using NavThroughPoses = nav2_msgs::action::NavigateThroughPoses;
 
 static geometry_msgs::msg::Quaternion yaw_to_quat(double yaw)
 {
@@ -117,14 +118,11 @@ public:
       this->declare_parameter<std::string>("coverage_path_topic", "cover_vision/coverage_path");
 
     nav_action_name_ = this->declare_parameter<std::string>("navigate_action_name", "navigate_to_pose");
-    follow_action_name_ = this->declare_parameter<std::string>("follow_action_name", "follow_path");
-
-    follow_controller_id_ = this->declare_parameter<std::string>("follow_controller_id", "FollowPath");
-    follow_goal_checker_id_ =
-      this->declare_parameter<std::string>("follow_goal_checker_id", "general_goal_checker");
+    nav_through_action_name_ =
+      this->declare_parameter<std::string>("navigate_through_poses_action_name", "navigate_through_poses");
 
     spiral_pitch_m_ = this->declare_parameter<double>("spiral_pitch_m", 3.0);
-    spiral_point_spacing_m_ = this->declare_parameter<double>("spiral_point_spacing_m", 0.5);
+    spiral_point_spacing_m_ = this->declare_parameter<double>("spiral_point_spacing_m", 2.4);
     spiral_max_points_ = static_cast<size_t>(this->declare_parameter<int>("spiral_max_points", 5000));
 
     detection_stale_sec_ = this->declare_parameter<double>("detection_stale_sec", 0.75);
@@ -132,7 +130,7 @@ public:
       this->declare_parameter<std::string>("detection_pose_topic", "cover_vision/object_pose");
 
     nav_client_ = rclcpp_action::create_client<NavToPose>(this, nav_action_name_);
-    follow_client_ = rclcpp_action::create_client<FollowPath>(this, follow_action_name_);
+    nav_through_client_ = rclcpp_action::create_client<NavThroughPoses>(this, nav_through_action_name_);
 
     coverage_path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
       coverage_path_topic_,
@@ -159,17 +157,15 @@ private:
 
   rclcpp_action::Server<CoverVision>::SharedPtr server_;
   rclcpp_action::Client<NavToPose>::SharedPtr nav_client_;
-  rclcpp_action::Client<FollowPath>::SharedPtr follow_client_;
+  rclcpp_action::Client<NavThroughPoses>::SharedPtr nav_through_client_;
   GpsConverter gps_conv_;
 
   std::string map_frame_;
   std::string coverage_path_topic_;
   std::string nav_action_name_;
-  std::string follow_action_name_;
-  std::string follow_controller_id_;
-  std::string follow_goal_checker_id_;
+  std::string nav_through_action_name_;
   double spiral_pitch_m_{3.0};
-  double spiral_point_spacing_m_{0.5};
+  double spiral_point_spacing_m_{2.4};
   size_t spiral_max_points_{5000};
   double detection_stale_sec_{0.75};
   std::string detection_pose_topic_;
@@ -233,8 +229,8 @@ private:
       RCLCPP_ERROR(get_logger(), "navigate_to_pose action server unavailable");
       return false;
     }
-    if (!follow_client_->wait_for_action_server(5s)) {
-      RCLCPP_ERROR(get_logger(), "follow_path action server unavailable");
+    if (!nav_through_client_->wait_for_action_server(5s)) {
+      RCLCPP_ERROR(get_logger(), "navigate_through_poses action server unavailable");
       return false;
     }
     return true;
@@ -333,7 +329,9 @@ private:
       return;
     }
 
-    // 2) Generate spiral path in map frame (publish for RViz/debug) and FollowPath it.
+    // 2) Generate spiral poses in map frame.
+    // Publish a Path for dashboard/geo conversion,
+    // even though NavigateThroughPoses consumes PoseStamped[] goals.
     const double max_radius_m = std::max(0.0, goal->target_radius) + 0.5 * spiral_pitch_m_;
     const auto poses =
       make_archimedean_spiral(center, spiral_pitch_m_, max_radius_m, spiral_point_spacing_m_, spiral_max_points_);
@@ -344,8 +342,9 @@ private:
     path.poses = poses;
     coverage_path_pub_->publish(path);
 
-    fb.total_waypoints = static_cast<int32_t>(poses.size());
-    fb.current_waypoint_index = -1;  // FollowPath doesn't expose a waypoint index.
+    const int32_t total_waypoints = static_cast<int32_t>(poses.size());
+    fb.total_waypoints = total_waypoints;
+    fb.current_waypoint_index = -1;
     goal_handle->publish_feedback(std::make_shared<CoverVision::Feedback>(fb));
 
     if (poses.size() < 2) {
@@ -373,47 +372,71 @@ private:
 
     geometry_msgs::msg::PoseStamped detected_pose_map;
 
-    // FollowPath loop with mission-level detection checks.
-    auto follow_goal = FollowPath::Goal{};
-    follow_goal.path = path;
-    follow_goal.controller_id = follow_controller_id_;
-    follow_goal.goal_checker_id = follow_goal_checker_id_;
+    // NavigateThroughPoses loop with mission-level detection checks.
+    auto remaining = std::make_shared<std::atomic<int32_t>>(-1);
+    auto nav_through_goal = NavThroughPoses::Goal{};
+    nav_through_goal.poses = poses;
 
-    auto gh_future = follow_client_->async_send_goal(follow_goal);
+    auto goal_options = rclcpp_action::Client<NavThroughPoses>::SendGoalOptions();
+    goal_options.feedback_callback =
+      [remaining](rclcpp_action::ClientGoalHandle<NavThroughPoses>::SharedPtr,
+                  const std::shared_ptr<const NavThroughPoses::Feedback> feedback)
+      {
+        if (!feedback) {
+          return;
+        }
+        remaining->store(static_cast<int32_t>(feedback->number_of_poses_remaining),
+                         std::memory_order_relaxed);
+      };
+
+    auto gh_future = nav_through_client_->async_send_goal(nav_through_goal, goal_options);
     if (gh_future.wait_for(5s) != std::future_status::ready) {
-      RCLCPP_ERROR(get_logger(), "FollowPath goal handle timeout");
+      RCLCPP_ERROR(get_logger(), "NavigateThroughPoses goal handle timeout");
       result->mission_result = 0;
       result->waypoints_completed = 0;
       goal_handle->abort(result);
       return;
     }
 
-    auto fp_gh = gh_future.get();
-    if (!fp_gh) {
-      RCLCPP_ERROR(get_logger(), "FollowPath goal rejected");
+    auto ntp_gh = gh_future.get();
+    if (!ntp_gh) {
+      RCLCPP_ERROR(get_logger(), "NavigateThroughPoses goal rejected");
       result->mission_result = 0;
       result->waypoints_completed = 0;
       goal_handle->abort(result);
       return;
     }
 
-    auto res_future = follow_client_->async_get_result(fp_gh);
+    auto res_future = nav_through_client_->async_get_result(ntp_gh);
     bool detected = false;
     while (rclcpp::ok()) {
       if (goal_handle->is_canceling()) {
-        follow_client_->async_cancel_goal(fp_gh);
+        nav_through_client_->async_cancel_goal(ntp_gh);
         result->mission_result = 0;
         result->waypoints_completed = 0;
         goal_handle->canceled(result);
         return;
       }
 
+      const int32_t poses_remaining = remaining->load(std::memory_order_relaxed);
+      if (poses_remaining >= 0 && total_waypoints > 0) {
+        int32_t current_index = total_waypoints - poses_remaining;
+        if (poses_remaining <= 0) {
+          current_index = total_waypoints - 1;
+        }
+        current_index = std::clamp(current_index, 0, total_waypoints - 1);
+        if (current_index != fb.current_waypoint_index) {
+          fb.current_waypoint_index = current_index;
+          goal_handle->publish_feedback(std::make_shared<CoverVision::Feedback>(fb));
+        }
+      }
+
       const auto now = this->now();
       if (!detected) {
         detected = try_get_detection_map_pose(det, now, detected_pose_map);
         if (detected) {
-          RCLCPP_INFO(get_logger(), "CoverVision: object detected, canceling coverage FollowPath");
-          follow_client_->async_cancel_goal(fp_gh);
+          RCLCPP_INFO(get_logger(), "CoverVision: object detected, canceling coverage NavigateThroughPoses");
+          nav_through_client_->async_cancel_goal(ntp_gh);
         }
       }
 
@@ -439,7 +462,7 @@ private:
           return;
         }
 
-        // Detected object: regardless of FollowPath result, attempt approach.
+        // Detected object: regardless of NavigateThroughPoses result, attempt approach.
         break;
       }
 

@@ -97,7 +97,7 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.4
+      xy_goal_tolerance: 0.4 # TODO: differ per mission; can we modify this in MM level?
       yaw_goal_tolerance: 0.25
     PathHandler:
       plugin: "nav2_controller::FeasiblePathHandler"
@@ -296,7 +296,7 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
     expected_planner_frequency: 1.0 # calculate once per second
     use_sim_time: True
     planner_plugins: ["GridBased", "Smac2D", "SmacHybrid", "Theta"]
-    # allow_partial_planning: true # in case of impossible planning
+    allow_partial_planning: true # in case of impossible goal, use quasi-goal.
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.4
