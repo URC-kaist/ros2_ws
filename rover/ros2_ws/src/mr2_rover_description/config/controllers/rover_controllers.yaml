@@ -31,7 +31,9 @@ rover_controller:
     wheel_base: 0.95386
     track_width: 0.6504
     wheel_radius: 0.125
+    max_wheel_linear_speed: 0.4  # m/s hard limit per wheel
     max_steer: 2.35619  # +/- 135 degrees
+    steering_error_ratio_deg: 40.0  # v1.0 speed scale vs steering error
     # cmd_vel slew-rate limits (preserved from controller defaults)
     rate_limit_linear_x: 1.5   # m/s^2
     rate_limit_linear_y: 1.5   # m/s^2
@@ -46,7 +48,9 @@ rover_controller:
     wheel_odom_topic: /wheel_encoder/odometry
     odom_frame_id: odom
     base_frame_id: base_link
-    cmd_vel_topic: /cmd_vel
+    cmd_vel_topic_nominal: /base/cmd_vel
+    cmd_vel_topic_running: /cmd_vel
+    mission_status_topic: /mission_status
 
 manipulator_controller:
   ros__parameters:
