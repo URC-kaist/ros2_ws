@@ -59,6 +59,7 @@ private:
   double wheel_base_;
   double track_width_;
   double wheel_radius_;
+  double max_wheel_linear_speed_;
   double max_steer_;
   double timeout_;
   double odom_publish_rate_;
@@ -67,7 +68,6 @@ private:
   double rate_limit_vx_;
   double rate_limit_vy_;
   double rate_limit_wz_;
-  double max_wheel_speed_;
   double steering_error_ratio_rad_;
   std::string odom_frame_id_;
   std::string base_frame_id_;
