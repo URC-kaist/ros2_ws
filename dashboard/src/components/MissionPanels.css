@@ -54,6 +54,10 @@
   min-height: 292px;
 }
 
+.card--span-2x1 {
+  grid-column: span 2;
+}
+
 .card h3 {
   margin: 0 0 8px;
   font-size: 1rem;

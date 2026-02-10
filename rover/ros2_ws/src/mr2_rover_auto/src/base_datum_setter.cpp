@@ -6,6 +6,7 @@
 #include "geographic_msgs/msg/geo_pose.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "robot_localization/srv/set_datum.hpp"
+#include "sensor_msgs/msg/nav_sat_fix.hpp"
 #include "ublox_ubx_msgs/msg/ubx_nav_svin.hpp"
 
 namespace {
@@ -21,6 +22,31 @@ struct Llh {
   double lon_deg;
   double alt_m;
 };
+
+bool is_valid_lat_lon(const Llh &llh) {
+  if (!std::isfinite(llh.lat_deg) || !std::isfinite(llh.lon_deg)) {
+    return false;
+  }
+  if (llh.lat_deg < -90.0 || llh.lat_deg > 90.0) {
+    return false;
+  }
+  if (llh.lon_deg < -180.0 || llh.lon_deg > 180.0) {
+    return false;
+  }
+  // Guard against accidentally initializing to Null Island.
+  if (std::abs(llh.lat_deg) < 1e-7 && std::abs(llh.lon_deg) < 1e-7) {
+    return false;
+  }
+  return true;
+}
+
+bool is_reasonable_altitude(const Llh &llh) {
+  return std::isfinite(llh.alt_m) && llh.alt_m > -1000.0 && llh.alt_m < 10000.0;
+}
+
+bool is_valid_llh(const Llh &llh) {
+  return is_valid_lat_lon(llh) && is_reasonable_altitude(llh);
+}
 
 Llh ecef_to_llh(double x, double y, double z) {
   const double p = std::hypot(x, y);
@@ -57,9 +83,14 @@ class BaseDatumSetter : public rclcpp::Node {
         svin_topic_(
             declare_parameter<std::string>("svin_topic", "/base/ubx_nav_svin")),
         require_svin_complete_(
-        declare_parameter<bool>("require_svin_complete", true)),
+            declare_parameter<bool>("require_svin_complete", true)),
         allow_provisional_(
             declare_parameter<bool>("allow_provisional", false)),
+        allow_fix_fallback_(
+            declare_parameter<bool>("allow_fix_fallback", true)),
+        fallback_fix_topic_(
+            declare_parameter<std::string>("fallback_fix_topic",
+                                           "/left_gnss/navsat")),
         navsat_service_(
             declare_parameter<std::string>("navsat_service",
                                            "/datum")),
@@ -77,6 +108,14 @@ class BaseDatumSetter : public rclcpp::Node {
         [this](const ublox_ubx_msgs::msg::UBXNavSvin::SharedPtr msg) {
           handle_svin_(msg);
         });
+
+    if (allow_fix_fallback_) {
+      fix_sub_ = create_subscription<sensor_msgs::msg::NavSatFix>(
+          fallback_fix_topic_, rclcpp::SensorDataQoS(),
+          [this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+            handle_fix_(msg);
+          });
+    }
 
     retry_timer_ = create_wall_timer(
         std::chrono::seconds(1),
@@ -107,21 +146,18 @@ class BaseDatumSetter : public rclcpp::Node {
     const double z_m = (mean_z + 0.01 * mean_z_hp) / 100.0;
     const auto llh = ecef_to_llh(x_m, y_m, z_m);
 
-    if (!navsat_client_->wait_for_service(std::chrono::seconds(1))) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                           "Waiting for %s service", navsat_service_.c_str());
-      return;
-    }
-    if (!navsat_query_client_->wait_for_service(std::chrono::seconds(1))) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                           "Waiting for %s service",
-                           navsat_query_service_.c_str());
+    if (!is_valid_llh(llh)) {
+      RCLCPP_WARN_THROTTLE(
+          get_logger(), *get_clock(), 2000,
+          "Ignoring invalid SVIN-derived datum candidate: lat=%.8f lon=%.8f alt=%.3f",
+          llh.lat_deg, llh.lon_deg, llh.alt_m);
       return;
     }
 
     latest_llh_ = llh;
     latest_valid_ = msg->valid;
     latest_active_ = msg->active;
+    latest_source_ = "base_survey_in";
     if (!svin_seen_) {
       svin_seen_ = true;
       RCLCPP_INFO(get_logger(),
@@ -129,6 +165,40 @@ class BaseDatumSetter : public rclcpp::Node {
                   msg->valid ? "true" : "false",
                   msg->active ? "true" : "false");
     }
+    try_set_datum_();
+  }
+
+  void handle_fix_(const sensor_msgs::msg::NavSatFix::SharedPtr &msg) {
+    if (!msg || datum_set_ || svin_seen_) {
+      return;
+    }
+    if (msg->status.status == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
+      return;
+    }
+
+    Llh llh{msg->latitude, msg->longitude, msg->altitude};
+    if (!is_valid_lat_lon(llh)) {
+      RCLCPP_WARN_THROTTLE(
+          get_logger(), *get_clock(), 2000,
+          "Ignoring invalid fallback NavSatFix candidate: lat=%.8f lon=%.8f",
+          llh.lat_deg, llh.lon_deg);
+      return;
+    }
+    if (!std::isfinite(llh.alt_m)) {
+      llh.alt_m = 0.0;
+    }
+    if (!is_reasonable_altitude(llh)) {
+      // Keep fallback conservative; only altitude is clamped.
+      llh.alt_m = 0.0;
+    }
+
+    latest_llh_ = llh;
+    latest_valid_ = true;
+    latest_active_ = false;
+    latest_source_ = "fallback_navsat_fix";
+    RCLCPP_INFO_ONCE(
+        get_logger(),
+        "Using fallback NavSatFix for datum because no usable base SVIN has been seen yet");
     try_set_datum_();
   }
 
@@ -159,7 +229,8 @@ class BaseDatumSetter : public rclcpp::Node {
 
     datum_set_ = true;
     RCLCPP_INFO(get_logger(),
-                "Datum set from base survey-in (valid=%s active=%s): lat=%.8f lon=%.8f alt=%.3f",
+                "Datum set (%s, valid=%s active=%s): lat=%.8f lon=%.8f alt=%.3f",
+                latest_source_.c_str(),
                 latest_valid_ ? "true" : "false",
                 latest_active_ ? "true" : "false",
                 latest_llh_->lat_deg, latest_llh_->lon_deg, latest_llh_->alt_m);
@@ -168,6 +239,8 @@ class BaseDatumSetter : public rclcpp::Node {
   std::string svin_topic_;
   bool require_svin_complete_;
   bool allow_provisional_;
+  bool allow_fix_fallback_;
+  std::string fallback_fix_topic_;
   std::string navsat_service_;
   std::string navsat_query_service_;
   bool datum_set_{false};
@@ -175,8 +248,10 @@ class BaseDatumSetter : public rclcpp::Node {
   std::optional<Llh> latest_llh_;
   bool latest_valid_{false};
   bool latest_active_{false};
+  std::string latest_source_{"unknown"};
 
   rclcpp::Subscription<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr svin_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr fix_sub_;
   rclcpp::Client<robot_localization::srv::SetDatum>::SharedPtr navsat_client_;
   rclcpp::Client<robot_localization::srv::SetDatum>::SharedPtr
       navsat_query_client_;

@@ -5,12 +5,6 @@
   margin-bottom: 10px;
 }
 
-.gnss-card__subtitle {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
 .gnss-card__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -4,7 +4,6 @@ from typing import Optional, Tuple, List
 
 import cv2
 import numpy as np
-from cv_bridge import CvBridge
 from ament_index_python.packages import get_package_share_directory
 from image_geometry import PinholeCameraModel
 from rclpy.node import Node
@@ -71,7 +70,6 @@ class YoloRgbdDetector(Node):
             .bool_value
         )
 
-        self.bridge = CvBridge()
         self.camera_model = PinholeCameraModel()
         self.camera_info_received = False
 
@@ -103,7 +101,7 @@ class YoloRgbdDetector(Node):
 
         resolved_model_path = self._resolve_model_path(self.model_path)
         self.get_logger().info(f"Loading YOLO model: {resolved_model_path}")
-        self.model = YOLO(resolved_model_path)
+        self.model = YOLO(resolved_model_path, task="detect")
 
     def _resolve_model_path(self, model_path: str) -> str:
         if model_path.startswith("package://"):
@@ -120,6 +118,61 @@ class YoloRgbdDetector(Node):
     def _on_camera_info(self, msg: CameraInfo) -> None:
         self.camera_model.fromCameraInfo(msg)
         self.camera_info_received = True
+
+    def _decode_image(self, msg: Image, dtype: np.dtype, channels: int) -> np.ndarray:
+        itemsize = np.dtype(dtype).itemsize
+        expected_step = msg.width * channels * itemsize
+        if msg.step < expected_step:
+            raise ValueError(
+                f"Invalid image step for encoding {msg.encoding}: got {msg.step}, expected >= {expected_step}"
+            )
+
+        flat = np.frombuffer(msg.data, dtype=dtype)
+        row_stride = msg.step // itemsize
+        image = flat.reshape((msg.height, row_stride))
+        image = image[:, : msg.width * channels]
+
+        if channels == 1:
+            image = image.reshape((msg.height, msg.width))
+        else:
+            image = image.reshape((msg.height, msg.width, channels))
+
+        if msg.is_bigendian and itemsize > 1:
+            image = image.byteswap().newbyteorder()
+
+        return np.ascontiguousarray(image)
+
+    def _rgb_from_msg(self, msg: Image) -> np.ndarray:
+        if msg.encoding == "bgr8":
+            return self._decode_image(msg, np.uint8, 3)
+        if msg.encoding == "rgb8":
+            rgb = self._decode_image(msg, np.uint8, 3)
+            return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        if msg.encoding == "mono8":
+            mono = self._decode_image(msg, np.uint8, 1)
+            return cv2.cvtColor(mono, cv2.COLOR_GRAY2BGR)
+        raise ValueError(f"Unsupported RGB encoding: {msg.encoding}")
+
+    def _depth_from_msg(self, msg: Image) -> np.ndarray:
+        if msg.encoding == "16UC1":
+            return self._decode_image(msg, np.uint16, 1)
+        if msg.encoding == "32FC1":
+            return self._decode_image(msg, np.float32, 1)
+        raise ValueError(f"Unsupported depth encoding: {msg.encoding}")
+
+    def _bgr_to_imgmsg(self, image: np.ndarray, header) -> Image:
+        if image.ndim != 3 or image.shape[2] != 3:
+            raise ValueError("Annotated image must be HxWx3 BGR")
+        image_u8 = np.ascontiguousarray(image, dtype=np.uint8)
+        msg = Image()
+        msg.header = header
+        msg.height = int(image_u8.shape[0])
+        msg.width = int(image_u8.shape[1])
+        msg.encoding = "bgr8"
+        msg.is_bigendian = 0
+        msg.step = int(image_u8.shape[1] * 3)
+        msg.data = image_u8.tobytes()
+        return msg
 
     def _select_detection(
         self, boxes, names
@@ -235,8 +288,8 @@ class YoloRgbdDetector(Node):
             return
 
         try:
-            rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="bgr8")
-            depth_raw = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
+            rgb_image = self._rgb_from_msg(rgb_msg)
+            depth_raw = self._depth_from_msg(depth_msg)
         except Exception as exc:
             self.get_logger().error(f"Failed to convert images: {exc}")
             return
@@ -345,8 +398,7 @@ class YoloRgbdDetector(Node):
             self.tf_broadcaster.sendTransform(camera_tf)
 
         annotated = result.plot()
-        annotated_msg = self.bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
-        annotated_msg.header = rgb_msg.header
+        annotated_msg = self._bgr_to_imgmsg(annotated, rgb_msg.header)
         self.image_pub.publish(annotated_msg)
 
         self.get_logger().debug(f"Published detection pose (conf={conf:.2f})")
@@ -354,14 +406,17 @@ class YoloRgbdDetector(Node):
 
 def main() -> None:
     rclpy.init()
-    node = YoloRgbdDetector()
+    node = None
     try:
+        node = YoloRgbdDetector()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

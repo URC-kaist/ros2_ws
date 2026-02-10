@@ -78,7 +78,7 @@ tf2 tf2_ros tf2_geometry_msgs mr2_action_interface robot_localization
 
 add_executable(base_datum_setter src/base_datum_setter.cpp)
 ament_target_dependencies(base_datum_setter
-  rclcpp geographic_msgs robot_localization ublox_ubx_msgs
+  rclcpp geographic_msgs robot_localization sensor_msgs ublox_ubx_msgs
 )
 
 add_executable(cover_vision_yolo_adapter src/cover_vision_yolo_adapter.cpp)
