@@ -45,7 +45,6 @@ def generate_launch_description():
                 {"allow_fix_fallback": True},
                 {"fallback_fix_topic": "/left_gnss/navsat"},
                 {"navsat_service": "/navsat_transform/datum"},
-                {"navsat_query_service": "/navsat_transform_query/datum"},
             ],
             condition=UnlessCondition(LaunchConfiguration("use_sim_time")),
         ),

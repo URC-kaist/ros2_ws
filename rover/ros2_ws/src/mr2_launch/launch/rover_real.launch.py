@@ -426,27 +426,6 @@ def generate_launch_description():
                 ],
                 output="screen",
             ),
-            ExecuteProcess(
-                cmd=[
-                    "ros2",
-                    "service",
-                    "call",
-                    "/navsat_transform_query/datum",
-                    "robot_localization/srv/SetDatum",
-                    PythonExpression(
-                        [
-                            "'{geo_pose: {position: {latitude: ",
-                            LaunchConfiguration("datum_lat"),
-                            ", longitude: ",
-                            LaunchConfiguration("datum_lon"),
-                            ", altitude: ",
-                            LaunchConfiguration("datum_alt"),
-                            "}}}'",
-                        ]
-                    ),
-                ],
-                output="screen",
-            ),
         ],
         condition=IfCondition(LaunchConfiguration("set_manual_datum")),
     )
@@ -488,7 +467,7 @@ def generate_launch_description():
             sik_sim_launch,
             realsense_launch,
             front_uvc_launch,
-            traversability_launch,
+            # traversability_launch, # launched by navigation.launch.py
             ntrip_client_launch,
             rover_launch,
             ublox_left_launch_delayed,

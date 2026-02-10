@@ -93,14 +93,9 @@ class BaseDatumSetter : public rclcpp::Node {
                                            "/left_gnss/navsat")),
         navsat_service_(
             declare_parameter<std::string>("navsat_service",
-                                           "/datum")),
-        navsat_query_service_(
-            declare_parameter<std::string>("navsat_query_service",
                                            "/datum")) {
     navsat_client_ = create_client<robot_localization::srv::SetDatum>(
         navsat_service_);
-    navsat_query_client_ = create_client<robot_localization::srv::SetDatum>(
-        navsat_query_service_);
 
     auto svin_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
     svin_sub_ = create_subscription<ublox_ubx_msgs::msg::UBXNavSvin>(
@@ -211,12 +206,6 @@ class BaseDatumSetter : public rclcpp::Node {
                            "Waiting for %s service", navsat_service_.c_str());
       return;
     }
-    if (!navsat_query_client_->service_is_ready()) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                           "Waiting for %s service",
-                           navsat_query_service_.c_str());
-      return;
-    }
 
     auto req = std::make_shared<robot_localization::srv::SetDatum::Request>();
     req->geo_pose.position.latitude = latest_llh_->lat_deg;
@@ -225,7 +214,6 @@ class BaseDatumSetter : public rclcpp::Node {
     req->geo_pose.orientation.w = 1.0;
 
     navsat_client_->async_send_request(req);
-    navsat_query_client_->async_send_request(req);
 
     datum_set_ = true;
     RCLCPP_INFO(get_logger(),
@@ -242,7 +230,6 @@ class BaseDatumSetter : public rclcpp::Node {
   bool allow_fix_fallback_;
   std::string fallback_fix_topic_;
   std::string navsat_service_;
-  std::string navsat_query_service_;
   bool datum_set_{false};
   bool svin_seen_{false};
   std::optional<Llh> latest_llh_;
@@ -253,8 +240,6 @@ class BaseDatumSetter : public rclcpp::Node {
   rclcpp::Subscription<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr svin_sub_;
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr fix_sub_;
   rclcpp::Client<robot_localization::srv::SetDatum>::SharedPtr navsat_client_;
-  rclcpp::Client<robot_localization::srv::SetDatum>::SharedPtr
-      navsat_query_client_;
   rclcpp::TimerBase::SharedPtr retry_timer_;
 };
 
