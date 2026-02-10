@@ -41,12 +41,15 @@ rover_controller:
     solver_cmd_deadzone_lin: 0.001  # m/s
     solver_cmd_deadzone_ang: 0.001  # rad/s
     solver_vel_eps: 0.0001          # m/s
+    steering_error_ratio_deg: 40.0  # drive scale->0 around 30 deg
     twist_timeout: 0.5
     odom_publish_rate_hz: 30.0
     wheel_odom_topic: /wheel_encoder/odometry
     odom_frame_id: odom
     base_frame_id: base_link
-    cmd_vel_topic: /cmd_vel
+    cmd_vel_topic_nominal: /base/cmd_vel
+    cmd_vel_topic_running: /cmd_vel
+    mission_status_topic: /mission_status
 
 manipulator_controller:
   ros__parameters:
