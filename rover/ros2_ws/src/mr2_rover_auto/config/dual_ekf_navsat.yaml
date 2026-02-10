@@ -147,4 +147,4 @@ navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
     publish_filtered_gps: true # publish estimation back to WGS84
     use_odometry_yaw: true
     wait_for_datum: true
-    datum: [38.406739, -110.791394, 0.12449754510850013]  # Where the rover spawns
+    datum: [38.406739, -110.791394, 0.0]  # lat, lon, heading (!)

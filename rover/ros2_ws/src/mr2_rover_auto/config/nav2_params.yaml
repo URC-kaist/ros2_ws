@@ -380,7 +380,7 @@ velocity_smoother:
     use_sim_time: True
     smoothing_frequency: 20.0
     scale_velocities: False
-    feedback: "CLOSED_LOOP" # listen to /odom to estimate current speed
+    feedback: "OPEN_LOOP" # XXX: Setting "CLOSED_LOOP" gives 0.125 max vel (???)
     max_velocity: [0.4, 0.4, 1.0] # NOTE: MUST follow actual rover specification (#34)
     min_velocity: [-0.4, -0.4, -1.0]
     max_accel: [2.5, 2.5, 3.2]
