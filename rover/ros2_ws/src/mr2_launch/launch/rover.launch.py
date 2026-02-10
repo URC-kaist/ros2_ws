@@ -112,6 +112,16 @@ def generate_launch_description():
         default_value="/rgbd_camera/color/image_raw",
         description="Base image topic for aruco_opencv (must have matching /camera_info; default is Gazebo RGBD camera)",
     )
+    enable_yolo_arg = DeclareLaunchArgument(
+        "enable_yolo",
+        default_value="false",
+        description="Start YOLO RGBD detector node",
+    )
+    yolo_cam_topic_arg = DeclareLaunchArgument(
+        "yolo_cam_topic",
+        default_value="/rgbd_camera",
+        description="RealSense camera base topic for YOLO (e.g., /rgbd_camera)",
+    )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
     sim_condition = IfCondition(
@@ -210,6 +220,35 @@ def generate_launch_description():
                 "aruco.detectInvertedMarker": True,
                 "use_sim_time": LaunchConfiguration("use_sim_time"),
             },
+        ],
+    )
+
+    yolo_rgb_topic = PythonExpression(
+        ["'", LaunchConfiguration("yolo_cam_topic"), "/color/image_raw'"]
+    )
+    yolo_depth_topic = PythonExpression(
+        ["'", LaunchConfiguration("yolo_cam_topic"), "/depth/image_rect_raw'"]
+    )
+    yolo_camera_info_topic = PythonExpression(
+        ["'", LaunchConfiguration("yolo_cam_topic"), "/color/camera_info'"]
+    )
+
+    yolo_detector = Node(
+        package="mr2_yolo_perception",
+        executable="yolo_rgbd_detector",
+        name="yolo_detector",
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("enable_yolo")),
+        parameters=[
+            {
+                "rgb_topic": yolo_rgb_topic,
+                "depth_topic": yolo_depth_topic,
+                "camera_info_topic": yolo_camera_info_topic,
+                "annotated_topic": "yolo/annotated_image",
+                "pose_topic": "yolo/object_pose",
+                "camera_frame_is_optical": False,
+                "use_sim_time": LaunchConfiguration("use_sim_time"),
+            }
         ],
     )
 
@@ -367,12 +406,15 @@ def generate_launch_description():
         sik_baud_arg,
         enable_aruco_arg,
         aruco_cam_topic_arg,
+        enable_yolo_arg,
+        yolo_cam_topic_arg,
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
         localization_launch,
         system_status,
         aruco_tracker,
+        yolo_detector,
         move_group_launch,
         servo_launch,
         sik_sim_launch,

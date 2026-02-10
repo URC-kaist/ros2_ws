@@ -81,6 +81,16 @@ def generate_launch_description():
         default_value="true",
         description="Launch the front UVC camera (/dev/videoFRONT) and use it for ArUco detection",
     )
+    enable_yolo_arg = DeclareLaunchArgument(
+        "enable_yolo",
+        default_value="false",
+        description="Start YOLO RGBD detector node",
+    )
+    yolo_cam_topic_arg = DeclareLaunchArgument(
+        "yolo_cam_topic",
+        default_value="/rgbd_camera",
+        description="RealSense camera base topic for YOLO (e.g., /rgbd_camera)",
+    )
     enable_sik_sim_arg = DeclareLaunchArgument(
         "enable_sik_sim",
         default_value="false",
@@ -197,6 +207,16 @@ def generate_launch_description():
         default_value="30",
         description="Max age for reconnection attempts (seconds)",
     )
+    enable_led_arg = DeclareLaunchArgument(
+        "enable_led",
+        default_value="false",
+        description="Start mr2_led CAN node for status LEDs",
+    )
+    led_can_id_arg = DeclareLaunchArgument(
+        "led_can_id",
+        default_value="0x123",
+        description="Standard CAN ID for the LED controller",
+    )
 
     sik_sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -291,6 +311,8 @@ def generate_launch_description():
             "sik_sim_baud": LaunchConfiguration("sik_sim_baud"),
             "enable_aruco": LaunchConfiguration("enable_front_camera"),
             "aruco_cam_topic": "/front_camera/image_raw",
+            "enable_yolo": LaunchConfiguration("enable_yolo"),
+            "yolo_cam_topic": LaunchConfiguration("yolo_cam_topic"),
         }.items(),
     )
 
@@ -350,6 +372,18 @@ def generate_launch_description():
         name="right_gnss_navsat_relay",
         output="screen",
         arguments=["/right_gnss/fix", "/right_gnss/navsat"],
+    )
+
+    led_node = Node(
+        package="mr2_led",
+        executable="led_can_node",
+        name="mr2_led",
+        output="screen",
+        parameters=[
+            {"can_iface": LaunchConfiguration("can_iface")},
+            {"can_id": LaunchConfiguration("led_can_id")},
+        ],
+        condition=IfCondition(LaunchConfiguration("enable_led")),
     )
 
     # Static TF for rocker joints (hardware has no joint states for these)
@@ -450,6 +484,8 @@ def generate_launch_description():
             sik_device_arg,
             sik_baud_arg,
             enable_front_camera_arg,
+            enable_yolo_arg,
+            yolo_cam_topic_arg,
             left_gnss_serial_arg,
             right_gnss_serial_arg,
             left_gnss_frame_arg,
@@ -464,6 +500,8 @@ def generate_launch_description():
             ntrip_password_arg,
             ntrip_log_level_arg,
             ntrip_maxage_conn_arg,
+            enable_led_arg,
+            led_can_id_arg,
             sik_sim_launch,
             realsense_launch,
             front_uvc_launch,
@@ -474,6 +512,7 @@ def generate_launch_description():
             ublox_right_launch_delayed,
             left_navsat_relay,
             right_navsat_relay,
+            led_node,
             left_rocker_static_tf,
             right_rocker_static_tf,
             manual_set_datum,
