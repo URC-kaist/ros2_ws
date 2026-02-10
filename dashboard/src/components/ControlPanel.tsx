@@ -7,6 +7,18 @@ import ControlVectorPlot, { type CmdVel } from './ControlPanel/ControlVectorPlot
 import { getSikGatewayClient } from '../lib/sikGateway'
 import './ControlPanel/ControlPanel.css'
 
+const sensitivityScale = {
+  low: 0.2,
+  med: 0.4,
+  high: 0.6,
+} as const
+
+const yawSensitivityScale = {
+  low: 0.5,
+  med: 1.0,
+  high: 1.5,
+} as const
+
 const ControlPanel = () => {
   const gatewayRef = useRef(getSikGatewayClient())
   const cmdVelRef = useRef<CmdVel>({ x: 0, y: 0, yaw: 0 })
@@ -37,6 +49,26 @@ const ControlPanel = () => {
       gatewayRef.current.sendHeartbeat()
     }, 500)
     return () => window.clearInterval(heartbeatId)
+  }, [])
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        return
+      }
+      const zero = { x: 0, y: 0, yaw: 0 }
+      cmdVelRef.current = zero
+      setCmdVel(zero)
+      gamepadConnectedRef.current = false
+      setGamepadConnected(false)
+      gatewayRef.current.sendCmdDrive({
+        linear_x_m_s: 0,
+        linear_y_m_s: 0,
+        angular_z_rad_s: 0,
+      })
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
 
   useEffect(() => {
@@ -88,9 +120,10 @@ const ControlPanel = () => {
   useEffect(() => {
     let frame = 0
     const deadzone = 0.08
-    const xScale = 1
-    const yScale = 1
-    const yawScale = 1
+    const scale = sensitivityScale[sensitivity]
+    const yawScale = yawSensitivityScale[sensitivity]
+    const xScale = scale
+    const yScale = scale
 
     const applyDeadzone = (value: number) => (Math.abs(value) < deadzone ? 0 : value)
 
@@ -132,7 +165,7 @@ const ControlPanel = () => {
 
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [])
+  }, [sensitivity])
 
   return (
     <aside className="control-panel">

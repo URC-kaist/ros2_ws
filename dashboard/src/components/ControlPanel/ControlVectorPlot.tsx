@@ -20,9 +20,15 @@ type ControlVectorPlotProps = {
 }
 
 const sensitivityScale = {
-  low: 0.6,
+  low: 0.2,
+  med: 0.4,
+  high: 0.6,
+} as const
+
+const yawSensitivityScale = {
+  low: 0.5,
   med: 1.0,
-  high: 1.6,
+  high: 1.5,
 } as const
 
 const ARC_CENTER = 30
@@ -46,7 +52,7 @@ const ControlVectorPlot = ({
   onToggleSettings,
 }: ControlVectorPlotProps) => {
   const axisRange = 1 * sensitivityScale[sensitivity]
-  const yawRange = 1 * sensitivityScale[sensitivity]
+  const yawRange = 1 * yawSensitivityScale[sensitivity]
   const displayX = -cmdVel.x
   const displayY = cmdVel.y
   const displayYaw = -cmdVel.yaw
