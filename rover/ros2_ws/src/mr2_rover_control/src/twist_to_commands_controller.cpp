@@ -20,6 +20,7 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<double>("rate_limit_linear_y", 1.5); // m/s^2
   auto_declare<double>("rate_limit_angular_z",
                        1.0); // rad/s^2 (tighter yaw slew)
+  auto_declare<double>("max_wheel_speed", 0.4); // m/s
   auto_declare<double>("solver_error_alpha", 0.1); // EMA factor for steering cmd
   auto_declare<double>("solver_gain_k", 4.0);      // EMA weight sharpness
   auto_declare<double>("solver_cmd_deadzone_lin", 1e-3); // m/s
@@ -91,6 +92,7 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   rate_limit_vy_ = get_node()->get_parameter("rate_limit_linear_y").as_double();
   rate_limit_wz_ =
       get_node()->get_parameter("rate_limit_angular_z").as_double();
+  max_wheel_speed_ = get_node()->get_parameter("max_wheel_speed").as_double();
   const double steer_err_ratio_deg =
       get_node()->get_parameter("steering_error_ratio_deg").as_double();
   steering_error_ratio_rad_ = (steer_err_ratio_deg > 0.0)
@@ -407,8 +409,11 @@ TwistToCommandsController::update(const rclcpp::Time &,
           wheel_radius_);
       publishZeros();
     } else {
+      const double max_wheel_ang = max_wheel_speed_ / wheel_radius_;
       for (size_t i = 0; i < 4; ++i) {
-        const double wheel_speed = targets[i].speed / wheel_radius_;
+        const double wheel_speed =
+            std::clamp(targets[i].speed / wheel_radius_, -max_wheel_ang,
+                       max_wheel_ang);
         double steer_cmd = targets[i].angle;
         if (max_steer_ > 0.0) {
           steer_cmd = std::clamp(steer_cmd, -max_steer_, max_steer_);
@@ -548,8 +553,10 @@ TwistToCommandsController::update(const rclcpp::Time &,
       }
     }
 
+    const double max_wheel_ang = max_wheel_speed_ / wheel_radius_;
     for (size_t i = 0; i < 4; ++i) {
-      command_interfaces_[i].set_value(speed[i]);
+      command_interfaces_[i].set_value(
+          std::clamp(speed[i], -max_wheel_ang, max_wheel_ang));
       command_interfaces_[i + 4].set_value(steer[i]);
     }
 
