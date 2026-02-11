@@ -209,7 +209,7 @@ def generate_launch_description():
     )
     enable_led_arg = DeclareLaunchArgument(
         "enable_led",
-        default_value="false",
+        default_value="true",
         description="Start mr2_led CAN node for status LEDs",
     )
     led_can_id_arg = DeclareLaunchArgument(
