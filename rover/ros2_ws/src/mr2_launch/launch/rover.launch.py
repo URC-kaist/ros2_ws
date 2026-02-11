@@ -72,6 +72,11 @@ def generate_launch_description():
         default_value="true",
         description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
     )
+    enable_manipulator_sim_arg = DeclareLaunchArgument(
+        "enable_manipulator_sim",
+        default_value="false",
+        description="Enable manipulator URDF and ros2_control in simulation",
+    )
     use_servo_arg = DeclareLaunchArgument(
         "use_servo",
         default_value="false",
@@ -109,12 +114,12 @@ def generate_launch_description():
     )
     aruco_cam_topic_arg = DeclareLaunchArgument(
         "aruco_cam_topic",
-        default_value="/rgbd_camera/color/image_raw",
+        default_value="/front_camera/image_raw",
         description="Base image topic for aruco_opencv (must have matching /camera_info; default is Gazebo RGBD camera)",
     )
     enable_yolo_arg = DeclareLaunchArgument(
         "enable_yolo",
-        default_value="false",
+        default_value="true",
         description="Start YOLO RGBD detector node",
     )
     yolo_cam_topic_arg = DeclareLaunchArgument(
@@ -167,6 +172,7 @@ def generate_launch_description():
             "can_iface": LaunchConfiguration("can_iface"),
             "controller_config": LaunchConfiguration("controller_config"),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
+            "enable_manipulator": LaunchConfiguration("enable_manipulator_sim"),
         }.items(),
         condition=sim_condition,
     )
@@ -398,6 +404,7 @@ def generate_launch_description():
         controller_config_arg,
         use_mock_servos_arg,
         enable_manipulator_arg,
+        enable_manipulator_sim_arg,
         use_servo_arg,
         sik_sim_device_arg,
         sik_sim_peer_arg,

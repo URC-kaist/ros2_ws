@@ -121,7 +121,7 @@
     <link name="front_camera"/>
     <joint name="base_to_front_camera" type="fixed">
       <origin xyz="${length/2.0} 0 0.5" rpy="0 0 0"/>
-      <parent link="base_link"/>
+      <parent link="base_chassis"/>
       <child link="front_camera"/>
     </joint>
 

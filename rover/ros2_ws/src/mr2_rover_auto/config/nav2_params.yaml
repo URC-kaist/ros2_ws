@@ -98,7 +98,7 @@ controller_server:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.4 # TODO: For Cover Vision, we need to stop in front of the object.
-      yaw_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.05
     PathHandler:
       plugin: "nav2_controller::FeasiblePathHandler"
       prune_distance: 6.0 # MPPI; > v_max * N * dt

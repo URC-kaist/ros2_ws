@@ -9,6 +9,7 @@ from launch.actions import (
     SetEnvironmentVariable,
     TimerAction,
 )
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
@@ -42,6 +43,12 @@ def generate_launch_description():
         default_value="true",
         description="Use simulation time; normally true for Gazebo workflows",
     )
+    enable_manipulator = LaunchConfiguration("enable_manipulator")
+    enable_manipulator_arg = DeclareLaunchArgument(
+        "enable_manipulator",
+        default_value="false",
+        description="Enable manipulator URDF and ros2_control in simulation",
+    )
 
     can_iface, can_iface_arg = declare_can_iface(
         description="CAN interface used by the AK servo hardware",
@@ -60,6 +67,7 @@ def generate_launch_description():
             "ros2_control_mode": TextSubstitution(text="gazebo"),
             "can_iface": can_iface,
             "ros2_control_config": controller_config,
+            "enable_manipulator": enable_manipulator,
         },
     )
 
@@ -166,21 +174,35 @@ def generate_launch_description():
             ("/rgbd_camera/camera_info", "/rgbd_camera/color/camera_info"),
             ("/rgbd_camera/depth_image", "/rgbd_camera/depth/image_rect_raw"),
             ("/rgbd_camera/points", "/rgbd_camera/depth/color/points"),
+            ("/front_camera/image", "/front_camera/image_raw"),
         ],
         output="screen",
     )
 
     # ───── load controllers (after ros2_control is running) ─────────────
     spawners = controller_spawners(
-        ["joint_state_broadcaster", "rover_controller", "manipulator_controller"],
+        ["joint_state_broadcaster", "rover_controller"],
         start_after=2.0,
         interval=2.0,
+    )
+    manipulator_spawner = TimerAction(
+        period=6.0,
+        actions=[
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=["manipulator_controller"],
+                output="screen",
+                condition=IfCondition(enable_manipulator),
+            )
+        ],
     )
 
     return LaunchDescription(
         [
             headless_arg,
             use_sim_time_arg,
+            enable_manipulator_arg,
             can_iface_arg,
             controller_config_arg,
             SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", gz_resource_path),
@@ -191,6 +213,7 @@ def generate_launch_description():
             battery_emulator_2,
             spawn,
             *spawners,
+            manipulator_spawner,
             gz_bridge,
         ]
     )
