@@ -386,6 +386,14 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("enable_led")),
     )
 
+    mission_status_led_node = Node(
+        package="mr2_led",
+        executable="mission_status_led_node",
+        name="mr2_mission_status_led",
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("enable_led")),
+    )
+
     # Static TF for rocker joints (hardware has no joint states for these)
     left_rocker_static_tf = Node(
         package="tf2_ros",
@@ -513,6 +521,7 @@ def generate_launch_description():
             left_navsat_relay,
             right_navsat_relay,
             led_node,
+            mission_status_led_node,
             left_rocker_static_tf,
             right_rocker_static_tf,
             manual_set_datum,
