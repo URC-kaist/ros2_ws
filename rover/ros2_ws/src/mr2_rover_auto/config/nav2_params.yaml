@@ -113,9 +113,9 @@ controller_server:
       vx_std: 0.2
       vy_std: 0.2
       wz_std: 0.4
-      vx_max: 0.4
+      vx_max: 0.6
       vx_min: -0.35
-      vy_max: 0.4
+      vy_max: 0.6
       wz_max: 1.0
       iteration_count: 1
       temperature: 0.3
@@ -317,7 +317,7 @@ planner_server: # https://docs.nav2.org/configuration/packages/configuring-plann
       plugin: "nav2_theta_star_planner/ThetaStarPlanner" # In Iron and older versions, "/" was used instead of "::"
       how_many_corners: 8
       w_euc_cost: 1.0
-      w_traversal_cost: 2.0
+      w_traversal_cost: 2.0 # increase for conservative path
       use_final_approach_orientation: true
 
 
@@ -381,8 +381,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP" # XXX: Setting "CLOSED_LOOP" gives 0.125 max vel (???)
-    max_velocity: [0.4, 0.4, 1.0] # NOTE: MUST follow actual rover specification (#34)
-    min_velocity: [-0.4, -0.4, -1.0]
+    max_velocity: [0.6, 0.6, 1.0] # NOTE: MUST follow actual rover specification (#34)
+    min_velocity: [-0.6, -0.6, -1.0]
     max_accel: [2.5, 2.5, 3.2]
     max_decel: [-2.5, -2.5, -3.2]
     odom_topic: "odom"

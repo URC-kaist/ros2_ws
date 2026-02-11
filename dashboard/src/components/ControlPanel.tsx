@@ -8,9 +8,9 @@ import { getSikGatewayClient } from '../lib/sikGateway'
 import './ControlPanel/ControlPanel.css'
 
 const sensitivityScale = {
-  low: 0.2,
-  med: 0.4,
-  high: 0.6,
+  low: 0.4,
+  med: 0.6,
+  high: 0.8,
 } as const
 
 const yawSensitivityScale = {

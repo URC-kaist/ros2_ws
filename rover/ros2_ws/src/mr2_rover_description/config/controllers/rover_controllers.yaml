@@ -31,7 +31,7 @@ rover_controller:
     wheel_base: 0.95386
     track_width: 0.6504
     wheel_radius: 0.125
-    max_wheel_linear_speed: 0.4  # m/s hard limit per wheel
+    max_wheel_linear_speed: 0.6  # m/s hard limit per wheel
     max_steer: 2.35619  # +/- 135 degrees
     steering_error_ratio_deg: 40.0  # v1.0 speed scale vs steering error
     # cmd_vel slew-rate limits (preserved from controller defaults)

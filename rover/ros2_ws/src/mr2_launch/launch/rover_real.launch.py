@@ -83,7 +83,7 @@ def generate_launch_description():
     )
     enable_yolo_arg = DeclareLaunchArgument(
         "enable_yolo",
-        default_value="false",
+        default_value="true",
         description="Start YOLO RGBD detector node",
     )
     yolo_cam_topic_arg = DeclareLaunchArgument(
