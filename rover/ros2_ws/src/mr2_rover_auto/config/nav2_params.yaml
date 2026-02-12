@@ -157,7 +157,7 @@ controller_server:
         collision_margin_distance: 0.1
         near_goal_distance: 0.5
         cost_scaling_Factor: 1.9386 # match costmap's last inflation layer
-        inflation_radius: 3.6 # match costmap's last inflation layer
+        inflation_radius: 1.2 # match costmap's last inflation layer
       # CostCritic:
       #   enabled: true
       #   cost_power: 1
@@ -204,22 +204,23 @@ local_costmap:
   local_costmap:
     ros__parameters:
       update_frequency: 20.0 # internal computation
-      publish_frequency: 1.0 # nav2 etc
+      publish_frequency: 1.0 # rviz2 etc
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: True
       rolling_window: true
-      width: 12 # > prune_distance * 2
-      height: 12
+      width: 8 # > prune_distance * 2
+      height: 8
       resolution: 0.1 # follow pc2_to_heightmap resolution
       map_vis_z: -0.235
       track_unknown_space: false  
-      footprint: "[[0.6, 0.6], [0.6, -0.6], [-0.6, -0.6], [-0.6, 0.6]]"
+      # footprint: "[[0.6, 0.6], [0.6, -0.6], [-0.6, -0.6], [-0.6, 0.6]]"
+      robot_radius: 0.8485 # safer to assume circular
       plugins: ["traversability_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 1.9386 # 128 = 253 * e ^ (-f *(1.2-r_i)); r_i = r_c = 0.8485
-        inflation_radius: 3.6 # > r_c = 1.2 * sqrt(2) = 0.8485
+        inflation_radius: 1.2 # > r_c = 1.2 * sqrt(2) = 0.8485
       traversability_layer:
         plugin: "mr2_nav2_plugins::TraversabilityLayer"
         enabled: true
@@ -241,11 +242,12 @@ global_costmap:
   global_costmap:
     ros__parameters:
       update_frequency: 1.0 # internal computation
-      publish_frequency: 1.0 # nav2 etc
+      publish_frequency: 1.0 # rviz2 etc
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
-      footprint: "[[0.6, 0.6], [0.6, -0.6], [-0.6, -0.6], [-0.6, 0.6]]"
+      # footprint: "[[0.6, 0.6], [0.6, -0.6], [-0.6, -0.6], [-0.6, 0.6]]"
+      robot_radius: 0.8485 # safer to assume circular
       resolution: 0.4 # follow map0p4.yaml resolution
       map_vis_z: -0.47
       track_unknown_space: true
@@ -273,7 +275,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 1.9386 # 128 = 253 * e ^ (-f *(1.2-r_i)); r_i = r_c = 0.8485
-        inflation_radius: 10.0 # > r_c = 1.2 * sqrt(2) = 0.8485
+        inflation_radius: 1.2 # > r_c = 1.2 * sqrt(2) = 0.8485
       always_send_full_costmap: False
 
 map_server: # https://docs.nav2.org/configuration/packages/map_server/configuring-map-server.html

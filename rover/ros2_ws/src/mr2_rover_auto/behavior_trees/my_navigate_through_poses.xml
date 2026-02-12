@@ -11,7 +11,7 @@
             <Sequence name="ComputeAndSmoothPath">
               <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="Theta"/>
               <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}" smoother_id="curvature_smoother"/>
-              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="3.0"/> <!-- NOTE: #34 -->
+              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="2.4"/> <!-- NOTE: #34 -->
             </Sequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>

@@ -112,9 +112,9 @@ Visualization Manager:
       Autocompute Intensity Bounds: false
       Class: grid_map_rviz_plugin/GridMap
       Color: 200; 200; 200
-      Color Layer: traversability
+      Color Layer: elevation
       Color Transformer: IntensityLayer
-      Enabled: false
+      Enabled: true
       Height Layer: traversability
       Height Transformer: Layer
       History Length: 1
@@ -133,7 +133,7 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /traversability_gridmap
       Use Rainbow: false
-      Value: false
+      Value: true
     - Alpha: 0.699999988079071
       Class: rviz_default_plugins/Map
       Color Scheme: map
@@ -159,7 +159,7 @@ Visualization Manager:
       Class: rviz_default_plugins/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: false
+      Enabled: true
       Name: Local
       Topic:
         Depth: 5
@@ -175,7 +175,7 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /local_costmap/costmap_updates
       Use Timestamp: false
-      Value: false
+      Value: true
     - Alpha: 1
       Class: rviz_default_plugins/Polygon
       Color: 25; 255; 0
@@ -207,7 +207,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /goal_pose
+        Value: /cover_vision/object_pose
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -385,25 +385,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/ThirdPersonFollower
-      Distance: 15.617203712463379
+      Distance: 18.770105361938477
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: -0.11435127258300781
+        Y: 1.4985485076904297
+        Z: -3.337860107421875e-06
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8703981041908264
+      Pitch: 1.124796748161316
       Target Frame: base_link
       Value: ThirdPersonFollower (rviz_default_plugins)
-      Yaw: 1.070397973060608
+      Yaw: 2.110398054122925
     Saved: ~
 Window Geometry:
   Displays:

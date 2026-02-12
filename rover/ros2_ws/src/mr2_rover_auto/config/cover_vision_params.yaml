@@ -8,7 +8,7 @@ cover_vision_server:
 
     # Spiral coverage tuning
     spiral_pitch_m: 3.0
-    spiral_point_spacing_m: 1.8
+    spiral_point_spacing_m: 1.2
     spiral_max_points: 5000
 
     # Detection handling
