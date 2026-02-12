@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global1/Topic1
         - /Coverage1/Topic1
+        - /RGBD1
       Splitter Ratio: 0.5
     Tree Height: 164
   - Class: rviz_common/Selection
@@ -294,9 +295,9 @@ Visualization Manager:
     - Class: rviz_default_plugins/Camera
       Enabled: true
       Far Plane Distance: 100
-      Image Rendering: background and overlay
+      Image Rendering: overlay
       Name: RGBD
-      Overlay Alpha: 0.5
+      Overlay Alpha: 1
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -383,7 +384,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/ThirdPersonFollower
-      Distance: 6.732115745544434
+      Distance: 30.66998291015625
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
