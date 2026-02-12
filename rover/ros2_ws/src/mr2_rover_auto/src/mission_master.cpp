@@ -96,6 +96,11 @@ private:
     COVER
   };
 
+  static bool is_via_point(const MissionSpec & spec)
+  {
+    return spec.waypoint_count == 1;
+  }
+
   void on_mission_list(const MissionList::SharedPtr msg)
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -238,6 +243,7 @@ private:
       {
         bool restart_now = false;
         bool success = false;
+        bool skip_arrival = false;
         {
           std::lock_guard<std::mutex> lock(mutex_);
           active_action_ = ActiveAction::NONE;
@@ -258,6 +264,7 @@ private:
             if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
               current_index_++;
               success = true;
+              skip_arrival = is_via_point(active_mission_);
             } else {
               cancel_arrival_delay_locked();
               state_ = STATE_FAILED;
@@ -273,7 +280,14 @@ private:
         }
         if (success) {
           std::lock_guard<std::mutex> lock(mutex_);
-          schedule_arrival_delay_locked();
+          if (skip_arrival) {
+            if (pause_requested_ || abort_requested_ || pending_restart_) {
+              return;
+            }
+            start_current_mission_locked();
+          } else {
+            schedule_arrival_delay_locked();
+          }
         }
       };
 
@@ -323,6 +337,7 @@ private:
       {
         bool restart_now = false;
         bool success = false;
+        bool skip_arrival = false;
         {
           std::lock_guard<std::mutex> lock(mutex_);
           active_action_ = ActiveAction::NONE;
@@ -343,6 +358,7 @@ private:
             if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
               current_index_++;
               success = true;
+              skip_arrival = is_via_point(active_mission_);
             } else {
               cancel_arrival_delay_locked();
               state_ = STATE_FAILED;
@@ -358,7 +374,14 @@ private:
         }
         if (success) {
           std::lock_guard<std::mutex> lock(mutex_);
-          schedule_arrival_delay_locked();
+          if (skip_arrival) {
+            if (pause_requested_ || abort_requested_ || pending_restart_) {
+              return;
+            }
+            start_current_mission_locked();
+          } else {
+            schedule_arrival_delay_locked();
+          }
         }
       };
 

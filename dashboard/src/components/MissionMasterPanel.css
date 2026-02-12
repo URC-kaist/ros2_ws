@@ -192,6 +192,22 @@
   width: 100%;
 }
 
+.mission-master__via-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mission-master__table-row .mission-master__via-checkbox {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  accent-color: rgba(53, 211, 195, 0.9);
+}
+
 .mission-master__table-row input[type='number'],
 .mission-master__input[type='number'] {
   appearance: textfield;

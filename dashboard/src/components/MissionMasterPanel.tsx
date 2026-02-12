@@ -609,7 +609,7 @@ const MissionMasterPanel = ({
                 <span>Lat</span>
                 <span>Lon</span>
                 <span>Radius</span>
-                <span>Waypoints</span>
+                <span title="Via point skips the arrival hold between missions.">Via</span>
                 <span />
               </div>
               {missionList.length === 0 ? (
@@ -734,16 +734,20 @@ const MissionMasterPanel = ({
                         invalidFields[index]?.target_radius ? 'mission-master__input--invalid' : ''
                       }
                     />
-                    <input
-                      type="number"
-                      value={mission.waypoint_count === 0 ? '' : mission.waypoint_count}
-                      onChange={(event) =>
-                        updateField(index, 'waypoint_count', Number(event.target.value) || 0)
-                      }
-                      className={
-                        invalidFields[index]?.waypoint_count ? 'mission-master__input--invalid' : ''
-                      }
-                    />
+                    <div className="mission-master__via-cell">
+                      <input
+                        type="checkbox"
+                        className={`mission-master__via-checkbox ${
+                          invalidFields[index]?.waypoint_count ? 'mission-master__input--invalid' : ''
+                        }`}
+                        checked={mission.waypoint_count === 1}
+                        onChange={(event) =>
+                          updateField(index, 'waypoint_count', event.target.checked ? 1 : 0)
+                        }
+                        aria-label="Via point (skip arrival delay)"
+                        title="Via point skips the arrival hold between missions."
+                      />
+                    </div>
                     <button
                       type="button"
                       className="mission-master__icon-button"
