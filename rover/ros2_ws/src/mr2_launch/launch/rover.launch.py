@@ -193,8 +193,11 @@ def generate_launch_description():
         condition=real_condition,
     )
 
+    localization_delay = PythonExpression(
+        ["'30.0' if '", LaunchConfiguration("mode"), "' == 'real' else '3.0'"]
+    )
     localization_launch = TimerAction(
-        period=2.0,
+        period=localization_delay,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(

@@ -454,9 +454,9 @@ class YoloRgbdDetector(Node):
             pose_pub = self.pose_pubs.get(class_id)
             if pose_pub is not None:
                 pose_pub.publish(pose)
-                self.get_logger().info(
-                    f"Published pose for class {class_id} (conf={conf:.2f})"
-                )
+                # self.get_logger().info(
+                #     f"Published pose for class {class_id} (conf={conf:.2f})"
+                # )
 
             self.tf_broadcaster.sendTransform(camera_tf)
 
@@ -464,7 +464,7 @@ class YoloRgbdDetector(Node):
         annotated_msg = self._bgr_to_imgmsg(annotated, rgb_msg.header)
         self.image_pub.publish(annotated_msg)
 
-        self.get_logger().debug(f"Published detection pose (conf={conf:.2f})")
+        self.get_logger().debug(f"Published pose for class {class_id} (conf={conf:.2f})")
 
 
 def main() -> None:
