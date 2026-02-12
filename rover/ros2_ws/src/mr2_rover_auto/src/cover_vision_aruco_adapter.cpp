@@ -47,11 +47,20 @@ public:
     filter_window_ = static_cast<size_t>(this->declare_parameter<int>("filter_window", 5));
     max_jump_m_ = this->declare_parameter<double>("max_jump_m", 2.0);
 
+    force_enable_ = this->declare_parameter<bool>("force_enable", false);
+
     out_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(output_topic_, 10);
 
     status_sub_ = this->create_subscription<mr2_action_interface::msg::MissionStatus>(
       mission_status_topic_, 10,
       std::bind(&CoverVisionArucoAdapter::on_status, this, std::placeholders::_1));
+
+    if (force_enable_) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      enabled_ = true;
+      ensure_subscription_locked();
+      RCLCPP_INFO(get_logger(), "CoverVision ArUco adapter: force enabled");
+    }
 
     RCLCPP_INFO(get_logger(), "CoverVision ArUco adapter ready");
   }
@@ -146,6 +155,10 @@ private:
   void on_status(const mr2_action_interface::msg::MissionStatus::SharedPtr msg)
   {
     if (!msg) {
+      return;
+    }
+
+    if (force_enable_) {
       return;
     }
 
@@ -266,6 +279,10 @@ private:
     out.pose.position.x = fx;
     out.pose.position.y = fy;
     out_pub_->publish(out);
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000,
+      "CoverVision ArUco adapter: detection published (x=%.2f, y=%.2f)",
+      fx, fy);
 
     last_pub_time_ = now;
     last_pub_xy_ = std::make_pair(fx, fy);
@@ -279,6 +296,8 @@ private:
   std::string mission_status_topic_;
   std::string output_topic_;
   std::string aruco_detections_topic_;
+
+  bool force_enable_{false};
 
   bool prefer_boards_{true};
   std::string preferred_board_name_;

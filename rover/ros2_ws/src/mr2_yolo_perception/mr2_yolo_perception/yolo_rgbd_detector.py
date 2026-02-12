@@ -35,6 +35,8 @@ class YoloRgbdDetector(Node):
         self.declare_parameter("target_class", "")
         self.declare_parameter("target_class_id", -1)
         self.declare_parameter("class_ids", [0, 1, 2])
+        self.declare_parameter("class_id_map", "")
+        self.declare_parameter("semantic_class_names", [])
         self.declare_parameter("camera_frame_is_optical", True)
 
         self.rgb_topic = self.get_parameter("rgb_topic").get_parameter_value().string_value
@@ -64,6 +66,20 @@ class YoloRgbdDetector(Node):
         self.class_ids = list(
             self.get_parameter("class_ids").get_parameter_value().integer_array_value
         )
+        self.class_id_map = self._parse_class_id_map(
+            self.get_parameter("class_id_map").value
+        )
+        self.semantic_class_names = list(
+            self.get_parameter("semantic_class_names")
+            .get_parameter_value()
+            .string_array_value
+        )
+        self.semantic_class_names = [
+            name.strip().lower() for name in self.semantic_class_names if name.strip()
+        ]
+        self.semantic_name_to_id = {
+            name: idx for idx, name in enumerate(self.semantic_class_names)
+        }
         self.camera_frame_is_optical = (
             self.get_parameter("camera_frame_is_optical")
             .get_parameter_value()
@@ -184,25 +200,33 @@ class YoloRgbdDetector(Node):
         if self.target_class_id >= 0:
             target_id = int(self.target_class_id)
         elif self.target_class:
-            for idx, name in names.items():
-                if name == self.target_class:
-                    target_id = int(idx)
-                    break
+            want = self.target_class.strip().lower()
+            if self.semantic_name_to_id:
+                target_id = self.semantic_name_to_id.get(want)
+            else:
+                for idx, name in names.items():
+                    if name.strip().lower() == want:
+                        target_id = int(idx)
+                        break
             if target_id is None:
-                self.get_logger().warn(
-                    f"target_class '{self.target_class}' not found in model classes"
-                )
+                # self.get_logger().warn(
+                #     f"target_class '{self.target_class}' not found in model classes"
+                # )
+                pass
 
         best_idx = None
         best_conf = -1.0
         best_xyxy = None
         for i, box in enumerate(boxes):
             cls_id = int(box.cls[0])
+            sem_id = self._semantic_id_for(cls_id, names)
+            if sem_id is None:
+                continue
             conf = float(box.conf[0])
-            if target_id is not None and cls_id != target_id:
+            if target_id is not None and sem_id != target_id:
                 continue
             if conf > best_conf:
-                best_idx = cls_id
+                best_idx = sem_id
                 best_conf = conf
                 best_xyxy = box.xyxy[0].cpu().numpy()
 
@@ -211,7 +235,7 @@ class YoloRgbdDetector(Node):
         return best_idx, best_conf, best_xyxy
 
     def _select_detection_for_class(
-        self, boxes, class_id: int
+        self, boxes, names, class_id: int
     ) -> Optional[Tuple[float, np.ndarray]]:
         if boxes is None or len(boxes) == 0:
             return None
@@ -220,7 +244,8 @@ class YoloRgbdDetector(Node):
         best_xyxy = None
         for box in boxes:
             cls_id = int(box.cls[0])
-            if cls_id != class_id:
+            sem_id = self._semantic_id_for(cls_id, names)
+            if sem_id is None or sem_id != class_id:
                 continue
             conf = float(box.conf[0])
             if conf > best_conf:
@@ -237,6 +262,44 @@ class YoloRgbdDetector(Node):
         if self.target_class_id >= 0:
             return [int(self.target_class_id)]
         return []
+
+    def _semantic_id_for(self, class_id: int, names) -> Optional[int]:
+        if self.class_id_map:
+            if class_id not in self.class_id_map:
+                return None
+            return self.class_id_map[class_id]
+        if not self.semantic_name_to_id:
+            return class_id
+        name = names.get(class_id, "")
+        if not name:
+            return None
+        return self.semantic_name_to_id.get(name.strip().lower())
+
+    def _parse_class_id_map(self, raw) -> dict:
+        if not raw:
+            return {}
+        if isinstance(raw, dict):
+            return {int(k): int(v) for k, v in raw.items()}
+        if isinstance(raw, (list, tuple)):
+            items = list(raw)
+            if len(items) % 2 != 0:
+                return {}
+            out = {}
+            for i in range(0, len(items), 2):
+                out[int(items[i])] = int(items[i + 1])
+            return out
+        if isinstance(raw, str):
+            out = {}
+            for part in raw.split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                if ":" not in part:
+                    return {}
+                k, v = part.split(":", 1)
+                out[int(k.strip())] = int(v.strip())
+            return out
+        return {}
 
     def _depth_at_bbox(self, depth_image: np.ndarray, bbox: np.ndarray) -> Optional[float]:
         x1, y1, x2, y2 = bbox
@@ -304,7 +367,7 @@ class YoloRgbdDetector(Node):
             verbose=False,
         )
         if not results:
-            self.get_logger().info("YOLO returned no results")
+            # self.get_logger().info("YOLO returned no results")
             return
 
         result = results[0]
@@ -313,9 +376,9 @@ class YoloRgbdDetector(Node):
         if not effective_class_ids:
             selection = self._select_detection(boxes, result.names)
             if selection is None:
-                self.get_logger().info(
-                    "No detections matched target class or confidence"
-                )
+                # self.get_logger().info(
+                #     "No detections matched target class or confidence"
+                # )
                 return
             class_id, conf, bbox = selection
             effective_class_ids = [class_id]
@@ -323,15 +386,15 @@ class YoloRgbdDetector(Node):
         else:
             detections = {}
             for class_id in effective_class_ids:
-                selection = self._select_detection_for_class(boxes, class_id)
+                selection = self._select_detection_for_class(boxes, result.names, class_id)
                 if selection is None:
                     continue
                 detections[class_id] = selection
 
             if not detections:
-                self.get_logger().info(
-                    "No detections matched target class or confidence"
-                )
+                # self.get_logger().info(
+                #     "No detections matched target class or confidence"
+                # )
                 return
 
         for class_id, (conf, bbox) in detections.items():

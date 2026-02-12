@@ -37,6 +37,9 @@ public:
     yolo_pose_topic_prefix_ =
       this->declare_parameter<std::string>("yolo_pose_topic_prefix", "yolo/object_pose");
 
+    force_enable_ = this->declare_parameter<bool>("force_enable", false);
+    forced_class_id_ = this->declare_parameter<int>("forced_class_id", 0);
+
     tf_timeout_sec_ = this->declare_parameter<double>("tf_timeout_sec", 0.2);
     min_publish_interval_sec_ = this->declare_parameter<double>("min_publish_interval_sec", 0.1);
     filter_window_ = static_cast<size_t>(this->declare_parameter<int>("filter_window", 5));
@@ -46,6 +49,14 @@ public:
     status_sub_ = this->create_subscription<mr2_action_interface::msg::MissionStatus>(
       mission_status_topic_, 10,
       std::bind(&CoverVisionYoloAdapter::on_status, this, std::placeholders::_1));
+
+    if (force_enable_) {
+      const int class_id = std::max(0, forced_class_id_);
+      std::lock_guard<std::mutex> lock(mutex_);
+      enabled_ = true;
+      ensure_subscription_locked(class_id);
+      RCLCPP_INFO(get_logger(), "CoverVision YOLO adapter: force enabled (class_id=%d)", class_id);
+    }
 
     RCLCPP_INFO(get_logger(), "CoverVision YOLO adapter ready");
   }
@@ -110,6 +121,10 @@ private:
   void on_status(const mr2_action_interface::msg::MissionStatus::SharedPtr msg)
   {
     if (!msg) {
+      return;
+    }
+
+    if (force_enable_) {
       return;
     }
 
@@ -213,6 +228,10 @@ private:
     out.pose.position.x = fx;
     out.pose.position.y = fy;
     out_pub_->publish(out);
+    RCLCPP_INFO_THROTTLE(
+      get_logger(), *get_clock(), 2000,
+      "CoverVision YOLO adapter: detection published (class_id=%d, x=%.2f, y=%.2f)",
+      active_class_id_, fx, fy);
 
     last_pub_time_ = now;
     last_pub_xy_ = std::make_pair(fx, fy);
@@ -226,6 +245,9 @@ private:
   std::string mission_status_topic_;
   std::string output_topic_;
   std::string yolo_pose_topic_prefix_;
+
+  bool force_enable_{false};
+  int forced_class_id_{0};
 
   double tf_timeout_sec_{0.2};
   double min_publish_interval_sec_{0.1};

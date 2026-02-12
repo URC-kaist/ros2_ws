@@ -253,6 +253,7 @@ def generate_launch_description():
                 "annotated_topic": "yolo/annotated_image",
                 "pose_topic": "yolo/object_pose",
                 "camera_frame_is_optical": False,
+                "class_id_map": "0:2,1:0,2:1",
                 "use_sim_time": LaunchConfiguration("use_sim_time"),
             }
         ],

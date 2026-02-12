@@ -44,6 +44,7 @@ def _launch_setup(context, *args, **kwargs):
                     "target_class": "",
                     "target_class_id": -1,
                     "class_ids": [0, 1, 2],
+                    "class_id_map": "0:2,1:0,2:1",
                     "camera_frame_is_optical": False,
                 }
             ],
