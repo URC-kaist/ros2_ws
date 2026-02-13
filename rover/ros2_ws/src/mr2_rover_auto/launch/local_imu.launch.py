@@ -14,6 +14,22 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("use_sim_time", default_value="false"),
 
+        # Align D435i optical frame to ROS2 ENU frame
+        Node(
+            package="imu_filter_madgwick",
+            executable="imu_filter_madgwick_node",
+            name="d435i_filter",
+            output="screen",
+            parameters=[
+                params_file_real,
+                {"use_sim_time": LaunchConfiguration("use_sim_time")},
+            ],
+            remappings=[
+                ("imu/data_raw", "/rgbd_camera/imu"),
+                ("imu/data", "/rgbd_camera/imu/filtered"),
+            ],
+        ),
+
         # Local EKF: publish tf: odom -> base_link
         Node(
             package="robot_localization",
@@ -25,6 +41,7 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
             ],
             remappings=[
+                ('/rgbd_camera/imu', '/rgbd_camera/imu/filtered'),
                 ('/odometry/filtered', '/odometry/filtered/local')
             ],
         ),

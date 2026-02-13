@@ -1,13 +1,5 @@
 # https://www.intel.com/content/www/us/en/products/sku/190004/intel-realsense-depth-camera-d435i/specifications.html
 
-imu_gravity_filter:
-  ros__parameters:
-    use_mag: false    # D435i has no compass
-    stateless: false  # Keep state between updates
-    fixed_frame: "base_link"
-    publish_tf: false
-    gain: 0.1         # Filter gain (lower = smoother)
-
 pc2_to_heightmap:
   ros__parameters:
     use_sim_time: true
