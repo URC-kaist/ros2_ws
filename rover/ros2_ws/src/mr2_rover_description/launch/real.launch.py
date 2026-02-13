@@ -26,16 +26,22 @@ def generate_launch_description():
     )
 
     use_sim_time = LaunchConfiguration("use_sim_time")
-    enable_manipulator = LaunchConfiguration("enable_manipulator")
+    enable_manipulator_module = LaunchConfiguration("enable_manipulator_module")
+    enable_autonomous_module = LaunchConfiguration("enable_autonomous_module")
     use_sim_time_arg = DeclareLaunchArgument(
         "use_sim_time",
         default_value="false",
         description="Use simulation time; normally false for hardware",
     )
-    enable_manipulator_arg = DeclareLaunchArgument(
-        "enable_manipulator",
+    enable_manipulator_module_arg = DeclareLaunchArgument(
+        "enable_manipulator_module",
         default_value="true",
         description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
+    )
+    enable_autonomous_module_arg = DeclareLaunchArgument(
+        "enable_autonomous_module",
+        default_value="true",
+        description="Enable autonomous camera module (front_camera) in URDF",
     )
 
     can_iface, can_iface_arg = declare_can_iface(
@@ -57,7 +63,8 @@ def generate_launch_description():
             "ros2_control_mode": "real_hardware",
             "can_iface": can_iface,
             "ros2_control_config": controller_config,
-            "enable_manipulator": enable_manipulator,
+            "enable_manipulator_module": enable_manipulator_module,
+            "enable_autonomous_module": enable_autonomous_module,
         },
     )
 
@@ -68,7 +75,7 @@ def generate_launch_description():
         motor_ids=range(1, 7),
         condition=IfCondition(
             PythonExpression(
-                ["'", enable_manipulator, "' == 'true' and '", use_mock_servos, "' == 'true'"]
+                ["'", enable_manipulator_module, "' == 'true' and '", use_mock_servos, "' == 'true'"]
             )
         ),
     )
@@ -87,7 +94,7 @@ def generate_launch_description():
                 executable="spawner",
                 arguments=["manipulator_controller", "--inactive"],
                 output="screen",
-                condition=IfCondition(enable_manipulator),
+                condition=IfCondition(enable_manipulator_module),
             )
         ],
     )
@@ -126,7 +133,8 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_sim_time_arg,
-            enable_manipulator_arg,
+            enable_manipulator_module_arg,
+            enable_autonomous_module_arg,
             can_iface_arg,
             controller_config_arg,
             use_mock_servos_arg,

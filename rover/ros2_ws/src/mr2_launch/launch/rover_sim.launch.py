@@ -30,6 +30,16 @@ def generate_launch_description():
         default_value="can0",
         description="CAN interface used by the AK servo hardware",
     )
+    enable_manipulator_module_arg = DeclareLaunchArgument(
+        "enable_manipulator_module",
+        default_value="false",
+        description="Enable manipulator URDF and ros2_control in simulation",
+    )
+    enable_autonomous_module_arg = DeclareLaunchArgument(
+        "enable_autonomous_module",
+        default_value="true",
+        description="Enable autonomous camera module (front_camera) in simulation",
+    )
     sik_sim_device_arg = DeclareLaunchArgument(
         "sik_sim_device",
         default_value="/tmp/sik_sim0",
@@ -58,6 +68,8 @@ def generate_launch_description():
             "rviz_config": LaunchConfiguration("rviz_config"),
             "controller_config": LaunchConfiguration("controller_config"),
             "can_iface": LaunchConfiguration("can_iface"),
+            "enable_manipulator_module_sim": LaunchConfiguration("enable_manipulator_module"),
+            "enable_autonomous_module_sim": LaunchConfiguration("enable_autonomous_module"),
             "sik_sim_device": LaunchConfiguration("sik_sim_device"),
             "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
             "sik_sim_baud": LaunchConfiguration("sik_sim_baud"),
@@ -70,6 +82,8 @@ def generate_launch_description():
             rviz_arg,
             controller_config_arg,
             can_iface_arg,
+            enable_manipulator_module_arg,
+            enable_autonomous_module_arg,
             sik_sim_device_arg,
             sik_sim_peer_arg,
             sik_sim_baud_arg,

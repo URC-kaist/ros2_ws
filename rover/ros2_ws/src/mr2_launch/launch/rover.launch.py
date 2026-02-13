@@ -67,15 +67,25 @@ def generate_launch_description():
         default_value="false",
         description="Start mock AK servo nodes instead of hardware interfaces (real mode)",
     )
-    enable_manipulator_arg = DeclareLaunchArgument(
-        "enable_manipulator",
+    enable_manipulator_module_arg = DeclareLaunchArgument(
+        "enable_manipulator_module",
         default_value="true",
         description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
     )
-    enable_manipulator_sim_arg = DeclareLaunchArgument(
-        "enable_manipulator_sim",
+    enable_manipulator_module_sim_arg = DeclareLaunchArgument(
+        "enable_manipulator_module_sim",
         default_value="false",
         description="Enable manipulator URDF and ros2_control in simulation",
+    )
+    enable_autonomous_module_arg = DeclareLaunchArgument(
+        "enable_autonomous_module",
+        default_value="true",
+        description="Enable autonomous camera module (front_camera)",
+    )
+    enable_autonomous_module_sim_arg = DeclareLaunchArgument(
+        "enable_autonomous_module_sim",
+        default_value="true",
+        description="Enable autonomous camera module (front_camera) in simulation",
     )
     use_servo_arg = DeclareLaunchArgument(
         "use_servo",
@@ -135,7 +145,7 @@ def generate_launch_description():
     real_condition = IfCondition(
         PythonExpression(["'", LaunchConfiguration("mode"), "' == 'real'"])
     )
-    enable_manipulator = LaunchConfiguration("enable_manipulator")
+    enable_manipulator_module = LaunchConfiguration("enable_manipulator_module")
     sik_sim_condition = sim_condition
     use_sim_time_param = SetParameter(
         name="use_sim_time", value=LaunchConfiguration("use_sim_time")
@@ -172,7 +182,8 @@ def generate_launch_description():
             "can_iface": LaunchConfiguration("can_iface"),
             "controller_config": LaunchConfiguration("controller_config"),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
-            "enable_manipulator": LaunchConfiguration("enable_manipulator_sim"),
+            "enable_manipulator_module": LaunchConfiguration("enable_manipulator_module_sim"),
+            "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module_sim"),
         }.items(),
         condition=sim_condition,
     )
@@ -188,7 +199,8 @@ def generate_launch_description():
             "controller_config": LaunchConfiguration("controller_config"),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
-            "enable_manipulator": enable_manipulator,
+            "enable_manipulator_module": enable_manipulator_module,
+            "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
         }.items(),
         condition=real_condition,
     )
@@ -278,7 +290,7 @@ def generate_launch_description():
             PythonExpression(
                 [
                     "'",
-                    enable_manipulator,
+                    enable_manipulator_module,
                     "' == 'true' and '",
                     LaunchConfiguration("use_servo"),
                     "' != 'true'",
@@ -300,7 +312,7 @@ def generate_launch_description():
             PythonExpression(
                 [
                     "'",
-                    enable_manipulator,
+                    enable_manipulator_module,
                     "' == 'true' and '",
                     LaunchConfiguration("use_servo"),
                     "' == 'true'",
@@ -410,8 +422,10 @@ def generate_launch_description():
         can_iface_arg,
         controller_config_arg,
         use_mock_servos_arg,
-        enable_manipulator_arg,
-        enable_manipulator_sim_arg,
+        enable_manipulator_module_arg,
+        enable_manipulator_module_sim_arg,
+        enable_autonomous_module_arg,
+        enable_autonomous_module_sim_arg,
         use_servo_arg,
         sik_sim_device_arg,
         sik_sim_peer_arg,

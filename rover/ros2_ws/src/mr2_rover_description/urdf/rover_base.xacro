@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="rover_base" params="length:=0.73 width:=0.491 height:=0.19 mass:=10 rocker_size:=0.1 rocker_mass:=0.5 joint_effort:=50 joint_vel:=2.0 joint_lim:=1.57 front_camera_pitch:=0.349066">
+  <xacro:macro name="rover_base" params="length:=0.73 width:=0.491 height:=0.19 mass:=10 rocker_size:=0.1 rocker_mass:=0.5 joint_effort:=50 joint_vel:=2.0 joint_lim:=1.57 front_camera_pitch:=0.349066 enable_autonomous_module:=true">
+    <xacro:property name="enable_autonomous_module_value" value="${enable_autonomous_module}"/>
     <!-- TODO: set as real dimension of the rover (#34) -->
     <link name="base_link"/>
 
@@ -11,10 +12,20 @@
       </inertial>
       <visual>
         <geometry>
-	<box size="${length/2.0} ${width} ${height}"/>
+          <mesh filename="${rover_mesh_prefix}/base.obj"
+                scale="${rover_mesh_scale} ${rover_mesh_scale} ${rover_mesh_scale}"/>
         </geometry>
-        <origin xyz="${-length/4.0} 0 ${height/2.0}"/>
+        <origin xyz="0 0 0.05"/>
       </visual>
+      <xacro:if value="${enable_autonomous_module_value}">
+        <visual>
+          <geometry>
+            <mesh filename="${rover_mesh_prefix}/autonomous_module.obj"
+                  scale="${rover_mesh_scale} ${rover_mesh_scale} ${rover_mesh_scale}"/>
+          </geometry>
+          <origin xyz="0 0 0.05"/>
+        </visual>
+      </xacro:if>
       <collision>
         <geometry>
           <box size="${length} ${width} ${height}"/>
@@ -118,20 +129,22 @@
       <child link="rgbd_camera"/>
     </joint>
 
-    <link name="front_camera"/>
-    <joint name="base_to_front_camera" type="fixed">
-      <origin xyz="${length/2.0} 0 0.5" rpy="0 0 0"/>
-      <parent link="base_chassis"/>
-      <child link="front_camera"/>
-    </joint>
+    <xacro:if value="${enable_autonomous_module_value}">
+      <link name="front_camera"/>
+      <joint name="base_to_front_camera" type="fixed">
+        <origin xyz="0.3476 0 0.438" rpy="0 0 0"/>
+        <parent link="base_chassis"/>
+        <child link="front_camera"/>
+      </joint>
 
-    <!-- Optical frame for the front UVC camera (REP 103): x right, y down, z forward -->
-    <link name="front_camera_optical_frame"/>
-    <joint name="front_camera_to_optical" type="fixed">
-      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
-      <parent link="front_camera"/>
-      <child link="front_camera_optical_frame"/>
-    </joint>
+      <!-- Optical frame for the front UVC camera (REP 103): x right, y down, z forward -->
+      <link name="front_camera_optical_frame"/>
+      <joint name="front_camera_to_optical" type="fixed">
+        <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+        <parent link="front_camera"/>
+        <child link="front_camera_optical_frame"/>
+      </joint>
+    </xacro:if>
 
     <!-- IMU mounted at the top of the base box -->
     <link name="imu_link"/>

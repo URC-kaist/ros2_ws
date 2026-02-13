@@ -66,8 +66,8 @@ def generate_launch_description():
         default_value="false",
         description="Start mock AK servo nodes that emulate the manipulator CAN motors",
     )
-    enable_manipulator_arg = DeclareLaunchArgument(
-        "enable_manipulator",
+    enable_manipulator_module_arg = DeclareLaunchArgument(
+        "enable_manipulator_module",
         default_value="true",
         description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
     )
@@ -76,10 +76,10 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
-    enable_front_camera_arg = DeclareLaunchArgument(
-        "enable_front_camera",
+    enable_autonomous_module_arg = DeclareLaunchArgument(
+        "enable_autonomous_module",
         default_value="true",
-        description="Launch the front UVC camera (/dev/videoFRONT) and use it for ArUco detection",
+        description="Enable autonomous module: launch the front UVC camera and use it for ArUco detection",
     )
     enable_yolo_arg = DeclareLaunchArgument(
         "enable_yolo",
@@ -256,7 +256,7 @@ def generate_launch_description():
             "camera_name": "front_camera",
             "camera_namespace": "front_camera",
         }.items(),
-        condition=IfCondition(LaunchConfiguration("enable_front_camera")),
+        condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
     )
 
     traversability_launch = IncludeLaunchDescription(
@@ -302,14 +302,15 @@ def generate_launch_description():
             "controller_config": LaunchConfiguration("controller_config"),
             "can_iface": LaunchConfiguration("can_iface"),
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
-            "enable_manipulator": LaunchConfiguration("enable_manipulator"),
+            "enable_manipulator_module": LaunchConfiguration("enable_manipulator_module"),
+            "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
             "use_servo": LaunchConfiguration("use_servo"),
             "sik_device": LaunchConfiguration("sik_device"),
             "sik_baud": LaunchConfiguration("sik_baud"),
             "sik_sim_device": LaunchConfiguration("sik_sim_device"),
             "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
             "sik_sim_baud": LaunchConfiguration("sik_sim_baud"),
-            "enable_aruco": LaunchConfiguration("enable_front_camera"),
+            "enable_aruco": LaunchConfiguration("enable_autonomous_module"),
             "aruco_cam_topic": "/front_camera/image_raw",
             "enable_yolo": LaunchConfiguration("enable_yolo"),
             "yolo_cam_topic": LaunchConfiguration("yolo_cam_topic"),
@@ -483,7 +484,7 @@ def generate_launch_description():
             controller_config_arg,
             can_iface_arg,
             use_mock_servos_arg,
-            enable_manipulator_arg,
+            enable_manipulator_module_arg,
             use_servo_arg,
             enable_sik_sim_arg,
             sik_sim_device_arg,
@@ -491,7 +492,7 @@ def generate_launch_description():
             sik_sim_baud_arg,
             sik_device_arg,
             sik_baud_arg,
-            enable_front_camera_arg,
+            enable_autonomous_module_arg,
             enable_yolo_arg,
             yolo_cam_topic_arg,
             left_gnss_serial_arg,
