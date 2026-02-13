@@ -25,7 +25,7 @@ def generate_launch_description():
 
     camera_info_url_arg = DeclareLaunchArgument(
         "camera_info_url",
-        default_value="file:///home/mr2/calib_out/ost.yaml",
+        default_value="file:///home/mr2/mr2-stack/rover/ros2_ws/src/mr2_launch/config/ost.yaml",
         description="URL for the camera calibration file (ost.yaml)",
     )
 

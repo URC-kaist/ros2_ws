@@ -1,0 +1,10 @@
+. my_rviz.bash
+ros2 launch mr2_rover_description real.launch.py
+ros2 launch mr2_launch realsense_rgbd.launch.py 2>&1 | tee realsense.log
+ros2 launch mr2_rover_auto local_imu.launch.py
+
+ros2 launch mr2_rover_auto traversability_pipeline.launch.py
+
+ros2 launch mr2_launch front_uvc_camera.launch.py
+ros2 launch mr2_rover_auto vision_ablation.launch.py \
+force_enable:=true real_and_detector:=true yolo_class_id:=0

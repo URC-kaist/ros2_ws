@@ -7,7 +7,7 @@ ros2 doctor --report > doctor.log # detect QoS mode mismatch failure
 # under ros2_ws:
 rosdep install --from-paths src -y --ignore-src --rosdistro humble
 # But this will not solve every dependency issue.
-# ex: ros-humble-aruco-opencv, ros-humble-foxglove-bridge, socat, ...
+# ex: ros-humble-aruco-opencv, ros-humble-foxglove-bridge, socat, ros-humble-v4l2-camera ...
 ros2 pkg create --build-type ament_cmake <package_name>
 ```
 
