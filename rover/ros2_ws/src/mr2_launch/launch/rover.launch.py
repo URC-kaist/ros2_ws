@@ -62,6 +62,11 @@ def generate_launch_description():
         ),
         description="Controller manager YAML shared by sim and hardware",
     )
+    controller_spawn_delay_arg = DeclareLaunchArgument(
+        "controller_spawn_delay",
+        default_value="2.0",
+        description="Delay (seconds) before spawning ros2_control controllers in real mode",
+    )
     use_mock_servos_arg = DeclareLaunchArgument(
         "use_mock_servos",
         default_value="false",
@@ -81,6 +86,11 @@ def generate_launch_description():
         "use_servo",
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
+    )
+    localization_delay_arg = DeclareLaunchArgument(
+        "localization_delay",
+        default_value="2.0",
+        description="Delay (seconds) before starting localization stack",
     )
     sik_sim_device_arg = DeclareLaunchArgument(
         "sik_sim_device",
@@ -186,6 +196,7 @@ def generate_launch_description():
         launch_arguments={
             "can_iface": LaunchConfiguration("can_iface"),
             "controller_config": LaunchConfiguration("controller_config"),
+            "controller_spawn_delay": LaunchConfiguration("controller_spawn_delay"),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
             "enable_manipulator": enable_manipulator,
@@ -194,7 +205,7 @@ def generate_launch_description():
     )
 
     localization_launch = TimerAction(
-        period=2.0,
+        period=LaunchConfiguration("localization_delay"),
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -403,10 +414,12 @@ def generate_launch_description():
         foxglove_port_arg,
         can_iface_arg,
         controller_config_arg,
+        controller_spawn_delay_arg,
         use_mock_servos_arg,
         enable_manipulator_arg,
         enable_manipulator_sim_arg,
         use_servo_arg,
+        localization_delay_arg,
         sik_sim_device_arg,
         sik_sim_peer_arg,
         sik_sim_baud_arg,

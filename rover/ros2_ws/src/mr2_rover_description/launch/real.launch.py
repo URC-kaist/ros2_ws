@@ -27,6 +27,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_manipulator = LaunchConfiguration("enable_manipulator")
+    controller_spawn_delay = LaunchConfiguration("controller_spawn_delay")
     use_sim_time_arg = DeclareLaunchArgument(
         "use_sim_time",
         default_value="false",
@@ -36,6 +37,11 @@ def generate_launch_description():
         "enable_manipulator",
         default_value="true",
         description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
+    )
+    controller_spawn_delay_arg = DeclareLaunchArgument(
+        "controller_spawn_delay",
+        default_value="2.0",
+        description="Delay (seconds) before spawning ros2_control controllers",
     )
 
     can_iface, can_iface_arg = declare_can_iface(
@@ -76,16 +82,16 @@ def generate_launch_description():
     ros2_control = ros2_control_node(controller_config, robot_description, use_sim_time)
     spawners = controller_spawners(
         ["joint_state_broadcaster", "rover_controller"],
-        start_after=2.0,
+        start_after=controller_spawn_delay,
         interval=2.0,
     )
     manipulator_spawner = TimerAction(
-        period=6.0,
+        period=PythonExpression([controller_spawn_delay, " + 4.0"]),
         actions=[
             Node(
                 package="controller_manager",
                 executable="spawner",
-                arguments=["manipulator_controller", "--inactive"],
+                arguments=["manipulator_controller", "gripper_controller", "--inactive"],
                 output="screen",
                 condition=IfCondition(enable_manipulator),
             )
@@ -127,6 +133,7 @@ def generate_launch_description():
         [
             use_sim_time_arg,
             enable_manipulator_arg,
+            controller_spawn_delay_arg,
             can_iface_arg,
             controller_config_arg,
             use_mock_servos_arg,

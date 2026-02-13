@@ -166,6 +166,7 @@ const MsgId = {
   CMD_ARM_TWIST: 0x02,
   HEARTBEAT: 0x03,
   MISSION_CONTROL: 0x04,
+  CMD_ARM_GRIPPER: 0x05,
   TELEM_BATTERY_1: 0x10,
   TELEM_BATTERY_2: 0x11,
   TELEM_NAV: 0x20,
@@ -645,6 +646,13 @@ function encodeMissionControl(cmd) {
   return encodeFrame(MsgId.MISSION_CONTROL, nextSeq(), payload)
 }
 
+function encodeCmdArmGripper(cmd) {
+  const payload = Buffer.alloc(8)
+  payload.writeUInt32LE(cmd.timestamp_ms >>> 0, 0)
+  payload.writeFloatLE(cmd.position_norm, 4)
+  return encodeFrame(MsgId.CMD_ARM_GRIPPER, nextSeq(), payload)
+}
+
 function encodeBaseSvin(msg) {
   // Payload: int32 mean_x/y/z cm (12), int8 mean_xhp/mean_yhp/mean_zhp (3),
   // uint8 valid, uint8 active (2), uint32 mean_acc_0p1mm, uint32 obs (8) => 25 bytes
@@ -797,6 +805,17 @@ function handleDashboardMessage(msg) {
       command,
       clear_costmap: clearCostmap,
       mission_id: missionId,
+    })
+    writeFrame(frame)
+    return
+  }
+
+  if (type === 'cmd_arm_gripper') {
+    const positionNorm = coerceNumber(msg.position_norm)
+    log(`cmd_arm_gripper rx pos_norm=${positionNorm}`)
+    const frame = encodeCmdArmGripper({
+      timestamp_ms: Date.now() >>> 0,
+      position_norm: positionNorm,
     })
     writeFrame(frame)
     return

@@ -13,6 +13,10 @@ export type CmdArmTwist = {
   ang_z_rad_s: number
 }
 
+export type CmdArmGripper = {
+  position_norm: number
+}
+
 export type MissionControl = {
   command: number
   clear_costmap: boolean
@@ -277,6 +281,13 @@ class SikGatewayClient {
     this.send({
       type: 'cmd_arm_twist',
       ...cmd,
+    })
+  }
+
+  sendCmdArmGripper(cmd: CmdArmGripper) {
+    this.send({
+      type: 'cmd_arm_gripper',
+      position_norm: cmd.position_norm,
     })
   }
 

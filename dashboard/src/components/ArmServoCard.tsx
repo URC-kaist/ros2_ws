@@ -8,6 +8,7 @@ const LIN_SCALE = 0.6 // m/s equivalent for servo twist
 const ANG_SCALE = 1.2 // rad/s equivalent for servo twist
 const DEADZONE = 0.08
 const CMD_PERIOD_MS = 50
+const GRIPPER_RATE_PER_SEC = 0.08
 
 const ArmServoCard = () => {
   const gatewayRef = useRef(getSikGatewayClient())
@@ -23,8 +24,11 @@ const ArmServoCard = () => {
     ang_z: 0,
   })
   const cmdRef = useRef(lastCmdDisplay)
+  const gripperRef = useRef(0.5)
   const hasPadRef = useRef(false)
   const controlEnabledRef = useRef(false)
+  const lastTickMsRef = useRef<number | null>(null)
+  const [gripperDisplay, setGripperDisplay] = useState(0.5)
 
   // Keep refs for animation loop
   const selectedRef = useRef<number | null>(null)
@@ -67,6 +71,10 @@ const ArmServoCard = () => {
   useEffect(() => {
     let frame = 0
     const tick = () => {
+      const nowMs = performance.now()
+      const prevMs = lastTickMsRef.current
+      lastTickMsRef.current = nowMs
+      const dtSec = prevMs == null ? 0 : Math.max(0, Math.min((nowMs - prevMs) / 1000, 0.1))
       const pads = navigator.getGamepads?.() ?? []
       const pad =
         controlEnabledRef.current && selectedRef.current != null
@@ -85,17 +93,24 @@ const ArmServoCard = () => {
         const rt = pad.buttons[7]?.value ?? 0
         const lb = pad.buttons[4]?.value ?? 0
         const rb = pad.buttons[5]?.value ?? 0
+        const dpadLeft = pad.buttons[14]?.value ?? 0
+        const dpadRight = pad.buttons[15]?.value ?? 0
 
         const lin_x = -ly * LIN_SCALE // forward/back
         const lin_y = lx * LIN_SCALE // left/right
         const lin_z = (rt - lt) * LIN_SCALE // triggers for up/down
-        const ang_z = rx * ANG_SCALE // yaw
         const ang_y = -ry * ANG_SCALE // pitch
-        const ang_x = (rb - lb) * ANG_SCALE * 0.6 // roll via bumpers
+        const ang_x = rx * ANG_SCALE // roll
+        const ang_z = (Math.max(0, dpadRight) - Math.max(0, dpadLeft)) * ANG_SCALE // yaw
 
         const next = { lin_x, lin_y, lin_z, ang_x, ang_y, ang_z }
         cmdRef.current = next
         setLastCmdDisplay(next)
+
+        const gripAxis = Math.max(0, rb) - Math.max(0, lb)
+        const nextGrip = Math.min(1, Math.max(0, gripperRef.current + gripAxis * GRIPPER_RATE_PER_SEC * dtSec))
+        gripperRef.current = nextGrip
+        setGripperDisplay(nextGrip)
       } else {
         if (hasPadRef.current) {
           hasPadRef.current = false
@@ -104,6 +119,7 @@ const ArmServoCard = () => {
         const zero = { lin_x: 0, lin_y: 0, lin_z: 0, ang_x: 0, ang_y: 0, ang_z: 0 }
         cmdRef.current = zero
         setLastCmdDisplay(zero)
+        lastTickMsRef.current = null
       }
       frame = requestAnimationFrame(tick)
     }
@@ -123,6 +139,11 @@ const ArmServoCard = () => {
         ang_y_rad_s: cmd.ang_y,
         ang_z_rad_s: cmd.ang_z,
       })
+      if (controlEnabledRef.current) {
+        gatewayRef.current.sendCmdArmGripper({
+          position_norm: gripperRef.current,
+        })
+      }
     }, CMD_PERIOD_MS)
     return () => window.clearInterval(timer)
   }, [])
@@ -149,6 +170,7 @@ const ArmServoCard = () => {
               cmdRef.current = zero
               setLastCmdDisplay(zero)
               setConnected(false)
+              lastTickMsRef.current = null
             }
           }}
         >
@@ -186,8 +208,15 @@ const ArmServoCard = () => {
         </div>
       </div>
 
+      <div>
+        <p className="arm-card__label">Gripper (normalized)</p>
+        <div className="arm-card__values">
+          <span>Pos {gripperDisplay.toFixed(2)}</span>
+        </div>
+      </div>
+
       <p className="arm-card__hint">
-        LS: XY, Triggers: Z, RS: yaw/pitch, Bumpers: roll
+        LS: XY, Triggers: Z, RS: pitch/roll, D-pad left/right: yaw, Bumpers: gripper
       </p>
     </article>
   )
