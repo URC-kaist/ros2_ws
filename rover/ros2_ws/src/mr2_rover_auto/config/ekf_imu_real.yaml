@@ -1,0 +1,54 @@
+ekf_local: # for short range (wheel odom + imu)
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.1
+    two_d_mode: false # Consider in 3D; testing
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # IMU (Realsense D435i)
+    imu0: /rgbd_camera/imu # Check if tf is sane (in terms of coordinate convention)
+    imu0_config: [false, false, false, true, true, false, # orientation
+                  true, true, true, true, true, true, # vel and gyro
+                  true, true, true] # acceleration
+    imu0_queue_size: 32 # <= 960 Hz
+    imu0_differential: false # using navsat
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true
+    gravitational_acceleration: 9.80393328 # G_ACC; Value depends on where you are
+
+    publish_tf: true # ekf_local tf: odom -> base_link
+    permit_corrected_publication: true # compensate delayed GNSS data
+    print_diagnostics: true # true for debugging with /diagnostics topic
+    debug: false
+
+    use_control: false # if true, internally used for acceleration term
+
+    # Recall: What are covariances in KF?
+    # P: the estimation of state variance (how reliable is my prediction?)
+    # Q: the estimation of process variance (outside noise modelled as Gaussian)
+    # R: the inherent sensor noise (Written in /rgbd_camera/imu and /fix)
+    
+    # Then why "co"variance? Because there are correlations everywhere. -> matrix
+
+    # Here we set Q, the metric of "how noizy the environment is"
+    # Position, velocity, acceleration: high Q for rough terrain
+    process_noise_covariance: [ # XXX This has to be tuned properly.
+      0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # x
+      0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # y
+      0.0,  0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # z
+      0.0,  0.0,  0.0,  0.1,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # roll
+      0.0,  0.0,  0.0,  0.0,  0.1,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # pitch
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # yaw
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # vx
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # vy
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  # vz
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.1,  0.0,  0.0,  0.0,  0.0,  0.0,  # vroll
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.1,  0.0,  0.0,  0.0,  0.0,  # vpitch
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.05,0.0,  0.0,  0.0,  # vyaw
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  0.0,  # Ax (m^2/s^4)
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1, 0.0,  # Ay
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-1] # Az
