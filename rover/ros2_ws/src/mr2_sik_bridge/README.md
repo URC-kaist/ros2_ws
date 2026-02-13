@@ -28,6 +28,7 @@ Notes:
 - `0x02` CMD_ARM_TWIST
 - `0x03` HEARTBEAT
 - `0x04` MISSION_CONTROL
+- `0x05` CMD_ARM_GRIPPER
 - `0x10` TELEM_BATTERY_1
 - `0x11` TELEM_BATTERY_2
 - `0x20` TELEM_NAV
@@ -90,6 +91,18 @@ Payload size: 6 bytes
 
 ROS mapping: `mr2_action_interface/MissionControl`
 - `command`, `clear_costmap`, `mission_id` mapped 1:1.
+
+### CMD_ARM_GRIPPER (msg_id 0x05)
+Payload size: 8 bytes
+
+- `uint32 timestamp_ms`
+- `float32 position_norm` (expected range `0.0..1.0`)
+
+ROS mapping: `std_msgs/Float64MultiArray` (single element)
+- Published on `gripper_cmd_topic` (default `/gripper_controller/commands`)
+- Converted to radians with bridge params:
+  - `gripper_min_position_rad` (default `0.0`)
+  - `gripper_max_position_rad` (default `1.0`)
 
 ### TELEM_BATTERY_1 / TELEM_BATTERY_2 (msg_id 0x10 / 0x11)
 Payload size: 16 bytes
@@ -164,11 +177,11 @@ rover before publishing a single `rtcm_msgs/Message` on `/base/rtcm`.
 Header: `mr2_sik_bridge/packets.hpp`
 
 Key functions:
-- `encode_cmd_drive`, `encode_cmd_arm_twist`, `encode_heartbeat`,
+- `encode_cmd_drive`, `encode_cmd_arm_twist`, `encode_cmd_arm_gripper`, `encode_heartbeat`,
   `encode_mission_control`, `encode_telem_battery` (battery 1 by default) /
   `encode_telem_battery` with `battery_id`, `encode_telem_nav`
 - `decode_frame` (validates magic, size, CRC)
-- `decode_cmd_drive`, `decode_cmd_arm_twist`, `decode_heartbeat`,
+- `decode_cmd_drive`, `decode_cmd_arm_twist`, `decode_cmd_arm_gripper`, `decode_heartbeat`,
   `decode_mission_control`, `decode_telem_battery`, `decode_telem_nav`
 
 ## Behavior Expectations (out of scope for this package)
@@ -176,5 +189,5 @@ Key functions:
 This package does not implement serial I/O, timeouts, or ROS publishers.
 A higher-level SiK bridge node should:
 - Enforce heartbeat timeouts and publish zero commands on loss.
-- Map decoded drive/arm commands into ROS topics.
+- Map decoded drive/arm/gripper commands into ROS topics.
 - Convert ROS battery telemetry into the compact payload above.

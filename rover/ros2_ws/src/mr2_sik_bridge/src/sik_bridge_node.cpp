@@ -27,6 +27,7 @@
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include "ublox_ubx_msgs/msg/ubx_nav_svin.hpp"
 #include "rtcm_msgs/msg/message.hpp"
 
@@ -39,6 +40,7 @@ using mr2_sik_bridge::Heartbeat;
 using mr2_sik_bridge::MissionControl;
 using mr2_sik_bridge::TelemBattery;
 using mr2_sik_bridge::TelemNav;
+using mr2_sik_bridge::CmdArmGripper;
 
 class SikBridgeNode : public rclcpp::Node {
  public:
@@ -61,6 +63,12 @@ class SikBridgeNode : public rclcpp::Node {
             "mission_control_topic", "/mission_control")),
         arm_twist_topic_(declare_parameter<std::string>(
             "arm_twist_topic", "/moveit_servo/delta_twist_cmds")),
+        gripper_cmd_topic_(declare_parameter<std::string>(
+            "gripper_cmd_topic", "/gripper_controller/commands")),
+        gripper_min_position_rad_(
+            declare_parameter<double>("gripper_min_position_rad", 0.0)),
+        gripper_max_position_rad_(
+            declare_parameter<double>("gripper_max_position_rad", 1.0)),
         arm_frame_id_(declare_parameter<std::string>("arm_frame_id", "base_link")),
         nav_fix_topic_(
             declare_parameter<std::string>("nav_fix_topic", "/gps/filtered")),
@@ -81,6 +89,8 @@ class SikBridgeNode : public rclcpp::Node {
             mission_control_topic_, 10);
     arm_twist_pub_ =
         create_publisher<geometry_msgs::msg::TwistStamped>(arm_twist_topic_, 10);
+    gripper_cmd_pub_ =
+        create_publisher<std_msgs::msg::Float64MultiArray>(gripper_cmd_topic_, 10);
     base_svin_pub_ = create_publisher<ublox_ubx_msgs::msg::UBXNavSvin>(
         base_svin_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
     base_rtcm_pub_ = create_publisher<rtcm_msgs::msg::Message>(
@@ -328,6 +338,13 @@ class SikBridgeNode : public rclcpp::Node {
         }
         break;
       }
+      case mr2_sik_bridge::MsgId::kCmdArmGripper: {
+        auto cmd = mr2_sik_bridge::decode_cmd_arm_gripper(frame);
+        if (cmd) {
+          handle_cmd_arm_gripper_(*cmd);
+        }
+        break;
+      }
       case mr2_sik_bridge::MsgId::kBaseSvin: {
         auto svin = mr2_sik_bridge::decode_base_svin(frame);
         if (svin && base_svin_pub_) {
@@ -414,6 +431,26 @@ class SikBridgeNode : public rclcpp::Node {
                            "CMD_ARM_TWIST lin=(%.3f, %.3f, %.3f) ang=(%.3f, %.3f, %.3f)",
                            cmd.lin_x_m_s, cmd.lin_y_m_s, cmd.lin_z_m_s,
                            cmd.ang_x_rad_s, cmd.ang_y_rad_s, cmd.ang_z_rad_s);
+    }
+  }
+
+  void handle_cmd_arm_gripper_(const CmdArmGripper &cmd) {
+    if (!gripper_cmd_pub_) {
+      return;
+    }
+    const double clipped_norm =
+        std::max(0.0, std::min(1.0, static_cast<double>(cmd.position_norm)));
+    const double min_pos = std::min(gripper_min_position_rad_, gripper_max_position_rad_);
+    const double max_pos = std::max(gripper_min_position_rad_, gripper_max_position_rad_);
+    const double target = min_pos + clipped_norm * (max_pos - min_pos);
+
+    std_msgs::msg::Float64MultiArray msg;
+    msg.data.push_back(target);
+    gripper_cmd_pub_->publish(msg);
+    if (log_frames_) {
+      RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+                           "CMD_ARM_GRIPPER norm=%.3f target=%.3f",
+                           clipped_norm, target);
     }
   }
 
@@ -639,6 +676,9 @@ class SikBridgeNode : public rclcpp::Node {
   std::string cmd_vel_topic_;
   std::string mission_control_topic_;
   std::string arm_twist_topic_;
+  std::string gripper_cmd_topic_;
+  double gripper_min_position_rad_;
+  double gripper_max_position_rad_;
   std::string arm_frame_id_;
   std::string nav_fix_topic_;
   std::string odom_topic_;
@@ -653,6 +693,7 @@ class SikBridgeNode : public rclcpp::Node {
   rclcpp::Publisher<mr2_action_interface::msg::MissionControl>::SharedPtr
       mission_control_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr arm_twist_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_cmd_pub_;
   rclcpp::Publisher<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr base_svin_pub_;
   rclcpp::Publisher<rtcm_msgs::msg::Message>::SharedPtr base_rtcm_pub_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr

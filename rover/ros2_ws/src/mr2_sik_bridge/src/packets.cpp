@@ -216,6 +216,23 @@ std::vector<uint8_t> encode_mission_control(uint8_t seq,
   return finalize_frame(header, payload);
 }
 
+std::vector<uint8_t> encode_cmd_arm_gripper(uint8_t seq,
+                                            const CmdArmGripper &cmd) {
+  std::vector<uint8_t> payload;
+  payload.reserve(8);
+  ByteWriter writer(&payload);
+  writer.write_u32(cmd.timestamp_ms);
+  writer.write_f32(cmd.position_norm);
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kCmdArmGripper;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
 std::vector<uint8_t> encode_telem_battery(uint8_t seq,
                                           const TelemBattery &telem) {
   return encode_telem_battery(seq, telem, 1);
@@ -420,6 +437,21 @@ std::optional<MissionControl> decode_mission_control(const Frame &frame) {
   }
   ctrl.clear_costmap = (clear != 0);
   return ctrl;
+}
+
+std::optional<CmdArmGripper> decode_cmd_arm_gripper(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kCmdArmGripper ||
+      frame.payload.size() != 8) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  CmdArmGripper cmd;
+  if (!reader.read_u32(&cmd.timestamp_ms) ||
+      !reader.read_f32(&cmd.position_norm)) {
+    return std::nullopt;
+  }
+  return cmd;
 }
 
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame) {

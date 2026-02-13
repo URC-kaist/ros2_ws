@@ -56,6 +56,11 @@ def generate_launch_description():
         ),
         description="Controller manager YAML shared by sim and hardware",
     )
+    controller_spawn_delay_arg = DeclareLaunchArgument(
+        "controller_spawn_delay",
+        default_value="10.0",
+        description="Delay (seconds) before spawning ros2_control controllers",
+    )
     can_iface_arg = DeclareLaunchArgument(
         "can_iface",
         default_value="can0",
@@ -300,6 +305,7 @@ def generate_launch_description():
             "rviz_config": LaunchConfiguration("rviz_config"),
             "headless": LaunchConfiguration("headless"),
             "controller_config": LaunchConfiguration("controller_config"),
+            "controller_spawn_delay": LaunchConfiguration("controller_spawn_delay"),
             "can_iface": LaunchConfiguration("can_iface"),
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
             "enable_manipulator": LaunchConfiguration("enable_manipulator"),
@@ -481,6 +487,7 @@ def generate_launch_description():
             rviz_arg,
             headless_arg,
             controller_config_arg,
+            controller_spawn_delay_arg,
             can_iface_arg,
             use_mock_servos_arg,
             enable_manipulator_arg,
