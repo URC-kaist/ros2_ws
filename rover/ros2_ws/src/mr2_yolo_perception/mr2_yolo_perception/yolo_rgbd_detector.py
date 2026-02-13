@@ -23,7 +23,7 @@ class YoloRgbdDetector(Node):
         super().__init__("yolo_rgbd_detector")
 
         self.declare_parameter("rgb_topic", "/rgbd_camera/color/image_raw")
-        self.declare_parameter("depth_topic", "/rgbd_camera/depth/image_rect_raw")
+        self.declare_parameter("depth_topic", "/rgbd_camera/aligned_depth_to_color/image_raw")
         self.declare_parameter("camera_info_topic", "/rgbd_camera/color/camera_info")
         self.declare_parameter("annotated_topic", "yolo/annotated_image")
         self.declare_parameter("pose_topic", "yolo/object_pose")
@@ -401,9 +401,9 @@ class YoloRgbdDetector(Node):
             x1, y1, x2, y2 = bbox
             depth = self._depth_at_bbox(depth_m, bbox)
             if depth is None or math.isnan(depth):
-                self.get_logger().warn(
-                    f"No valid depth at detection for class {class_id}"
-                )
+                # self.get_logger().warn(
+                #     f"No valid depth at detection for class {class_id}"
+                # )
                 continue
 
             u = (x1 + x2) * 0.5

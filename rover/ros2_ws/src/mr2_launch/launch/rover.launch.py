@@ -236,10 +236,13 @@ def generate_launch_description():
         ["'", LaunchConfiguration("yolo_cam_topic"), "/color/image_raw'"]
     )
     yolo_depth_topic = PythonExpression(
-        ["'", LaunchConfiguration("yolo_cam_topic"), "/depth/image_rect_raw'"]
+        ["'", LaunchConfiguration("yolo_cam_topic"), "/aligned_depth_to_color/image_raw'"]
     )
     yolo_camera_info_topic = PythonExpression(
         ["'", LaunchConfiguration("yolo_cam_topic"), "/color/camera_info'"]
+    )
+    camera_frame_is_optical = PythonExpression(
+        ["'true' if '", LaunchConfiguration("mode"), "' == 'real' else 'false'"]
     )
 
     yolo_detector = Node(
@@ -255,7 +258,7 @@ def generate_launch_description():
                 "camera_info_topic": yolo_camera_info_topic,
                 "annotated_topic": "yolo/annotated_image",
                 "pose_topic": "yolo/object_pose",
-                "camera_frame_is_optical": False,
+                "camera_frame_is_optical": camera_frame_is_optical,
                 "class_id_map": "0:2,1:0,2:1",
                 "use_sim_time": LaunchConfiguration("use_sim_time"),
             }

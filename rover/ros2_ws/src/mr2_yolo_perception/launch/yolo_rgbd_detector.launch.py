@@ -32,7 +32,7 @@ def _launch_setup(context, *args, **kwargs):
             parameters=[
                 {
                     "rgb_topic": "/rgbd_camera/color/image_raw",
-                    "depth_topic": "/rgbd_camera/depth/image_rect_raw",
+                    "depth_topic": "/rgbd_camera/aligned_depth_to_color/image_raw",
                     "camera_info_topic": "/rgbd_camera/color/camera_info",
                     "annotated_topic": "yolo/annotated_image",
                     "pose_topic": "yolo/object_pose",
