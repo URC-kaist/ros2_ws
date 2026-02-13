@@ -87,11 +87,6 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
-    localization_delay_arg = DeclareLaunchArgument(
-        "localization_delay",
-        default_value="2.0",
-        description="Delay (seconds) before starting localization stack",
-    )
     sik_sim_device_arg = DeclareLaunchArgument(
         "sik_sim_device",
         default_value="/tmp/sik_sim0",
@@ -205,7 +200,7 @@ def generate_launch_description():
     )
 
     localization_launch = TimerAction(
-        period=LaunchConfiguration("localization_delay"),
+        period=2.0,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -419,7 +414,6 @@ def generate_launch_description():
         enable_manipulator_arg,
         enable_manipulator_sim_arg,
         use_servo_arg,
-        localization_delay_arg,
         sik_sim_device_arg,
         sik_sim_peer_arg,
         sik_sim_baud_arg,

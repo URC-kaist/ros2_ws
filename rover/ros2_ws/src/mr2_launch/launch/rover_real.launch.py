@@ -81,11 +81,6 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
-    localization_delay_arg = DeclareLaunchArgument(
-        "localization_delay",
-        default_value="35.0",
-        description="Delay (seconds) before starting localization in real mode",
-    )
     enable_front_camera_arg = DeclareLaunchArgument(
         "enable_front_camera",
         default_value="true",
@@ -315,7 +310,6 @@ def generate_launch_description():
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
             "enable_manipulator": LaunchConfiguration("enable_manipulator"),
             "use_servo": LaunchConfiguration("use_servo"),
-            "localization_delay": LaunchConfiguration("localization_delay"),
             "sik_device": LaunchConfiguration("sik_device"),
             "sik_baud": LaunchConfiguration("sik_baud"),
             "sik_sim_device": LaunchConfiguration("sik_sim_device"),
@@ -498,7 +492,6 @@ def generate_launch_description():
             use_mock_servos_arg,
             enable_manipulator_arg,
             use_servo_arg,
-            localization_delay_arg,
             enable_sik_sim_arg,
             sik_sim_device_arg,
             sik_sim_peer_arg,
