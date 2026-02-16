@@ -5,6 +5,7 @@ from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+
 def generate_launch_description():
     mr2_launch_share = FindPackageShare("mr2_launch")
     rover_description_share = FindPackageShare("mr2_rover_description")
@@ -21,37 +22,44 @@ def generate_launch_description():
         output="screen",
     )
 
-    include_real_launch = IncludeLaunchDescription(
+    real_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [PathJoinSubstitution([rover_description_share, "launch", "real.launch.py"])]
-        )
+        ),
+        launch_arguments={
+            "enable_manipulator": "false",
+        }.items(),
     )
 
-    include_realsense_rgbd_launch = IncludeLaunchDescription(
+    realsense_rgbd_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [PathJoinSubstitution([mr2_launch_share, "launch", "realsense_rgbd.launch.py"])]
         )
     )
 
-    include_local_imu_launch = IncludeLaunchDescription(
+    local_imu_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [PathJoinSubstitution([rover_auto_share, "launch", "local_imu.launch.py"])]
         )
     )
 
-    include_traversability_pipeline_launch = IncludeLaunchDescription(
+    traversability_pipeline_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            [PathJoinSubstitution([rover_auto_share, "launch", "traversability_pipeline.launch.py"])]
+            [
+                PathJoinSubstitution(
+                    [rover_auto_share, "launch", "traversability_pipeline.launch.py"]
+                )
+            ]
         )
     )
 
-    include_front_uvc_camera_launch = IncludeLaunchDescription(
+    front_uvc_camera_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [PathJoinSubstitution([mr2_launch_share, "launch", "front_uvc_camera.launch.py"])]
         )
     )
 
-    include_vision_ablation_launch = IncludeLaunchDescription(
+    vision_ablation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [PathJoinSubstitution([rover_auto_share, "launch", "vision_ablation.launch.py"])]
         ),
@@ -62,12 +70,14 @@ def generate_launch_description():
         }.items(),
     )
 
-    return LaunchDescription([
-        rviz2,
-        include_real_launch,
-        include_realsense_rgbd_launch,
-        include_local_imu_launch,
-        include_traversability_pipeline_launch,
-        include_front_uvc_camera_launch,
-        include_vision_ablation_launch
-    ])
+    return LaunchDescription(
+        [
+            rviz2,
+            real_launch,
+            realsense_rgbd_launch,
+            local_imu_launch,
+            traversability_pipeline_launch,
+            front_uvc_camera_launch,
+            vision_ablation_launch,
+        ]
+    )

@@ -57,10 +57,9 @@ grid_map_filters:
         name: surface_normals
         type: gridMapFilters/NormalVectorsFilter
         params:
-          # Use the smoothed height map to make normals flatter on nominal ground.
-          input_layer:              elevation_smooth
+          input_layer:              elevation_inpainted
           output_layers_prefix:     normal_vectors_
-          radius:                   0.4
+          radius:                   0.2
           normal_vector_positive_axis: z
 
       filter5:  # 법선 벡터를 색상으로 시각화
