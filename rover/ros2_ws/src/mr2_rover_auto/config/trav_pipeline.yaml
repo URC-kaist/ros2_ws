@@ -92,7 +92,7 @@ grid_map_filters:
           output_layer: traversability # NOTE: tune for real (#34)
           # We define step obstructiveness as a criteria for lethal obstacle:
           # slope: >0.5 radian is lethal (if roughness >0.1). roughness: >0.1 is lethal.
-          expression: "cwiseMax( (2.0 ./ (1 + exp(-50 * (slope - 0.5)))) .* (1.0 ./ (1 + exp(-200 * (roughness - 0.1)))) , 2.0 ./ (1 + exp(-50 * (roughness - 0.1))) )"
+          expression: "0 .* cwiseMax( (2.0 ./ (1 + exp(-50 * (slope - 0.5)))) .* (1.0 ./ (1 + exp(-200 * (roughness - 0.1)))) , 2.0 ./ (1 + exp(-50 * (roughness - 0.1))) )"
 
       filter9:  # 하한(0) 클램핑
         name: traversability_lower_threshold

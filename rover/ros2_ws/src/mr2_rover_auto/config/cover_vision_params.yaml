@@ -19,13 +19,15 @@ cover_vision_server:
     # Detection handling
     detection_stale_sec: 0.75
     detection_pose_topic: cover_vision/object_pose
+    detection_pose_topic_aruco: cover_vision/object_pose/aruco
+    detection_pose_topic_yolo: cover_vision/object_pose/yolo
 
 cover_vision_yolo_adapter:
   ros__parameters:
     use_sim_time: true
     map_frame: map
     mission_status_topic: mission_status
-    output_topic: cover_vision/object_pose
+    output_topic: cover_vision/object_pose/yolo
     yolo_pose_topic_prefix: yolo/object_pose
     force_enable: false
     forced_class_id: 0
@@ -39,7 +41,7 @@ cover_vision_aruco_adapter:
     use_sim_time: true
     map_frame: map
     mission_status_topic: mission_status
-    output_topic: cover_vision/object_pose
+    output_topic: cover_vision/object_pose/aruco
     aruco_detections_topic: aruco_detections
     prefer_boards: true
     preferred_board_name: aruco_post

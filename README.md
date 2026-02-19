@@ -115,7 +115,7 @@ Publish a CoverVision mission with ArUco:
 ```bash
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
-    {mission_id: 5, mission_type: 2, detection_method: 2, object_type: 0,
+    {mission_id: 5, mission_type: 2, detection_method: 1, object_type: 0,
      target_latitude: 38.4065, target_longitude: -110.7900,
      target_radius: 5.0, waypoint_count: 0}
   ]
@@ -126,9 +126,9 @@ Publish a CoverVision mission with ArUco and then YOLO:
 ```bash
 ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
   missions: [
-    {mission_id: 4, mission_type: 1, detection_method: 1, object_type: 0,
+    {mission_id: 4, mission_type: 2, detection_method: 1, object_type: 0,
      target_latitude: 38.40645496, target_longitude: -110.7900,
-     target_radius: 0.0, waypoint_count: 0},
+     target_radius: 5.0, waypoint_count: 0},
     {mission_id: 5, mission_type: 2, detection_method: 2, object_type: 0,
      target_latitude: 38.4065, target_longitude: -110.7900,
      target_radius: 5.0, waypoint_count: 0}
@@ -163,19 +163,21 @@ ros2 service call /fromLL robot_localization/srv/FromLL "{ll_point: {latitude: 3
 
 ### Vision Topics (ArUco + YOLO)
 
-CoverVision mission consumes a single "mission-level" detection topic:
-- `cover_vision/object_pose` (`geometry_msgs/PoseStamped`, **must be in `map` frame**)
+CoverVision mission consumes detection topics selected by `detection_method`:
+- ArUco (`detection_method=1`): `cover_vision/object_pose/aruco`
+- YOLO (`detection_method=2`): `cover_vision/object_pose/yolo`
 
-Adapters (launched by `mr2_rover_auto/launch/action.launch.py`) bridge perception into that topic:
-- YOLO adapter node: `cover_vision_yolo_adapter` subscribes `yolo/object_pose/class_<object_type>` -> publishes `cover_vision/object_pose`
-- ArUco adapter node: `cover_vision_aruco_adapter` subscribes `aruco_detections` -> publishes `cover_vision/object_pose`
+Adapters (launched by `mr2_rover_auto/launch/action.launch.py`) bridge perception into those mission-level topics:
+- YOLO adapter node: `cover_vision_yolo_adapter` subscribes `yolo/object_pose/class_<object_type>` -> publishes `cover_vision/object_pose/yolo`
+- ArUco adapter node: `cover_vision_aruco_adapter` subscribes `aruco_detections` -> publishes `cover_vision/object_pose/aruco`
 
 CoverVision coverage path (for RViz/debug):
 - `cover_vision/coverage_path` (`nav_msgs/Path`, latched / transient-local)
 
 Monitor mission-level detection:
 ```bash
-ros2 topic echo /cover_vision/object_pose
+ros2 topic echo /cover_vision/object_pose/aruco
+ros2 topic echo /cover_vision/object_pose/yolo
 ros2 topic echo /cover_vision/coverage_path
 ```
 

@@ -49,6 +49,7 @@ def generate_launch_description():
             name='cover_vision_yolo_adapter',
             output='screen',
             parameters=[
+                LaunchConfiguration("cover_vision_params"),
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
         ),
@@ -59,6 +60,7 @@ def generate_launch_description():
             name='cover_vision_aruco_adapter',
             output='screen',
             parameters=[
+                LaunchConfiguration("cover_vision_params"),
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
         ),

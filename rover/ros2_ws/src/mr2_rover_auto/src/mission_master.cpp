@@ -308,6 +308,12 @@ private:
     goal.target_radius = spec.target_radius;
     goal.detection_method = spec.detection_method;
     goal.object_type = spec.object_type;
+    RCLCPP_INFO(
+      get_logger(),
+      "MissionMaster: CoverVision mission_id=%d detection_method=%u object_type=%d",
+      spec.mission_id,
+      static_cast<unsigned>(spec.detection_method),
+      spec.object_type);
 
     auto opts = rclcpp_action::Client<CoverVision>::SendGoalOptions();
     opts.goal_response_callback =

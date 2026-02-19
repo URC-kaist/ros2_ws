@@ -138,6 +138,10 @@ public:
     detection_stale_sec_ = this->declare_parameter<double>("detection_stale_sec", 0.75);
     detection_pose_topic_ =
       this->declare_parameter<std::string>("detection_pose_topic", "cover_vision/object_pose");
+    detection_pose_topic_aruco_ =
+      this->declare_parameter<std::string>("detection_pose_topic_aruco", detection_pose_topic_);
+    detection_pose_topic_yolo_ =
+      this->declare_parameter<std::string>("detection_pose_topic_yolo", detection_pose_topic_);
 
     nav_client_ = rclcpp_action::create_client<NavToPose>(this, nav_action_name_);
     nav_through_client_ = rclcpp_action::create_client<NavThroughPoses>(this, nav_through_action_name_);
@@ -194,6 +198,8 @@ private:
   size_t spiral_max_points_{5000};
   double detection_stale_sec_{0.75};
   std::string detection_pose_topic_;
+  std::string detection_pose_topic_aruco_;
+  std::string detection_pose_topic_yolo_;
   double tf_timeout_sec_{0.2};
 
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr coverage_path_pub_;
@@ -277,6 +283,17 @@ private:
     return true;
   }
 
+  const std::string & detection_topic_for_method(uint8_t detection_method) const
+  {
+    if (detection_method == DET_ARUCO) {
+      return detection_pose_topic_aruco_;
+    }
+    if (detection_method == DET_YOLO) {
+      return detection_pose_topic_yolo_;
+    }
+    return detection_pose_topic_;
+  }
+
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID &,
     std::shared_ptr<const CoverVision::Goal> goal)
@@ -287,6 +304,11 @@ private:
     }
     if (!std::isfinite(goal->target_radius) || goal->target_radius < 0.0) {
       RCLCPP_WARN(get_logger(), "Rejecting CoverVision goal: invalid target_radius");
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+    if (goal->detection_method > DET_YOLO) {
+      RCLCPP_WARN(get_logger(), "Rejecting CoverVision goal: invalid detection_method=%u",
+                  static_cast<unsigned>(goal->detection_method));
       return rclcpp_action::GoalResponse::REJECT;
     }
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
@@ -454,7 +476,9 @@ private:
       return;
     }
 
-    const bool detection_enabled = (goal->detection_method != DET_NONE);
+    const uint8_t detection_method = goal->detection_method;
+    const bool detection_enabled = (detection_method != DET_NONE);
+    const std::string detection_topic = detection_topic_for_method(detection_method);
     const double search_radius_m = std::max(0.0, goal->target_radius);
     auto search_radius_reached =
       detection_enabled ? std::make_shared<std::atomic<bool>>(false) : nullptr;
@@ -467,7 +491,7 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr detection_sub;
     if (detection_enabled) {
       detection_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-        detection_pose_topic_, 10,
+        detection_topic, 10,
         [this, det, center, search_radius_m, search_radius_reached](const geometry_msgs::msg::PoseStamped::SharedPtr msg)
         {
           if (!msg) {
@@ -497,8 +521,10 @@ private:
           det->stamp = rclcpp::Time(msg->header.stamp);
           det->pose_map = pose_map;
         });
-      RCLCPP_INFO(get_logger(), "CoverVision: listening for mission detection pose on %s",
-                  detection_pose_topic_.c_str());
+      RCLCPP_INFO(
+        get_logger(),
+        "CoverVision: listening for detection_method=%u on %s",
+        static_cast<unsigned>(detection_method), detection_topic.c_str());
     }
 
     // 2) Generate spiral poses in map frame.
