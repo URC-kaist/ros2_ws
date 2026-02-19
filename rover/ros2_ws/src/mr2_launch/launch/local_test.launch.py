@@ -27,7 +27,7 @@ def generate_launch_description():
             [PathJoinSubstitution([rover_description_share, "launch", "real.launch.py"])]
         ),
         launch_arguments={
-            "enable_manipulator": "false",
+            "enable_manipulator_module": "false",
         }.items(),
     )
 
