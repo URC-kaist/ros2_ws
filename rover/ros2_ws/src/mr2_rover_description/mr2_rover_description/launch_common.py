@@ -1,3 +1,4 @@
+from numbers import Real
 from typing import Iterable, List, Mapping, Sequence
 
 from launch.actions import DeclareLaunchArgument, TimerAction
@@ -78,18 +79,17 @@ def controller_spawners(
 ):
     """Create staggered controller spawner TimerActions for a list of controllers."""
     actions = []
-    for idx, name in enumerate(controller_names):
+    for index, name in enumerate(controller_names):
+        if isinstance(start_after, Real):
+            delay = float(start_after) + (index * interval)
+        else:
+            delay = PythonExpression([start_after, f" + {index * interval}"])
         args = [name]
         if name in inactive_controllers:
             args.append("--inactive")
-        if isinstance(start_after, (int, float)):
-            period = start_after + (interval * idx)
-        else:
-            offset = interval * idx
-            period = start_after if offset == 0 else PythonExpression([start_after, f" + {offset}"])
         actions.append(
             TimerAction(
-                period=period,
+                period=delay,
                 actions=[
                     Node(
                         package="controller_manager",

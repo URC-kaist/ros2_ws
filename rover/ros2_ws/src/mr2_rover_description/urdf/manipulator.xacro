@@ -6,7 +6,7 @@
   <!-- <xacro:property name="arm_j1_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j1_upper_limit" value="100"/> -->
   <xacro:property name="arm_j2_lower_limit" value="-0.645"/>
-  <xacro:property name="arm_j2_upper_limit" value="1.57"/>
+  <xacro:property name="arm_j2_upper_limit" value="1.7"/>
   <!-- <xacro:property name="arm_j2_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j2_upper_limit" value="100"/> -->
   <xacro:property name="arm_j3_lower_limit" value="-2"/>

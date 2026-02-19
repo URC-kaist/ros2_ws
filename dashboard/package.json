@@ -11,6 +11,8 @@
     "typecheck": "tsc -p tsconfig.app.json"
   },
   "dependencies": {
+    "@fontsource/dm-mono": "^5.2.7",
+    "@fontsource/space-grotesk": "^5.2.10",
     "@transitive-sdk/utils-web": "^0.14.14",
     "bootstrap": "^5.3.3",
     "maplibre-gl": "^4.7.1",
