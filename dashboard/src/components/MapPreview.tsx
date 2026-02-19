@@ -5,6 +5,14 @@ import { getRosBridgeClient } from '../lib/rosBridge'
 import { getSikGatewayClient } from '../lib/sikGateway'
 
 type PoseStamped = {
+  header?: {
+    stamp?: {
+      sec?: number
+      nanosec?: number
+      secs?: number
+      nsecs?: number
+    }
+  }
   pose?: {
     position?: {
       x?: number
@@ -45,6 +53,11 @@ const MISSION_CIRCLE_STEPS = 64
 const WGS84_A = 6378137
 const RAD_TO_DEG = 180 / Math.PI
 const DEG_TO_RAD = Math.PI / 180
+const COVER_VISION_OBJECT_TOPICS = [
+  '/cover_vision/object_pose/aruco',
+  '/cover_vision/object_pose/yolo',
+  '/cover_vision/object_pose',
+] as const
 
 type MapPreviewProps = {
   missionList?: MissionSpec[]
@@ -77,6 +90,7 @@ const MapPreview = ({
   const smoothedGeoRawRef = useRef<GeoPathMsg | null>(null)
   const coverageGeoRawRef = useRef<GeoPathMsg | null>(null)
   const objectRawRef = useRef<PoseStamped | null>(null)
+  const objectStampMsRef = useRef(0)
   const toLLCacheRef = useRef<Map<string, [number, number]>>(new Map())
   const objectReqRef = useRef(0)
 
@@ -519,23 +533,39 @@ const MapPreview = ({
       },
       { throttleRate: 250 }
     )
-    const unsubObject = ros.subscribe<PoseStamped>(
-      '/cover_vision/object_pose',
-      'geometry_msgs/msg/PoseStamped',
-      (msg) => {
-        objectRawRef.current = msg
-        const reqId = ++objectReqRef.current
-        void convertPose(msg).then((coord) => {
-          if (reqId !== objectReqRef.current) return
-          if (coord) setObjectPose(coord)
-        })
-      },
-      { throttleRate: 250 }
+
+    const getStampMs = (msg: PoseStamped | null): number => {
+      const stamp = msg?.header?.stamp
+      const sec = Number(stamp?.sec ?? stamp?.secs)
+      const nanosec = Number(stamp?.nanosec ?? stamp?.nsecs)
+      if (!Number.isFinite(sec)) return 0
+      const nanos = Number.isFinite(nanosec) ? nanosec : 0
+      return sec * 1000 + nanos / 1e6
+    }
+    const onObjectPose = (msg: PoseStamped) => {
+      const stampMs = getStampMs(msg)
+      if (stampMs > 0 && stampMs < objectStampMsRef.current) return
+      objectStampMsRef.current = stampMs > 0 ? stampMs : Date.now()
+      objectRawRef.current = msg
+      const reqId = ++objectReqRef.current
+      void convertPose(msg).then((coord) => {
+        if (reqId !== objectReqRef.current) return
+        if (coord) setObjectPose(coord)
+      })
+    }
+
+    const objectUnsubs = COVER_VISION_OBJECT_TOPICS.map((topic) =>
+      ros.subscribe<PoseStamped>(
+        topic,
+        'geometry_msgs/msg/PoseStamped',
+        onObjectPose,
+        { throttleRate: 250 }
+      )
     )
     return () => {
       unsubPlanSmoothedGeo()
       unsubCoverageGeo()
-      unsubObject()
+      objectUnsubs.forEach((unsub) => unsub())
     }
   }, [])
 

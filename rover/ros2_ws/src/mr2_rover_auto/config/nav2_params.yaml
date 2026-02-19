@@ -101,14 +101,14 @@ controller_server:
       yaw_goal_tolerance: 0.05
     PathHandler:
       plugin: "nav2_controller::FeasiblePathHandler"
-      prune_distance: 6.0 # MPPI; > v_max * N * dt
+      prune_distance: 2.0 # MPPI; > v_max * N * dt
     FollowPath: # MPPI
       # https://github.com/ros-navigation/navigation2/tree/main/nav2_mppi_controller
       plugin: "nav2_mppi_controller::MPPIController"
       visualize: false # expensive visualization; /trajectories
       time_steps: 56
       model_dt: 0.05
-      prune_distance: 6.0 # MPPI: > v_max * N * dt
+      prune_distance: 2.0 # MPPI: > v_max * N * dt
       batch_size: 2000
       vx_std: 0.2
       vy_std: 0.2

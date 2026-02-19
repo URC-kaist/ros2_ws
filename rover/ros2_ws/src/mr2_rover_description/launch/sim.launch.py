@@ -172,7 +172,7 @@ def generate_launch_description():
             ("/imu", "/rgbd_camera/imu"),  # match RealSense IMU topic used in robot_localization
             ("/rgbd_camera/image", "/rgbd_camera/color/image_raw"),
             ("/rgbd_camera/camera_info", "/rgbd_camera/color/camera_info"),
-            ("/rgbd_camera/depth_image", "/rgbd_camera/depth/image_rect_raw"),
+            ("/rgbd_camera/depth_image", "/rgbd_camera/aligned_depth_to_color/image_raw"),
             ("/rgbd_camera/points", "/rgbd_camera/depth/color/points"),
             ("/front_camera/image", "/front_camera/image_raw"),
         ],
