@@ -45,6 +45,7 @@ const MISSION_CIRCLE_STEPS = 64
 const WGS84_A = 6378137
 const RAD_TO_DEG = 180 / Math.PI
 const DEG_TO_RAD = Math.PI / 180
+const LOCAL_TILE_BASE = '/tiles'
 
 type MapPreviewProps = {
   missionList?: MissionSpec[]
@@ -63,6 +64,7 @@ const MapPreview = ({
   const baseMarkerRef = useRef<maplibregl.Marker | null>(null)
   const [mapReady, setMapReady] = useState(false)
   const [followRover, setFollowRover] = useState(true)
+  const [basemapMode, setBasemapMode] = useState<'local' | 'esri'>('local')
   const [fix, setFix] = useState<[number, number] | null>(null) // [lng, lat]
   const [headingDeg, setHeadingDeg] = useState<number | null>(null)
   const [cov, setCov] = useState<{ xVar: number; yVar: number; yawVar: number } | null>(null)
@@ -235,21 +237,51 @@ const MapPreview = ({
       style: {
         version: 8,
         sources: {
-          imagery: {
+          esri: {
             type: 'raster',
             tiles: [
               'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
             ],
             tileSize: 256,
+            maxzoom: 18,
             attribution:
               'Sources: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+          },
+          local_kaist: {
+            type: 'raster',
+            tiles: [`${LOCAL_TILE_BASE}/kaist/{z}/{x}/{y}.png`],
+            tileSize: 256,
+            minzoom: 14,
+            maxzoom: 22,
+            bounds: [127.35, 36.35, 127.375, 36.375],
+          },
+          local_pump_track: {
+            type: 'raster',
+            tiles: [`${LOCAL_TILE_BASE}/pump_track/{z}/{x}/{y}.png`],
+            tileSize: 256,
+            minzoom: 14,
+            maxzoom: 22,
+            bounds: [127.35, 36.275, 127.375, 36.3],
           },
         },
         layers: [
           {
-            id: 'imagery',
+            id: 'basemap-esri',
             type: 'raster',
-            source: 'imagery',
+            source: 'esri',
+            layout: {
+              visibility: 'none',
+            },
+          },
+          {
+            id: 'basemap-local-kaist',
+            type: 'raster',
+            source: 'local_kaist',
+          },
+          {
+            id: 'basemap-local-pump_track',
+            type: 'raster',
+            source: 'local_pump_track',
           },
         ],
       },
@@ -406,6 +438,16 @@ const MapPreview = ({
       mapInstanceRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const localVisibility = basemapMode === 'local' ? 'visible' : 'none'
+    const esriVisibility = basemapMode === 'esri' ? 'visible' : 'none'
+    map.setLayoutProperty('basemap-esri', 'visibility', esriVisibility)
+    map.setLayoutProperty('basemap-local-kaist', 'visibility', localVisibility)
+    map.setLayoutProperty('basemap-local-pump_track', 'visibility', localVisibility)
+  }, [basemapMode, mapReady])
 
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -775,6 +817,26 @@ const MapPreview = ({
           }}
         >
           {followRover ? 'Following rover' : 'Follow rover'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setBasemapMode((prev) => (prev === 'local' ? 'esri' : 'local'))}
+          style={{
+            position: 'absolute',
+            top: 54,
+            right: 10,
+            zIndex: 2,
+            background: 'rgba(11, 18, 32, 0.85)',
+            color: '#cdd6f4',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 10,
+            padding: '8px 12px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+          }}
+        >
+          Basemap: {basemapMode === 'local' ? 'Local' : 'Esri'}
         </button>
         {grabFromMap ? (
           <div
