@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="rover_gazebo_sensors" params="ros2_control_config">
+  <xacro:macro name="rover_gazebo_sensors" params="ros2_control_config enable_autonomous_module:=true">
+    <xacro:property name="enable_autonomous_module_value" value="${enable_autonomous_module}"/>
     <!-- ros2_control plugin that loads the TwistToCommands controller -->
     <gazebo>
       <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
@@ -85,59 +86,61 @@
       </sensor>
     </gazebo>
 
-    <gazebo reference="front_camera">
-      <sensor name="front_camera_sensor" type="rgbd_camera">
-        <update_rate>30</update_rate>
-        <always_on>1</always_on>
-        <visualize>true</visualize>
-        <topic>front_camera</topic>
-        <ignition_frame_id>front_camera_optical_frame</ignition_frame_id>
-        <camera>
-          <horizontal_fov>1.5184</horizontal_fov>
-          <lens>
-            <intrinsics>
-              <!-- fx = fy = width / ( 2 * tan (hfov / 2 ) ) -->
-              <fx>277.12735</fx>
-              <fy>277.12735</fy>
-              <!-- cx = ( width + 1 ) / 2 -->
-              <cx>160.5</cx>
-              <!-- cy = ( height + 1 ) / 2 -->
-              <cy>120.5</cy>
-              <s>0</s>
-            </intrinsics>
-          </lens>
-          <distortion>
-            <k1>0.0</k1>
-            <k2>0.0</k2>
-            <k3>0.0</k3>
-            <p1>0.0</p1>
-            <p2>0.0</p2>
-            <center>0.5 0.5</center>
-          </distortion>
-          <image>
-            <width>320</width>
-            <height>180</height>
-            <anti_aliasing>4</anti_aliasing>
-            <format>R8G8B8</format>
-          </image>
-          <clip>
-            <near>0.3</near>
-            <far>3.0</far>
-          </clip>
-          <depth_camera>
+    <xacro:if value="${enable_autonomous_module_value}">
+      <gazebo reference="front_camera">
+        <sensor name="front_camera_sensor" type="rgbd_camera">
+          <update_rate>30</update_rate>
+          <always_on>1</always_on>
+          <visualize>true</visualize>
+          <topic>front_camera</topic>
+          <ignition_frame_id>front_camera_optical_frame</ignition_frame_id>
+          <camera>
+            <horizontal_fov>1.5184</horizontal_fov>
+            <lens>
+              <intrinsics>
+                <!-- fx = fy = width / ( 2 * tan (hfov / 2 ) ) -->
+                <fx>277.12735</fx>
+                <fy>277.12735</fy>
+                <!-- cx = ( width + 1 ) / 2 -->
+                <cx>160.5</cx>
+                <!-- cy = ( height + 1 ) / 2 -->
+                <cy>120.5</cy>
+                <s>0</s>
+              </intrinsics>
+            </lens>
+            <distortion>
+              <k1>0.0</k1>
+              <k2>0.0</k2>
+              <k3>0.0</k3>
+              <p1>0.0</p1>
+              <p2>0.0</p2>
+              <center>0.5 0.5</center>
+            </distortion>
+            <image>
+              <width>320</width>
+              <height>180</height>
+              <anti_aliasing>4</anti_aliasing>
+              <format>R8G8B8</format>
+            </image>
             <clip>
               <near>0.3</near>
               <far>3.0</far>
             </clip>
-          </depth_camera>
-          <noise>
-            <type>gaussian</type>
-            <mean>0</mean>
-            <stddev>0.007</stddev>
-          </noise>
-        </camera>
-      </sensor>
-    </gazebo>
+            <depth_camera>
+              <clip>
+                <near>0.3</near>
+                <far>3.0</far>
+              </clip>
+            </depth_camera>
+            <noise>
+              <type>gaussian</type>
+              <mean>0</mean>
+              <stddev>0.007</stddev>
+            </noise>
+          </camera>
+        </sensor>
+      </gazebo>
+    </xacro:if>
 
     <gazebo reference="imu_link">
       <sensor name="imu_sensor" type="imu">

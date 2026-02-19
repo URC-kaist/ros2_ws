@@ -70,6 +70,55 @@ def generate_launch_description():
         }.items(),
     )
 
+    # Static TF for rocker joints (hardware has no joint states for these)
+    left_rocker_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="left_rocker_static_tf",
+        arguments=[
+            "--x",
+            "0",
+            "--y",
+            "0.2455",
+            "--z",
+            "0.06",
+            "--roll",
+            "0",
+            "--pitch",
+            "0",
+            "--yaw",
+            "0",
+            "--frame-id",
+            "base_chassis",
+            "--child-frame-id",
+            "left_rocker",
+        ],
+    )
+
+    right_rocker_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="right_rocker_static_tf",
+        arguments=[
+            "--x",
+            "0",
+            "--y",
+            "-0.2455",
+            "--z",
+            "0.06",
+            "--roll",
+            "0",
+            "--pitch",
+            "0",
+            "--yaw",
+            "0",
+            "--frame-id",
+            "base_chassis",
+            "--child-frame-id",
+            "right_rocker",
+        ],
+    )
+
     return LaunchDescription(
         [
             rviz2,
@@ -79,5 +128,7 @@ def generate_launch_description():
             traversability_pipeline_launch,
             front_uvc_camera_launch,
             vision_ablation_launch,
+            left_rocker_static_tf,
+            right_rocker_static_tf,
         ]
     )

@@ -43,11 +43,17 @@ def generate_launch_description():
         default_value="true",
         description="Use simulation time; normally true for Gazebo workflows",
     )
-    enable_manipulator = LaunchConfiguration("enable_manipulator")
-    enable_manipulator_arg = DeclareLaunchArgument(
-        "enable_manipulator",
+    enable_manipulator_module = LaunchConfiguration("enable_manipulator_module")
+    enable_manipulator_module_arg = DeclareLaunchArgument(
+        "enable_manipulator_module",
         default_value="false",
         description="Enable manipulator URDF and ros2_control in simulation",
+    )
+    enable_autonomous_module = LaunchConfiguration("enable_autonomous_module")
+    enable_autonomous_module_arg = DeclareLaunchArgument(
+        "enable_autonomous_module",
+        default_value="true",
+        description="Enable autonomous camera module (front_camera) in URDF and Gazebo sensors",
     )
 
     can_iface, can_iface_arg = declare_can_iface(
@@ -67,7 +73,8 @@ def generate_launch_description():
             "ros2_control_mode": TextSubstitution(text="gazebo"),
             "can_iface": can_iface,
             "ros2_control_config": controller_config,
-            "enable_manipulator": enable_manipulator,
+            "enable_manipulator_module": enable_manipulator_module,
+            "enable_autonomous_module": enable_autonomous_module,
         },
     )
 
@@ -193,7 +200,7 @@ def generate_launch_description():
                 executable="spawner",
                 arguments=["manipulator_controller"],
                 output="screen",
-                condition=IfCondition(enable_manipulator),
+                condition=IfCondition(enable_manipulator_module),
             )
         ],
     )
@@ -202,7 +209,8 @@ def generate_launch_description():
         [
             headless_arg,
             use_sim_time_arg,
-            enable_manipulator_arg,
+            enable_manipulator_module_arg,
+            enable_autonomous_module_arg,
             can_iface_arg,
             controller_config_arg,
             SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", gz_resource_path),
