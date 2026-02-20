@@ -22,7 +22,11 @@ fi
 
 $SUDO install -d "$(dirname "$RULES_DST")"
 $SUDO install -m 0644 "$RULES_SRC" "$RULES_DST"
-$SUDO udevadm control --reload-rules
-$SUDO udevadm trigger
+if [[ "${SKIP_UDEVADM:-0}" == "1" ]]; then
+  echo "Skipping udev reload/trigger (SKIP_UDEVADM=1)"
+else
+  $SUDO udevadm control --reload-rules
+  $SUDO udevadm trigger
+fi
 
 echo "Installed $RULES_DST"

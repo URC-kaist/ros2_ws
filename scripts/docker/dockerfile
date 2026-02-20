@@ -1,20 +1,34 @@
 ARG BASE_IMAGE
+ARG BASE_IMAGE
 FROM ${BASE_IMAGE:-ros:humble}
 
-RUN apt-get update
-RUN apt-get install -y build-essential curl git lsb-release gnupg
+RUN apt-get update && apt-get install -y build-essential curl git lsb-release gnupg
 
-# Fill in id and token from the curl command on your fleet page.
+COPY scripts/install_udev_serial_rules.bash /tmp/mr2-scripts/install_udev_serial_rules.bash
+COPY scripts/99-mr2-serial.rules /tmp/mr2-scripts/99-mr2-serial.rules
+RUN SKIP_UDEVADM=1 /tmp/mr2-scripts/install_udev_serial_rules.bash && rm -rf /tmp/mr2-scripts
+
 RUN curl -sf "https://install.transitiverobotics.com?id=ryan000502&token=6p3fd2s1q4x5l4e5n3y1z6x&docker=true" | bash
 
+ARG UID=1000
+ARG GID=1000
+RUN chown -R ${UID}:${GID} /transitive-preinstalled
+
 WORKDIR /transitive-preinstalled
+COPY scripts/docker/config.json .
 
-# Optional: pre-configure + pre-install desiredPackages
-COPY config.json .
+# ---- add these lines ----
+ARG USERNAME=mr2
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g ${GID} ${USERNAME} \
+ && useradd -m -u ${UID} -g ${GID} -s /bin/bash ${USERNAME} \
+ && mkdir -p /home/${USERNAME}/.transitive \
+ && chown -R ${UID}:${GID} /home/${USERNAME}
+# ------------------------
 
-# Optional: env vars (ROS_DOMAIN_ID, etc.)
-# COPY .env_user .
+COPY scripts/docker/entrypoint.sh /usr/local/bin/mr2_entrypoint.sh
+RUN chmod 755 /usr/local/bin/mr2_entrypoint.sh
 
-WORKDIR /root
-COPY entrypoint.sh .
-CMD ["./entrypoint.sh"]
+WORKDIR /work
+CMD ["/usr/local/bin/mr2_entrypoint.sh"]
