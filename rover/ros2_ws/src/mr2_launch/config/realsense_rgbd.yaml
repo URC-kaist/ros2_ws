@@ -23,7 +23,7 @@ rgb_camera.enable_auto_exposure: true
 
 enable_depth: true # enable depth stream only
 enable_infra: false
-enable_infra1: false
+enable_infra1: true # debugging (please set these three to false later)
 enable_infra2: false
 depth_module.depth_profile: 640x480x6  # default: 0,0,0 # Disparity map
 depth_module.depth_format: Z16
@@ -33,10 +33,10 @@ depth_module.infra1_format: Y8
 depth_module.infra2_format: Y8
 depth_module.color_profile: 0,0,0
 depth_module.color_format: RGB8
-depth_module.exposure: 1000  # default: 8500 # NOTE: sunlight issue
+depth_module.exposure: 100  # default: 8500 # NOTE: sunlight issue
 depth_module.gain: 16
 depth_module.hdr_enabled: false
-depth_module.enable_auto_exposure: false  # default: true # NOTE: sunlight issue (non-HDR)
+depth_module.enable_auto_exposure: true  # default: true # NOTE: sunlight issue (non-HDR)
 depth_module.exposure.1: 7500
 depth_module.gain.1: 16
 depth_module.exposure.2: 1
@@ -77,7 +77,7 @@ colorizer.enable: false
 decimation_filter.enable: true
 rotation_filter.enable: false
 rotation_filter.rotation: 0.0
-spatial_filter.enable: true  # default: false # NOTE: sunlight issue
+spatial_filter.enable: false  # default: false # NOTE: sunlight issue
 temporal_filter.enable: true  # default: false # NOTE: sunlight issue
 disparity_filter.enable: false
 hole_filling_filter.enable: true # default: false # NOTE: sunlight issue
