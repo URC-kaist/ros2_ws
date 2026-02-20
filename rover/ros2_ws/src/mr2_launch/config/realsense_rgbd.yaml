@@ -42,6 +42,8 @@ depth_module.gain.1: 16
 depth_module.exposure.2: 1
 depth_module.gain.2: 16
 
+depth_module.emitter_enabled: 0  # default: 1 # NOTE: sunlight issue ("hidden" in ros2 param list)
+
 enable_sync: false
 depth_module.inter_cam_sync_mode: 0
 enable_rgbd: false
@@ -65,13 +67,14 @@ tf_publish_rate: 0.0
 pointcloud.enable: true  # default: false
 pointcloud__neon_.enable: true # XXX for Jetson
 pointcloud.stream_filter: 2 # (texture stream)
+pointcloud__neon_.stream_filter: 2 # default: 0 # XXX for Jetson
 pointcloud.stream_index_filter: 0
 pointcloud.ordered_pc: false
 pointcloud.allow_no_texture_points: false
 
 align_depth.enable: true  # default: false # Creates depth map /aligned_depth_to_color/image_raw for YOLO
 colorizer.enable: false
-decimation_filter.enable: false  # default: true # NOTE: sunlight issue
+decimation_filter.enable: true
 rotation_filter.enable: false
 rotation_filter.rotation: 0.0
 spatial_filter.enable: true  # default: false # NOTE: sunlight issue
