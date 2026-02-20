@@ -33,10 +33,10 @@ depth_module.infra1_format: Y8
 depth_module.infra2_format: Y8
 depth_module.color_profile: 0,0,0
 depth_module.color_format: RGB8
-depth_module.exposure: 8500
+depth_module.exposure: 1000  # default: 8500 # NOTE: sunlight issue
 depth_module.gain: 16
 depth_module.hdr_enabled: false
-depth_module.enable_auto_exposure: true
+depth_module.enable_auto_exposure: false  # default: true # NOTE: sunlight issue (non-HDR)
 depth_module.exposure.1: 7500
 depth_module.gain.1: 16
 depth_module.exposure.2: 1
@@ -71,13 +71,13 @@ pointcloud.allow_no_texture_points: false
 
 align_depth.enable: true  # default: false # Creates depth map /aligned_depth_to_color/image_raw for YOLO
 colorizer.enable: false
-decimation_filter.enable: false
+decimation_filter.enable: false  # default: true # NOTE: sunlight issue
 rotation_filter.enable: false
 rotation_filter.rotation: 0.0
-spatial_filter.enable: false
-temporal_filter.enable: false
+spatial_filter.enable: true  # default: false # NOTE: sunlight issue
+temporal_filter.enable: true  # default: false # NOTE: sunlight issue
 disparity_filter.enable: false
-hole_filling_filter.enable: false
+hole_filling_filter.enable: true # default: false # NOTE: sunlight issue
 hdr_merge.enable: false
 
 wait_for_device_timeout: -1.0
