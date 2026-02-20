@@ -37,7 +37,7 @@ ROS_CMD=$(
 set -e
 source "$ROS_SETUP"
 source "$WS_SETUP"
-exec ros2 launch mr2_launch rover_real.launch.py enable_manipulator:=false enable_sik_sim:=true
+exec ros2 launch mr2_launch rover_real.launch.py enable_manipulator_module:=false enable_sik_sim:=true
 CMD
 )
 
