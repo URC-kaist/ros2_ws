@@ -30,6 +30,7 @@ public:
     tf_listener_(tf_buffer_, this, true)
   {
     map_frame_ = this->declare_parameter<std::string>("map_frame", "map");
+    base_frame_ = this->declare_parameter<std::string>("base_frame", "base_link");
     mission_status_topic_ =
       this->declare_parameter<std::string>("mission_status_topic", "mission_status");
     output_topic_ =
@@ -44,6 +45,7 @@ public:
     min_publish_interval_sec_ = this->declare_parameter<double>("min_publish_interval_sec", 0.1);
     filter_window_ = static_cast<size_t>(this->declare_parameter<int>("filter_window", 5));
     max_jump_m_ = this->declare_parameter<double>("max_jump_m", 2.0);
+    max_detection_distance_m_ = this->declare_parameter<double>("max_detection_distance_m", 0.0);
 
     out_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(output_topic_, 10);
     status_sub_ = this->create_subscription<mr2_action_interface::msg::MissionStatus>(
@@ -87,6 +89,37 @@ private:
     return (st.state == STATE_RUNNING &&
             st.active_mission.mission_type == MISSION_COVER_VISION &&
             st.active_mission.detection_method == DETECTION_YOLO);
+  }
+
+  bool is_within_distance_limit(const geometry_msgs::msg::PoseStamped & pose_map)
+  {
+    if (!std::isfinite(max_detection_distance_m_) || max_detection_distance_m_ <= 0.0) {
+      return true;
+    }
+
+    geometry_msgs::msg::PoseStamped pose_base;
+    try {
+      if (pose_map.header.frame_id.empty()) {
+        return false;
+      }
+      if (pose_map.header.frame_id == base_frame_) {
+        pose_base = pose_map;
+      } else {
+        pose_base = tf_buffer_.transform(
+          pose_map, base_frame_, tf2::durationFromSec(tf_timeout_sec_));
+      }
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000,
+        "CoverVision YOLO adapter: distance TF failed (%s -> %s): %s",
+        pose_map.header.frame_id.c_str(), base_frame_.c_str(), ex.what());
+      return false;
+    }
+
+    const double dx = pose_base.pose.position.x;
+    const double dy = pose_base.pose.position.y;
+    const double distance = std::hypot(dx, dy);
+    return distance <= max_detection_distance_m_;
   }
 
   void disable_locked()
@@ -180,6 +213,10 @@ private:
     pose_map.pose.position.z = 0.0;
     pose_map.pose.orientation.w = 1.0;
 
+    if (!is_within_distance_limit(pose_map)) {
+      return;
+    }
+
     std::lock_guard<std::mutex> lock(mutex_);
     if (!enabled_) {
       return;
@@ -242,6 +279,7 @@ private:
   int active_class_id_{-1};
 
   std::string map_frame_;
+  std::string base_frame_;
   std::string mission_status_topic_;
   std::string output_topic_;
   std::string yolo_pose_topic_prefix_;
@@ -253,6 +291,7 @@ private:
   double min_publish_interval_sec_{0.1};
   size_t filter_window_{5};
   double max_jump_m_{2.0};
+  double max_detection_distance_m_{0.0};
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;

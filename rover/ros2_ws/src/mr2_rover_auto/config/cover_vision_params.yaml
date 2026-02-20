@@ -26,6 +26,7 @@ cover_vision_yolo_adapter:
   ros__parameters:
     use_sim_time: true
     map_frame: map
+    base_frame: base_link
     mission_status_topic: mission_status
     output_topic: cover_vision/object_pose/yolo
     yolo_pose_topic_prefix: yolo/object_pose
@@ -35,11 +36,13 @@ cover_vision_yolo_adapter:
     min_publish_interval_sec: 0.1
     filter_window: 5
     max_jump_m: 2.0
+    max_detection_distance_m: 5.0 # D435i range is 3.0 so this is generous enough
 
 cover_vision_aruco_adapter:
   ros__parameters:
     use_sim_time: true
     map_frame: map
+    base_frame: base_link
     mission_status_topic: mission_status
     output_topic: cover_vision/object_pose/aruco
     aruco_detections_topic: aruco_detections
@@ -50,4 +53,5 @@ cover_vision_aruco_adapter:
     min_publish_interval_sec: 0.1
     filter_window: 5
     max_jump_m: 2.0
+    max_detection_distance_m: 5.0 # D435i range is 3.0 so this is generous enough
     force_enable: false
