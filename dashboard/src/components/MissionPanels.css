@@ -69,6 +69,28 @@
   font-size: 0.9rem;
 }
 
+.delivery-live-feed-card {
+  display: grid;
+  gap: 10px;
+}
+
+.delivery-live-feed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.delivery-live-feed-item {
+  display: grid;
+  gap: 8px;
+}
+
+.delivery-live-feed-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
 .pill-row {
   display: flex;
   flex-wrap: wrap;

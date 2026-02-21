@@ -1,3 +1,7 @@
+.transitive-embedded {
+  width: 100%;
+}
+
 .transitive-frame {
   width: min(100%, var(--video-width, 640px));
   aspect-ratio: var(--video-aspect, 4 / 3);

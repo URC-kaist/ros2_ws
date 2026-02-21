@@ -7,6 +7,7 @@ type TransitiveVideoCardProps = {
   description?: string
   source?: string
   jwt?: string
+  embedded?: boolean
   videoWidth?: number
   videoHeight?: number
   type?: string
@@ -25,6 +26,7 @@ const TransitiveVideoCard = ({
   description = 'Live feed via Transitive WebRTC.',
   source = '/rgbd_camera/color/image_raw',
   jwt,
+  embedded = false,
   videoWidth,
   videoHeight,
   type = 'rostopic',
@@ -44,7 +46,6 @@ const TransitiveVideoCard = ({
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rawToken = jwt ?? fetchedToken ?? ''
   const token = rawToken.trim().replace(/^['"]|['"]$/g, '')
-  const missingToken = !token
   const capabilityProps = useMemo(() => {
     if (type === 'v4l2src') {
       return {
@@ -171,27 +172,39 @@ const TransitiveVideoCard = ({
     return () => observer.disconnect()
   }, [token])
 
+  const videoStyle = {
+    ...(videoWidth ? { '--video-width': `${videoWidth}px` } : {}),
+    ...(videoWidth && videoHeight
+      ? { '--video-aspect': `${videoWidth} / ${videoHeight}` }
+      : {}),
+  } as CSSProperties
+
+  const media = token ? (
+    <div className="transitive-frame" ref={frameRef}>
+      <TransitiveCapability jwt={token} {...capabilityProps} />
+    </div>
+  ) : (
+    <div className="transitive-placeholder">
+      {tokenStatus === 'loading' ? 'Waiting for token...' : 'Missing Transitive JWT'}
+    </div>
+  )
+
+  if (embedded) {
+    return (
+      <div className="transitive-embedded" style={videoStyle}>
+        {media}
+      </div>
+    )
+  }
+
   return (
     <article
       className="card card--span-2"
-      style={
-        {
-          '--video-width': `${videoWidth}px`,
-          '--video-aspect': `${videoWidth} / ${videoHeight}`,
-        } as CSSProperties
-      }
+      style={videoStyle}
     >
       <h3>{title}</h3>
-      <p>{description}</p>
-      {token ? (
-        <div className="transitive-frame" ref={frameRef}>
-          <TransitiveCapability jwt={token} {...capabilityProps} />
-        </div>
-      ) : (
-        <div className="transitive-placeholder">
-          {tokenStatus === 'loading' ? 'Waiting for token...' : 'Missing Transitive JWT'}
-        </div>
-      )}
+      {description ? <p>{description}</p> : null}
+      {media}
     </article>
   )
 }
