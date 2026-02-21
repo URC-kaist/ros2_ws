@@ -8,12 +8,12 @@
       <PipelineSequence name="NavigateWithReplanning">
         <RateController hz="1.0">
           <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
-            <Sequence name="ComputeAndSmoothPath">
+            <ReactiveSequence name="ComputeAndSmoothPath"> <!-- assure RemovePassedGoals works before ComputePathThroughPoses -->
               <!-- <RemoveInCollisionGoals input_goals="{goals}" output_goals="{goals}"/> --> <!-- from humble_main -->
               <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="1.8"/> <!-- 1.5 * spiral_point_spacing_m -->
               <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="Theta"/>
-              <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}" smoother_id="curvature_smoother"/>
-            </Sequence>
+              <!-- <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}" smoother_id="curvature_smoother"/> -->
+            </ReactiveSequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
         </RateController>
