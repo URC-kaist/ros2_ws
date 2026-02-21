@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getRosBridgeClient } from '../../lib/rosBridge'
-import { type LinkStatus, type TelemBattery, getSikGatewayClient } from '../../lib/sikGateway'
+import {
+  type BaseStatus,
+  type LinkStatus,
+  type TelemBattery,
+  getSikGatewayClient,
+} from '../../lib/sikGateway'
 import './ControlStatusList.css'
 
 type MissionStatusMsg = {
@@ -9,12 +14,53 @@ type MissionStatusMsg = {
   arrival?: boolean
 }
 
+type GpsFix = {
+  fix_type?: number
+}
+
+type UBXNavStatus = {
+  gps_fix?: GpsFix
+  gps_fix_ok?: boolean
+}
+
+type GnssSideId = 'left' | 'right'
+
 const MISSION_STATE_LABELS: Record<number, string> = {
   0: 'IDLE',
   1: 'RUNNING',
   2: 'PAUSED',
   3: 'COMPLETED',
   4: 'FAILED',
+}
+
+const GNSS_SIDES: Array<{ id: GnssSideId; label: string; ns: string }> = [
+  { id: 'left', label: 'Left GNSS', ns: '/left_gnss' },
+  { id: 'right', label: 'Right GNSS', ns: '/right_gnss' },
+]
+
+const formatFixType = (fixType?: number) => {
+  if (typeof fixType !== 'number' || !Number.isFinite(fixType)) return '--'
+  switch (fixType) {
+    case 0:
+      return 'No Fix'
+    case 1:
+      return 'Dead Reckoning'
+    case 2:
+      return '2D'
+    case 3:
+      return '3D'
+    case 4:
+      return '3D + DR'
+    case 5:
+      return 'Time Only'
+    default:
+      return `${fixType}`
+  }
+}
+
+const formatFixOk = (fixOk?: boolean) => {
+  if (fixOk == null) return '--'
+  return fixOk ? 'yes' : 'no'
 }
 
 const ControlStatusList = () => {
@@ -28,6 +74,12 @@ const ControlStatusList = () => {
   const [battery1UpdatedAt, setBattery1UpdatedAt] = useState(0)
   const [battery2UpdatedAt, setBattery2UpdatedAt] = useState(0)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [baseStatus, setBaseStatus] = useState<BaseStatus | null>(null)
+  const [baseHeadingInput, setBaseHeadingInput] = useState('')
+  const [gnssState, setGnssState] = useState<Record<GnssSideId, UBXNavStatus>>({
+    left: {},
+    right: {},
+  })
 
   useEffect(() => {
     const gateway = getSikGatewayClient()
@@ -48,6 +100,30 @@ const ControlStatusList = () => {
       offConnection()
       offBattery()
     }
+  }, [])
+
+  useEffect(() => {
+    const gateway = getSikGatewayClient()
+    gateway.connect()
+    const offBase = gateway.onBaseStatus((status) => {
+      setBaseStatus(status)
+    })
+    return () => {
+      offBase()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('baseHeadingDeg')
+    if (!stored) return
+    setBaseHeadingInput(stored)
+    const parsed = Number(stored)
+    if (!Number.isFinite(parsed)) return
+    const normalized = ((parsed % 360) + 360) % 360
+    const gateway = getSikGatewayClient()
+    gateway.connect()
+    gateway.sendBaseHeading(normalized)
   }, [])
 
   useEffect(() => {
@@ -87,6 +163,35 @@ const ControlStatusList = () => {
     )
     return () => {
       offMission()
+    }
+  }, [])
+
+  useEffect(() => {
+    const rosBridge = getRosBridgeClient()
+    rosBridge.connect()
+    const unsubscribers: Array<() => void> = []
+
+    for (const side of GNSS_SIDES) {
+      unsubscribers.push(
+        rosBridge.subscribe<UBXNavStatus>(
+          `${side.ns}/ubx_nav_status`,
+          'ublox_ubx_msgs/msg/UBXNavStatus',
+          (msg) => {
+            if (!msg) return
+            setGnssState((prev) => ({
+              ...prev,
+              [side.id]: msg,
+            }))
+          },
+          { throttleRate: 1000 }
+        )
+      )
+    }
+
+    return () => {
+      for (const off of unsubscribers) {
+        off()
+      }
     }
   }, [])
 
@@ -146,41 +251,113 @@ const ControlStatusList = () => {
           ? 'status-dot-manual'
           : 'status-dot-off'
 
+  const gnssSummary = useMemo(
+    () =>
+      GNSS_SIDES.map((side) => {
+        const status = gnssState[side.id]
+        const fixType = formatFixType(status?.gps_fix?.fix_type)
+        const fixOk = formatFixOk(status?.gps_fix_ok)
+        const fixOkTone =
+          status?.gps_fix_ok == null ? '' : status.gps_fix_ok ? 'status-good' : 'status-bad'
+        return {
+          id: side.id,
+          label: side.label,
+          fixType,
+          fixOk,
+          fixOkTone,
+        }
+      }),
+    [gnssState]
+  )
+
+  const baseHeadingValue =
+    baseStatus && Number.isFinite(baseStatus.heading_offset_deg)
+      ? `${baseStatus.heading_offset_deg.toFixed(1)}°`
+      : '—'
+
   return (
     <>
       <section className="panel-section">
-        <div className="status-list">
-          <div className="status-item status-link">
-            <span className="status-label">
-              <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
-              SiK Link
-            </span>
-            <div className="status-pill">
-              <strong>{linkState}</strong>
-            </div>
+        <div className="status-grid-compact">
+          <div className="status-grid-label">
+            <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
+            SiK Link
           </div>
-          <div className="status-item status-link">
-            <span className="status-label">
-              <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />
-              ROS Bridge
-            </span>
-            <div className="status-pill">
-              <strong>{rosState}</strong>
-            </div>
+          <div className="status-grid-label">
+            <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />
+            ROS Bridge
           </div>
-          <div className="status-item status-softstop">
-            <span className="status-label">
-              <span className={`status-dot ${missionDotClass}`} aria-hidden="true" />
-              Auto Mission
-            </span>
-            <div className="status-pill">
-              <strong>{missionLabel}</strong>
-            </div>
+          <div className="status-grid-label">
+            <span className={`status-dot ${missionDotClass}`} aria-hidden="true" />
+            Auto Mission
+          </div>
+          <div className="status-grid-value">
+            <strong>{linkState}</strong>
+          </div>
+          <div className="status-grid-value">
+            <strong>{rosState}</strong>
+          </div>
+          <div className="status-grid-value">
+            <strong>{missionLabel}</strong>
           </div>
         </div>
       </section>
       <section className="panel-section">
-        <div className="status-list">
+        <div className="sidebar-section-title">GNSS Fix</div>
+        <div className="gnss-mini-grid">
+          {gnssSummary.map((side) => (
+            <div className="gnss-mini-card" key={side.id}>
+              <div className="gnss-mini-title">{side.label}</div>
+              <div className="gnss-mini-kv">
+                <span>Fix</span>
+                <strong>{side.fixType}</strong>
+              </div>
+              <div className="gnss-mini-kv">
+                <span>Fix OK</span>
+                <strong className={side.fixOkTone}>{side.fixOk}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="sidebar-divider" />
+        <div className="sidebar-section-title">Base Station</div>
+        <div className="base-heading-row sidebar-base-heading">
+          <div className="base-heading-header">
+            <span className="base-heading-label">Heading offset</span>
+            <span className="base-heading-value">{baseHeadingValue}</span>
+          </div>
+          <div className="base-heading-input-row">
+            <input
+              id="base-heading-sidebar"
+              type="number"
+              inputMode="decimal"
+              value={baseHeadingInput}
+              onChange={(event) => setBaseHeadingInput(event.target.value)}
+              placeholder="deg"
+              className="base-heading-input"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const parsed = Number(baseHeadingInput)
+                if (!Number.isFinite(parsed)) return
+                const normalized = ((parsed % 360) + 360) % 360
+                if (typeof window !== 'undefined') {
+                  window.localStorage.setItem('baseHeadingDeg', String(normalized))
+                }
+                const gateway = getSikGatewayClient()
+                gateway.connect()
+                gateway.sendBaseHeading(normalized)
+              }}
+              className="base-heading-apply"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      </section>
+      <section className="panel-section">
+        <div className="status-list status-list--batteries">
           <div className={`status-item battery${battery1Stale ? ' battery-stale' : ''}`}>
             <div className="metric-label">
               <span>Battery 1</span>

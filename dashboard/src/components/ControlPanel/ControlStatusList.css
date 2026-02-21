@@ -12,6 +12,11 @@
   width: 100%;
 }
 
+.status-list--batteries {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .status-item {
   display: flex;
   justify-content: space-between;
@@ -63,6 +68,29 @@
   animation: status-dot-flash 1s ease-in-out infinite;
 }
 
+.status-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.status-grid-label,
+.status-grid-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.status-grid-label {
+  color: var(--muted);
+}
+
+.status-grid-value strong {
+  font-size: 0.95rem;
+  color: #f0f6ff;
+}
+
 .status-dot-error {
   background: var(--danger);
   box-shadow: 0 0 8px rgba(242, 95, 92, 0.6);
@@ -106,6 +134,10 @@
   color: var(--accent-2);
 }
 
+.status-bad {
+  color: var(--danger);
+}
+
 .meter {
   height: 8px;
   border-radius: 999px;
@@ -147,4 +179,72 @@
 .battery-stale .meter-fill {
   background: rgba(255, 255, 255, 0.2);
   box-shadow: none;
+}
+
+.sidebar-section-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.gnss-mini-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gnss-mini-card {
+  background: rgba(7, 12, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.gnss-mini-title {
+  font-size: 0.85rem;
+  color: #f0f6ff;
+}
+
+.gnss-mini-kv {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.gnss-mini-kv strong {
+  color: #e8f4ff;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 12px 0;
+}
+
+.sidebar-base-heading .base-heading-label {
+  min-width: auto;
+}
+
+.base-heading-value {
+  color: #e8f4ff;
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .status-grid-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .status-list--batteries {
+    grid-template-columns: 1fr;
+  }
+
+  .gnss-mini-grid {
+    grid-template-columns: 1fr;
+  }
 }

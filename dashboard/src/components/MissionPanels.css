@@ -29,6 +29,28 @@
   gap: 12px;
 }
 
+.delivery-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  grid-template-areas:
+    "live map"
+    "servo map";
+  gap: 12px;
+  align-items: start;
+}
+
+.delivery-layout .delivery-live-feed-card {
+  grid-area: live;
+}
+
+.delivery-layout .delivery-map-card {
+  grid-area: map;
+}
+
+.delivery-layout .arm-card {
+  grid-area: servo;
+}
+
 .card {
   background: linear-gradient(160deg, rgba(24, 36, 56, 0.9), rgba(15, 23, 36, 0.85));
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -45,6 +67,10 @@
 }
 
 .autonomy-left .card--map {
+  aspect-ratio: 4 / 3;
+}
+
+.delivery-map-card {
   aspect-ratio: 4 / 3;
 }
 
@@ -89,6 +115,16 @@
   color: var(--muted);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
+}
+
+@media (max-width: 960px) {
+  .delivery-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "live"
+      "servo"
+      "map";
+  }
 }
 
 .pill-row {

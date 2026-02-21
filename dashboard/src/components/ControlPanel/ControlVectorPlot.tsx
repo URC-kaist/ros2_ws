@@ -76,43 +76,45 @@ const ControlVectorPlot = ({
   return (
     <section className="panel-section">
       <div className="control-visual">
-        <label className="gamepad-picker">
-          <span className="gamepad-header">
-            Gamepad
-          </span>
-          <select
-            value={selectedGamepadIndex ?? ''}
-            onChange={(event) =>
-              onSelectGamepad(event.target.value === '' ? null : Number(event.target.value))
-            }
-          >
-            <option value="">No control</option>
-            {gamepads.length === 0 ? (
-              <option value="" disabled>
-                No gamepad detected
-              </option>
-            ) : (
-              gamepads.map((pad) => (
-                <option key={pad.index} value={pad.index}>
-                  {pad.id}
+        <div className="gamepad-row">
+          <label className="gamepad-picker">
+            <span className="gamepad-header">Gamepad</span>
+            <select
+              value={selectedGamepadIndex ?? ''}
+              onChange={(event) =>
+                onSelectGamepad(event.target.value === '' ? null : Number(event.target.value))
+              }
+            >
+              <option value="">No control</option>
+              {gamepads.length === 0 ? (
+                <option value="" disabled>
+                  No gamepad detected
                 </option>
-              ))
-            )}
-          </select>
-        </label>
-        <label className="gamepad-picker">
-          <span className="gamepad-header">Sensitivity</span>
-          <select
-            value={sensitivity}
-            onChange={(event) => onSelectSensitivity(event.target.value as 'low' | 'med' | 'high')}
-          >
-            {(['low', 'med', 'high'] as const).map((level) => (
-              <option key={level} value={level}>
-                {level.toUpperCase()} {sensitivityValues[level].toFixed(1)}
-              </option>
-            ))}
-          </select>
-        </label>
+              ) : (
+                gamepads.map((pad) => (
+                  <option key={pad.index} value={pad.index}>
+                    {pad.id}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          <label className="gamepad-picker">
+            <span className="gamepad-header">Sensitivity</span>
+            <select
+              value={sensitivity}
+              onChange={(event) =>
+                onSelectSensitivity(event.target.value as 'low' | 'med' | 'high')
+              }
+            >
+              {(['low', 'med', 'high'] as const).map((level) => (
+                <option key={level} value={level}>
+                  {level.toUpperCase()} {sensitivityValues[level].toFixed(1)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className={`vector-plot ${isConnected ? '' : 'vector-plot-disconnected'}`}>
           <div className="axis-markers">
             <span className="axis-label top">+{axisRange.toFixed(1)}</span>

@@ -4,8 +4,8 @@ import ArmServoCard from './ArmServoCard'
 
 const DeliveryPanel = () => {
   return (
-    <div className="panel-grid" role="tabpanel">
-      <article className="card card--span-2 delivery-live-feed-card">
+    <div className="delivery-layout" role="tabpanel">
+      <article className="card delivery-live-feed-card">
         <h3>Live Feed</h3>
         <div className="delivery-live-feed-grid">
           <div className="delivery-live-feed-item">
@@ -44,7 +44,7 @@ const DeliveryPanel = () => {
           </div>
         </div>
       </article>
-      <div className="card card--span-2 card--map">
+      <div className="card card--map delivery-map-card">
         <h3>Rover Position</h3>
         <MapPreview />
       </div>

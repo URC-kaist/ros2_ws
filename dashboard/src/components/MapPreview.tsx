@@ -82,8 +82,6 @@ const MapPreview = ({
   const [trail, setTrail] = useState<[number, number][]>([])
   const [baseFix, setBaseFix] = useState<[number, number] | null>(null)
   const [baseHeadingDeg, setBaseHeadingDeg] = useState<number | null>(null)
-  const [baseHeadingInput, setBaseHeadingInput] = useState('')
-  const [baseHeadingApplied, setBaseHeadingApplied] = useState<number | null>(null)
   const [smoothedPath, setSmoothedPath] = useState<[number, number][]>([])
   const [coveragePath, setCoveragePath] = useState<[number, number][]>([])
   const [objectPose, setObjectPose] = useState<[number, number] | null>(null)
@@ -491,20 +489,6 @@ const MapPreview = ({
   }, [])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const stored = window.localStorage.getItem('baseHeadingDeg')
-    if (!stored) return
-    setBaseHeadingInput(stored)
-    const parsed = Number(stored)
-    if (!Number.isFinite(parsed)) return
-    const normalized = ((parsed % 360) + 360) % 360
-    setBaseHeadingApplied(normalized)
-    const sik = getSikGatewayClient()
-    sik.connect()
-    sik.sendBaseHeading(normalized)
-  }, [])
-
-  useEffect(() => {
     const ros = getRosBridgeClient()
     ros.connect()
     const unsubPlanSmoothedGeo = ros.subscribe<GeoPathMsg>(
@@ -791,8 +775,8 @@ const MapPreview = ({
           }}
           style={{
             position: 'absolute',
-            top: 10,
-            right: 10,
+            bottom: 12,
+            left: 12,
             zIndex: 2,
             background: followRover ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
             color: followRover ? '#0b1220' : '#cdd6f4',
@@ -810,7 +794,7 @@ const MapPreview = ({
           <div
             style={{
               position: 'absolute',
-              bottom: 12,
+              bottom: 54,
               left: 12,
               zIndex: 2,
               background: 'rgba(53, 211, 195, 0.9)',
@@ -854,56 +838,6 @@ const MapPreview = ({
           {cov ? `${(Math.sqrt(Math.max(cov.yawVar, 0)) * (180 / Math.PI)).toFixed(1)}°` : '—'}
         </div>
         <div><strong>Trail pts:</strong> {trail.length}</div>
-        <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
-          <label htmlFor="base-heading" style={{ minWidth: 88 }}>
-            <strong>Base heading:</strong>
-          </label>
-          <input
-            id="base-heading"
-            type="number"
-            inputMode="decimal"
-            value={baseHeadingInput}
-            onChange={(event) => setBaseHeadingInput(event.target.value)}
-            placeholder="deg"
-            style={{
-              width: 78,
-              background: 'rgba(5, 10, 20, 0.6)',
-              color: '#cdd6f4',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 6,
-              padding: '2px 6px',
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const parsed = Number(baseHeadingInput)
-              if (!Number.isFinite(parsed)) return
-              const normalized = ((parsed % 360) + 360) % 360
-              setBaseHeadingApplied(normalized)
-              if (typeof window !== 'undefined') {
-                window.localStorage.setItem('baseHeadingDeg', String(normalized))
-              }
-              const sik = getSikGatewayClient()
-              sik.connect()
-              sik.sendBaseHeading(normalized)
-            }}
-            style={{
-              background: 'rgba(53, 211, 195, 0.9)',
-              color: '#0b1220',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 6,
-              padding: '2px 8px',
-              fontSize: '12px',
-              cursor: 'pointer',
-            }}
-          >
-            Apply
-          </button>
-          <span style={{ opacity: 0.7 }}>
-            {baseHeadingApplied != null ? `${baseHeadingApplied.toFixed(1)}°` : '—'}
-          </span>
-        </div>
       </div>
       </div>
     </div>
