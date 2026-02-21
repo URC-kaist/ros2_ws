@@ -1,5 +1,3 @@
-import { FiSettings } from 'react-icons/fi'
-import IconButton from '../ui/IconButton'
 import './ControlVectorPlot.css'
 
 export type CmdVel = {
@@ -15,20 +13,21 @@ type ControlVectorPlotProps = {
   gamepads: Array<{ index: number; id: string }>
   selectedGamepadIndex: number | null
   onSelectGamepad: (index: number | null) => void
-  isSettingsOpen: boolean
-  onToggleSettings: () => void
+  onSelectSensitivity: (level: 'low' | 'med' | 'high') => void
 }
 
 const sensitivityScale = {
   low: 0.4,
-  med: 0.6,
-  high: 0.8,
+  med: 0.8,
+  high: 1.2,
 } as const
 
-const yawSensitivityScale = {
-  low: 0.5,
-  med: 1.0,
-  high: 1.5,
+const RADIUS = 0.57725 // meters
+
+const sensitivityValues = {
+  low: 0.4,
+  med: 0.8,
+  high: 1.2,
 } as const
 
 const ARC_CENTER = 30
@@ -48,11 +47,10 @@ const ControlVectorPlot = ({
   gamepads,
   selectedGamepadIndex,
   onSelectGamepad,
-  isSettingsOpen,
-  onToggleSettings,
+  onSelectSensitivity,
 }: ControlVectorPlotProps) => {
   const axisRange = 1 * sensitivityScale[sensitivity]
-  const yawRange = 1 * yawSensitivityScale[sensitivity]
+  const yawRange = axisRange / RADIUS
   const displayX = -cmdVel.x
   const displayY = cmdVel.y
   const displayYaw = -cmdVel.yaw
@@ -81,14 +79,6 @@ const ControlVectorPlot = ({
         <label className="gamepad-picker">
           <span className="gamepad-header">
             Gamepad
-            <IconButton
-              className="settings-button"
-              ariaLabel="Open settings"
-              pressed={isSettingsOpen}
-              onClick={onToggleSettings}
-            >
-              <FiSettings aria-hidden="true" />
-            </IconButton>
           </span>
           <select
             value={selectedGamepadIndex ?? ''}
@@ -108,6 +98,19 @@ const ControlVectorPlot = ({
                 </option>
               ))
             )}
+          </select>
+        </label>
+        <label className="gamepad-picker">
+          <span className="gamepad-header">Sensitivity</span>
+          <select
+            value={sensitivity}
+            onChange={(event) => onSelectSensitivity(event.target.value as 'low' | 'med' | 'high')}
+          >
+            {(['low', 'med', 'high'] as const).map((level) => (
+              <option key={level} value={level}>
+                {level.toUpperCase()} {sensitivityValues[level].toFixed(1)}
+              </option>
+            ))}
           </select>
         </label>
         <div className={`vector-plot ${isConnected ? '' : 'vector-plot-disconnected'}`}>

@@ -7,6 +7,12 @@ type ControlSettingsProps = {
   onClose: () => void
 }
 
+const sensitivityValues = {
+  low: 0.4,
+  med: 0.8,
+  high: 1.2,
+} as const
+
 const ControlSettings = ({ sensitivity, onSelect, onClose }: ControlSettingsProps) => {
   return (
     <Modal ariaLabel="Control settings" onClose={onClose} panelClassName="settings-panel">
@@ -19,7 +25,7 @@ const ControlSettings = ({ sensitivity, onSelect, onClose }: ControlSettingsProp
             className={`settings-chip ${sensitivity === level ? 'active' : ''}`}
             onClick={() => onSelect(level)}
           >
-            {level.toUpperCase()}
+            {level.toUpperCase()} {sensitivityValues[level].toFixed(1)}
           </button>
         ))}
       </div>

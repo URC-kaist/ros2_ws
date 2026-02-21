@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import ControlEstopSection from './ControlPanel/ControlEstopSection'
 import ControlPanelHeader from './ControlPanel/ControlPanelHeader'
-import ControlSettings from './ControlPanel/ControlSettings'
 import ControlStatusList from './ControlPanel/ControlStatusList'
 import ControlVectorPlot, { type CmdVel } from './ControlPanel/ControlVectorPlot'
 import { getSikGatewayClient } from '../lib/sikGateway'
@@ -9,20 +8,15 @@ import './ControlPanel/ControlPanel.css'
 
 const sensitivityScale = {
   low: 0.4,
-  med: 0.6,
-  high: 0.8,
+  med: 0.8,
+  high: 1.2,
 } as const
 
-const yawSensitivityScale = {
-  low: 0.5,
-  med: 1.0,
-  high: 1.5,
-} as const
+const RADIUS = 0.57725 // meters
 
 const ControlPanel = () => {
   const gatewayRef = useRef(getSikGatewayClient())
   const cmdVelRef = useRef<CmdVel>({ x: 0, y: 0, yaw: 0 })
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [sensitivity, setSensitivity] = useState<'low' | 'med' | 'high'>('med')
   const [cmdVel, setCmdVel] = useState<CmdVel>({ x: 0, y: 0, yaw: 0 })
   const [gamepadConnected, setGamepadConnected] = useState(false)
@@ -121,7 +115,7 @@ const ControlPanel = () => {
     let frame = 0
     const deadzone = 0.08
     const scale = sensitivityScale[sensitivity]
-    const yawScale = yawSensitivityScale[sensitivity]
+    const yawScale = scale / RADIUS
     const xScale = scale
     const yScale = scale
 
@@ -185,17 +179,9 @@ const ControlPanel = () => {
             setCmdVel({ x: 0, y: 0, yaw: 0 })
           }
         }}
-        isSettingsOpen={settingsOpen}
-        onToggleSettings={() => setSettingsOpen((open) => !open)}
+        onSelectSensitivity={setSensitivity}
       />
       <ControlEstopSection />
-      {settingsOpen ? (
-        <ControlSettings
-          sensitivity={sensitivity}
-          onSelect={setSensitivity}
-          onClose={() => setSettingsOpen(false)}
-        />
-      ) : null}
     </aside>
   )
 }
