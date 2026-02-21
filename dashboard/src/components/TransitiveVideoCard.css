@@ -30,3 +30,9 @@
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+.delivery-live-feed-card .transitive-frame,
+.delivery-live-feed-card .transitive-placeholder {
+  width: 100%;
+  border-radius: 0;
+}
