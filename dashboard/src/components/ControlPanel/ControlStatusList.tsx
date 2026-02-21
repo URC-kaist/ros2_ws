@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getRosBridgeClient } from '../../lib/rosBridge'
-import {
-  type BaseStatus,
-  type LinkStatus,
-  type TelemBattery,
-  getSikGatewayClient,
-} from '../../lib/sikGateway'
+import { type LinkStatus, type TelemBattery, getSikGatewayClient } from '../../lib/sikGateway'
 import './ControlStatusList.css'
 
 type MissionStatusMsg = {
@@ -74,8 +69,6 @@ const ControlStatusList = () => {
   const [battery1UpdatedAt, setBattery1UpdatedAt] = useState(0)
   const [battery2UpdatedAt, setBattery2UpdatedAt] = useState(0)
   const [nowMs, setNowMs] = useState(() => Date.now())
-  const [baseStatus, setBaseStatus] = useState<BaseStatus | null>(null)
-  const [baseHeadingInput, setBaseHeadingInput] = useState('')
   const [gnssState, setGnssState] = useState<Record<GnssSideId, UBXNavStatus>>({
     left: {},
     right: {},
@@ -102,29 +95,6 @@ const ControlStatusList = () => {
     }
   }, [])
 
-  useEffect(() => {
-    const gateway = getSikGatewayClient()
-    gateway.connect()
-    const offBase = gateway.onBaseStatus((status) => {
-      setBaseStatus(status)
-    })
-    return () => {
-      offBase()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const stored = window.localStorage.getItem('baseHeadingDeg')
-    if (!stored) return
-    setBaseHeadingInput(stored)
-    const parsed = Number(stored)
-    if (!Number.isFinite(parsed)) return
-    const normalized = ((parsed % 360) + 360) % 360
-    const gateway = getSikGatewayClient()
-    gateway.connect()
-    gateway.sendBaseHeading(normalized)
-  }, [])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -270,11 +240,6 @@ const ControlStatusList = () => {
     [gnssState]
   )
 
-  const baseHeadingValue =
-    baseStatus && Number.isFinite(baseStatus.heading_offset_deg)
-      ? `${baseStatus.heading_offset_deg.toFixed(1)}°`
-      : '—'
-
   return (
     <>
       <section className="panel-section">
@@ -318,42 +283,6 @@ const ControlStatusList = () => {
               </div>
             </div>
           ))}
-        </div>
-        <div className="sidebar-divider" />
-        <div className="sidebar-section-title">Base Station</div>
-        <div className="base-heading-row sidebar-base-heading">
-          <div className="base-heading-header">
-            <span className="base-heading-label">Heading offset</span>
-            <span className="base-heading-value">{baseHeadingValue}</span>
-          </div>
-          <div className="base-heading-input-row">
-            <input
-              id="base-heading-sidebar"
-              type="number"
-              inputMode="decimal"
-              value={baseHeadingInput}
-              onChange={(event) => setBaseHeadingInput(event.target.value)}
-              placeholder="deg"
-              className="base-heading-input"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const parsed = Number(baseHeadingInput)
-                if (!Number.isFinite(parsed)) return
-                const normalized = ((parsed % 360) + 360) % 360
-                if (typeof window !== 'undefined') {
-                  window.localStorage.setItem('baseHeadingDeg', String(normalized))
-                }
-                const gateway = getSikGatewayClient()
-                gateway.connect()
-                gateway.sendBaseHeading(normalized)
-              }}
-              className="base-heading-apply"
-            >
-              Apply
-            </button>
-          </div>
         </div>
       </section>
       <section className="panel-section">

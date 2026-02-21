@@ -163,7 +163,7 @@ const SpectrophotometerCard = () => {
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect
       if (!rect) return
-      const nextWidth = Math.max(320, Math.floor(rect.width))
+      const nextWidth = Math.max(1, Math.floor(rect.width))
       const nextHeight = Math.max(180, Math.floor(rect.height))
       setPlotSize((prev) =>
         prev.width === nextWidth && prev.height === nextHeight
@@ -250,7 +250,7 @@ const SpectrophotometerCard = () => {
   }, [spectrum])
 
   return (
-    <article className="card card--span-2 spectro-card">
+    <article className="card spectro-card">
       <header className="spectro-card__header">
         <div>
           <h3>Spectrophotometer</h3>

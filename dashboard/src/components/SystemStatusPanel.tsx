@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getRosBridgeClient } from '../lib/rosBridge'
 import { BaseStatus, getSikGatewayClient } from '../lib/sikGateway'
 import GnssStatusCard from './GnssStatusCard'
+import RocketM2Card from './RocketM2Card'
 import './SystemStatusPanel.css'
 
 type DiagnosticKeyValue = {
@@ -339,6 +340,34 @@ const SystemStatusPanel = () => {
   return (
     <div className="panel-grid" role="tabpanel">
       <GnssStatusCard />
+      <RocketM2Card />
+      <article className="card">
+        <h3>Link Budget</h3>
+        <p>SiK telemetry strength and latency.</p>
+        <div className="status-list">
+          <div className="status-item">
+            <span>RSSI</span>
+            <strong>62 dBm</strong>
+          </div>
+          <div className="status-item">
+            <span>Latency</span>
+            <strong>180 ms</strong>
+          </div>
+          <div className="status-item">
+            <span>Packet Loss</span>
+            <strong className="status-warn">2.1%</strong>
+          </div>
+        </div>
+      </article>
+      <article className="card">
+        <h3>Event Stream</h3>
+        <p>Command acknowledgements and alerts.</p>
+        <ul className="list">
+          <li>Autonomy plan synced.</li>
+          <li>New waypoint uploaded.</li>
+          <li>Telemetry: nominal.</li>
+        </ul>
+      </article>
       {cards.map(({ spec, snapshot, values }) => (
         <article className="card" key={spec.id}>
           <h3>{spec.label}</h3>

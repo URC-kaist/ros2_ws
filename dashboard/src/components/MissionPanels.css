@@ -11,6 +11,13 @@
   grid-auto-rows: minmax(140px, auto);
 }
 
+.science-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
 .autonomy-layout {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
@@ -21,12 +28,125 @@
 .autonomy-left {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .autonomy-right {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+}
+
+.science-left {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  justify-items: stretch;
+}
+
+.science-right {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.science-left .card {
+  width: 100%;
+}
+
+.science-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.module-progress-card {
+  width: 100%;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+.module-progress {
+  --module-steps: 5;
+  display: grid;
+  grid-template-columns: repeat(var(--module-steps), minmax(0, 1fr));
+  gap: 12px;
+  align-items: flex-start;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.module-progress::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6px;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(53, 211, 195, 0.15),
+    rgba(53, 211, 195, 0.6),
+    rgba(53, 211, 195, 0.15)
+  );
+}
+
+.module-step {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.module-step span {
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.module-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(53, 211, 195, 0.9);
+  box-shadow: 0 0 0 0 rgba(53, 211, 195, 0.5);
+  animation: module-pulse 1.8s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+.module-step:nth-child(2) .module-dot {
+  animation-delay: 0.2s;
+}
+
+.module-step:nth-child(3) .module-dot {
+  animation-delay: 0.4s;
+}
+
+.module-step:nth-child(4) .module-dot {
+  animation-delay: 0.6s;
+}
+
+.module-step:nth-child(5) .module-dot {
+  animation-delay: 0.8s;
+}
+
+.metric-card {
+  min-height: 120px;
+}
+
+.metric-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #eaf1ff;
 }
 
 .delivery-layout {
@@ -39,7 +159,7 @@
   align-items: start;
 }
 
-.delivery-layout .delivery-live-feed-card {
+.delivery-layout .video-feed-card {
   grid-area: live;
 }
 
@@ -95,26 +215,52 @@
   font-size: 0.9rem;
 }
 
-.delivery-live-feed-card {
+.video-feed-card {
   display: grid;
   gap: 10px;
 }
 
-.delivery-live-feed-grid {
+.video-feed-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.delivery-live-feed-item {
+.video-feed-item {
   display: grid;
   gap: 8px;
 }
 
-.delivery-live-feed-label {
+.video-feed-label {
   color: var(--muted);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
+}
+
+.video-feed-placeholder {
+  min-height: 190px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(8, 12, 20, 0.45);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+}
+
+@keyframes module-pulse {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(53, 211, 195, 0.45);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 8px rgba(53, 211, 195, 0.15);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(53, 211, 195, 0.35);
+  }
 }
 
 @media (max-width: 960px) {
@@ -126,7 +272,19 @@
       "map";
   }
 
-  .delivery-live-feed-grid {
+  .science-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .module-progress {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .module-progress::before {
+    display: none;
+  }
+
+  .video-feed-grid {
     grid-template-columns: 1fr;
   }
 }

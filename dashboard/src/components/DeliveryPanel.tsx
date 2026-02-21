@@ -5,11 +5,11 @@ import ArmServoCard from './ArmServoCard'
 const DeliveryPanel = () => {
   return (
     <div className="delivery-layout" role="tabpanel">
-      <article className="card delivery-live-feed-card">
+      <article className="card video-feed-card">
         <h3>Live Feed</h3>
-        <div className="delivery-live-feed-grid">
-          <div className="delivery-live-feed-item">
-            <span className="delivery-live-feed-label">/dev/video0</span>
+        <div className="video-feed-grid">
+          <div className="video-feed-item">
+            <span className="video-feed-label">/dev/video0</span>
             <TransitiveVideoCard
               embedded
               source="/dev/video0"
@@ -25,8 +25,8 @@ const DeliveryPanel = () => {
               videoHeight={180}
             />
           </div>
-          <div className="delivery-live-feed-item">
-            <span className="delivery-live-feed-label">/dev/video8</span>
+          <div className="video-feed-item">
+            <span className="video-feed-label">/dev/video8</span>
             <TransitiveVideoCard
               embedded
               source="/dev/video8"

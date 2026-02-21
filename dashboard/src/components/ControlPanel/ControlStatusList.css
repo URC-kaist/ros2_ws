@@ -226,15 +226,6 @@
   margin: 12px 0;
 }
 
-.sidebar-base-heading .base-heading-label {
-  min-width: auto;
-}
-
-.base-heading-value {
-  color: #e8f4ff;
-  font-weight: 600;
-}
-
 @media (max-width: 520px) {
   .status-grid-compact {
     grid-template-columns: 1fr;

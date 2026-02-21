@@ -2,12 +2,9 @@ import './MissionTabs.css'
 
 const TABS = [
   { id: 'status', label: 'Status' },
-  { id: 'delivery', label: 'Delivery' },
   { id: 'science', label: 'Science' },
+  { id: 'delivery', label: 'Delivery / Servicing' },
   { id: 'autonomous', label: 'Autonomous' },
-  { id: 'manipulation', label: 'Manipulation' },
-  { id: 'navigation', label: 'Navigation' },
-  { id: 'comms', label: 'Comms' },
 ]
 
 type MissionTabId = (typeof TABS)[number]['id']
