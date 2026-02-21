@@ -28,6 +28,8 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<double>("solver_vel_eps", 1e-4);          // m/s
   auto_declare<double>("steering_error_ratio_deg",
                        40.0); // drive scale->0 around 30 deg
+  auto_declare<std::vector<bool>>("odom_wheel_drive_enabled", {});
+  auto_declare<std::vector<bool>>("odom_wheel_steer_enabled", {});
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
   auto_declare<std::string>("odom_frame_id", "odom");
   auto_declare<std::string>("base_frame_id", "base_link");
@@ -121,6 +123,37 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   solver_cfg_.cmd_deadzone_ang = std::max(0.0, solver_cmd_deadzone_ang);
   solver_cfg_.vel_eps = std::max(0.0, solver_vel_eps);
   solver_.emplace(solver_cfg_);
+
+  const auto odom_wheel_drive_enabled =
+      get_node()->get_parameter("odom_wheel_drive_enabled").as_bool_array();
+  if (odom_wheel_drive_enabled.empty()) {
+    odom_wheel_drive_enabled_.fill(true);
+  } else if (odom_wheel_drive_enabled.size() != 4) {
+    odom_wheel_drive_enabled_.fill(true);
+    RCLCPP_WARN(get_node()->get_logger(),
+                "odom_wheel_drive_enabled must have 4 entries (FL, FR, RL, RR); "
+                "falling back to all true");
+  } else {
+    for (size_t i = 0; i < odom_wheel_drive_enabled_.size(); ++i) {
+      odom_wheel_drive_enabled_[i] = odom_wheel_drive_enabled[i];
+    }
+  }
+
+  const auto odom_wheel_steer_enabled =
+      get_node()->get_parameter("odom_wheel_steer_enabled").as_bool_array();
+  if (odom_wheel_steer_enabled.empty()) {
+    odom_wheel_steer_enabled_.fill(true);
+  } else if (odom_wheel_steer_enabled.size() != 4) {
+    odom_wheel_steer_enabled_.fill(true);
+    RCLCPP_WARN(get_node()->get_logger(),
+                "odom_wheel_steer_enabled must have 4 entries (FL, FR, RL, RR); "
+                "falling back to all true");
+  } else {
+    for (size_t i = 0; i < odom_wheel_steer_enabled_.size(); ++i) {
+      odom_wheel_steer_enabled_[i] = odom_wheel_steer_enabled[i];
+    }
+  }
+
   odom_frame_id_ = get_node()->get_parameter("odom_frame_id").as_string();
   base_frame_id_ = get_node()->get_parameter("base_frame_id").as_string();
   const auto cmd_topic_nominal =
@@ -267,6 +300,9 @@ void TwistToCommandsController::publishOdom(
   size_t lin_count = 0;
 
   for (size_t i = 0; i < 4; ++i) {
+    if (!odom_wheel_drive_enabled_[i] || !odom_wheel_steer_enabled_[i]) {
+      continue;
+    }
     const double theta = steer_angle[i];
     const double c = std::cos(theta);
     const double s = std::sin(theta);
@@ -282,6 +318,9 @@ void TwistToCommandsController::publishOdom(
   double wz_sum = 0.0;
   size_t wz_count = 0;
   for (size_t i = 0; i < 4; ++i) {
+    if (!odom_wheel_drive_enabled_[i] || !odom_wheel_steer_enabled_[i]) {
+      continue;
+    }
     const double theta = steer_angle[i];
     const double c = std::cos(theta);
     const double s = std::sin(theta);

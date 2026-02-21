@@ -71,6 +71,8 @@ private:
   double steering_error_ratio_rad_;
   std::string odom_frame_id_;
   std::string base_frame_id_;
+  std::array<bool, 4> odom_wheel_drive_enabled_;
+  std::array<bool, 4> odom_wheel_steer_enabled_;
 
   FourWheelSteeringSolver::Config solver_cfg_;
   std::optional<FourWheelSteeringSolver> solver_;
