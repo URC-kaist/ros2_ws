@@ -43,20 +43,22 @@ private:
     last_status_time_ = now();
     have_status_ = true;
 
-    uint8_t desired = mr2_led::srv::SetLedMode::Request::MODE_OFF;
+    uint8_t desired = mr2_led::srv::SetLedMode::Request::MODE_MANUAL;
     if (msg->arrival) {
       desired = mr2_led::srv::SetLedMode::Request::MODE_SUCCESS;
     } else {
       switch (msg->state) {
         case 0:  // IDLE
-        case 3:  // COMPLETED
-          desired = mr2_led::srv::SetLedMode::Request::MODE_OFF;
+          desired = mr2_led::srv::SetLedMode::Request::MODE_MANUAL;
           break;
         case 1:  // RUNNING
           desired = mr2_led::srv::SetLedMode::Request::MODE_AUTONOMOUS;
           break;
         case 2:  // PAUSED
           desired = mr2_led::srv::SetLedMode::Request::MODE_MANUAL;
+          break;
+        case 3:  // COMPLETED
+          desired = mr2_led::srv::SetLedMode::Request::MODE_SUCCESS;
           break;
         default:
           desired = mr2_led::srv::SetLedMode::Request::MODE_OFF;
@@ -70,7 +72,7 @@ private:
   void on_timer_() {
     const auto now_time = now();
     if (!have_status_ || (now_time - last_status_time_) > status_timeout_) {
-      send_mode_if_changed_(mr2_led::srv::SetLedMode::Request::MODE_OFF);
+      send_mode_if_changed_(mr2_led::srv::SetLedMode::Request::MODE_MANUAL);
     }
   }
 

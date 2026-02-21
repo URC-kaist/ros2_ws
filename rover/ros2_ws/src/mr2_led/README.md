@@ -53,16 +53,17 @@ Mapping:
 
 | Condition                                  | LED mode    |
 |--------------------------------------------|-------------|
-| No `/mission_status` (timeout)             | OFF         |
-| `state` = IDLE (0) or COMPLETED (3)        | OFF         |
+| No `/mission_status` (timeout)             | MANUAL      |
+| `state` = IDLE (0)                         | MANUAL      |
 | `state` = RUNNING (1)                      | AUTONOMOUS  |
 | `state` = PAUSED (2)                       | MANUAL      |
 | `arrival` = true                           | SUCCESS     |
+| `state` = COMPLETED (3)                    | SUCCESS     |
 
 Parameters:
 - `mission_status_topic` (string, default: `/mission_status`)
 - `led_service_name` (string, default: `set_led_mode`)
-- `status_timeout_sec` (double, default: `1.0`)
+- `status_timeout_sec` (double, default: `4.0`)
 
 Run:
 
