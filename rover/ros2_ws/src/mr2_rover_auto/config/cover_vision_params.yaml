@@ -54,4 +54,4 @@ cover_vision_aruco_adapter:
     filter_window: 5
     max_jump_m: 2.0
     max_detection_distance_m: 5.0 # D435i range is 3.0 so this is generous enough
-    force_enable: false
+    force_enable: true # easier debugging
