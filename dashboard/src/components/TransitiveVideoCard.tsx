@@ -149,6 +149,20 @@ const TransitiveVideoCard = ({
     const shouldHide = (text: string) =>
       text.toLowerCase().includes('performs best on google chrome')
 
+    const applySizing = () => {
+      target.style.width = '100%'
+      target.style.height = '100%'
+      target.style.display = 'block'
+      const mediaNodes = root.querySelectorAll('video, img, canvas, iframe')
+      for (const node of Array.from(mediaNodes)) {
+        const el = node as HTMLElement
+        el.style.width = '100%'
+        el.style.height = '100%'
+        el.style.display = 'block'
+        el.style.objectFit = 'contain'
+      }
+    }
+
     const hideBanner = () => {
       const alerts = Array.from(root.querySelectorAll('[role="alert"], .alert'))
       for (const alert of alerts) {
@@ -166,8 +180,12 @@ const TransitiveVideoCard = ({
     }
 
     hideBanner()
+    applySizing()
 
-    const observer = new MutationObserver(() => hideBanner())
+    const observer = new MutationObserver(() => {
+      hideBanner()
+      applySizing()
+    })
     observer.observe(root, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [token])
