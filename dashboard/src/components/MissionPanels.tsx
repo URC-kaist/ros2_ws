@@ -7,6 +7,9 @@ import SystemStatusPanel from './SystemStatusPanel'
 import SpectrophotometerCard from './SpectrophotometerCard'
 import AutonomyHealthCard from './AutonomyHealthCard'
 import TransitiveVideoCard from './TransitiveVideoCard'
+import CameraTurretCard from './CameraTurretCard'
+import CentrifugeCard from './CentrifugeCard'
+import MicroscopeViewCard from './MicroscopeViewCard'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -49,7 +52,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
       {activeTab === 'delivery' && <DeliveryPanel />}
       {activeTab === 'science' && (
         <div className="science-layout" role="tabpanel">
-          <div className="science-left">
+          <div className="science-column">
             <article className="card module-progress-card">
               <h3>Module Progress</h3>
               <div className="module-progress">
@@ -59,11 +62,11 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
                 </div>
                 <div className="module-step">
                   <span className="module-dot" />
-                  <span>Pump</span>
+                  <span>Cache</span>
                 </div>
                 <div className="module-step">
                   <span className="module-dot" />
-                  <span>Cache</span>
+                  <span>Pump</span>
                 </div>
                 <div className="module-step">
                   <span className="module-dot" />
@@ -75,9 +78,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
                 </div>
               </div>
             </article>
-            <SpectrophotometerCard />
-          </div>
-          <div className="science-right">
+            <CameraTurretCard />
             <div className="science-metrics">
               <article className="card metric-card">
                 <h3>Temperature</h3>
@@ -88,9 +89,41 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
                 <div className="metric-value">-- %</div>
               </article>
             </div>
-            <article className="card video-feed-card">
-              <h3>Microscope View</h3>
-              <div className="video-feed-placeholder">Awaiting stream...</div>
+            <MicroscopeViewCard />
+          </div>
+          <div className="science-column">
+            <CentrifugeCard />
+            <SpectrophotometerCard />
+          </div>
+          <div className="science-column">
+            <article className="card video-feed-card science-camera-bank">
+              <h3>Module Cameras</h3>
+              <div className="video-feed-grid">
+                <div className="video-feed-item">
+                  <span className="video-feed-label">Boring Camera</span>
+                  <div className="video-feed-placeholder video-feed-placeholder--compact">
+                    Awaiting stream...
+                  </div>
+                </div>
+                <div className="video-feed-item">
+                  <span className="video-feed-label">Pump Camera</span>
+                  <div className="video-feed-placeholder video-feed-placeholder--compact">
+                    Awaiting stream...
+                  </div>
+                </div>
+                <div className="video-feed-item">
+                  <span className="video-feed-label">Cache Camera</span>
+                  <div className="video-feed-placeholder video-feed-placeholder--compact">
+                    Awaiting stream...
+                  </div>
+                </div>
+                <div className="video-feed-item">
+                  <span className="video-feed-label">Centrifuge Camera</span>
+                  <div className="video-feed-placeholder video-feed-placeholder--compact">
+                    Awaiting stream...
+                  </div>
+                </div>
+              </div>
             </article>
           </div>
         </div>
