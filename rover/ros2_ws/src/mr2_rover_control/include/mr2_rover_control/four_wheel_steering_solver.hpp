@@ -23,7 +23,9 @@ public:
         double wheel_base;        // Distance between F/R wheels
         double error_alpha;       // Filter factor [0.0 - 1.0]. Lower = More "Memory" (sluggish but smooth)
         double gain_k;            // Sharpness of EMA weighting vs steering error. Higher = more responsive.
-        double max_steer_angle;   // Physical limit of the servo (rad)
+        double max_steer_angle;   // Steering clamp for solver output (rad)
+        double steer_speed_no_atten;   // No speed attenuation below this error (rad)
+        double steer_speed_full_atten; // Full stop at/above this error (rad)
         double cmd_deadzone_lin;  // Command deadzone for linear speed (m/s)
         double cmd_deadzone_ang;  // Command deadzone for angular speed (rad/s)
         double vel_eps;           // Wheel speed epsilon for undefined direction (m/s)
@@ -88,15 +90,8 @@ public:
                 raw_angle = filtered_steer_[i];
             }
 
-            // --- STEP D: Optimization (The "Flip" Logic) ---
-            // We want to avoid turning the wheel 180 degrees if we can just reverse the motor.
-            if (!undefined_dir) {
-                double diff = normalizeAngle(raw_angle - current_steering[i]);
-                if (std::abs(diff) > M_PI_2) { // > 90 degrees
-                    raw_angle = normalizeAngle(raw_angle + M_PI);
-                    raw_speed *= -1.0;
-                }
-            }
+            // Clamp steering to configured limits (e.g., +/- 90 deg).
+            raw_angle = clampSteer(raw_angle);
 
             // --- STEP E: Per-wheel weighted EMA on steering command ---
             const double steer_err =
@@ -108,9 +103,24 @@ public:
                                      : std::clamp(cfg_.error_alpha * weight, 0.0, 1.0);
             const double delta = normalizeAngle(raw_angle - filtered_steer_[i]);
             filtered_steer_[i] = normalizeAngle(filtered_steer_[i] + alpha * delta);
+            filtered_steer_[i] = clampSteer(filtered_steer_[i]);
 
             targets[i].angle = filtered_steer_[i];
             targets[i].speed = raw_speed;
+        }
+
+        // Global speed attenuation based on the worst steering alignment.
+        double max_align_err = 0.0;
+        for (int i = 0; i < 4; ++i) {
+            const double align_err =
+                std::abs(normalizeAngle(targets[i].angle - current_steering[i]));
+            if (align_err > max_align_err) {
+                max_align_err = align_err;
+            }
+        }
+        const double speed_scale = steerSpeedScale(max_align_err);
+        for (int i = 0; i < 4; ++i) {
+            targets[i].speed *= speed_scale;
         }
 
         return targets;
@@ -126,5 +136,29 @@ private:
         angle = std::fmod(angle + M_PI, 2.0 * M_PI);
         if (angle < 0) angle += 2.0 * M_PI;
         return angle - M_PI;
+    }
+
+    double clampSteer(double angle) {
+        const double limit = cfg_.max_steer_angle;
+        if (limit <= 0.0) {
+            return normalizeAngle(angle);
+        }
+        return std::clamp(normalizeAngle(angle), -limit, limit);
+    }
+
+    double steerSpeedScale(double steer_err) {
+        const double start = std::max(0.0, cfg_.steer_speed_no_atten);
+        const double end = std::max(start, cfg_.steer_speed_full_atten);
+        if (end <= start + 1e-6) {
+            return (steer_err <= start) ? 1.0 : 0.0;
+        }
+        if (steer_err <= start) {
+            return 1.0;
+        }
+        if (steer_err >= end) {
+            return 0.0;
+        }
+        const double t = (steer_err - start) / (end - start);
+        return std::clamp(1.0 - t, 0.0, 1.0);
     }
 };

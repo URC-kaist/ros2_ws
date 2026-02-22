@@ -69,6 +69,7 @@ private:
   double rate_limit_vy_;
   double rate_limit_wz_;
   double steering_error_ratio_rad_;
+  bool mission_smooth_;
   std::string odom_frame_id_;
   std::string base_frame_id_;
   std::array<bool, 4> odom_wheel_drive_enabled_;

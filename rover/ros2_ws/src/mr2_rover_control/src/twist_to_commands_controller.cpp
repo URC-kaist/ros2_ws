@@ -23,11 +23,14 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
                        1.0); // rad/s^2 (tighter yaw slew)
   auto_declare<double>("solver_error_alpha", 0.1); // EMA factor for steering cmd
   auto_declare<double>("solver_gain_k", 4.0);      // EMA weight sharpness
+  auto_declare<double>("solver_max_steer_deg", 90.0); // solver steering clamp
+  auto_declare<double>("solver_speed_no_atten_deg", 15.0); // speed=1 below this
   auto_declare<double>("solver_cmd_deadzone_lin", 1e-3); // m/s
   auto_declare<double>("solver_cmd_deadzone_ang", 1e-3); // rad/s
   auto_declare<double>("solver_vel_eps", 1e-4);          // m/s
   auto_declare<double>("steering_error_ratio_deg",
                        40.0); // drive scale->0 around 30 deg
+  auto_declare<bool>("mission_smooth", true);
   auto_declare<std::vector<bool>>("odom_wheel_drive_enabled", {});
   auto_declare<std::vector<bool>>("odom_wheel_steer_enabled", {});
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
@@ -102,11 +105,16 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   steering_error_ratio_rad_ = (steer_err_ratio_deg > 0.0)
                                   ? steer_err_ratio_deg * M_PI / 180.0
                                   : max_steer_;
+  mission_smooth_ = get_node()->get_parameter("mission_smooth").as_bool();
   solver_error_alpha_ =
       get_node()->get_parameter("solver_error_alpha").as_double();
   solver_error_alpha_ = std::clamp(solver_error_alpha_, 0.0, 1.0);
   solver_gain_k_ = get_node()->get_parameter("solver_gain_k").as_double();
   solver_gain_k_ = std::max(0.0, solver_gain_k_);
+  const double solver_max_steer_deg =
+      get_node()->get_parameter("solver_max_steer_deg").as_double();
+  const double solver_speed_no_atten_deg =
+      get_node()->get_parameter("solver_speed_no_atten_deg").as_double();
   const double solver_cmd_deadzone_lin =
       get_node()->get_parameter("solver_cmd_deadzone_lin").as_double();
   const double solver_cmd_deadzone_ang =
@@ -118,7 +126,15 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   solver_cfg_.wheel_base = wheel_base_;
   solver_cfg_.error_alpha = solver_error_alpha_;
   solver_cfg_.gain_k = solver_gain_k_;
-  solver_cfg_.max_steer_angle = max_steer_;
+  const double solver_max_steer_rad =
+      std::abs(solver_max_steer_deg) * M_PI / 180.0;
+  solver_cfg_.max_steer_angle =
+      (max_steer_ > 0.0) ? std::min(max_steer_, solver_max_steer_rad)
+                         : solver_max_steer_rad;
+  solver_cfg_.steer_speed_no_atten =
+      std::max(0.0, solver_speed_no_atten_deg) * M_PI / 180.0;
+  solver_cfg_.steer_speed_full_atten =
+      std::max(0.0, steering_error_ratio_rad_);
   solver_cfg_.cmd_deadzone_lin = std::max(0.0, solver_cmd_deadzone_lin);
   solver_cfg_.cmd_deadzone_ang = std::max(0.0, solver_cmd_deadzone_ang);
   solver_cfg_.vel_eps = std::max(0.0, solver_vel_eps);
@@ -397,8 +413,9 @@ TwistToCommandsController::update(const rclcpp::Time &,
 
   const bool running =
       (mission_state_.has_value() && mission_state_.value() == kMissionStateRunning);
+  const bool use_solver = running && mission_smooth_;
 
-  if (!running) {
+  if (!use_solver) {
     if (wheel_radius_ <= 0.0) {
       RCLCPP_ERROR_THROTTLE(
           get_node()->get_logger(), *get_node()->get_clock(), 2000,
