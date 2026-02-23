@@ -77,7 +77,7 @@ bt_navigator_navigate_to_pose_rclcpp_node:
 controller_server:
   ros__parameters:
     use_sim_time: True
-    controller_frequency: 20.0
+    controller_frequency: 10.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001
     min_theta_velocity_threshold: 0.001
@@ -106,10 +106,10 @@ controller_server:
       # https://github.com/ros-navigation/navigation2/tree/main/nav2_mppi_controller
       plugin: "nav2_mppi_controller::MPPIController"
       visualize: false # expensive visualization; /trajectories
-      time_steps: 56
-      model_dt: 0.05
+      time_steps: 28 # 56
+      model_dt: 0.1 # 0.05; inverse of controller_frequency
       prune_distance: 2.0 # MPPI: > v_max * N * dt
-      batch_size: 1000 # 2000 # Hopefully use less CPU
+      batch_size: 500 # 2000 # Hopefully use less CPU
       vx_std: 0.2
       vy_std: 0.2
       wz_std: 0.4
