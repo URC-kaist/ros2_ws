@@ -4,7 +4,7 @@ const http = require('http')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 
-const { AntennaTracker } = require('../../antenna_tracker')
+const { AntennaTracker } = require('../antenna/tracker')
 const {
   MsgId,
   createSequencer,
@@ -18,7 +18,7 @@ const {
 } = require('../protocol/sik')
 const { createGatewayHttpHandler } = require('../runtime/http_handlers')
 const { RocketM2Client } = require('../runtime/rocket_m2_client')
-const { startRosBridge } = require('../runtime/ros_bridge')
+const { startRosTopicRelay } = require('../runtime/ros_topic_relay')
 const { SikSerialLink } = require('../runtime/serial_link')
 const { createWsHub } = require('../runtime/ws_hub')
 
@@ -39,7 +39,7 @@ function createGatewayApp(options = {}) {
   let heartbeatTimer = null
   let antennaStatusTimer = null
   let antennaTracker = null
-  let rosBridge = { stop() {} }
+  let rosTopicRelay = { stop() {} }
   let serverListening = false
 
   const rocketM2Client = new RocketM2Client({
@@ -264,7 +264,7 @@ function createGatewayApp(options = {}) {
       }
     }
 
-    rosBridge = await startRosBridge({
+    rosTopicRelay = await startRosTopicRelay({
       nextSeq,
       writeFrame,
       log,
@@ -318,9 +318,9 @@ function createGatewayApp(options = {}) {
       antennaTracker = null
     }
 
-    if (rosBridge) {
-      await Promise.resolve(rosBridge.stop())
-      rosBridge = null
+    if (rosTopicRelay) {
+      await Promise.resolve(rosTopicRelay.stop())
+      rosTopicRelay = null
     }
 
     serialLink.stop()
