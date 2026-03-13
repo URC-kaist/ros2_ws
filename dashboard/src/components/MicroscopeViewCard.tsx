@@ -32,7 +32,7 @@ const MicroscopeViewCard = () => {
 
       const current = selectedRef.current
       const currentPad = current != null ? pads[current] : null
-      const nextIndex = currentPad ? current : list[0].index
+      const nextIndex = currentPad && current != null ? current : list[0].index
 
       if (current !== nextIndex) {
         setSelectedIndex(nextIndex)
@@ -70,7 +70,7 @@ const MicroscopeViewCard = () => {
             const next = event.target.value === '' ? null : Number(event.target.value)
             setSelectedIndex(next)
             const pads = navigator.getGamepads?.() ?? []
-            setConnected(next != null && Boolean(pads[next]))
+            setConnected(next != null && next >= 0 && Boolean(pads[next]))
           }}
         >
           <option value="">No control</option>

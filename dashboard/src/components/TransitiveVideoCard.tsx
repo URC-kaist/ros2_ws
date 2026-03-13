@@ -40,12 +40,19 @@ const TransitiveVideoCard = ({
   rosversion = '2',
 }: TransitiveVideoCardProps) => {
   const [fetchedToken, setFetchedToken] = useState<string | null>(null)
-  const [tokenStatus, setTokenStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
-    'idle'
-  )
+  const [fetchError, setFetchError] = useState(false)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rawToken = jwt ?? fetchedToken ?? ''
   const token = rawToken.trim().replace(/^['"]|['"]$/g, '')
+  const tokenStatus: 'idle' | 'loading' | 'ready' | 'error' = jwt
+    ? jwt.trim()
+      ? 'ready'
+      : 'error'
+    : fetchedToken
+      ? 'ready'
+      : fetchError
+        ? 'error'
+        : 'loading'
   const capabilityProps = useMemo(() => {
     if (type === 'v4l2src') {
       return {
@@ -105,31 +112,23 @@ const TransitiveVideoCard = ({
   }, [])
 
   useEffect(() => {
-    if (jwt) {
-      setTokenStatus(jwt.trim() ? 'ready' : 'error')
-      return
-    }
-    if (fetchedToken) {
-      setTokenStatus('ready')
-      return
-    }
+    if (jwt || fetchedToken) return
 
     let active = true
-    setTokenStatus('loading')
     fetch(tokenEndpoint)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!active) return
         if (data?.token && typeof data.token === 'string') {
+          setFetchError(false)
           setFetchedToken(data.token)
-          setTokenStatus('ready')
         } else {
-          setTokenStatus('error')
+          setFetchError(true)
         }
       })
       .catch(() => {
         if (!active) return
-        setTokenStatus('error')
+        setFetchError(true)
       })
     return () => {
       active = false

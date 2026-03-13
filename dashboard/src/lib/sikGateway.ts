@@ -238,34 +238,50 @@ class SikGatewayClient {
     })
   }
 
+  isConnected() {
+    return this.connected
+  }
+
   onLinkStatus(handler: MessageHandler<LinkStatus>) {
     this.linkListeners.add(handler)
-    return () => this.linkListeners.delete(handler)
+    return () => {
+      this.linkListeners.delete(handler)
+    }
   }
 
   onConnectionStatus(handler: MessageHandler<boolean>) {
     this.connectionListeners.add(handler)
-    return () => this.connectionListeners.delete(handler)
+    return () => {
+      this.connectionListeners.delete(handler)
+    }
   }
 
   onTelemBattery(handler: MessageHandler<TelemBattery>) {
     this.batteryListeners.add(handler)
-    return () => this.batteryListeners.delete(handler)
+    return () => {
+      this.batteryListeners.delete(handler)
+    }
   }
 
   onTelemNav(handler: MessageHandler<TelemNav>) {
     this.navListeners.add(handler)
-    return () => this.navListeners.delete(handler)
+    return () => {
+      this.navListeners.delete(handler)
+    }
   }
 
   onBaseStatus(handler: MessageHandler<BaseStatus>) {
     this.baseStatusListeners.add(handler)
-    return () => this.baseStatusListeners.delete(handler)
+    return () => {
+      this.baseStatusListeners.delete(handler)
+    }
   }
 
   onRocketM2Status(handler: MessageHandler<RocketM2Status>) {
     this.rocketM2Listeners.add(handler)
-    return () => this.rocketM2Listeners.delete(handler)
+    return () => {
+      this.rocketM2Listeners.delete(handler)
+    }
   }
 
   sendCmdDrive(cmd: CmdDrive) {

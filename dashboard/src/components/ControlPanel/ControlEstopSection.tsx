@@ -1,13 +1,8 @@
-import { useEffect } from 'react'
-import { getSikGatewayClient } from '../../lib/sikGateway'
+import { useSikGateway } from '../../hooks/useSikGateway'
 import './ControlEstopSection.css'
 
 const ControlEstopSection = () => {
-  const gateway = getSikGatewayClient()
-
-  useEffect(() => {
-    gateway.connect()
-  }, [gateway])
+  const { gateway } = useSikGateway()
 
   const handleEstop = () => {
     gateway.sendMissionControl({

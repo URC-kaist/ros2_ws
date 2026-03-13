@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getSikGatewayClient } from '../lib/sikGateway'
+import { useSikGateway } from '../hooks/useSikGateway'
 import './ArmServoCard.css'
 
 type GamepadInfo = { index: number; id: string }
@@ -11,7 +11,7 @@ const CMD_PERIOD_MS = 50
 const GRIPPER_RATE_PER_SEC = 0.08
 
 const ArmServoCard = () => {
-  const gatewayRef = useRef(getSikGatewayClient())
+  const { gateway } = useSikGateway()
   const [gamepads, setGamepads] = useState<GamepadInfo[]>([])
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [connected, setConnected] = useState(false) // gamepad present
@@ -35,10 +35,6 @@ const ArmServoCard = () => {
   useEffect(() => {
     selectedRef.current = selectedIndex
   }, [selectedIndex])
-
-  useEffect(() => {
-    gatewayRef.current.connect()
-  }, [])
 
   // Gamepad discovery
   useEffect(() => {
@@ -131,7 +127,7 @@ const ArmServoCard = () => {
   useEffect(() => {
     const timer = window.setInterval(() => {
       const cmd = cmdRef.current
-      gatewayRef.current.sendCmdArmTwist({
+      gateway.sendCmdArmTwist({
         lin_x_m_s: cmd.lin_x,
         lin_y_m_s: cmd.lin_y,
         lin_z_m_s: cmd.lin_z,
@@ -140,13 +136,13 @@ const ArmServoCard = () => {
         ang_z_rad_s: cmd.ang_z,
       })
       if (controlEnabledRef.current) {
-        gatewayRef.current.sendCmdArmGripper({
+        gateway.sendCmdArmGripper({
           position_norm: gripperRef.current,
         })
       }
     }, CMD_PERIOD_MS)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [gateway])
 
   return (
     <article className="card arm-card">

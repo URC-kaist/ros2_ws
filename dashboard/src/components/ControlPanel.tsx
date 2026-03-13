@@ -3,7 +3,7 @@ import ControlEstopSection from './ControlPanel/ControlEstopSection'
 import ControlPanelHeader from './ControlPanel/ControlPanelHeader'
 import ControlStatusList from './ControlPanel/ControlStatusList'
 import ControlVectorPlot, { type CmdVel } from './ControlPanel/ControlVectorPlot'
-import { getSikGatewayClient } from '../lib/sikGateway'
+import { useSikGateway } from '../hooks/useSikGateway'
 import './ControlPanel/ControlPanel.css'
 
 const sensitivityScale = {
@@ -15,7 +15,7 @@ const sensitivityScale = {
 const RADIUS = 0.57725 // meters
 
 const ControlPanel = () => {
-  const gatewayRef = useRef(getSikGatewayClient())
+  const { gateway } = useSikGateway()
   const cmdVelRef = useRef<CmdVel>({ x: 0, y: 0, yaw: 0 })
   const [sensitivity, setSensitivity] = useState<'low' | 'med' | 'high'>('med')
   const [cmdVel, setCmdVel] = useState<CmdVel>({ x: 0, y: 0, yaw: 0 })
@@ -27,10 +27,6 @@ const ControlPanel = () => {
   const controlEnabledRef = useRef(true)
 
   useEffect(() => {
-    gatewayRef.current.connect()
-  }, [])
-
-  useEffect(() => {
     gamepadIndexRef.current = gamepadIndex
   }, [gamepadIndex])
 
@@ -40,10 +36,10 @@ const ControlPanel = () => {
 
   useEffect(() => {
     const heartbeatId = window.setInterval(() => {
-      gatewayRef.current.sendHeartbeat()
+      gateway.sendHeartbeat()
     }, 500)
     return () => window.clearInterval(heartbeatId)
-  }, [])
+  }, [gateway])
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -55,7 +51,7 @@ const ControlPanel = () => {
       setCmdVel(zero)
       gamepadConnectedRef.current = false
       setGamepadConnected(false)
-      gatewayRef.current.sendCmdDrive({
+      gateway.sendCmdDrive({
         linear_x_m_s: 0,
         linear_y_m_s: 0,
         angular_z_rad_s: 0,
@@ -63,7 +59,7 @@ const ControlPanel = () => {
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
+  }, [gateway])
 
   useEffect(() => {
     const cmdRateMs = 50
@@ -72,14 +68,14 @@ const ControlPanel = () => {
         return
       }
       const latest = cmdVelRef.current
-      gatewayRef.current.sendCmdDrive({
+      gateway.sendCmdDrive({
         linear_x_m_s: latest.y,
         linear_y_m_s: latest.x,
         angular_z_rad_s: latest.yaw,
       })
     }, cmdRateMs)
     return () => window.clearInterval(cmdId)
-  }, [gamepadConnected])
+  }, [gamepadConnected, gateway])
 
   useEffect(() => {
     const updateGamepads = () => {

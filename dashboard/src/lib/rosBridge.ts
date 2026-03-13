@@ -33,7 +33,7 @@ class RosBridgeClient {
   private reconnectTimer: number | null = null
   private reconnectDelayMs = RECONNECT_BASE_MS
   private connectionListeners = new Set<MessageHandler<boolean>>()
-  private topics = new Map<string, TopicEntry<unknown>>()
+  private topics = new Map<string, TopicEntry<any>>()
 
   constructor(url: string) {
     this.url = url
@@ -73,7 +73,9 @@ class RosBridgeClient {
 
   onConnectionStatus(handler: MessageHandler<boolean>) {
     this.connectionListeners.add(handler)
-    return () => this.connectionListeners.delete(handler)
+    return () => {
+      this.connectionListeners.delete(handler)
+    }
   }
 
   subscribe<T>(
@@ -116,12 +118,12 @@ class RosBridgeClient {
       return Promise.reject(new Error('ROS bridge is not connected'))
     }
     const roslib = this.getRosLib()
-    const service = new roslib.Service({
+    const service = new roslib.Service<TRequest, TResponse>({
       ros: this.ros,
       name,
       serviceType,
     })
-    const serviceRequest = new roslib.ServiceRequest(request as Record<string, unknown>)
+    const serviceRequest = new roslib.ServiceRequest<TRequest>(request)
     return new Promise((resolve, reject) => {
       service.callService(
         serviceRequest,
@@ -163,7 +165,7 @@ class RosBridgeClient {
       compression: options.compression,
     })
     const entry: TopicEntry<T> = { topic, handlers: new Set() }
-    this.topics.set(key, entry as TopicEntry<unknown>)
+    this.topics.set(key, entry)
     return entry
   }
 
@@ -198,10 +200,7 @@ class RosBridgeClient {
    * state (`_events`) to exist. If we call it before any subscribe()
    * was made (e.g., when ROS is offline and we clean up), it throws.
    */
-  private safeTopicUnsubscribe(
-    entry: TopicEntry<unknown>,
-    handler?: MessageHandler<unknown>
-  ) {
+  private safeTopicUnsubscribe<T>(entry: TopicEntry<T>, handler?: MessageHandler<T>) {
     const topicAny = entry.topic as any
     const hasEvents = !!topicAny?._events
     if (!hasEvents) return

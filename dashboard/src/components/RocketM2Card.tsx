@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getSikGatewayClient, type RocketM2Status } from '../lib/sikGateway'
+import { useSikGateway } from '../hooks/useSikGateway'
+import { type RocketM2Status } from '../lib/sikGateway'
 import './RocketM2Card.css'
 
 const STALE_MS = 15000
@@ -21,19 +22,18 @@ const formatChain = (values: number[] | null | undefined, idx: number) => {
 }
 
 const RocketM2Card = () => {
+  const { gateway } = useSikGateway()
   const [status, setStatus] = useState<RocketM2Status | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
 
   useEffect(() => {
-    const gateway = getSikGatewayClient()
-    gateway.connect()
     const unsubscribe = gateway.onRocketM2Status((payload) => {
       setStatus(payload)
     })
     return () => {
       unsubscribe()
     }
-  }, [])
+  }, [gateway])
 
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 1000)

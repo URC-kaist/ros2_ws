@@ -1,28 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getRosBridgeClient } from '../lib/rosBridge'
+import { useRosBridge } from '../hooks/useRosBridge'
+import type { UBXNavHPPosLLH, UBXNavStatus } from '../lib/rosMessages'
 import './GnssStatusCard.css'
-
-type GpsFix = {
-  fix_type?: number
-}
-
-type CarrSoln = {
-  status?: number
-}
-
-type UBXNavStatus = {
-  gps_fix?: GpsFix
-  gps_fix_ok?: boolean
-  diff_soln?: boolean
-  diff_corr?: boolean
-  carr_soln_valid?: boolean
-  carr_soln?: CarrSoln
-}
-
-type UBXNavHPPosLLH = {
-  h_acc?: number
-  v_acc?: number
-}
 
 type GnssSideId = 'left' | 'right'
 
@@ -105,14 +84,13 @@ const formatUpdatedAt = (ts?: number) =>
   ts != null ? new Date(ts).toLocaleTimeString() : '—'
 
 const GnssStatusCard = () => {
+  const { ros } = useRosBridge()
   const [gnssState, setGnssState] = useState<Record<GnssSideId, GnssState>>({
     left: {},
     right: {},
   })
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     const unsubscribers: Array<() => void> = []
 
     for (const side of GNSS_SIDES) {
@@ -159,7 +137,7 @@ const GnssStatusCard = () => {
         off()
       }
     }
-  }, [])
+  }, [ros])
 
   const sides = useMemo(
     () =>
