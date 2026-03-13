@@ -63,6 +63,9 @@ const ControlStatusList = () => {
 
   useEffect(() => {
     const offLink = gateway.onLinkStatus(setLinkStatus)
+    const offConnection = gateway.onConnectionStatus(() => {
+      setLinkStatus(null)
+    })
     const offBattery = gateway.onTelemBattery((payload) => {
       if (payload.battery_id === 2) {
         setBattery2(payload)
@@ -74,9 +77,11 @@ const ControlStatusList = () => {
     })
     return () => {
       offLink()
+      offConnection()
       offBattery()
     }
   }, [gateway])
+
   useEffect(() => {
     const interval = window.setInterval(() => {
       setNowMs(Date.now())
