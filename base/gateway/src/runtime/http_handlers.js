@@ -1,7 +1,5 @@
 'use strict'
 
-const jwt = require('jsonwebtoken')
-
 const { toInt } = require('../config')
 
 function handleRocketM2Status(_req, res, options = {}) {
@@ -72,6 +70,7 @@ function handleTransitiveToken(req, res, options = {}) {
 
   let token
   try {
+    const jwt = require('jsonwebtoken')
     token = jwt.sign(payload, secret)
   } catch (err) {
     log(`Failed to sign token: ${err.message || err}`)

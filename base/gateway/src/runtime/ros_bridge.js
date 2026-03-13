@@ -6,6 +6,8 @@ async function startRosBridge(options = {}) {
   const nextSeq = options.nextSeq
   const writeFrame = options.writeFrame
   const log = typeof options.log === 'function' ? options.log : () => {}
+  const onBaseSurveyIn =
+    typeof options.onBaseSurveyIn === 'function' ? options.onBaseSurveyIn : null
 
   let rclnodejs
   try {
@@ -36,6 +38,9 @@ async function startRosBridge(options = {}) {
     '/base/ubx_nav_svin',
     (msg) => {
       if (!msg) return
+      if (onBaseSurveyIn) {
+        onBaseSurveyIn(msg)
+      }
       const nowMs = Date.now()
       if (nowMs - lastSvinTxMs < 500) return
       lastSvinTxMs = nowMs

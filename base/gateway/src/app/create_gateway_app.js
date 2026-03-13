@@ -268,6 +268,11 @@ function createGatewayApp(options = {}) {
       nextSeq,
       writeFrame,
       log,
+      onBaseSurveyIn: (msg) => {
+        if (antennaTracker) {
+          antennaTracker.updateBaseSurveyIn(msg)
+        }
+      },
     })
 
     await new Promise((resolve) => {

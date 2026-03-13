@@ -28,7 +28,7 @@ class RocketM2Client {
     const configured =
       this.config.rocketM2Ip && this.config.rocketM2User && this.config.rocketM2Pass
     return {
-      enabled: this.config.rocketM2Enable || configured,
+      enabled: Boolean(this.config.rocketM2Enable || configured),
       configured: Boolean(configured),
       status: this.status,
     }
