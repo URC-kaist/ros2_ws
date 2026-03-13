@@ -8,8 +8,6 @@ const DEFAULTS = {
   baud: 57600,
   port: 8081,
   heartbeatHz: 2,
-  cmdHz: 10,
-  cmdTimeoutMs: 500,
   linkTimeoutMs: 2000,
   antennaEnable: false,
   antennaDevice: '',
@@ -79,10 +77,6 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
     port: toInt(getArg(args, '--port') || env.SIK_WS_PORT || DEFAULTS.port),
     heartbeatHz: toFloat(
       getArg(args, '--heartbeat-hz') || env.SIK_HEARTBEAT_HZ || DEFAULTS.heartbeatHz
-    ),
-    cmdHz: toFloat(getArg(args, '--cmd-hz') || env.SIK_CMD_HZ || DEFAULTS.cmdHz),
-    cmdTimeoutMs: toInt(
-      getArg(args, '--cmd-timeout-ms') || env.SIK_CMD_TIMEOUT_MS || DEFAULTS.cmdTimeoutMs
     ),
     linkTimeoutMs: toInt(
       getArg(args, '--link-timeout-ms') ||

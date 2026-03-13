@@ -1,7 +1,6 @@
 'use strict'
 
 const { EventEmitter } = require('events')
-const { SerialPort } = require('serialport')
 
 const { consumeFrames } = require('../protocol/sik')
 
@@ -11,7 +10,7 @@ class SikSerialLink extends EventEmitter {
     this.device = options.device
     this.baud = options.baud
     this.log = typeof options.log === 'function' ? options.log : () => {}
-    this.SerialPortImpl = options.SerialPortImpl || SerialPort
+    this.SerialPortImpl = options.SerialPortImpl || null
 
     this.port = null
     this.portReconnectTimer = null
@@ -79,7 +78,8 @@ class SikSerialLink extends EventEmitter {
       this.port = null
     }
 
-    this.port = new this.SerialPortImpl({
+    const SerialPortImpl = this._getSerialPortImpl()
+    this.port = new SerialPortImpl({
       path: this.device,
       baudRate: this.baud,
       autoOpen: true,
@@ -112,6 +112,14 @@ class SikSerialLink extends EventEmitter {
         this.emit('frame', msgId, payload)
       })
     })
+  }
+
+  _getSerialPortImpl() {
+    if (this.SerialPortImpl) return this.SerialPortImpl
+    // Delay loading the serialport package so tests can inject a fake implementation.
+    const { SerialPort } = require('serialport')
+    this.SerialPortImpl = SerialPort
+    return this.SerialPortImpl
   }
 }
 

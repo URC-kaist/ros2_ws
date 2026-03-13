@@ -1,13 +1,12 @@
 'use strict'
 
-const { WebSocketServer } = require('ws')
-
 function createWsHub(options = {}) {
   const onMessage = typeof options.onMessage === 'function' ? options.onMessage : () => {}
   const getInitialMessages =
     typeof options.getInitialMessages === 'function' ? options.getInitialMessages : () => []
+  const WebSocketServerImpl = options.WebSocketServerImpl || require('ws').WebSocketServer
 
-  const wss = new WebSocketServer({ server: options.server })
+  const wss = new WebSocketServerImpl({ server: options.server })
   wss.on('connection', (ws) => {
     ws.on('message', (data) => {
       let message
@@ -25,6 +24,7 @@ function createWsHub(options = {}) {
   })
 
   return {
+    wss,
     broadcast(obj) {
       const payload = JSON.stringify(obj)
       for (const client of wss.clients) {

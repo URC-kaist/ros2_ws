@@ -33,6 +33,8 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
   assert.equal(config.heartbeatHz, 5)
   assert.equal(config.antennaEnable, true)
   assert.equal(config.rocketM2Enable, true)
+  assert.equal('cmdHz' in config, false)
+  assert.equal('cmdTimeoutMs' in config, false)
 })
 
 test('parseGatewayConfig falls back to defaults when values are absent', () => {
