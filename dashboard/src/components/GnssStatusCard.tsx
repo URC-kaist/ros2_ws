@@ -1,28 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRosBridge } from '../hooks/useRosBridge'
+import type { UBXNavHPPosLLH, UBXNavStatus } from '../lib/rosMessages'
 import './GnssStatusCard.css'
-
-type GpsFix = {
-  fix_type?: number
-}
-
-type CarrSoln = {
-  status?: number
-}
-
-type UBXNavStatus = {
-  gps_fix?: GpsFix
-  gps_fix_ok?: boolean
-  diff_soln?: boolean
-  diff_corr?: boolean
-  carr_soln_valid?: boolean
-  carr_soln?: CarrSoln
-}
-
-type UBXNavHPPosLLH = {
-  h_acc?: number
-  v_acc?: number
-}
 
 type GnssSideId = 'left' | 'right'
 

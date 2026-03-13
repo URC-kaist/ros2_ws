@@ -1,23 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRosBridge } from '../../hooks/useRosBridge'
 import { useSikGateway } from '../../hooks/useSikGateway'
+import type { MissionStatusMsg, UBXNavStatus } from '../../lib/rosMessages'
 import { type LinkStatus, type TelemBattery } from '../../lib/sikGateway'
 import './ControlStatusList.css'
-
-type MissionStatusMsg = {
-  state?: number
-  detail?: string
-  arrival?: boolean
-}
-
-type GpsFix = {
-  fix_type?: number
-}
-
-type UBXNavStatus = {
-  gps_fix?: GpsFix
-  gps_fix_ok?: boolean
-}
 
 type GnssSideId = 'left' | 'right'
 

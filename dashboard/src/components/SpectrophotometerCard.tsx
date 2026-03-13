@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRosBridge } from '../hooks/useRosBridge'
+import type {
+  GetSpectrumRequest,
+  GetSpectrumResponse,
+  SpectrumMsg,
+} from '../lib/rosMessages'
 import './SpectrophotometerCard.css'
 
 type UPlotInstance = { destroy: () => void; setData: (data: number[][]) => void }
@@ -27,24 +32,6 @@ type UPlotOptions = {
     | Record<string, never>
     | { label: string; stroke: string; width: number; fill: string }
   >
-}
-
-type SpectrumMsg = {
-  header?: { stamp?: { sec?: number; nanosec?: number }; frame_id?: string }
-  wavelength_nm: number[]
-  intensity: number[]
-  mode: number
-}
-
-type GetSpectrumRequest = {
-  use_absorbance: boolean
-  publish_topic: boolean
-}
-
-type GetSpectrumResponse = {
-  success: boolean
-  message: string
-  spectrum: SpectrumMsg
 }
 
 const SERVICE_NAME = '/get_spectrum'

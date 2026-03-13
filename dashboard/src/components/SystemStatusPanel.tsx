@@ -1,26 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRosBridge } from '../hooks/useRosBridge'
 import { useSikGateway } from '../hooks/useSikGateway'
+import type {
+  DiagnosticArray,
+  DiagnosticKeyValue,
+  PackTelemetry,
+} from '../lib/rosMessages'
 import { type BaseStatus } from '../lib/sikGateway'
 import GnssStatusCard from './GnssStatusCard'
 import RocketM2Card from './RocketM2Card'
 import './SystemStatusPanel.css'
-
-type DiagnosticKeyValue = {
-  key: string
-  value: string
-}
-
-type DiagnosticStatus = {
-  level: number
-  name: string
-  message: string
-  values: DiagnosticKeyValue[]
-}
-
-type DiagnosticArray = {
-  status: DiagnosticStatus[]
-}
 
 type TopicSpec = {
   id: string
@@ -34,20 +23,6 @@ type StatusSnapshot = {
 }
 
 type BatteryCardId = 'battery_1' | 'battery_2'
-
-type PackTelemetry = {
-  state_of_charge_pct?: number
-  health_pct?: number
-  temperature_c?: number
-  pack_voltage_v?: number
-  pack_life_cycles?: number
-  firmware_cycle_count?: number
-  nominal_cell_capacity_mah?: number
-  parallel_group_count?: number
-  cell_count?: number
-  cell_voltage_mv?: number[]
-  cell_voltage_valid?: boolean[]
-}
 
 const TOPICS: TopicSpec[] = [
   { id: 'cpu', label: 'CPU', topic: '/system_status/cpu' },

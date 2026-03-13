@@ -11,29 +11,8 @@ import {
   OBJECT_TYPES,
   type MissionSpec,
 } from '../lib/missions'
+import type { MissionControlMsg, MissionListMsg, MissionStatusMsg } from '../lib/rosMessages'
 import './MissionMasterPanel.css'
-
-type MissionListMsg = {
-  stamp?: { sec?: number; nanosec?: number }
-  missions?: MissionSpec[]
-}
-
-type MissionControlMsg = {
-  command: number
-  clear_costmap: boolean
-  mission_id: number
-}
-
-type MissionStatusMsg = {
-  stamp?: { sec?: number; nanosec?: number }
-  active_mission?: MissionSpec
-  state?: number
-  arrival?: boolean
-  current_waypoint_index?: number
-  total_waypoints?: number
-  distance_remaining?: number
-  detail?: string
-}
 
 const COMMANDS = [
   { id: 1, label: 'Pause' },
