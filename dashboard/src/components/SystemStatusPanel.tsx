@@ -217,7 +217,10 @@ const SystemStatusPanel = () => {
     battery_1: null,
     battery_2: null,
   })
-  const [baseHeadingInput, setBaseHeadingInput] = useState('')
+  const [baseHeadingInput, setBaseHeadingInput] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return window.localStorage.getItem('baseHeadingDeg') ?? ''
+  })
 
   useEffect(() => {
     const ros = getRosBridgeClient()
@@ -288,7 +291,6 @@ const SystemStatusPanel = () => {
     if (typeof window === 'undefined') return
     const stored = window.localStorage.getItem('baseHeadingDeg')
     if (!stored) return
-    setBaseHeadingInput(stored)
     const parsed = Number(stored)
     if (!Number.isFinite(parsed)) return
     const normalized = ((parsed % 360) + 360) % 360

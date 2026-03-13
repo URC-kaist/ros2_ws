@@ -105,7 +105,7 @@ const SpectrophotometerCard = () => {
     ros.connect()
     const offConnection = ros.onConnectionStatus(setRosConnected)
     return () => offConnection()
-  }, [])
+  }, [spectrum])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -181,9 +181,7 @@ const SpectrophotometerCard = () => {
 
     plotInstanceRef.current?.destroy()
     const options = makePlotOptions(modeLabel, plotSize.width, plotSize.height)
-    const initial = spectrum
-      ? [spectrum.wavelength_nm, spectrum.intensity]
-      : [[], []]
+    const initial: [number[], number[]] = [[], []]
     const plot = new uplotCtor(options, initial, container)
     plotInstanceRef.current = plot
     return () => plot.destroy()

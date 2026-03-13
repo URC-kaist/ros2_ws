@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getRosBridgeClient } from '../lib/rosBridge'
 
 type LastSeenKey =
@@ -26,7 +26,7 @@ const labelForTone = (tone: HealthTone) => {
 }
 
 const AutonomyHealthCard = () => {
-  const lastSeenRef = useRef<Record<LastSeenKey, number | null>>({
+  const [lastSeen, setLastSeen] = useState<Record<LastSeenKey, number | null>>({
     odomLocal: null,
     gpsFiltered: null,
     traversability: null,
@@ -46,7 +46,10 @@ const AutonomyHealthCard = () => {
     const ros = getRosBridgeClient()
     ros.connect()
     const markSeen = (key: LastSeenKey) => {
-      lastSeenRef.current[key] = Date.now()
+      setLastSeen((prev) => ({
+        ...prev,
+        [key]: Date.now(),
+      }))
     }
     const unsubscribers = [
       ros.subscribe<Record<string, unknown>>(
@@ -92,15 +95,15 @@ const AutonomyHealthCard = () => {
       ts == null ? Number.POSITIVE_INFINITY : nowMs - ts
 
     const localizationAge = Math.max(
-      ageMs(lastSeenRef.current.odomLocal),
-      ageMs(lastSeenRef.current.gpsFiltered)
+      ageMs(lastSeen.odomLocal),
+      ageMs(lastSeen.gpsFiltered)
     )
 
     const items = [
       { key: 'Localization', age: localizationAge },
-      { key: 'Traversability', age: ageMs(lastSeenRef.current.traversability) },
-      { key: 'Controller', age: ageMs(lastSeenRef.current.cmdVel) },
-      { key: 'Master Status', age: ageMs(lastSeenRef.current.missionStatus) },
+      { key: 'Traversability', age: ageMs(lastSeen.traversability) },
+      { key: 'Controller', age: ageMs(lastSeen.cmdVel) },
+      { key: 'Master Status', age: ageMs(lastSeen.missionStatus) },
     ]
 
     return items.map((item) => {
@@ -111,7 +114,7 @@ const AutonomyHealthCard = () => {
         value: labelForTone(tone),
       }
     })
-  }, [nowMs])
+  }, [lastSeen, nowMs])
 
   return (
     <article className="card">

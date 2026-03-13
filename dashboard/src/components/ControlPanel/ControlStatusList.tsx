@@ -94,8 +94,6 @@ const ControlStatusList = () => {
       offBattery()
     }
   }, [])
-
-
   useEffect(() => {
     const interval = window.setInterval(() => {
       setNowMs(Date.now())
@@ -104,11 +102,6 @@ const ControlStatusList = () => {
       window.clearInterval(interval)
     }
   }, [])
-
-  // Clear stale link status whenever the websocket reconnects/disconnects
-  useEffect(() => {
-    setLinkStatus(null)
-  }, [wsConnected])
 
   useEffect(() => {
     const rosBridge = getRosBridgeClient()
@@ -182,11 +175,12 @@ const ControlStatusList = () => {
   const battery2Stale = battery2UpdatedAt === 0 || nowMs - battery2UpdatedAt > batteryStaleMs
   let linkState = 'Down'
   let linkDotClass = 'status-dot-error'
+  const effectiveLinkStatus = wsConnected ? linkStatus : null
   if (wsConnected) {
-    if (linkStatus?.connected) {
+    if (effectiveLinkStatus?.connected) {
       linkState = 'Up'
       linkDotClass = ''
-    } else if (linkStatus && linkStatus.connected === false) {
+    } else if (effectiveLinkStatus && effectiveLinkStatus.connected === false) {
       linkState = 'Lost'
       linkDotClass = 'status-dot-warn'
     } else {

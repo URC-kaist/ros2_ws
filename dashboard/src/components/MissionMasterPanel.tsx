@@ -142,6 +142,7 @@ const MissionMasterPanel = ({
   const [missionId, setMissionId] = useState('0')
   const [status, setStatus] = useState<MissionStatusMsg | null>(null)
   const [statusAt, setStatusAt] = useState<number | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [rosConnected, setRosConnected] = useState(false)
   const [invalidFields, setInvalidFields] = useState<InvalidFieldMap>({})
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -177,6 +178,15 @@ const MissionMasterPanel = ({
       { throttleRate: 500 }
     )
     return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+    return () => {
+      window.clearInterval(timer)
+    }
   }, [])
 
   const validateMissionList = () => {
@@ -255,8 +265,8 @@ const MissionMasterPanel = ({
   const arrivalLabel = status?.arrival ? 'ARRIVAL' : '—'
   const active = status?.active_mission
   const lastStatusAge =
-    statusAt != null ? `${((Date.now() - statusAt) / 1000).toFixed(1)}s ago` : '—'
-  const statusStale = statusAt == null || Date.now() - statusAt > 1000
+    statusAt != null ? `${((nowMs - statusAt) / 1000).toFixed(1)}s ago` : '—'
+  const statusStale = statusAt == null || nowMs - statusAt > 1000
   const statusFlash = !statusStale && !!status?.arrival
   const ledMode = (() => {
     if (statusStale || !status) return 'off'

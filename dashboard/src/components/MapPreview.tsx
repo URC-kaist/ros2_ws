@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { getRosBridgeClient } from '../lib/rosBridge'
@@ -108,28 +108,31 @@ const MapPreview = ({
     }
   }
 
-  const toLL = async (x: number, y: number, z = 0): Promise<[number, number] | null> => {
-    const key = `${x},${y},${z}`
-    const cached = toLLCacheRef.current.get(key)
-    if (cached) return cached
-    const ros = getRosBridgeClient()
-    if (!ros.isConnected()) return null
-    try {
-      const res = await ros.callService<ToLLRequest, ToLLResponse>(
-        '/toLL',
-        'robot_localization/srv/ToLL',
-        { map_point: { x, y, z } }
-      )
-      const lat = Number(res?.ll_point?.latitude)
-      const lon = Number(res?.ll_point?.longitude)
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
-      const coord: [number, number] = [lon, lat]
-      toLLCacheRef.current.set(key, coord)
-      return coord
-    } catch {
-      return null
-    }
-  }
+  const toLL = useCallback(
+    async (x: number, y: number, z = 0): Promise<[number, number] | null> => {
+      const key = `${x},${y},${z}`
+      const cached = toLLCacheRef.current.get(key)
+      if (cached) return cached
+      const ros = getRosBridgeClient()
+      if (!ros.isConnected()) return null
+      try {
+        const res = await ros.callService<ToLLRequest, ToLLResponse>(
+          '/toLL',
+          'robot_localization/srv/ToLL',
+          { map_point: { x, y, z } }
+        )
+        const lat = Number(res?.ll_point?.latitude)
+        const lon = Number(res?.ll_point?.longitude)
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+        const coord: [number, number] = [lon, lat]
+        toLLCacheRef.current.set(key, coord)
+        return coord
+      } catch {
+        return null
+      }
+    },
+    []
+  )
 
   const convertGeoPath = (msg: GeoPathMsg | null, maxPoints: number): [number, number][] => {
     const poses = msg?.poses ?? []
@@ -147,14 +150,14 @@ const MapPreview = ({
     return coords
   }
 
-  const convertPose = async (msg: PoseStamped | null): Promise<[number, number] | null> => {
+  const convertPose = useCallback(async (msg: PoseStamped | null): Promise<[number, number] | null> => {
     const position = msg?.pose?.position
     const x = Number(position?.x)
     const y = Number(position?.y)
     const z = Number(position?.z ?? 0)
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null
     return toLL(x, y, Number.isFinite(z) ? z : 0)
-  }
+  }, [toLL])
 
   const buildMissionPointFeatures = (missions: MissionSpec[]) => {
     const total = missions.length
@@ -213,7 +216,7 @@ const MapPreview = ({
     return coords
   }
 
-  const buildMissionCircleFeatures = (missions: MissionSpec[]) =>
+  const buildMissionCircleFeatures = useCallback((missions: MissionSpec[]) =>
     missions
       .filter(
         (mission) =>
@@ -238,7 +241,7 @@ const MapPreview = ({
           mission_id: mission.mission_id,
           mission_type: mission.mission_type,
         },
-      }))
+      })), [])
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -422,7 +425,7 @@ const MapPreview = ({
   useEffect(() => {
     const map = mapInstanceRef.current
     if (!map || !mapReady) return
-    const handler = (event: maplibregl.MapMouseEvent & maplibregl.EventData) => {
+    const handler = (event: maplibregl.MapMouseEvent) => {
       if (!grabFromMap || !onGrabCoordinate) return
       onGrabCoordinate({ lat: event.lngLat.lat, lon: event.lngLat.lng })
     }
@@ -448,7 +451,21 @@ const MapPreview = ({
     sik.connect()
     const unsubscribe = sik.onTelemNav((msg) => {
       if (Number.isFinite(msg.longitude_deg) && Number.isFinite(msg.latitude_deg)) {
-        setFix([msg.longitude_deg, msg.latitude_deg])
+        const nextFix: [number, number] = [msg.longitude_deg, msg.latitude_deg]
+        setFix(nextFix)
+        setTrail((prev) => {
+          const last = prev[prev.length - 1]
+          if (
+            last &&
+            Math.abs(last[0] - nextFix[0]) < 1e-6 &&
+            Math.abs(last[1] - nextFix[1]) < 1e-6
+          ) {
+            return prev
+          }
+          const next = [...prev, nextFix]
+          if (next.length > 1200) next.shift()
+          return next
+        })
       }
       if (Number.isFinite(msg.heading_deg)) {
         setHeadingDeg(msg.heading_deg)
@@ -532,7 +549,7 @@ const MapPreview = ({
       objectStampMsRef.current = stampMs > 0 ? stampMs : Date.now()
       objectRawRef.current = msg
       const reqId = ++objectReqRef.current
-      void convertPose(msg).then((coord) => {
+      void convertPose(msg).then((coord: [number, number] | null) => {
         if (reqId !== objectReqRef.current) return
         if (coord) setObjectPose(coord)
       })
@@ -551,7 +568,7 @@ const MapPreview = ({
       unsubCoverageGeo()
       objectUnsubs.forEach((unsub) => unsub())
     }
-  }, [])
+  }, [convertPose])
 
   useEffect(() => {
     const ros = getRosBridgeClient()
@@ -573,7 +590,7 @@ const MapPreview = ({
       }
       if (objectRawRef.current) {
         const reqId = ++objectReqRef.current
-        void convertPose(objectRawRef.current).then((coord) => {
+        void convertPose(objectRawRef.current).then((coord: [number, number] | null) => {
           if (reqId !== objectReqRef.current) return
           if (coord) setObjectPose(coord)
         })
@@ -592,7 +609,7 @@ const MapPreview = ({
     return () => {
       unsubscribe()
     }
-  }, [])
+  }, [convertPose])
 
   // Update marker + view when a fix arrives
   useEffect(() => {
@@ -601,11 +618,9 @@ const MapPreview = ({
 
     const lngLat: [number, number] = fix
     if (!markerRef.current) {
-      const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-      el.setAttribute('width', '34')
-      el.setAttribute('height', '34')
-      el.setAttribute('viewBox', '0 0 34 34')
+      const el = document.createElement('div')
       el.innerHTML = `
+        <svg width="34" height="34" viewBox="0 0 34 34">
         <defs>
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="2" result="blur"/>
@@ -616,6 +631,7 @@ const MapPreview = ({
           <path d="M 0 -12 L 8 10 L 0 6 L -8 10 Z" fill="#35d3c3" stroke="#0b1220" stroke-width="1.5"/>
           <circle cx="0" cy="0" r="2.6" fill="#0b1220" stroke="#35d3c3" stroke-width="1.2"/>
         </g>
+        </svg>
       `
       markerRef.current = new maplibregl.Marker({ element: el, rotationAlignment: 'map' })
         .setLngLat(lngLat)
@@ -635,11 +651,9 @@ const MapPreview = ({
     if (!map || !mapReady || !baseFix) return
 
     if (!baseMarkerRef.current) {
-      const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-      el.setAttribute('width', '30')
-      el.setAttribute('height', '30')
-      el.setAttribute('viewBox', '0 0 30 30')
+      const el = document.createElement('div')
       el.innerHTML = `
+        <svg width="30" height="30" viewBox="0 0 30 30">
         <defs>
           <filter id="baseGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="1.5" result="blur"/>
@@ -650,6 +664,7 @@ const MapPreview = ({
           <circle cx="0" cy="0" r="6" fill="#f4d35e" stroke="#0b1220" stroke-width="1.5"/>
           <path d="M 0 -12 L 4 0 L 0 -2 L -4 0 Z" fill="#f4d35e" stroke="#0b1220" stroke-width="1.2"/>
         </g>
+        </svg>
       `
       baseMarkerRef.current = new maplibregl.Marker({ element: el, rotationAlignment: 'map' })
         .setLngLat(baseFix)
@@ -662,7 +677,6 @@ const MapPreview = ({
   // Rotate marker when heading updates
   useEffect(() => {
     if (!markerRef.current || headingDeg == null) return
-    // @ts-expect-error maplibre marker rotation typing is looser at runtime
     const rotation = 90 - headingDeg // ENU yaw (0=east, CCW) -> MapLibre rotation (0=north, CW)
     markerRef.current.setRotation(rotation)
   }, [headingDeg])
@@ -670,24 +684,8 @@ const MapPreview = ({
   // Rotate base marker when antenna heading updates
   useEffect(() => {
     if (!baseMarkerRef.current || baseHeadingDeg == null) return
-    // @ts-expect-error maplibre marker rotation typing is looser at runtime
     baseMarkerRef.current.setRotation(baseHeadingDeg)
   }, [baseHeadingDeg])
-
-  // Build trail from successive fixes
-  useEffect(() => {
-    if (!fix) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTrail((prev) => {
-      const last = prev[prev.length - 1]
-      if (last && Math.abs(last[0] - fix[0]) < 1e-6 && Math.abs(last[1] - fix[1]) < 1e-6) {
-        return prev
-      }
-      const next = [...prev, fix]
-      if (next.length > 1200) next.shift()
-      return next
-    })
-  }, [fix])
 
   // Push trail to map source
   useEffect(() => {
@@ -723,7 +721,7 @@ const MapPreview = ({
         features: buildMissionCircleFeatures(missionList),
       })
     }
-  }, [missionList, mapReady])
+  }, [buildMissionCircleFeatures, missionList, mapReady])
 
   useEffect(() => {
     const map = mapInstanceRef.current
