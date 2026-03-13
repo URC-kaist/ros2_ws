@@ -9,6 +9,8 @@ const {
   parseRocketM2Signal,
 } = require('../rocket_m2')
 
+// Poll the Rocket M2 management interface through curl so we can tolerate its
+// older TLS stack and preserve the latest known status for the dashboard.
 class RocketM2Client {
   constructor(options = {}) {
     this.config = options.config
@@ -96,6 +98,7 @@ class RocketM2Client {
     } catch (err) {
       const error = formatRocketM2Error(err)
       const previous = this.status
+      // Keep the last successful radio metrics visible even while polling fails.
       this.status = createRocketM2Status(
         {
           connected: false,
@@ -134,6 +137,8 @@ class RocketM2Client {
       throw new Error('Rocket M2 cookie path not initialized')
     }
 
+    // The device expects an authenticated cookie-backed session before
+    // requesting signal.cgi.
     const loginPayload = new URLSearchParams({
       username: this.config.rocketM2User,
       password: this.config.rocketM2Pass,

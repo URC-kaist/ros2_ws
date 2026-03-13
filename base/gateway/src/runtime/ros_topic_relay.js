@@ -2,6 +2,8 @@
 
 const { encodeBaseRtcm, encodeBaseSvin } = require('../protocol/sik')
 
+// Relay selected base-station ROS topics over SiK. This module is optional at
+// runtime so the gateway can still start on hosts without ROS installed.
 async function startRosTopicRelay(options = {}) {
   const nextSeq = options.nextSeq
   const writeFrame = options.writeFrame
@@ -46,6 +48,8 @@ async function startRosTopicRelay(options = {}) {
         onBaseSurveyIn(msg)
       }
       const nowMs = Date.now()
+      // Survey-in can update quickly; cap transmit rate to keep SiK bandwidth
+      // available for higher-value traffic.
       if (nowMs - lastSvinTxMs < 500) return
       lastSvinTxMs = nowMs
       const frame = encodeBaseSvin(
@@ -87,6 +91,7 @@ async function startRosTopicRelay(options = {}) {
       } catch (_) {
         /* ignore */
       }
+      // Only shut down the global ROS context if this relay created it.
       if (!ownsRosContext || typeof rclnodejs.shutdown !== 'function') {
         return
       }

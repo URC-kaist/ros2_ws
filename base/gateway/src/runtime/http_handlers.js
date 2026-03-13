@@ -2,6 +2,8 @@
 
 const { toInt } = require('../config')
 
+// HTTP surface for small base-side utilities. The main command/telemetry path
+// remains WebSocket plus SiK, so these handlers stay intentionally narrow.
 function handleRocketM2Status(_req, res, options = {}) {
   const status = options.status || null
   const enabled = options.enabled === true

@@ -70,6 +70,8 @@ function toBool(value) {
   return text === '1' || text === 'true' || text === 'yes' || text === 'on'
 }
 
+// Resolve runtime config with the standard precedence for this package:
+// CLI flags override environment variables, which override hard-coded defaults.
 function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
   return {
     device: getArg(args, '--device') || env.SIK_DEVICE || DEFAULTS.device,

@@ -22,6 +22,8 @@ const { startRosTopicRelay } = require('../runtime/ros_topic_relay')
 const { SikSerialLink } = require('../runtime/serial_link')
 const { createWsHub } = require('../runtime/ws_hub')
 
+// Compose the gateway runtime out of small adapters so the entrypoint stays thin
+// and each integration point can be tested independently.
 function createGatewayApp(options = {}) {
   const config = options.config
   const env = options.env || process.env
@@ -108,6 +110,7 @@ function createGatewayApp(options = {}) {
   function handleDashboardMessage(msg) {
     if (!msg || typeof msg !== 'object') return
 
+    // Older clients sometimes send `event`; current clients send `type`.
     const type = msg.type || msg.event
     if (!type) return
 
@@ -213,6 +216,7 @@ function createGatewayApp(options = {}) {
   function handleFrame(msgId, payload) {
     lastRxMs = Date.now()
 
+    // Link liveness is defined by heartbeat frames arriving from the rover side.
     if (msgId === MsgId.HEARTBEAT) {
       lastHeartbeatRxMs = Date.now()
     }
@@ -264,6 +268,8 @@ function createGatewayApp(options = {}) {
       }
     }
 
+    // Start the ROS topic relay before opening the server so base-side data can
+    // flow immediately once dashboard clients connect.
     rosTopicRelay = await startRosTopicRelay({
       nextSeq,
       writeFrame,
@@ -302,6 +308,7 @@ function createGatewayApp(options = {}) {
   }
 
   async function stop() {
+    // Stop periodic producers first so shutdown does not race with in-flight sends.
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer)
       heartbeatTimer = null

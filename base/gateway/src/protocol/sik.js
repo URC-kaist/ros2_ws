@@ -14,6 +14,8 @@ const MsgId = {
   BASE_RTCM_FRAG: 0x32,
 }
 
+// SiK payloads use a small custom binary frame: magic, message id, payload
+// length, sequence number, payload, then CRC16.
 const MAGIC = 0xa5
 
 function createSequencer(start = 0) {
@@ -135,6 +137,8 @@ function encodeBaseRtcm(msg, nextSeq, options = {}) {
 
   const seqValue = nextSeq()
   const frames = []
+  // Fragmented RTCM frames share one sequence id so the rover can treat them as
+  // one logical message stream.
   for (let fragIndex = 0; fragIndex < fragCount; fragIndex += 1) {
     const start = fragIndex * maxFragData
     const end = Math.min(start + maxFragData, buf.length)
@@ -177,6 +181,7 @@ function consumeFrames(buffer, onFrame) {
   let rxBuffer = buffer
   while (rxBuffer.length >= 4) {
     if (rxBuffer[0] !== MAGIC) {
+      // Skip forward until the next plausible frame boundary.
       rxBuffer = rxBuffer.slice(1)
       continue
     }

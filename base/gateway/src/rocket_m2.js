@@ -1,5 +1,7 @@
 'use strict'
 
+// Rocket M2 responses vary in shape and sometimes carry numeric values as
+// strings. Keep parsing and status normalization isolated from the polling code.
 function parseRocketM2Signal(raw) {
   const text = String(raw || '').trim()
   const parsed = JSON.parse(text)

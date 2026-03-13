@@ -1,5 +1,7 @@
 'use strict'
 
+// Minimal WebSocket wrapper for dashboard clients. Keep message handling
+// centralized in the app layer rather than burying business logic here.
 function createWsHub(options = {}) {
   const onMessage = typeof options.onMessage === 'function' ? options.onMessage : () => {}
   const getInitialMessages =
