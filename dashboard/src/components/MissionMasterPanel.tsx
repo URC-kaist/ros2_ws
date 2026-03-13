@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { getRosBridgeClient } from '../lib/rosBridge'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import { useRosBridge } from '../hooks/useRosBridge'
+import { useSikGateway } from '../hooks/useSikGateway'
 import {
   createMissionSpec,
   csvToMissionList,
@@ -10,7 +11,6 @@ import {
   OBJECT_TYPES,
   type MissionSpec,
 } from '../lib/missions'
-import { getSikGatewayClient } from '../lib/sikGateway'
 import './MissionMasterPanel.css'
 
 type MissionListMsg = {
@@ -69,14 +69,13 @@ const MissionMasterPanel = ({
   onMissionListChange,
   onMissionPreview,
 }: MissionMasterPanelProps) => {
-  const rosRef = useRef(getRosBridgeClient())
-  const gatewayRef = useRef(getSikGatewayClient())
+  const { ros, connected: rosConnected } = useRosBridge()
+  const { gateway } = useSikGateway()
   const [clearCostmap, setClearCostmap] = useState(false)
   const [missionId, setMissionId] = useState('0')
   const [status, setStatus] = useState<MissionStatusMsg | null>(null)
   const [statusAt, setStatusAt] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
-  const [rosConnected, setRosConnected] = useState(false)
   const [invalidFields, setInvalidFields] = useState<InvalidFieldMap>({})
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -86,21 +85,6 @@ const MissionMasterPanel = ({
   )
 
   useEffect(() => {
-    const ros = rosRef.current
-    ros.connect()
-    const unsub = ros.onConnectionStatus((connected) => {
-      setRosConnected(connected)
-    })
-    return () => unsub()
-  }, [])
-
-  useEffect(() => {
-    gatewayRef.current.connect()
-  }, [])
-
-  useEffect(() => {
-    const ros = rosRef.current
-    ros.connect()
     const unsubscribe = ros.subscribe<MissionStatusMsg>(
       '/mission_status',
       'mr2_action_interface/msg/MissionStatus',
@@ -111,7 +95,7 @@ const MissionMasterPanel = ({
       { throttleRate: 500 }
     )
     return () => unsubscribe()
-  }, [])
+  }, [ros])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -138,7 +122,6 @@ const MissionMasterPanel = ({
   }
 
   const handleSendMissionList = () => {
-    const ros = rosRef.current
     if (!validateMissionList()) return
 
     const now = Date.now()
@@ -164,7 +147,7 @@ const MissionMasterPanel = ({
       clear_costmap: clearCostmap,
       mission_id: Number.isFinite(id) ? id : 0,
     }
-    gatewayRef.current.sendMissionControl(msg)
+    gateway.sendMissionControl(msg)
   }
 
   const statusLabel =

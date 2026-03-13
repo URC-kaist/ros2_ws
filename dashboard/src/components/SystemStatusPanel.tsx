@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getRosBridgeClient } from '../lib/rosBridge'
-import { BaseStatus, getSikGatewayClient } from '../lib/sikGateway'
+import { useRosBridge } from '../hooks/useRosBridge'
+import { useSikGateway } from '../hooks/useSikGateway'
+import { type BaseStatus } from '../lib/sikGateway'
 import GnssStatusCard from './GnssStatusCard'
 import RocketM2Card from './RocketM2Card'
 import './SystemStatusPanel.css'
@@ -208,6 +209,8 @@ const buildBatteryValues = (telem: PackTelemetry): DiagnosticKeyValue[] => {
 }
 
 const SystemStatusPanel = () => {
+  const { ros } = useRosBridge()
+  const { gateway } = useSikGateway()
   const [snapshots, setSnapshots] = useState<Record<string, StatusSnapshot | null>>({})
   const [baseStatus, setBaseStatus] = useState<BaseStatus | null>(null)
   const [baseStatusUpdatedAt, setBaseStatusUpdatedAt] = useState<number | null>(null)
@@ -223,8 +226,6 @@ const SystemStatusPanel = () => {
   })
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     const unsubscribers = TOPICS.map((spec) =>
       ros.subscribe<DiagnosticArray>(
         spec.topic,
@@ -248,11 +249,9 @@ const SystemStatusPanel = () => {
         off()
       }
     }
-  }, [])
+  }, [ros])
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     const unsubscribers = BATTERY_TOPICS.map((spec) =>
       ros.subscribe<PackTelemetry>(
         spec.topic,
@@ -275,17 +274,15 @@ const SystemStatusPanel = () => {
         off()
       }
     }
-  }, [])
+  }, [ros])
 
   useEffect(() => {
-    const sik = getSikGatewayClient()
-    sik.connect()
-    const unsubscribe = sik.onBaseStatus((status) => {
+    const unsubscribe = gateway.onBaseStatus((status) => {
       setBaseStatus(status)
       setBaseStatusUpdatedAt(Date.now())
     })
     return () => unsubscribe()
-  }, [])
+  }, [gateway])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -294,10 +291,8 @@ const SystemStatusPanel = () => {
     const parsed = Number(stored)
     if (!Number.isFinite(parsed)) return
     const normalized = ((parsed % 360) + 360) % 360
-    const sik = getSikGatewayClient()
-    sik.connect()
-    sik.sendBaseHeading(normalized)
-  }, [])
+    gateway.sendBaseHeading(normalized)
+  }, [gateway])
 
   const cards = useMemo(() => {
     const baseValues = baseStatus ? buildBaseValues(baseStatus) : []
@@ -404,9 +399,7 @@ const SystemStatusPanel = () => {
                     if (typeof window !== 'undefined') {
                       window.localStorage.setItem('baseHeadingDeg', String(normalized))
                     }
-                    const sik = getSikGatewayClient()
-                    sik.connect()
-                    sik.sendBaseHeading(normalized)
+                    gateway.sendBaseHeading(normalized)
                   }}
                   className="base-heading-apply"
                 >

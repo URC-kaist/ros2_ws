@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useRosBridge } from '../hooks/useRosBridge'
+import { useSikGateway } from '../hooks/useSikGateway'
 import type { MissionSpec } from '../lib/missions'
-import { getRosBridgeClient } from '../lib/rosBridge'
-import { getSikGatewayClient } from '../lib/sikGateway'
 
 type PoseStamped = {
   header?: {
@@ -60,6 +60,8 @@ const MapPreview = ({
   grabFromMap = false,
   onGrabCoordinate,
 }: MapPreviewProps) => {
+  const { ros, connected: rosConnected } = useRosBridge()
+  const { gateway } = useSikGateway()
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
@@ -103,8 +105,7 @@ const MapPreview = ({
       const key = `${x},${y},${z}`
       const cached = toLLCacheRef.current.get(key)
       if (cached) return cached
-      const ros = getRosBridgeClient()
-      if (!ros.isConnected()) return null
+      if (!rosConnected) return null
       try {
         const res = await ros.callService<ToLLRequest, ToLLResponse>(
           '/toLL',
@@ -121,7 +122,7 @@ const MapPreview = ({
         return null
       }
     },
-    []
+    [ros, rosConnected]
   )
 
   const convertGeoPath = (msg: GeoPathMsg | null, maxPoints: number): [number, number][] => {
@@ -437,9 +438,7 @@ const MapPreview = ({
 
   // Subscribe to GNSS + heading via SiK gateway
   useEffect(() => {
-    const sik = getSikGatewayClient()
-    sik.connect()
-    const unsubscribe = sik.onTelemNav((msg) => {
+    const unsubscribe = gateway.onTelemNav((msg) => {
       if (Number.isFinite(msg.longitude_deg) && Number.isFinite(msg.latitude_deg)) {
         const nextFix: [number, number] = [msg.longitude_deg, msg.latitude_deg]
         setFix(nextFix)
@@ -477,12 +476,10 @@ const MapPreview = ({
       }
     })
     return () => unsubscribe()
-  }, [])
+  }, [gateway])
 
   useEffect(() => {
-    const sik = getSikGatewayClient()
-    sik.connect()
-    const unsubscribe = sik.onBaseStatus((status) => {
+    const unsubscribe = gateway.onBaseStatus((status) => {
       if (Number.isFinite(status.base_lon_deg) && Number.isFinite(status.base_lat_deg)) {
         setBaseFix([status.base_lon_deg as number, status.base_lat_deg as number])
       }
@@ -493,11 +490,9 @@ const MapPreview = ({
       }
     })
     return () => unsubscribe()
-  }, [])
+  }, [gateway])
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     const unsubPlanSmoothedGeo = ros.subscribe<GeoPathMsg>(
       '/plan_smoothed/geo',
       'geographic_msgs/msg/GeoPath',
@@ -558,11 +553,9 @@ const MapPreview = ({
       unsubCoverageGeo()
       objectUnsubs.forEach((unsub) => unsub())
     }
-  }, [convertPose])
+  }, [convertPose, ros])
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     const resync = () => {
       if (smoothedGeoRawRef.current) {
         const poseCount = smoothedGeoRawRef.current.poses?.length ?? 0
@@ -592,14 +585,14 @@ const MapPreview = ({
       resync()
     })
 
-    if (ros.isConnected()) {
+    if (rosConnected) {
       resync()
     }
 
     return () => {
       unsubscribe()
     }
-  }, [convertPose])
+  }, [convertPose, ros, rosConnected])
 
   // Update marker + view when a fix arrives
   useEffect(() => {

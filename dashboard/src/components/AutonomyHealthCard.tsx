@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getRosBridgeClient } from '../lib/rosBridge'
+import { useRosBridge } from '../hooks/useRosBridge'
 
 type LastSeenKey =
   | 'odomLocal'
@@ -26,6 +26,7 @@ const labelForTone = (tone: HealthTone) => {
 }
 
 const AutonomyHealthCard = () => {
+  const { ros } = useRosBridge()
   const [lastSeen, setLastSeen] = useState<Record<LastSeenKey, number | null>>({
     odomLocal: null,
     gpsFiltered: null,
@@ -43,8 +44,6 @@ const AutonomyHealthCard = () => {
   }, [])
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     const markSeen = (key: LastSeenKey) => {
       setLastSeen((prev) => ({
         ...prev,
@@ -88,7 +87,7 @@ const AutonomyHealthCard = () => {
         off()
       }
     }
-  }, [])
+  }, [ros])
 
   const statuses = useMemo(() => {
     const ageMs = (ts: number | null) =>

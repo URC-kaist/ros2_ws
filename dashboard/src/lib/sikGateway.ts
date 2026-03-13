@@ -238,6 +238,10 @@ class SikGatewayClient {
     })
   }
 
+  isConnected() {
+    return this.connected
+  }
+
   onLinkStatus(handler: MessageHandler<LinkStatus>) {
     this.linkListeners.add(handler)
     return () => {

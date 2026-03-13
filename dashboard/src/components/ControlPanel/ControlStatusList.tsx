@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getRosBridgeClient } from '../../lib/rosBridge'
-import { type LinkStatus, type TelemBattery, getSikGatewayClient } from '../../lib/sikGateway'
+import { useRosBridge } from '../../hooks/useRosBridge'
+import { useSikGateway } from '../../hooks/useSikGateway'
+import { type LinkStatus, type TelemBattery } from '../../lib/sikGateway'
 import './ControlStatusList.css'
 
 type MissionStatusMsg = {
@@ -59,9 +60,9 @@ const formatFixOk = (fixOk?: boolean) => {
 }
 
 const ControlStatusList = () => {
+  const { ros: rosBridge, connected: rosConnected } = useRosBridge()
+  const { gateway, connected: wsConnected } = useSikGateway()
   const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
-  const [wsConnected, setWsConnected] = useState(false)
-  const [rosConnected, setRosConnected] = useState(false)
   const [missionStatus, setMissionStatus] = useState<MissionStatusMsg | null>(null)
   const [missionStatusAt, setMissionStatusAt] = useState<number | null>(null)
   const [battery1, setBattery1] = useState<TelemBattery | null>(null)
@@ -75,10 +76,7 @@ const ControlStatusList = () => {
   })
 
   useEffect(() => {
-    const gateway = getSikGatewayClient()
-    gateway.connect()
     const offLink = gateway.onLinkStatus(setLinkStatus)
-    const offConnection = gateway.onConnectionStatus(setWsConnected)
     const offBattery = gateway.onTelemBattery((payload) => {
       if (payload.battery_id === 2) {
         setBattery2(payload)
@@ -90,10 +88,9 @@ const ControlStatusList = () => {
     })
     return () => {
       offLink()
-      offConnection()
       offBattery()
     }
-  }, [])
+  }, [gateway])
   useEffect(() => {
     const interval = window.setInterval(() => {
       setNowMs(Date.now())
@@ -104,17 +101,6 @@ const ControlStatusList = () => {
   }, [])
 
   useEffect(() => {
-    const rosBridge = getRosBridgeClient()
-    rosBridge.connect()
-    const offRosConnection = rosBridge.onConnectionStatus(setRosConnected)
-    return () => {
-      offRosConnection()
-    }
-  }, [])
-
-  useEffect(() => {
-    const rosBridge = getRosBridgeClient()
-    rosBridge.connect()
     const offMission = rosBridge.subscribe<MissionStatusMsg>(
       '/mission_status',
       'mr2_action_interface/msg/MissionStatus',
@@ -127,11 +113,9 @@ const ControlStatusList = () => {
     return () => {
       offMission()
     }
-  }, [])
+  }, [rosBridge])
 
   useEffect(() => {
-    const rosBridge = getRosBridgeClient()
-    rosBridge.connect()
     const unsubscribers: Array<() => void> = []
 
     for (const side of GNSS_SIDES) {
@@ -156,7 +140,7 @@ const ControlStatusList = () => {
         off()
       }
     }
-  }, [])
+  }, [rosBridge])
 
   const getBatteryPercent = (battery: TelemBattery | null) => {
     if (!battery || battery.total_capacity_mah <= 0) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getRosBridgeClient } from '../lib/rosBridge'
+import { useRosBridge } from '../hooks/useRosBridge'
 import './GnssStatusCard.css'
 
 type GpsFix = {
@@ -105,14 +105,13 @@ const formatUpdatedAt = (ts?: number) =>
   ts != null ? new Date(ts).toLocaleTimeString() : '—'
 
 const GnssStatusCard = () => {
+  const { ros } = useRosBridge()
   const [gnssState, setGnssState] = useState<Record<GnssSideId, GnssState>>({
     left: {},
     right: {},
   })
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     const unsubscribers: Array<() => void> = []
 
     for (const side of GNSS_SIDES) {
@@ -159,7 +158,7 @@ const GnssStatusCard = () => {
         off()
       }
     }
-  }, [])
+  }, [ros])
 
   const sides = useMemo(
     () =>
