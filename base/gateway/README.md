@@ -37,7 +37,7 @@ your ROS 2 environment is sourced before starting the gateway.
 ## Run
 
 ```bash
-npm start -- --device /dev/ttySIK --baud 57600 --port 8081 --heartbeat-hz 2 --cmd-timeout-ms 500
+npm start -- --device /dev/ttySIK --baud 57600 --port 8081 --heartbeat-hz 2
 ```
 
 You can also configure with environment variables:
@@ -46,8 +46,6 @@ You can also configure with environment variables:
 - `SIK_BAUD`
 - `SIK_WS_PORT`
 - `SIK_HEARTBEAT_HZ`
-- `SIK_CMD_HZ`
-- `SIK_CMD_TIMEOUT_MS`
 - `BASE_ANTENNA_ENABLE` (true/false)
 - `BASE_ANTENNA_DEVICE` (e.g. `/dev/ttyUSB1`)
 - `BASE_ANTENNA_BAUD` (default 115200)

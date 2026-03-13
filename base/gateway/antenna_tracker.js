@@ -85,9 +85,6 @@ class AntennaTracker {
     this.lastCmdRad = null
     this.rover = null
     this.base = null
-    this.rosReady = false
-    this.rclnodejs = null
-    this.rosNode = null
     this.antennaReady = false
     this.lastHeadingLogMs = 0
     this.lastCmdMs = 0
@@ -128,7 +125,6 @@ class AntennaTracker {
       }
     })
 
-    await this.startRos_()
     const periodMs = Math.max(1000 / Math.max(this.cmdHz, 0.1), 100)
     this.timer = setInterval(() => this.tick_(), periodMs)
   }
@@ -137,16 +133,6 @@ class AntennaTracker {
     if (this.timer) {
       clearInterval(this.timer)
       this.timer = null
-    }
-    if (this.rosReady && this.rclnodejs) {
-      try {
-        if (this.rosNode && typeof this.rosNode.destroy === 'function') {
-          this.rosNode.destroy()
-        }
-        this.rclnodejs.shutdown()
-      } catch (err) {
-        this.log(`Antenna tracker ROS shutdown failed: ${err.message}`)
-      }
     }
   }
 
@@ -168,38 +154,7 @@ class AntennaTracker {
     this.headingOffsetDeg = normalizeHeadingDeg(deg)
   }
 
-  async startRos_() {
-    let rclnodejs
-    try {
-      // eslint-disable-next-line global-require
-      rclnodejs = require('rclnodejs')
-      this.rclnodejs = rclnodejs
-    } catch (err) {
-      this.log(`Antenna tracker ROS disabled: rclnodejs not available (${err.message})`)
-      return
-    }
-
-    try {
-      await rclnodejs.init()
-    } catch (err) {
-      this.log(`Antenna tracker ROS init failed: ${err.message}`)
-      return
-    }
-
-    const pid = process.pid || Math.floor(Math.random() * 10000)
-    const nodeName = `gateway_antenna_tracker_${pid}`
-    const node = new rclnodejs.Node(nodeName)
-    this.rosNode = node
-    node.createSubscription(
-      'ublox_ubx_msgs/msg/UBXNavSvin',
-      '/base/ubx_nav_svin',
-      (msg) => this.handleSvin_(msg)
-    )
-    rclnodejs.spin(node)
-    this.rosReady = true
-  }
-
-  handleSvin_(msg) {
+  updateBaseSurveyIn(msg) {
     if (!msg) return
     const svinValid = !!msg.valid
     const svinActive = !!msg.active
