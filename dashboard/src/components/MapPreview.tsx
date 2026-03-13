@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import type { MissionSpec } from '../lib/missions'
 import { getRosBridgeClient } from '../lib/rosBridge'
 import { getSikGatewayClient } from '../lib/sikGateway'
 
@@ -34,17 +35,6 @@ type GeoPoseStamped = {
 
 type GeoPathMsg = {
   poses?: GeoPoseStamped[]
-}
-
-type MissionSpec = {
-  mission_id: number
-  mission_type: number
-  detection_method: number
-  object_type: number
-  target_latitude: number
-  target_longitude: number
-  target_radius: number
-  waypoint_count: number
 }
 
 const MAX_SMOOTHED_POINTS = 120
@@ -842,5 +832,4 @@ const MapPreview = ({
   )
 }
 
-export type { MissionSpec }
 export default MapPreview

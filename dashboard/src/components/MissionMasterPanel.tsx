@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { getRosBridgeClient } from '../lib/rosBridge'
+import {
+  createMissionSpec,
+  csvToMissionList,
+  DETECTION_METHODS,
+  getInvalidMissionFields,
+  missionListToCsv,
+  MISSION_TYPES,
+  OBJECT_TYPES,
+  type MissionSpec,
+} from '../lib/missions'
 import { getSikGatewayClient } from '../lib/sikGateway'
-import type { MissionSpec } from './MapPreview'
 import './MissionMasterPanel.css'
 
 type MissionListMsg = {
@@ -40,86 +49,10 @@ const STATE_LABELS: Record<number, string> = {
   4: 'FAILED',
 }
 
-const MISSION_TYPES = [
-  { value: 0, label: 'UNKNOWN' },
-  { value: 1, label: 'GNSS_ONLY' },
-  { value: 2, label: 'COVER_VISION' },
-]
-
-const DETECTION_METHODS = [
-  { value: 0, label: 'NONE' },
-  { value: 1, label: 'ARUCO' },
-  { value: 2, label: 'YOLO' },
-]
-
-const OBJECT_TYPES = [
-  { value: 0, label: 'MALLET' },
-  { value: 1, label: 'PICK' },
-  { value: 2, label: 'BOTTLE' },
-]
-
-const MISSION_TYPE_VALUES = new Set(MISSION_TYPES.map((item) => item.value))
-const DETECTION_METHOD_VALUES = new Set(DETECTION_METHODS.map((item) => item.value))
-const OBJECT_TYPE_VALUES = new Set(OBJECT_TYPES.map((item) => item.value))
-
 type InvalidFieldMap = Record<number, Record<string, boolean>>
 
 const STORAGE_SLOT_COUNT = 3
 const STORAGE_PREFIX = 'missionListSlot'
-const CSV_HEADERS = [
-  'mission_id',
-  'mission_type',
-  'detection_method',
-  'object_type',
-  'target_latitude',
-  'target_longitude',
-  'target_radius',
-  'waypoint_count',
-] as const
-
-const missionListToCsv = (missions: MissionSpec[]) => {
-  const header = CSV_HEADERS.join(',')
-  const rows = missions.map((mission) => {
-    const record = mission as Record<string, number>
-    return CSV_HEADERS.map((key) =>
-      Number.isFinite(record[key]) ? String(record[key]) : ''
-    ).join(',')
-  })
-  return [header, ...rows].join('\n')
-}
-
-const csvToMissionList = (csv: string) => {
-  const rows = csv
-    .split(/\r?\n/)
-    .map((row) => row.trim())
-    .filter(Boolean)
-  if (!rows.length) return []
-  const firstCells = rows[0].split(',').map((cell) => cell.trim().toLowerCase())
-  const hasHeader = CSV_HEADERS.every(
-    (header, index) => firstCells[index] === header.toLowerCase()
-  )
-  const start = hasHeader ? 1 : 0
-  const missions: MissionSpec[] = []
-  for (let i = start; i < rows.length; i += 1) {
-    const cells = rows[i].split(',').map((cell) => cell.trim())
-    if (cells.length < CSV_HEADERS.length) continue
-    const values = cells
-      .slice(0, CSV_HEADERS.length)
-      .map((value) => Number.parseFloat(value))
-    if (values.some((value) => !Number.isFinite(value))) continue
-    missions.push({
-      mission_id: values[0],
-      mission_type: values[1],
-      detection_method: values[2],
-      object_type: values[3],
-      target_latitude: values[4],
-      target_longitude: values[5],
-      target_radius: values[6],
-      waypoint_count: values[7],
-    })
-  }
-  return missions
-}
 
 type MissionMasterPanelProps = {
   missionList: MissionSpec[]
@@ -197,32 +130,7 @@ const MissionMasterPanel = ({
     }
 
     missionList.forEach((mission, index) => {
-      if (!MISSION_TYPE_VALUES.has(mission.mission_type)) clampIssues(index, 'mission_type')
-      if (!DETECTION_METHOD_VALUES.has(mission.detection_method))
-        clampIssues(index, 'detection_method')
-      if (!OBJECT_TYPE_VALUES.has(mission.object_type)) clampIssues(index, 'object_type')
-      if (!Number.isFinite(mission.mission_id) || mission.mission_id < 0)
-        clampIssues(index, 'mission_id')
-      if (
-        !Number.isFinite(mission.target_latitude) ||
-        mission.target_latitude < -90 ||
-        mission.target_latitude > 90
-      )
-        clampIssues(index, 'target_latitude')
-      if (
-        !Number.isFinite(mission.target_longitude) ||
-        mission.target_longitude < -180 ||
-        mission.target_longitude > 180
-      )
-        clampIssues(index, 'target_longitude')
-      if (
-        !Number.isFinite(mission.target_radius) ||
-        mission.target_radius < 0 ||
-        mission.target_radius > 99
-      )
-        clampIssues(index, 'target_radius')
-      if (!Number.isFinite(mission.waypoint_count) || mission.waypoint_count < 0)
-        clampIssues(index, 'waypoint_count')
+      getInvalidMissionFields(mission).forEach((field) => clampIssues(index, field))
     })
 
     setInvalidFields(nextInvalid)
@@ -380,16 +288,10 @@ const MissionMasterPanel = ({
       ) + 1
     onMissionListChange([
       ...missionList,
-      {
-        mission_id: nextId,
-        mission_type: 1,
-        detection_method: 0,
-        object_type: 0,
+      createMissionSpec(nextId, {
         target_latitude: 0,
         target_longitude: 0,
-        target_radius: 0,
-        waypoint_count: 0,
-      },
+      }),
     ])
   }
 

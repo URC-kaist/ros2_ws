@@ -2,7 +2,7 @@ import { useState } from 'react'
 import DeliveryPanel from './DeliveryPanel'
 import MapPreview from './MapPreview'
 import MissionMasterPanel from './MissionMasterPanel'
-import type { MissionSpec } from './MapPreview'
+import type { MissionTabId } from './MissionTabs'
 import SystemStatusPanel from './SystemStatusPanel'
 import SpectrophotometerCard from './SpectrophotometerCard'
 import AutonomyHealthCard from './AutonomyHealthCard'
@@ -10,10 +10,11 @@ import TransitiveVideoCard from './TransitiveVideoCard'
 import CameraTurretCard from './CameraTurretCard'
 import CentrifugeCard from './CentrifugeCard'
 import MicroscopeViewCard from './MicroscopeViewCard'
+import { createMissionSpec, type MissionSpec } from '../lib/missions'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
-  activeTab: string
+  activeTab: MissionTabId
 }
 
 const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
@@ -31,16 +32,10 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
         ) + 1
       return [
         ...prev,
-        {
-          mission_id: nextId,
-          mission_type: 1,
-          detection_method: 0,
-          object_type: 0,
+        createMissionSpec(nextId, {
           target_latitude: lat,
           target_longitude: lon,
-          target_radius: 0,
-          waypoint_count: 0,
-        },
+        }),
       ]
     })
   }
