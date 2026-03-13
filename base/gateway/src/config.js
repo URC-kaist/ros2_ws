@@ -10,7 +10,7 @@ const DEFAULTS = {
   heartbeatHz: 2,
   linkTimeoutMs: 2000,
   antennaEnable: false,
-  antennaDevice: '',
+  antennaDevice: '/dev/ttyARDUINO',
   antennaBaud: 115200,
   antennaCmdHz: 2,
   antennaStaleMs: 5000,

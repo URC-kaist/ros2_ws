@@ -16,14 +16,20 @@ It implements the MR2 SiK protocol described in
 
 ## Runtime Topology
 
-```text
-dashboard <-> WebSocket/HTTP <-> gateway <-> serial SiK radio <-> rover bridge
-                                    |
-                                    +-> ROS 2 topic relay (/base/ubx_nav_svin, /base/rtcm)
-                                    |
-                                    +-> base antenna serial controller
-                                    |
-                                    +-> Rocket M2 polling
+```mermaid
+flowchart LR
+  dashboard[Dashboard]
+  gateway[Gateway]
+  rover[Rover Bridge]
+  ros[ROS 2 Topic Relay<br/>/base/ubx_nav_svin<br/>/base/rtcm]
+  antenna[Base Antenna<br/>Serial Controller]
+  rocket[Rocket M2 Polling]
+
+  dashboard <-->|WebSocket / HTTP| gateway
+  gateway <-->|Serial SiK Radio| rover
+  gateway --> ros
+  gateway --> antenna
+  gateway --> rocket
 ```
 
 ## Entry Point
@@ -97,7 +103,7 @@ npm start -- \
   --port 8081 \
   --heartbeat-hz 2 \
   --antenna-enable true \
-  --antenna-device /dev/ttyUSB1
+  --antenna-device /dev/ttyARDUINO
 ```
 
 ### Config Sources
@@ -127,7 +133,7 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 | CLI flag | Environment variable | Default |
 | --- | --- | --- |
 | `--antenna-enable` | `BASE_ANTENNA_ENABLE` | `false` |
-| `--antenna-device` | `BASE_ANTENNA_DEVICE` | empty |
+| `--antenna-device` | `BASE_ANTENNA_DEVICE` | `/dev/ttyARDUINO` |
 | `--antenna-baud` | `BASE_ANTENNA_BAUD` | `115200` |
 | `--antenna-cmd-hz` | `BASE_ANTENNA_CMD_HZ` | `2` |
 | `--antenna-stale-ms` | `BASE_ANTENNA_STALE_MS` | `5000` |
