@@ -319,7 +319,7 @@ function createGatewayApp(options = {}) {
     }
 
     if (rosBridge) {
-      rosBridge.stop()
+      await Promise.resolve(rosBridge.stop())
       rosBridge = null
     }
 

@@ -9,18 +9,22 @@ async function startRosBridge(options = {}) {
   const onBaseSurveyIn =
     typeof options.onBaseSurveyIn === 'function' ? options.onBaseSurveyIn : null
 
-  let rclnodejs
-  try {
-    // eslint-disable-next-line global-require
-    rclnodejs = require('rclnodejs')
-  } catch (err) {
-    log(`ROS bridge disabled: rclnodejs not available (${err.message})`)
-    return { stop() {} }
+  let rclnodejs = options.rclnodejs
+  if (!rclnodejs) {
+    try {
+      // eslint-disable-next-line global-require
+      rclnodejs = require('rclnodejs')
+    } catch (err) {
+      log(`ROS bridge disabled: rclnodejs not available (${err.message})`)
+      return { stop() {} }
+    }
   }
 
+  let ownsRosContext = false
   try {
     if (!rclnodejs.isInitialized || !rclnodejs.isInitialized()) {
       await rclnodejs.init()
+      ownsRosContext = true
     }
   } catch (err) {
     if (!/already been initialized/i.test(err.message || '')) {
@@ -75,10 +79,20 @@ async function startRosBridge(options = {}) {
   log('ROS bridge started (SVIN + RTCM over SiK)')
 
   return {
-    stop() {
+    async stop() {
       try {
         if (typeof rosNode.destroy === 'function') {
           rosNode.destroy()
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      if (!ownsRosContext || typeof rclnodejs.shutdown !== 'function') {
+        return
+      }
+      try {
+        if (!rclnodejs.isInitialized || rclnodejs.isInitialized()) {
+          await rclnodejs.shutdown()
         }
       } catch (_) {
         /* ignore */
