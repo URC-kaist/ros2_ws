@@ -80,9 +80,9 @@ flowchart LR
   relay -->|BASE_SVIN / BASE_RTCM frames| sik
 
   serial -->|decoded TELEM_NAV| app
-  app -->|updateRoverNav(nav)| tracker
-  relay -->|onBaseSurveyIn(msg)| tracker
-  tracker -->|sendMoveRad(rad)| antenna_proto
+  app -->|update rover nav| tracker
+  relay -->|update base survey-in| tracker
+  tracker -->|send move command| antenna_proto
   antenna_proto <-->|serial bytes| antenna_hw
 
   rocket_client -->|curl login.cgi / signal.cgi| rocket_hw
