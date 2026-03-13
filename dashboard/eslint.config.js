@@ -14,7 +14,10 @@ const baseConfig = {
   ],
   languageOptions: {
     ecmaVersion: 2020,
-    globals: globals.browser,
+    globals: {
+      ...globals.browser,
+      ROSLIB: 'readonly',
+    },
     parserOptions: {
       ecmaVersion: 'latest',
       ecmaFeatures: { jsx: true },
@@ -27,7 +30,7 @@ const baseConfig = {
 }
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'public/roslib.min.js', 'public/vendor/**']),
   {
     files: ['**/*.{js,jsx}'],
     ...baseConfig,

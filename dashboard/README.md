@@ -1,25 +1,98 @@
-# React + Vite
+# MR2 Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The dashboard is a Vite + React + TypeScript frontend for the MR2 base station.
+It combines three runtime integrations:
 
-Currently, two official plugins are available:
+1. `rosbridge` for ROS topics and services
+2. the MR2 base gateway for SiK telemetry, link state, and mission control
+3. Transitive token minting for browser video access
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Development
 
-## React Compiler
+```bash
+cd dashboard
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The Vite dev server listens on all interfaces (`0.0.0.0`).
 
-## Expanding the ESLint configuration
+## Scripts
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `npm run dev` starts the Vite dev server
+- `npm run build` builds the production bundle
+- `npm run preview` serves the built bundle locally
+- `npm run lint` runs ESLint
+- `npm run typecheck` runs the TypeScript checker
+- `npm run check` runs typecheck, lint, and build in sequence
 
-## ROS Bridge (roslibjs)
+## Environment
 
-The dashboard loads `roslib.min.js` from `dashboard/public/roslib.min.js` (included in this repo) and expects the global `window.ROSLIB` object to be available at runtime. If you update roslib, replace that file and rebuild the dashboard.
+Copy `.env.example` to `.env.local` when you need to override endpoints.
 
-## Transitive token
+Available variables:
 
-The dashboard requests a token from `/transitive/token`. You can override the
-endpoint with `VITE_TRANSITIVE_TOKEN_URL`.
+- `VITE_ROSBRIDGE_URL`
+  Default: `ws(s)://<current-host>/rosbridge-ws`
+- `VITE_SIK_WS_URL`
+  Default: `ws(s)://<current-host>/sik-ws`
+- `VITE_TRANSITIVE_TOKEN_URL`
+  Default: `/transitive/token`
+
+If these variables are unset, the dashboard assumes it is being served behind
+the same host that proxies the gateway and rosbridge endpoints.
+
+## Runtime Dependencies
+
+### ROS bridge
+
+The dashboard uses `roslib` and expects `window.ROSLIB` to be provided by
+`public/roslib.min.js`.
+
+If you update `roslib`, replace `public/roslib.min.js` and rebuild the
+dashboard.
+
+### Gateway
+
+The gateway WebSocket client lives in `src/lib/sikGateway.ts`.
+It carries:
+
+- rover telemetry (`telem_nav`, `telem_battery`)
+- gateway link status
+- base antenna status
+- Rocket M2 status
+- outbound commands such as drive, gripper, mission control, and base heading
+
+### ROS topics and services
+
+The ROS bridge client lives in `src/lib/rosBridge.ts`.
+It is used for:
+
+- system diagnostics
+- battery telemetry topics
+- mission list and mission status
+- map-coordinate conversion via `/toLL`
+- science and autonomy visualization topics
+
+## Package Layout
+
+```text
+dashboard/
+├── public/                 # static vendor assets such as roslib and uPlot
+├── src/
+│   ├── components/         # React UI modules
+│   ├── lib/                # ROS and gateway transport clients
+│   ├── types/              # ambient type declarations
+│   ├── App.tsx             # top-level shell
+│   └── main.tsx            # React entrypoint
+├── vite.config.js
+└── eslint.config.js
+```
+
+## Current Refactor Priorities
+
+- replace component-local connection bootstrapping with shared React hooks or providers
+- move shared domain types out of leaf components
+- split large mixed-responsibility components such as `MapPreview`,
+  `MissionMasterPanel`, and `SystemStatusPanel`
+- document and standardize local verification so dashboard changes are easier to review
