@@ -159,11 +159,13 @@ const SpectrophotometerCard = () => {
 
     plotInstanceRef.current?.destroy()
     const options = makePlotOptions(modeLabel, plotSize.width, plotSize.height)
-    const initial: [number[], number[]] = [[], []]
+    const initial: [number[], number[]] = spectrum
+      ? [spectrum.wavelength_nm, spectrum.intensity]
+      : [[], []]
     const plot = new uplotCtor(options, initial, container)
     plotInstanceRef.current = plot
     return () => plot.destroy()
-  }, [plotSize, modeLabel, uplotCtor])
+  }, [plotSize, modeLabel, spectrum, uplotCtor])
 
   useEffect(() => {
     const plot = plotInstanceRef.current
