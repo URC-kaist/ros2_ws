@@ -1,5 +1,17 @@
 # Rover
 
+## Manual Dependencies
+
+After running `rosdep` in `rover/ros2_ws`, one runtime dependency is still manual:
+
+```bash
+python3 -m pip install ultralytics
+```
+
+This is required by `mr2_yolo_perception` because
+[yolo_rgbd_detector.py](/home/gmmyung/mr2-stack/rover/ros2_ws/src/mr2_yolo_perception/mr2_yolo_perception/yolo_rgbd_detector.py)
+imports `from ultralytics import YOLO`, and there is no working `rosdep` key for it in this workspace.
+
 ## OpenCV/ROS Humble Repair Notes (Jetson)
 
 ### Problem
@@ -42,4 +54,3 @@ rm -rf build/mr2_rover_auto install/mr2_rover_auto
 source /opt/ros/humble/setup.bash
 colcon build --packages-select mr2_rover_auto
 ```
-

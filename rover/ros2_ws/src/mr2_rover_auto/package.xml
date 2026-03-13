@@ -17,8 +17,11 @@
   <!-- Dependencies for what you're launching -->
   <exec_depend>rclcpp</exec_depend>
   <exec_depend>rclcpp_action</exec_depend>
+  <exec_depend>rclcpp_components</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
   <exec_depend>tf2</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
@@ -33,6 +36,7 @@
   <exec_depend>mr2_action_interface</exec_depend>
   <build_depend>aruco_opencv_msgs</build_depend>
   <build_depend>geographiclib</build_depend>
+  <exec_depend>aruco_opencv</exec_depend>
   <exec_depend>aruco_opencv_msgs</exec_depend>
   <exec_depend>robot_localization</exec_depend>
   <exec_depend>ublox_ubx_msgs</exec_depend>
