@@ -18,18 +18,76 @@ It implements the MR2 SiK protocol described in
 
 ```mermaid
 flowchart LR
-  dashboard[Dashboard]
-  gateway[Gateway]
-  rover[Rover Bridge]
-  ros[ROS 2 Topic Relay<br/>/base/ubx_nav_svin<br/>/base/rtcm]
-  antenna[Base Antenna<br/>Serial Controller]
-  rocket[Rocket M2 Polling]
+  dashboard[Dashboard UI]
 
-  dashboard <-->|WebSocket / HTTP| gateway
-  gateway <-->|Serial SiK Radio| rover
-  gateway --> ros
-  gateway --> antenna
-  gateway --> rocket
+  subgraph gateway_pkg[Base Gateway Process]
+    entry[index.js]
+    config[config.js<br/>CLI / env / defaults]
+    app[create_gateway_app.js<br/>composition root]
+
+    subgraph runtime[Runtime Adapters]
+      wshub[ws_hub.js<br/>dashboard WebSocket clients]
+      http[http_handlers.js<br/>HTTP endpoints]
+      serial[serial_link.js<br/>SiK serial port]
+      relay[ros_topic_relay.js<br/>/base/ubx_nav_svin<br/>/base/rtcm]
+      rocket_client[rocket_m2_client.js<br/>polling / session handling]
+    end
+
+    subgraph domain[Domain / Protocol]
+      sik[sik.js<br/>SiK frame encode / decode]
+      tracker[antenna/tracker.js<br/>bearing + tracking state]
+      antenna_proto[antenna/base_station.js<br/>antenna serial protocol]
+      rocket_parse[rocket_m2.js<br/>status normalization]
+    end
+  end
+
+  subgraph rover_side[Rover Side]
+    rover_bridge[mr2_sik_bridge]
+    rover_nav[TELEM_NAV / battery / heartbeat]
+  end
+
+  subgraph base_side[Base-Side Dependencies]
+    ros_topics[ROS 2 topics]
+    antenna_hw[Antenna controller<br/>/dev/ttyARDUINO]
+    rocket_hw[Rocket M2 management UI]
+    transitive[Transitive token clients]
+  end
+
+  entry --> config
+  config --> app
+  app --> wshub
+  app --> http
+  app --> serial
+  app --> relay
+  app --> tracker
+  app --> rocket_client
+
+  serial <--> sik
+  relay --> sik
+  app --> sik
+  rocket_client --> rocket_parse
+  tracker --> antenna_proto
+
+  dashboard <-->|WebSocket commands<br/>telemetry / status| wshub
+  transitive -->|GET /transitive/token| http
+  dashboard -->|GET /rocket-m2/status| http
+
+  serial <-->|bytes over /dev/ttySIK| rover_bridge
+  rover_bridge --> rover_nav
+  rover_nav -->|TELEM_NAV / battery / heartbeat frames| serial
+
+  ros_topics -->|UBXNavSvin / RTCM| relay
+  relay -->|BASE_SVIN / BASE_RTCM frames| sik
+
+  serial -->|decoded TELEM_NAV| app
+  app -->|updateRoverNav(nav)| tracker
+  relay -->|onBaseSurveyIn(msg)| tracker
+  tracker -->|sendMoveRad(rad)| antenna_proto
+  antenna_proto <-->|serial bytes| antenna_hw
+
+  rocket_client -->|curl login.cgi / signal.cgi| rocket_hw
+  rocket_client -->|rocket_m2_status| wshub
+  http -->|status JSON| dashboard
 ```
 
 ## Entry Point
