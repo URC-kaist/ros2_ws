@@ -3,7 +3,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { startRosBridge } = require('../src/runtime/ros_bridge')
+const { startRosTopicRelay } = require('../src/runtime/ros_topic_relay')
 
 function createRclnodejs({ initialized = false } = {}) {
   let isInitialized = initialized
@@ -44,31 +44,31 @@ function createRclnodejs({ initialized = false } = {}) {
   }
 }
 
-test('startRosBridge shuts down ROS when it initialized the context', async () => {
+test('startRosTopicRelay shuts down ROS when it initialized the context', async () => {
   const { api, rosNode } = createRclnodejs({ initialized: false })
-  const bridge = await startRosBridge({
+  const relay = await startRosTopicRelay({
     rclnodejs: api,
     nextSeq: () => 1,
     writeFrame() {},
   })
 
   assert.equal(api.initCalls, 1)
-  await bridge.stop()
+  await relay.stop()
 
   assert.equal(rosNode.destroyCalled, true)
   assert.equal(api.shutdownCalls, 1)
 })
 
-test('startRosBridge leaves shared ROS contexts running', async () => {
+test('startRosTopicRelay leaves shared ROS contexts running', async () => {
   const { api, rosNode } = createRclnodejs({ initialized: true })
-  const bridge = await startRosBridge({
+  const relay = await startRosTopicRelay({
     rclnodejs: api,
     nextSeq: () => 1,
     writeFrame() {},
   })
 
   assert.equal(api.initCalls, 0)
-  await bridge.stop()
+  await relay.stop()
 
   assert.equal(rosNode.destroyCalled, true)
   assert.equal(api.shutdownCalls, 0)

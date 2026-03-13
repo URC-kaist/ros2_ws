@@ -2,7 +2,9 @@
 
 const { encodeBaseRtcm, encodeBaseSvin } = require('../protocol/sik')
 
-async function startRosBridge(options = {}) {
+// Relay selected base-station ROS topics over SiK. This module is optional at
+// runtime so the gateway can still start on hosts without ROS installed.
+async function startRosTopicRelay(options = {}) {
   const nextSeq = options.nextSeq
   const writeFrame = options.writeFrame
   const log = typeof options.log === 'function' ? options.log : () => {}
@@ -15,7 +17,7 @@ async function startRosBridge(options = {}) {
       // eslint-disable-next-line global-require
       rclnodejs = require('rclnodejs')
     } catch (err) {
-      log(`ROS bridge disabled: rclnodejs not available (${err.message})`)
+      log(`ROS topic relay disabled: rclnodejs not available (${err.message})`)
       return { stop() {} }
     }
   }
@@ -28,13 +30,13 @@ async function startRosBridge(options = {}) {
     }
   } catch (err) {
     if (!/already been initialized/i.test(err.message || '')) {
-      log(`ROS bridge init failed: ${err.message}`)
+      log(`ROS topic relay init failed: ${err.message}`)
       return { stop() {} }
     }
   }
 
   let lastSvinTxMs = 0
-  const nodeName = `gateway_ros_${process.pid || Math.floor(Math.random() * 1e5)}`
+  const nodeName = `gateway_ros_topics_${process.pid || Math.floor(Math.random() * 1e5)}`
   const rosNode = new rclnodejs.Node(nodeName)
 
   rosNode.createSubscription(
@@ -46,6 +48,8 @@ async function startRosBridge(options = {}) {
         onBaseSurveyIn(msg)
       }
       const nowMs = Date.now()
+      // Survey-in can update quickly; cap transmit rate to keep SiK bandwidth
+      // available for higher-value traffic.
       if (nowMs - lastSvinTxMs < 500) return
       lastSvinTxMs = nowMs
       const frame = encodeBaseSvin(
@@ -76,7 +80,7 @@ async function startRosBridge(options = {}) {
   })
 
   rclnodejs.spin(rosNode)
-  log('ROS bridge started (SVIN + RTCM over SiK)')
+  log('ROS topic relay started (SVIN + RTCM over SiK)')
 
   return {
     async stop() {
@@ -87,6 +91,7 @@ async function startRosBridge(options = {}) {
       } catch (_) {
         /* ignore */
       }
+      // Only shut down the global ROS context if this relay created it.
       if (!ownsRosContext || typeof rclnodejs.shutdown !== 'function') {
         return
       }
@@ -102,5 +107,5 @@ async function startRosBridge(options = {}) {
 }
 
 module.exports = {
-  startRosBridge,
+  startRosTopicRelay,
 }

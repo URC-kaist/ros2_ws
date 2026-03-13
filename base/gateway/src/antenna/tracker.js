@@ -62,6 +62,8 @@ function bearingRad(lat1, lon1, lat2, lon2) {
   return az
 }
 
+// Convert base survey-in and rover navigation into bounded antenna heading
+// commands for the simple single-axis base antenna controller.
 class AntennaTracker {
   constructor(options = {}) {
     this.enabled = options.enabled === true
@@ -171,6 +173,8 @@ class AntennaTracker {
       return
     }
 
+    // UBX survey-in reports ECEF in centimeters plus high-precision 0.01 cm
+    // components. Convert to meters before projecting into latitude/longitude.
     const xM = (meanX + 0.01 * meanXHp) / 100.0
     const yM = (meanY + 0.01 * meanYHp) / 100.0
     const zM = (meanZ + 0.01 * meanZHp) / 100.0
@@ -216,6 +220,7 @@ class AntennaTracker {
     let desired = wrapToPi(az - offsetRad)
     desired = clamp(desired, -this.maxRad, this.maxRad)
 
+    // Optional smoothing trades responsiveness for less servo chatter.
     if (this.smoothing > 0 && this.smoothing < 1 && this.lastCmdRad != null) {
       desired = this.lastCmdRad + (desired - this.lastCmdRad) * this.smoothing
     }

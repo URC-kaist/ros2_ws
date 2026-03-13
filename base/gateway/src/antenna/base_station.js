@@ -13,6 +13,8 @@ const CMD_ACK = 0x80
 const CMD_DONE = 0x81
 const CMD_ERROR = 0x82
 
+// The antenna controller uses a compact framed protocol unrelated to the SiK
+// radio framing used elsewhere in the gateway.
 function crc16CcittFalse(buffer) {
   let crc = 0xffff
   for (let i = 0; i < buffer.length; i += 1) {
@@ -36,6 +38,8 @@ function q16_16(rad) {
   return Math.round(rad * 65536)
 }
 
+// Thin serial client for the base antenna controller. It owns framing,
+// sequence numbers, and acknowledgement event decoding.
 class BaseStationAntenna extends EventEmitter {
   constructor(options = {}) {
     super()
@@ -61,6 +65,8 @@ class BaseStationAntenna extends EventEmitter {
 
   _attachPort(port) {
     port.on('open', () => {
+      // Some Arduino-compatible boards reset on DTR/RTS changes. Keep them low
+      // so opening the port does not reboot the controller unexpectedly.
       if (this.disableControlLines && typeof port.set === 'function') {
         port.set({ dtr: false, rts: false }, (err) => {
           if (err) {
@@ -154,6 +160,7 @@ class BaseStationAntenna extends EventEmitter {
   }
 
   sendMoveRad(rad, seqValue = this._nextSeq()) {
+    // The controller only accepts a mechanical range of +/- 90 degrees.
     const clamped = clamp(rad, -Math.PI / 2, Math.PI / 2)
     const q = q16_16(clamped)
     const payload = Buffer.alloc(4)

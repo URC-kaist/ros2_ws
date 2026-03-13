@@ -4,7 +4,7 @@ const http = require('http')
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 
-const { AntennaTracker } = require('../../antenna_tracker')
+const { AntennaTracker } = require('../antenna/tracker')
 const {
   MsgId,
   createSequencer,
@@ -18,10 +18,12 @@ const {
 } = require('../protocol/sik')
 const { createGatewayHttpHandler } = require('../runtime/http_handlers')
 const { RocketM2Client } = require('../runtime/rocket_m2_client')
-const { startRosBridge } = require('../runtime/ros_bridge')
+const { startRosTopicRelay } = require('../runtime/ros_topic_relay')
 const { SikSerialLink } = require('../runtime/serial_link')
 const { createWsHub } = require('../runtime/ws_hub')
 
+// Compose the gateway runtime out of small adapters so the entrypoint stays thin
+// and each integration point can be tested independently.
 function createGatewayApp(options = {}) {
   const config = options.config
   const env = options.env || process.env
@@ -39,7 +41,7 @@ function createGatewayApp(options = {}) {
   let heartbeatTimer = null
   let antennaStatusTimer = null
   let antennaTracker = null
-  let rosBridge = { stop() {} }
+  let rosTopicRelay = { stop() {} }
   let serverListening = false
 
   const rocketM2Client = new RocketM2Client({
@@ -108,6 +110,7 @@ function createGatewayApp(options = {}) {
   function handleDashboardMessage(msg) {
     if (!msg || typeof msg !== 'object') return
 
+    // Older clients sometimes send `event`; current clients send `type`.
     const type = msg.type || msg.event
     if (!type) return
 
@@ -213,6 +216,7 @@ function createGatewayApp(options = {}) {
   function handleFrame(msgId, payload) {
     lastRxMs = Date.now()
 
+    // Link liveness is defined by heartbeat frames arriving from the rover side.
     if (msgId === MsgId.HEARTBEAT) {
       lastHeartbeatRxMs = Date.now()
     }
@@ -264,7 +268,9 @@ function createGatewayApp(options = {}) {
       }
     }
 
-    rosBridge = await startRosBridge({
+    // Start the ROS topic relay before opening the server so base-side data can
+    // flow immediately once dashboard clients connect.
+    rosTopicRelay = await startRosTopicRelay({
       nextSeq,
       writeFrame,
       log,
@@ -302,6 +308,7 @@ function createGatewayApp(options = {}) {
   }
 
   async function stop() {
+    // Stop periodic producers first so shutdown does not race with in-flight sends.
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer)
       heartbeatTimer = null
@@ -318,9 +325,9 @@ function createGatewayApp(options = {}) {
       antennaTracker = null
     }
 
-    if (rosBridge) {
-      await Promise.resolve(rosBridge.stop())
-      rosBridge = null
+    if (rosTopicRelay) {
+      await Promise.resolve(rosTopicRelay.stop())
+      rosTopicRelay = null
     }
 
     serialLink.stop()

@@ -4,6 +4,8 @@ const { EventEmitter } = require('events')
 
 const { consumeFrames } = require('../protocol/sik')
 
+// Reconnecting serial wrapper around the SiK link. It emits decoded protocol
+// frames upward so the app layer does not deal with byte buffering.
 class SikSerialLink extends EventEmitter {
   constructor(options = {}) {
     super()
@@ -108,6 +110,8 @@ class SikSerialLink extends EventEmitter {
 
     this.port.on('data', (data) => {
       this.rxBuffer = Buffer.concat([this.rxBuffer, data])
+      // Preserve incomplete trailing bytes so fragmented serial reads still
+      // reconstruct valid SiK frames.
       this.rxBuffer = consumeFrames(this.rxBuffer, (msgId, payload) => {
         this.emit('frame', msgId, payload)
       })
