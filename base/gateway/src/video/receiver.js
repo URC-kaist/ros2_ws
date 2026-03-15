@@ -15,7 +15,7 @@ function buildGstReceiveArgs(stream, options = {}) {
     '!',
     'rtpjitterbuffer',
     `latency=${latencyMs}`,
-    'drop-on-late=true',
+    'drop-on-latency=true',
     '!',
     'rtph264depay',
     '!',
