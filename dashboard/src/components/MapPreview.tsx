@@ -27,6 +27,7 @@ const MapPreview = ({
     objectPose,
   } = useMapPreviewData()
   const [followRover, setFollowRover] = useState(true)
+  const [basemapMode, setBasemapMode] = useState<'local' | 'esri'>('local')
   const handleFollowRoverChange = useCallback((follow: boolean) => {
     setFollowRover(follow)
   }, [])
@@ -44,6 +45,7 @@ const MapPreview = ({
     coveragePath,
     objectPose,
     missionList,
+    basemapMode,
   })
 
   return (
@@ -71,6 +73,26 @@ const MapPreview = ({
           }}
         >
           {followRover ? 'Following rover' : 'Follow rover'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setBasemapMode((prev) => (prev === 'local' ? 'esri' : 'local'))}
+          style={{
+            position: 'absolute',
+            top: 54,
+            right: 10,
+            zIndex: 2,
+            background: 'rgba(11, 18, 32, 0.85)',
+            color: '#cdd6f4',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 10,
+            padding: '8px 12px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+          }}
+        >
+          Basemap: {basemapMode === 'local' ? 'Local' : 'Esri'}
         </button>
         {grabFromMap ? (
           <div

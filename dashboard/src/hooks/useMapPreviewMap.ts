@@ -9,6 +9,8 @@ import {
 } from '../lib/mapPreview'
 import type { MissionSpec } from '../lib/missions'
 
+const LOCAL_TILE_BASE = '/tiles'
+
 type UseMapPreviewMapOptions = {
   grabFromMap: boolean
   onGrabCoordinate?: (coord: { lat: number; lon: number }) => void
@@ -23,6 +25,7 @@ type UseMapPreviewMapOptions = {
   coveragePath: MapCoordinate[]
   objectPose: MapCoordinate | null
   missionList: MissionSpec[]
+  basemapMode: 'local' | 'esri'
 }
 
 export const useMapPreviewMap = ({
@@ -39,6 +42,7 @@ export const useMapPreviewMap = ({
   coveragePath,
   objectPose,
   missionList,
+  basemapMode,
 }: UseMapPreviewMapOptions) => {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<maplibregl.Map | null>(null)
@@ -53,21 +57,63 @@ export const useMapPreviewMap = ({
       style: {
         version: 8,
         sources: {
-          imagery: {
+          esri: {
             type: 'raster',
             tiles: [
               'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
             ],
             tileSize: 256,
+            maxzoom: 18,
             attribution:
               'Sources: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+          },
+          local_kaist: {
+            type: 'raster',
+            tiles: [`${LOCAL_TILE_BASE}/kaist/{z}/{x}/{y}.png`],
+            tileSize: 256,
+            minzoom: 14,
+            maxzoom: 22,
+            bounds: [127.35, 36.35, 127.375, 36.375],
+          },
+          local_pump_track: {
+            type: 'raster',
+            tiles: [`${LOCAL_TILE_BASE}/pump_track/{z}/{x}/{y}.png`],
+            tileSize: 256,
+            minzoom: 14,
+            maxzoom: 22,
+            bounds: [127.35, 36.275, 127.375, 36.3],
+          },
+          local_naip: {
+            type: 'raster',
+            tiles: [`${LOCAL_TILE_BASE}/naip/{z}/{x}/{y}.png`],
+            tileSize: 256,
+            minzoom: 14,
+            maxzoom: 22,
           },
         },
         layers: [
           {
-            id: 'imagery',
+            id: 'basemap-esri',
             type: 'raster',
-            source: 'imagery',
+            source: 'esri',
+            layout: {
+              visibility: 'none',
+            },
+          },
+          {
+            id: 'basemap-local-kaist',
+            type: 'raster',
+            source: 'local_kaist',
+          },
+          {
+            id: 'basemap-local-pump_track',
+            type: 'raster',
+            source: 'local_pump_track',
+          },
+          {
+            id: 'basemap-local-naip',
+            type: 'raster',
+            source: 'local_naip',
           },
         ],
       },
@@ -224,6 +270,17 @@ export const useMapPreviewMap = ({
       mapInstanceRef.current = null
     }
   }, [onFollowRoverChange])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    const localVisibility = basemapMode === 'local' ? 'visible' : 'none'
+    const esriVisibility = basemapMode === 'esri' ? 'visible' : 'none'
+    map.setLayoutProperty('basemap-esri', 'visibility', esriVisibility)
+    map.setLayoutProperty('basemap-local-kaist', 'visibility', localVisibility)
+    map.setLayoutProperty('basemap-local-pump_track', 'visibility', localVisibility)
+    map.setLayoutProperty('basemap-local-naip', 'visibility', localVisibility)
+  }, [basemapMode, mapReady])
 
   useEffect(() => {
     const map = mapInstanceRef.current
