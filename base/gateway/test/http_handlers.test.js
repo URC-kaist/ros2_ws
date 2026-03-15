@@ -5,7 +5,6 @@ const assert = require('node:assert/strict')
 
 const {
   handleRocketM2Status,
-  handleTransitiveToken,
   createGatewayHttpHandler,
 } = require('../src/runtime/http_handlers')
 
@@ -61,28 +60,6 @@ test('handleRocketM2Status returns current proxied status', () => {
 
   assert.equal(res.statusCode, 200)
   assert.equal(JSON.parse(res.body).type, 'rocket_m2_status')
-})
-
-test('handleTransitiveToken fails cleanly when secret is missing', () => {
-  const res = createResponseRecorder()
-  const logs = []
-
-  handleTransitiveToken(
-    {
-      url: '/transitive/token',
-      headers: { host: 'localhost' },
-      socket: { remoteAddress: '127.0.0.1' },
-    },
-    res,
-    {
-      env: {},
-      log: (message) => logs.push(message),
-    }
-  )
-
-  assert.equal(res.statusCode, 500)
-  assert.deepEqual(JSON.parse(res.body), { error: 'TRANSITIVE_JWT_SECRET not set' })
-  assert.ok(logs.some((entry) => entry.includes('TRANSITIVE_JWT_SECRET not set')))
 })
 
 test('createGatewayHttpHandler serves video stream metadata', () => {

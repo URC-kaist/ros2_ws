@@ -1,6 +1,0 @@
-{
-  "global": {
-    "rosReleases": ["humble"],
-    "desiredPackages": ["@transitive-robotics/webrtc-video"]
-  }
-}

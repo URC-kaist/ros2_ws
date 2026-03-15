@@ -8,8 +8,7 @@ It does four jobs:
 1. Accept dashboard commands over WebSocket and forward them over SiK.
 2. Receive rover telemetry over SiK and rebroadcast it to dashboard clients.
 3. Optionally relay selected ROS 2 base topics over SiK.
-4. Optionally expose base-side HTTP utilities such as Transitive token minting
-   and Rocket M2 status.
+4. Optionally expose base-side HTTP utilities such as Rocket M2 status.
 
 It implements the MR2 SiK protocol described in
 `rover/ros2_ws/src/mr2_sik_bridge/README.md`.
@@ -50,7 +49,6 @@ flowchart LR
     ros_topics[ROS 2 topics]
     antenna_hw[Antenna controller<br/>/dev/ttyARDUINO]
     rocket_hw[Rocket M2 management UI]
-    transitive[Transitive token clients]
   end
 
   entry --> config
@@ -69,7 +67,6 @@ flowchart LR
   tracker --> antenna_proto
 
   dashboard <-->|WebSocket commands<br/>telemetry / status| wshub
-  transitive -->|GET /transitive/token| http
   dashboard -->|GET /rocket-m2/status| http
 
   serial <-->|bytes over /dev/ttySIK| rover_bridge
@@ -308,30 +305,6 @@ Notes:
   becomes `false` if no heartbeat is received within `SIK_LINK_TIMEOUT_MS`.
 
 ## HTTP Endpoints
-
-### `GET /transitive/token`
-
-Mints a Transitive JWT for the dashboard.
-
-Required environment:
-
-- `TRANSITIVE_JWT_SECRET`
-
-Optional environment:
-
-- `TRANSITIVE_ID` default `unknown`
-- `TRANSITIVE_DEVICE` default `unknown`
-- `TRANSITIVE_CAPABILITY` default `@transitive-robotics/webrtc-video`
-- `TRANSITIVE_USER_ID` default `operator`
-- `TRANSITIVE_VALIDITY` default `86400`
-
-Optional query parameters override the environment values:
-
-- `id`
-- `device`
-- `capability`
-- `userId`
-- `validity`
 
 ### `GET /rocket-m2/status`
 

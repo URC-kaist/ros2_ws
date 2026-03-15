@@ -18,8 +18,3 @@ If you are developing a production application, we recommend using TypeScript wi
 ## ROS Bridge (roslibjs)
 
 The dashboard loads `roslib.min.js` from `dashboard/public/roslib.min.js` (included in this repo) and expects the global `window.ROSLIB` object to be available at runtime. If you update roslib, replace that file and rebuild the dashboard.
-
-## Transitive token
-
-The dashboard requests a token from `/transitive/token`. You can override the
-endpoint with `VITE_TRANSITIVE_TOKEN_URL`.
