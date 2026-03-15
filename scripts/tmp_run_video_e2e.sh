@@ -13,6 +13,7 @@ SIK_A="${TMP_DIR}/sik_a"
 SIK_B="${TMP_DIR}/sik_b"
 VIDEO_CONFIG="${TMP_DIR}/video_streams.json"
 VIEWER_HTML="${TMP_DIR}/index.html"
+VIEWER_PROXY_JS="${TMP_DIR}/viewer_proxy.js"
 SOCAT_LOG="${TMP_DIR}/socat.log"
 GATEWAY_LOG="${TMP_DIR}/gateway.log"
 ROVER_LOG="${TMP_DIR}/rover_video.log"
@@ -124,10 +125,8 @@ cat >"${VIEWER_HTML}" <<'EOF'
     </main>
     <script>
       const STREAM_ID = 'front_nav_cam'
-      const GATEWAY_PORT = __GATEWAY_PORT__
       const gatewayUrl = new URL(window.location.href)
       gatewayUrl.protocol = gatewayUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-      gatewayUrl.port = String(GATEWAY_PORT)
       gatewayUrl.pathname = '/video-ws'
       gatewayUrl.search = ''
       gatewayUrl.hash = ''
@@ -371,7 +370,104 @@ cat >"${VIEWER_HTML}" <<'EOF'
 </html>
 EOF
 
-sed -i "s/__GATEWAY_PORT__/${GATEWAY_PORT}/g" "${VIEWER_HTML}"
+cat >"${VIEWER_PROXY_JS}" <<'EOF'
+const fs = require('fs')
+const http = require('http')
+const net = require('net')
+
+const bindHost = process.env.BIND_HOST || '0.0.0.0'
+const viewerPort = Number(process.env.VIEWER_PORT || '18082')
+const gatewayPort = Number(process.env.GATEWAY_PORT || '18081')
+const viewerHtml = process.env.VIEWER_HTML
+
+const server = http.createServer((req, res) => {
+  if (!req.url) {
+    res.writeHead(400)
+    res.end('missing url')
+    return
+  }
+
+  if (req.url === '/' || req.url.startsWith('/?')) {
+    const body = fs.readFileSync(viewerHtml)
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+    })
+    res.end(body)
+    return
+  }
+
+  if (req.url === '/favicon.ico') {
+    res.writeHead(204)
+    res.end()
+    return
+  }
+
+  if (req.url.startsWith('/video/')) {
+    const upstream = http.request(
+      {
+        host: '127.0.0.1',
+        port: gatewayPort,
+        method: req.method,
+        path: req.url,
+        headers: {
+          ...req.headers,
+          host: `127.0.0.1:${gatewayPort}`,
+        },
+      },
+      (upstreamRes) => {
+        res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers)
+        upstreamRes.pipe(res)
+      }
+    )
+    upstream.on('error', (error) => {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
+      res.end(`proxy error: ${error.message}`)
+    })
+    req.pipe(upstream)
+    return
+  }
+
+  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+  res.end('not found')
+})
+
+server.on('upgrade', (req, socket, head) => {
+  if (!req.url || req.url !== '/video-ws') {
+    socket.destroy()
+    return
+  }
+
+  const upstream = net.connect(gatewayPort, '127.0.0.1', () => {
+    const headers = []
+    for (let index = 0; index < req.rawHeaders.length; index += 2) {
+      const name = req.rawHeaders[index]
+      const lower = name.toLowerCase()
+      if (lower === 'host') {
+        headers.push(`${name}: 127.0.0.1:${gatewayPort}`)
+        continue
+      }
+      headers.push(`${name}: ${req.rawHeaders[index + 1]}`)
+    }
+    upstream.write(
+      `GET ${req.url} HTTP/${req.httpVersion}\r\n${headers.join('\r\n')}\r\n\r\n`
+    )
+    if (head.length > 0) {
+      upstream.write(head)
+    }
+    socket.pipe(upstream)
+    upstream.pipe(socket)
+  })
+
+  upstream.on('error', () => {
+    socket.destroy()
+  })
+})
+
+server.listen(viewerPort, bindHost, () => {
+  console.log(`Viewer proxy listening on ${bindHost}:${viewerPort}`)
+})
+EOF
 
 start_bg() {
   "$@" &
@@ -457,7 +553,9 @@ finally:
 PY
 "
 
-start_bg python3 -m http.server "${VIEWER_PORT}" --bind "${BIND_HOST}" --directory "${TMP_DIR}"
+start_bg bash -lc "
+  BIND_HOST='${BIND_HOST}' VIEWER_PORT='${VIEWER_PORT}' GATEWAY_PORT='${GATEWAY_PORT}' VIEWER_HTML='${VIEWER_HTML}' node '${VIEWER_PROXY_JS}'
+"
 
 wait_for_port "http://127.0.0.1:${VIEWER_PORT}"
 
@@ -474,7 +572,7 @@ Viewer URL:
   http://${REMOTE_HOST}:${VIEWER_PORT}
 
 Gateway metadata URL:
-  http://${REMOTE_HOST}:${GATEWAY_PORT}/video/streams
+  http://${REMOTE_HOST}:${VIEWER_PORT}/video/streams
 
 Bind address:
   ${BIND_HOST}
