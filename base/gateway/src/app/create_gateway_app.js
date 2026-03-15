@@ -301,9 +301,9 @@ function createGatewayApp(options = {}) {
     videoGateway.start()
 
     await new Promise((resolve) => {
-      server.listen(config.port, () => {
+      server.listen(config.port, config.host, () => {
         serverListening = true
-        log(`HTTP/WebSocket listening on ${config.port}`)
+        log(`HTTP/WebSocket listening on ${config.host}:${config.port}`)
         resolve()
       })
     })

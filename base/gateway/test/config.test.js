@@ -14,6 +14,8 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       '115200',
       '--heartbeat-hz',
       '5',
+      '--host',
+      '0.0.0.0',
       '--antenna-enable',
       'true',
       '--rocket-m2-enable',
@@ -26,6 +28,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
     {
       SIK_DEVICE: '/tmp/ignored',
       SIK_BAUD: '9600',
+      SIK_WS_HOST: '127.0.0.1',
       SIK_HEARTBEAT_HZ: '2',
       BASE_ANTENNA_ENABLE: 'false',
       ROCKET_M2_ENABLE: 'false',
@@ -36,6 +39,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
 
   assert.equal(config.device, '/tmp/sik0')
   assert.equal(config.baud, 115200)
+  assert.equal(config.host, '0.0.0.0')
   assert.equal(config.heartbeatHz, 5)
   assert.equal(config.antennaEnable, true)
   assert.equal(config.rocketM2Enable, true)
@@ -49,6 +53,7 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   const config = parseGatewayConfig([], {})
 
   assert.equal(config.device, '/dev/ttySIK')
+  assert.equal(config.host, '0.0.0.0')
   assert.equal(config.port, 8081)
   assert.equal(config.linkTimeoutMs, 2000)
   assert.equal(config.antennaEnable, false)

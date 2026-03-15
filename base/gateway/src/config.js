@@ -6,6 +6,7 @@ const path = require('path')
 const DEFAULTS = {
   device: '/dev/ttySIK',
   baud: 57600,
+  host: '0.0.0.0',
   port: 8081,
   videoConfigPath: path.resolve(
     __dirname,
@@ -84,6 +85,7 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
   return {
     device: getArg(args, '--device') || env.SIK_DEVICE || DEFAULTS.device,
     baud: toInt(getArg(args, '--baud') || env.SIK_BAUD || DEFAULTS.baud),
+    host: getArg(args, '--host') || env.SIK_WS_HOST || DEFAULTS.host,
     port: toInt(getArg(args, '--port') || env.SIK_WS_PORT || DEFAULTS.port),
     videoConfigPath:
       getArg(args, '--video-config') || env.VIDEO_CONFIG_PATH || DEFAULTS.videoConfigPath,

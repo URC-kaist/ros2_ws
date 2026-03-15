@@ -6,6 +6,7 @@ TMP_DIR="$(mktemp -d /tmp/mr2-video-e2e.XXXXXX)"
 
 GATEWAY_PORT="${GATEWAY_PORT:-18081}"
 VIEWER_PORT="${VIEWER_PORT:-18082}"
+BIND_HOST="${BIND_HOST:-0.0.0.0}"
 STREAM_ID="front_nav_cam"
 
 SIK_A="${TMP_DIR}/sik_a"
@@ -123,7 +124,14 @@ cat >"${VIEWER_HTML}" <<'EOF'
     </main>
     <script>
       const STREAM_ID = 'front_nav_cam'
-      const wsUrl = 'ws://127.0.0.1:18081/video-ws'
+      const GATEWAY_PORT = __GATEWAY_PORT__
+      const gatewayUrl = new URL(window.location.href)
+      gatewayUrl.protocol = gatewayUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+      gatewayUrl.port = String(GATEWAY_PORT)
+      gatewayUrl.pathname = '/video-ws'
+      gatewayUrl.search = ''
+      gatewayUrl.hash = ''
+      const wsUrl = gatewayUrl.toString()
       const statusEl = document.getElementById('status')
       const countsEl = document.getElementById('counts')
       const canvas = document.getElementById('canvas')
@@ -363,6 +371,8 @@ cat >"${VIEWER_HTML}" <<'EOF'
 </html>
 EOF
 
+sed -i "s/__GATEWAY_PORT__/${GATEWAY_PORT}/g" "${VIEWER_HTML}"
+
 start_bg() {
   "$@" &
   PIDS+=("$!")
@@ -389,7 +399,7 @@ start_bg bash -lc "
   source /opt/ros/humble/setup.bash &&
   source '${ROOT_DIR}/rover/ros2_ws/install/setup.bash' &&
   cd '${ROOT_DIR}/base/gateway' &&
-  npm start -- --device '${SIK_A}' --baud 57600 --port '${GATEWAY_PORT}' --video-config '${VIDEO_CONFIG}'
+  npm start -- --device '${SIK_A}' --baud 57600 --host '${BIND_HOST}' --port '${GATEWAY_PORT}' --video-config '${VIDEO_CONFIG}'
 "
 
 wait_for_port "http://127.0.0.1:${GATEWAY_PORT}/video/streams"
@@ -447,19 +457,27 @@ finally:
 PY
 "
 
-start_bg python3 -m http.server "${VIEWER_PORT}" --directory "${TMP_DIR}"
+start_bg python3 -m http.server "${VIEWER_PORT}" --bind "${BIND_HOST}" --directory "${TMP_DIR}"
 
 wait_for_port "http://127.0.0.1:${VIEWER_PORT}"
+
+REMOTE_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"
+if [[ -z "${REMOTE_HOST}" ]]; then
+  REMOTE_HOST="127.0.0.1"
+fi
 
 cat <<EOF
 
 Local MR2 video E2E stack is running.
 
 Viewer URL:
-  http://127.0.0.1:${VIEWER_PORT}
+  http://${REMOTE_HOST}:${VIEWER_PORT}
 
 Gateway metadata URL:
-  http://127.0.0.1:${GATEWAY_PORT}/video/streams
+  http://${REMOTE_HOST}:${GATEWAY_PORT}/video/streams
+
+Bind address:
+  ${BIND_HOST}
 
 Temporary files live under:
   ${TMP_DIR}
