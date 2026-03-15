@@ -6,10 +6,10 @@ import type { MissionSpec } from './MapPreview'
 import SystemStatusPanel from './SystemStatusPanel'
 import SpectrophotometerCard from './SpectrophotometerCard'
 import AutonomyHealthCard from './AutonomyHealthCard'
-import TransitiveVideoCard from './TransitiveVideoCard'
 import CameraTurretCard from './CameraTurretCard'
 import CentrifugeCard from './CentrifugeCard'
 import MicroscopeViewCard from './MicroscopeViewCard'
+import ConfiguredVideoGrid from './ConfiguredVideoGrid'
 import './MissionPanels.css'
 
 type MissionPanelsProps = {
@@ -139,29 +139,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
                 onGrabCoordinate={handleGrabFromMap}
               />
             </article>
-            <article className="card video-feed-card">
-              <h3>Vision</h3>
-              <div className="video-feed-grid">
-                <div className="video-feed-item">
-                  <span className="video-feed-label">ArUco</span>
-                  <TransitiveVideoCard
-                    embedded
-                    source="/aruco_tracker/debug"
-                    videoWidth={320}
-                    videoHeight={180}
-                  />
-                </div>
-                <div className="video-feed-item">
-                  <span className="video-feed-label">YOLO</span>
-                  <TransitiveVideoCard
-                    embedded
-                    source="/yolo/annotated_image"
-                    videoWidth={320}
-                    videoHeight={180}
-                  />
-                </div>
-              </div>
-            </article>
+            <ConfiguredVideoGrid title="Vision" panel="autonomous" />
           </div>
           <div className="autonomy-right">
             <AutonomyHealthCard />
