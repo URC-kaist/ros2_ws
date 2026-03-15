@@ -13,3 +13,5 @@ frames_*.pdf
 navigation.log
 doctor.log
 realsense.log
+
+crops/
