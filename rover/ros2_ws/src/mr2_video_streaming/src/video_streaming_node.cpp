@@ -1,5 +1,8 @@
 #include <algorithm>
+#include <cerrno>
 #include <cctype>
+#include <csignal>
+#include <cstring>
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
@@ -8,8 +11,11 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
@@ -196,9 +202,6 @@ class StreamPipeline {
     const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
 
     caps << (is_jpeg ? "image/jpeg" : "video/x-raw");
-    if (!pixel_format.empty() && !is_jpeg) {
-      caps << ",format=" << pixel_format;
-    }
     if (config_.width > 0) {
       caps << ",width=" << config_.width;
     }
@@ -271,27 +274,54 @@ class StreamPipeline {
     const std::string pixel_format = uppercase(config_.v4l2_pixel_format);
     const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
 
-    std::ostringstream pipeline_description;
-    pipeline_description
-        << "v4l2src device=" << quote_gstreamer_string(config_.v4l2_device)
-        << " do-timestamp=true "
-        << "! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ";
-
+    std::vector<std::string> args{
+        "gst-launch-1.0",
+        "-q",
+        "v4l2src",
+        "device=" + config_.v4l2_device,
+    };
     const std::string source_caps = build_v4l2_source_caps();
     if (!source_caps.empty()) {
-      pipeline_description << "! " << source_caps << " ";
+      args.push_back("!");
+      args.push_back(source_caps);
     }
     if (is_jpeg) {
-      pipeline_description << "! jpegdec ";
+      args.push_back("!");
+      args.push_back("jpegdec");
     }
-    pipeline_description
-        << "! videorate "
-        << "! videoscale "
-        << "! videoconvert "
-        << "! " << build_raw_output_caps() << " "
-        << build_encoded_sink_branch();
+    args.insert(
+        args.end(),
+        {
+            "!",
+            "videoconvert",
+            "!",
+            "video/x-raw,format=I420",
+            "!",
+            "x264enc",
+            "bitrate=" + std::to_string(config_.encoder.bitrate_kbps),
+            "speed-preset=" + config_.encoder.speed_preset,
+            "tune=" + config_.encoder.tune,
+            "key-int-max=" + std::to_string(config_.encoder.keyframe_interval),
+            "bframes=0",
+            "byte-stream=true",
+            "threads=1",
+            "!",
+            "h264parse",
+            "config-interval=1",
+            "!",
+            "rtph264pay",
+            "pt=96",
+            "mtu=1200",
+            "config-interval=1",
+            "!",
+            "udpsink",
+            "host=" + base_host_,
+            "port=" + std::to_string(config_.udp_port),
+            "sync=false",
+            "async=false",
+        });
 
-    start_pipeline(pipeline_description.str(), false);
+    start_gst_launch_child(args);
 
     std::ostringstream details;
     details << "Started V4L2 video stream " << config_.stream_id
@@ -360,9 +390,22 @@ class StreamPipeline {
       gst_caps_unref(caps);
     }
 
+    bus_ = gst_element_get_bus(pipeline_);
+    if (bus_ != nullptr) {
+      bus_watch_id_ = gst_bus_add_watch(bus_, &StreamPipeline::handle_bus_message, this);
+    }
+
     const GstStateChangeReturn state_change = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     if (state_change == GST_STATE_CHANGE_FAILURE) {
       throw std::runtime_error("failed to start pipeline for stream " + config_.stream_id);
+    }
+    if (state_change == GST_STATE_CHANGE_ASYNC) {
+      GstState current_state = GST_STATE_NULL;
+      const GstStateChangeReturn settled =
+          gst_element_get_state(pipeline_, &current_state, nullptr, 5 * GST_SECOND);
+      if (settled == GST_STATE_CHANGE_FAILURE) {
+        throw std::runtime_error("pipeline failed while settling to PLAYING for stream " + config_.stream_id);
+      }
     }
   }
 
@@ -400,8 +443,21 @@ class StreamPipeline {
   }
 
   void shutdown() {
+    if (gst_child_pid_ > 0) {
+      kill(gst_child_pid_, SIGTERM);
+      waitpid(gst_child_pid_, nullptr, 0);
+      gst_child_pid_ = -1;
+    }
     if (pipeline_ != nullptr) {
       gst_element_set_state(pipeline_, GST_STATE_NULL);
+    }
+    if (bus_watch_id_ != 0) {
+      g_source_remove(bus_watch_id_);
+      bus_watch_id_ = 0;
+    }
+    if (bus_ != nullptr) {
+      gst_object_unref(bus_);
+      bus_ = nullptr;
     }
     if (appsrc_ != nullptr) {
       gst_object_unref(appsrc_);
@@ -418,10 +474,109 @@ class StreamPipeline {
   rclcpp::Logger logger_;
   GstElement * pipeline_{nullptr};
   GstElement * appsrc_{nullptr};
+  GstBus * bus_{nullptr};
+  guint bus_watch_id_{0};
+  pid_t gst_child_pid_{-1};
   int width_{0};
   int height_{0};
   GstClockTime frame_duration_ns_{0};
   GstClockTime frame_index_{0};
+
+  static gboolean handle_bus_message(GstBus * /* bus */, GstMessage * message, gpointer user_data) {
+    auto * self = static_cast<StreamPipeline *>(user_data);
+    return self->on_bus_message(message);
+  }
+
+  gboolean on_bus_message(GstMessage * message) {
+    switch (GST_MESSAGE_TYPE(message)) {
+      case GST_MESSAGE_ERROR: {
+        GError * error = nullptr;
+        gchar * debug = nullptr;
+        gst_message_parse_error(message, &error, &debug);
+        RCLCPP_ERROR(
+            logger_,
+            "Stream %s GStreamer error from %s: %s%s%s",
+            config_.stream_id.c_str(),
+            GST_OBJECT_NAME(message->src),
+            error != nullptr ? error->message : "unknown error",
+            debug != nullptr ? " | " : "",
+            debug != nullptr ? debug : "");
+        if (error != nullptr) {
+          g_error_free(error);
+        }
+        if (debug != nullptr) {
+          g_free(debug);
+        }
+        break;
+      }
+      case GST_MESSAGE_WARNING: {
+        GError * warning = nullptr;
+        gchar * debug = nullptr;
+        gst_message_parse_warning(message, &warning, &debug);
+        RCLCPP_WARN(
+            logger_,
+            "Stream %s GStreamer warning from %s: %s%s%s",
+            config_.stream_id.c_str(),
+            GST_OBJECT_NAME(message->src),
+            warning != nullptr ? warning->message : "unknown warning",
+            debug != nullptr ? " | " : "",
+            debug != nullptr ? debug : "");
+        if (warning != nullptr) {
+          g_error_free(warning);
+        }
+        if (debug != nullptr) {
+          g_free(debug);
+        }
+        break;
+      }
+      case GST_MESSAGE_STATE_CHANGED: {
+        if (GST_MESSAGE_SRC(message) == GST_OBJECT(pipeline_)) {
+          GstState old_state = GST_STATE_NULL;
+          GstState new_state = GST_STATE_NULL;
+          GstState pending_state = GST_STATE_NULL;
+          gst_message_parse_state_changed(message, &old_state, &new_state, &pending_state);
+          RCLCPP_INFO(
+              logger_,
+              "Stream %s pipeline state %s -> %s (pending %s)",
+              config_.stream_id.c_str(),
+              gst_element_state_get_name(old_state),
+              gst_element_state_get_name(new_state),
+              gst_element_state_get_name(pending_state));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    return G_SOURCE_CONTINUE;
+  }
+
+  void start_gst_launch_child(const std::vector<std::string> & args) {
+    std::vector<char *> argv;
+    argv.reserve(args.size() + 1);
+    for (const auto & arg : args) {
+      argv.push_back(const_cast<char *>(arg.c_str()));
+    }
+    argv.push_back(nullptr);
+
+    gst_child_pid_ = fork();
+    if (gst_child_pid_ < 0) {
+      throw std::runtime_error(
+          "failed to fork gst-launch child for stream " + config_.stream_id + ": " +
+          std::strerror(errno));
+    }
+
+    if (gst_child_pid_ == 0) {
+      execvp(argv[0], argv.data());
+      std::fprintf(
+          stderr,
+          "video_streaming_node failed to exec %s for stream %s: %s\n",
+          argv[0],
+          config_.stream_id.c_str(),
+          std::strerror(errno));
+      _exit(127);
+    }
+  }
 };
 
 StreamConfig parse_stream_config(const json & item) {
@@ -515,10 +670,15 @@ class VideoStreamingNode : public rclcpp::Node {
   VideoStreamingNode()
       : rclcpp::Node("video_streaming"),
         video_config_path_(declare_parameter<std::string>("video_config_path", "")),
-        base_host_(declare_parameter<std::string>("base_host", "127.0.0.1")) {
+        base_host_(declare_parameter<std::string>("base_host", "127.0.0.1")),
+        gst_main_loop_(g_main_loop_new(nullptr, FALSE)) {
     if (video_config_path_.empty()) {
       throw std::runtime_error("video_config_path parameter is required");
     }
+
+    gst_main_loop_thread_ = std::thread([this]() {
+      g_main_loop_run(gst_main_loop_);
+    });
 
     const auto streams = load_streams_from_file(video_config_path_);
     for (const auto & stream : streams) {
@@ -555,9 +715,24 @@ class VideoStreamingNode : public rclcpp::Node {
     }
   }
 
+  ~VideoStreamingNode() override {
+    if (gst_main_loop_ != nullptr) {
+      g_main_loop_quit(gst_main_loop_);
+    }
+    if (gst_main_loop_thread_.joinable()) {
+      gst_main_loop_thread_.join();
+    }
+    if (gst_main_loop_ != nullptr) {
+      g_main_loop_unref(gst_main_loop_);
+      gst_main_loop_ = nullptr;
+    }
+  }
+
  private:
   std::string video_config_path_;
   std::string base_host_;
+  GMainLoop * gst_main_loop_{nullptr};
+  std::thread gst_main_loop_thread_;
   std::vector<std::shared_ptr<StreamPipeline>> pipelines_;
   std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subscriptions_;
 };

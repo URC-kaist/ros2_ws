@@ -576,11 +576,16 @@ start_bg socat -d -d pty,raw,echo=0,link="${SIK_A}" pty,raw,echo=0,link="${SIK_B
 sleep 1
 
 start_bg gst-launch-1.0 -q \
-  videotestsrc is-live=true pattern=smpte \
+  videotestsrc is-live=true pattern=ball \
+  ! timeoverlay shaded-background=true \
   ! video/x-raw,width=320,height=180,framerate=30/1 \
   ! videoconvert \
   ! video/x-raw,format=YUY2 \
   ! v4l2sink device="${V4L2_DEVICE}" sync=false
+
+sleep 1
+v4l2-ctl -d "${V4L2_DEVICE}" -c sustain_framerate=1
+v4l2loopback-ctl set-fps 30 "${V4L2_DEVICE}"
 
 start_bg bash -lc "
   source /opt/ros/humble/setup.bash &&
