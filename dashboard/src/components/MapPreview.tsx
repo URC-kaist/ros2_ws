@@ -263,6 +263,13 @@ const MapPreview = ({
             maxzoom: 22,
             bounds: [127.35, 36.275, 127.375, 36.3],
           },
+          local_naip: {
+            type: 'raster',
+            tiles: [`${LOCAL_TILE_BASE}/NAIP/{z}/{x}/{y}.png`],
+            tileSize: 256,
+            minzoom: 14,
+            maxzoom: 22,
+          },
         },
         layers: [
           {
@@ -282,6 +289,11 @@ const MapPreview = ({
             id: 'basemap-local-pump_track',
             type: 'raster',
             source: 'local_pump_track',
+          },
+          {
+            id: 'basemap-local-naip',
+            type: 'raster',
+            source: 'local_naip',
           },
         ],
       },
@@ -447,6 +459,7 @@ const MapPreview = ({
     map.setLayoutProperty('basemap-esri', 'visibility', esriVisibility)
     map.setLayoutProperty('basemap-local-kaist', 'visibility', localVisibility)
     map.setLayoutProperty('basemap-local-pump_track', 'visibility', localVisibility)
+    map.setLayoutProperty('basemap-local-naip', 'visibility', localVisibility)
   }, [basemapMode, mapReady])
 
   useEffect(() => {
