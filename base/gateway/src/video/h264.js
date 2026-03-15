@@ -144,9 +144,10 @@ function inspectNalUnit(nal) {
 
 function deriveCodecString(spsNal) {
   if (!spsNal || spsNal.length < 4) return null
-  return `avc1.${spsNal[1].toString(16).padStart(2, '0')}${spsNal[2]
-    .toString(16)
-    .padStart(2, '0')}${spsNal[3].toString(16).padStart(2, '0')}`.toUpperCase()
+  const profile = spsNal[1].toString(16).padStart(2, '0').toUpperCase()
+  const constraints = spsNal[2].toString(16).padStart(2, '0').toUpperCase()
+  const level = spsNal[3].toString(16).padStart(2, '0').toUpperCase()
+  return `avc1.${profile}${constraints}${level}`
 }
 
 function classifyAccessUnit(nals) {

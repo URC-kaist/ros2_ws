@@ -9,6 +9,8 @@ type VideoStreamCardProps = {
   videoHeight?: number
 }
 
+type H264PayloadFormat = 'annexb' | 'avcc'
+
 function findStartCodeLength(bytes: Uint8Array, offset: number) {
   if (offset + 3 > bytes.length) return 0
   if (bytes[offset] !== 0 || bytes[offset + 1] !== 0) return 0
@@ -76,10 +78,75 @@ function buildAvcDescription(config: VideoConfigMessage) {
   return output
 }
 
+function deriveAvcCodecString(sps: Uint8Array) {
+  if (sps.length < 4) return 'avc1.42E01F'
+  const profile = sps[1].toString(16).padStart(2, '0').toUpperCase()
+  const constraints = sps[2].toString(16).padStart(2, '0').toUpperCase()
+  const level = sps[3].toString(16).padStart(2, '0').toUpperCase()
+  return `avc1.${profile}${constraints}${level}`
+}
+
+function normalizeCodecString(codec: string | null | undefined, sps: Uint8Array) {
+  if (!codec) return deriveAvcCodecString(sps)
+  if (/^avc1\./i.test(codec)) {
+    return `avc1.${codec.slice(5)}`
+  }
+  return deriveAvcCodecString(sps)
+}
+
+function buildDecoderCandidates(message: VideoConfigMessage) {
+  const codec = normalizeCodecString(message.codec, message.sps)
+  const baseConfig: VideoDecoderConfig = {
+    codec,
+    hardwareAcceleration: 'prefer-hardware',
+  }
+  if (message.width > 0) {
+    baseConfig.codedWidth = message.width
+  }
+  if (message.height > 0) {
+    baseConfig.codedHeight = message.height
+  }
+
+  return [
+    {
+      config: {
+        ...baseConfig,
+        description: buildAvcDescription(message),
+      },
+      payloadFormat: 'avcc' as H264PayloadFormat,
+    },
+    {
+      config: baseConfig,
+      payloadFormat: 'annexb' as H264PayloadFormat,
+    },
+  ]
+}
+
+async function selectDecoderConfiguration(message: VideoConfigMessage) {
+  const candidates = buildDecoderCandidates(message)
+  if (typeof VideoDecoder.isConfigSupported !== 'function') {
+    return candidates[0]
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const result = await VideoDecoder.isConfigSupported(candidate.config)
+      if (result.supported) {
+        return candidate
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return null
+}
+
 const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const decoderRef = useRef<VideoDecoder | null>(null)
   const decoderConfigRef = useRef<VideoDecoderConfig | null>(null)
+  const payloadFormatRef = useRef<H264PayloadFormat>('avcc')
   const [status, setStatus] = useState(
     stream.available ? 'Waiting for codec config...' : 'Waiting for video ingest...'
   )
@@ -95,6 +162,8 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
   )
 
   useEffect(() => {
+    let active = true
+
     if (typeof VideoDecoder === 'undefined') {
       setStatus('WebCodecs is unavailable in this browser')
       return
@@ -133,22 +202,21 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
 
     const unsubscribe = getVideoGatewayClient().subscribe(stream.stream_id, (message) => {
       if (message.kind === 'config') {
-        const nextConfig: VideoDecoderConfig = {
-          codec: message.codec || 'avc1.42E01F',
-          description: buildAvcDescription(message),
-          hardwareAcceleration: 'prefer-hardware',
-        }
-        if (message.width > 0) {
-          nextConfig.codedWidth = message.width
-        }
-        if (message.height > 0) {
-          nextConfig.codedHeight = message.height
-        }
+        void (async () => {
+          const supported = await selectDecoderConfiguration(message)
+          if (!active) return
+          if (!supported) {
+            decoderConfigRef.current = null
+            setStatus('WebCodecs does not support this H.264 stream')
+            return
+          }
 
-        decoder.reset()
-        decoder.configure(nextConfig)
-        decoderConfigRef.current = nextConfig
-        setStatus('Waiting for keyframe...')
+          decoder.reset()
+          decoder.configure(supported.config)
+          decoderConfigRef.current = supported.config
+          payloadFormatRef.current = supported.payloadFormat
+          setStatus('Waiting for keyframe...')
+        })()
         return
       }
 
@@ -164,7 +232,8 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
         decoder.configure(decoderConfigRef.current)
       }
 
-      const payload = annexBToAvcc(chunk.payload)
+      const payload =
+        payloadFormatRef.current === 'annexb' ? chunk.payload : annexBToAvcc(chunk.payload)
       decoder.decode(
         new EncodedVideoChunk({
           type: chunk.key ? 'key' : 'delta',
@@ -175,10 +244,12 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
     })
 
     return () => {
+      active = false
       unsubscribe()
       decoder.close()
       decoderRef.current = null
       decoderConfigRef.current = null
+      payloadFormatRef.current = 'avcc'
     }
   }, [stream.available, stream.height, stream.stream_id, stream.width])
 

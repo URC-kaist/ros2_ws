@@ -22,7 +22,7 @@ test('AnnexBAccessUnitParser groups SPS/PPS/IDR into one key access unit', () =>
   assert.equal(flushed.length, 1)
   assert.equal(flushed[0].key, true)
   assert.equal(flushed[0].delta, false)
-  assert.equal(flushed[0].codec, 'AVC1.42E01F')
+  assert.equal(flushed[0].codec, 'avc1.42E01F')
   assert.deepEqual(flushed[0].sps, Buffer.from([0x67, 0x42, 0xe0, 0x1f]))
   assert.deepEqual(flushed[0].pps, Buffer.from([0x68, 0xce, 0x38, 0x80]))
 })
