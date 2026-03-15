@@ -43,12 +43,12 @@ cat >"${VIDEO_CONFIG}" <<'EOF'
       "ros_topic": "/front_camera/image_raw",
       "udp_port": 5000,
       "ros_encoding": "rgb8",
-      "width": 64,
-      "height": 48,
-      "framerate": 5,
+      "width": 640,
+      "height": 360,
+      "framerate": 30,
       "encoder": {
-        "bitrate_kbps": 500,
-        "keyframe_interval": 5,
+        "bitrate_kbps": 2000,
+        "keyframe_interval": 30,
         "speed_preset": "ultrafast",
         "tune": "zerolatency"
       },
@@ -120,7 +120,7 @@ cat >"${VIEWER_HTML}" <<'EOF'
         <p id="counts">config=0 key=0 delta=0</p>
       </section>
       <section class="panel">
-        <canvas id="canvas" width="640" height="480"></canvas>
+        <canvas id="canvas" width="640" height="360"></canvas>
       </section>
     </main>
     <script>
@@ -438,6 +438,8 @@ server.on('upgrade', (req, socket, head) => {
     return
   }
 
+  socket.on('error', () => {})
+
   const upstream = net.connect(gatewayPort, '127.0.0.1', () => {
     const headers = []
     for (let index = 0; index < req.rawHeaders.length; index += 2) {
@@ -460,6 +462,9 @@ server.on('upgrade', (req, socket, head) => {
   })
 
   upstream.on('error', () => {
+    socket.destroy()
+  })
+  upstream.on('close', () => {
     socket.destroy()
   })
 })
@@ -513,32 +518,115 @@ start_bg bash -lc "
   source '${ROOT_DIR}/rover/ros2_ws/install/setup.bash' &&
   python3 - <<'PY'
 import rclpy
+import time
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
 class Publisher(Node):
+    BAR_COLORS = [
+        (255, 255, 255),
+        (255, 255, 0),
+        (0, 255, 255),
+        (0, 255, 0),
+        (255, 0, 255),
+        (255, 0, 0),
+        (0, 0, 255),
+        (24, 24, 24),
+    ]
+    DIGIT_SEGMENTS = {
+        '0': 'abcedf',
+        '1': 'bc',
+        '2': 'abged',
+        '3': 'abgcd',
+        '4': 'fgbc',
+        '5': 'afgcd',
+        '6': 'afgcde',
+        '7': 'abc',
+        '8': 'abcdefg',
+        '9': 'abcdfg',
+    }
+
     def __init__(self):
         super().__init__('video_e2e_publisher')
+        self.width = 640
+        self.height = 360
+        self.step = self.width * 3
         self.pub = self.create_publisher(Image, '/front_camera/image_raw', 10)
         self.frame = 0
-        self.create_timer(0.2, self.tick)
+        self.start_time = time.monotonic()
+        self.base_frame = self.build_base_frame()
+        self.create_timer(1.0 / 30.0, self.tick)
+
+    def build_base_frame(self):
+        frame = bytearray(self.width * self.height * 3)
+        bar_width = self.width // len(self.BAR_COLORS)
+        for index, color in enumerate(self.BAR_COLORS):
+            x0 = index * bar_width
+            x1 = self.width if index == len(self.BAR_COLORS) - 1 else (index + 1) * bar_width
+            self.fill_rect(frame, x0, 0, x1 - x0, self.height, color)
+        self.fill_rect(frame, 0, self.height - 60, self.width, 60, (16, 16, 16))
+        return frame
+
+    def fill_rect(self, frame, x, y, width, height, color):
+        x0 = max(0, x)
+        y0 = max(0, y)
+        x1 = min(self.width, x + width)
+        y1 = min(self.height, y + height)
+        if x0 >= x1 or y0 >= y1:
+            return
+        row = bytes(color) * (x1 - x0)
+        for yy in range(y0, y1):
+            start = yy * self.step + x0 * 3
+            frame[start:start + len(row)] = row
+
+    def draw_segment(self, frame, origin_x, origin_y, segment, color):
+        digit_width = 44
+        digit_height = 80
+        thickness = 8
+        mid_y = origin_y + digit_height // 2 - thickness // 2
+        segments = {
+            'a': (origin_x + thickness, origin_y, digit_width - 2 * thickness, thickness),
+            'b': (origin_x + digit_width - thickness, origin_y + thickness, thickness, digit_height // 2 - thickness),
+            'c': (origin_x + digit_width - thickness, origin_y + digit_height // 2, thickness, digit_height // 2 - thickness),
+            'd': (origin_x + thickness, origin_y + digit_height - thickness, digit_width - 2 * thickness, thickness),
+            'e': (origin_x, origin_y + digit_height // 2, thickness, digit_height // 2 - thickness),
+            'f': (origin_x, origin_y + thickness, thickness, digit_height // 2 - thickness),
+            'g': (origin_x + thickness, mid_y, digit_width - 2 * thickness, thickness),
+        }
+        self.fill_rect(frame, *segments[segment], color)
+
+    def draw_text(self, frame, text):
+        origin_x = 28
+        origin_y = 24
+        digit_width = 44
+        digit_height = 80
+        thickness = 8
+        spacing = 14
+        text_width = len(text) * (digit_width + spacing) + 24
+        self.fill_rect(frame, 16, 12, text_width, digit_height + 24, (0, 0, 0))
+        for index, char in enumerate(text):
+            x = origin_x + index * (digit_width + spacing)
+            if char == '.':
+                self.fill_rect(frame, x + 16, origin_y + digit_height - 12, 12, 12, (255, 255, 255))
+                continue
+            segments = self.DIGIT_SEGMENTS.get(char)
+            if not segments:
+                continue
+            for segment in segments:
+                self.draw_segment(frame, x, origin_y, segment, (255, 255, 255))
 
     def tick(self):
+        elapsed = time.monotonic() - self.start_time
+        frame = bytearray(self.base_frame)
+        self.draw_text(frame, f'{elapsed:06.2f}')
         msg = Image()
         msg.header.frame_id = 'camera'
-        msg.height = 48
-        msg.width = 64
+        msg.height = self.height
+        msg.width = self.width
         msg.encoding = 'rgb8'
         msg.is_bigendian = 0
-        msg.step = 64 * 3
-        row = []
-        for x in range(64):
-            row.extend([
-                ((x * 4) + self.frame * 10) % 256,
-                (64 + self.frame * 3) % 256,
-                (255 - (x * 4) - self.frame * 5) % 256,
-            ])
-        msg.data = row * 48
+        msg.step = self.step
+        msg.data = frame
         msg.header.stamp = self.get_clock().now().to_msg()
         self.pub.publish(msg)
         self.frame += 1
