@@ -7,20 +7,19 @@ TMP_DIR="$(mktemp -d /tmp/mr2-video-e2e.XXXXXX)"
 GATEWAY_PORT="${GATEWAY_PORT:-18081}"
 VIEWER_PORT="${VIEWER_PORT:-18082}"
 BIND_HOST="${BIND_HOST:-0.0.0.0}"
-STREAM_ID="front_nav_cam"
+ROS_STREAM_ID="front_nav_cam"
+V4L2_STREAM_ID="loopback_cam"
+V4L2_VIDEO_NR="${V4L2_VIDEO_NR:-30}"
+V4L2_DEVICE="/dev/video${V4L2_VIDEO_NR}"
 
 SIK_A="${TMP_DIR}/sik_a"
 SIK_B="${TMP_DIR}/sik_b"
 VIDEO_CONFIG="${TMP_DIR}/video_streams.json"
 VIEWER_HTML="${TMP_DIR}/index.html"
 VIEWER_PROXY_JS="${TMP_DIR}/viewer_proxy.js"
-SOCAT_LOG="${TMP_DIR}/socat.log"
-GATEWAY_LOG="${TMP_DIR}/gateway.log"
-ROVER_LOG="${TMP_DIR}/rover_video.log"
-PUBLISHER_LOG="${TMP_DIR}/publisher.log"
-HTTP_LOG="${TMP_DIR}/http.log"
 
 PIDS=()
+LOOPBACK_LOADED=0
 
 cleanup() {
   for pid in "${PIDS[@]:-}"; do
@@ -29,20 +28,28 @@ cleanup() {
       wait "${pid}" 2>/dev/null || true
     fi
   done
+
+  if [[ "${LOOPBACK_LOADED}" == "1" ]]; then
+    sudo -n modprobe -r v4l2loopback >/dev/null 2>&1 || true
+  fi
+
   rm -rf "${TMP_DIR}"
 }
 
 trap cleanup EXIT INT TERM
 
-cat >"${VIDEO_CONFIG}" <<'EOF'
+cat >"${VIDEO_CONFIG}" <<EOF
 {
   "version": 1,
   "streams": [
     {
-      "stream_id": "front_nav_cam",
-      "ros_topic": "/front_camera/image_raw",
+      "stream_id": "${ROS_STREAM_ID}",
+      "source": {
+        "type": "ros_topic",
+        "ros_topic": "/front_camera/image_raw",
+        "ros_encoding": "rgb8"
+      },
       "udp_port": 5000,
-      "ros_encoding": "rgb8",
       "width": 320,
       "height": 180,
       "framerate": 30,
@@ -53,9 +60,32 @@ cat >"${VIDEO_CONFIG}" <<'EOF'
         "tune": "zerolatency"
       },
       "display": {
-        "label": "Front Nav",
+        "label": "ROS Topic",
         "panel": "delivery",
         "order": 1
+      }
+    },
+    {
+      "stream_id": "${V4L2_STREAM_ID}",
+      "source": {
+        "type": "v4l2",
+        "device": "${V4L2_DEVICE}",
+        "pixel_format": "YUY2"
+      },
+      "udp_port": 5002,
+      "width": 320,
+      "height": 180,
+      "framerate": 30,
+      "encoder": {
+        "bitrate_kbps": 900,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "V4L2 Loopback",
+        "panel": "delivery",
+        "order": 2
       }
     }
   ]
@@ -73,8 +103,6 @@ cat >"${VIEWER_HTML}" <<'EOF'
       body {
         margin: 0;
         min-height: 100vh;
-        display: grid;
-        place-items: center;
         background:
           radial-gradient(circle at top, rgba(29, 170, 145, 0.24), transparent 30%),
           #0b0f14;
@@ -82,7 +110,9 @@ cat >"${VIEWER_HTML}" <<'EOF'
         font: 16px/1.4 "Space Grotesk", system-ui, sans-serif;
       }
       main {
-        width: min(92vw, 920px);
+        width: min(96vw, 1200px);
+        margin: 0 auto;
+        padding: 24px;
         display: grid;
         gap: 16px;
       }
@@ -93,21 +123,34 @@ cat >"${VIEWER_HTML}" <<'EOF'
         background: rgba(6, 10, 18, 0.88);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
       }
+      .streams {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 16px;
+      }
       canvas {
         width: 100%;
-        aspect-ratio: 4 / 3;
+        aspect-ratio: 16 / 9;
         border-radius: 14px;
         background: #05070b;
         border: 1px solid rgba(255, 255, 255, 0.1);
       }
+      .meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 8px 0 12px;
+        color: rgba(231, 237, 244, 0.78);
+        font-size: 14px;
+      }
+      .status-live {
+        color: #89f0de;
+      }
+      .status-error {
+        color: #ff8c8c;
+      }
       code {
         color: #89f0de;
-      }
-      #status.live {
-        color: #89f0de;
-      }
-      #status.error {
-        color: #ff8c8c;
       }
     </style>
   </head>
@@ -115,41 +158,39 @@ cat >"${VIEWER_HTML}" <<'EOF'
     <main>
       <section class="panel">
         <h1>MR2 Local Video E2E</h1>
-        <p>Stream: <code>front_nav_cam</code></p>
-        <p id="status">Connecting...</p>
-        <p id="counts">config=0 key=0 delta=0</p>
+        <p>Single gateway, two streams: one ROS topic and one direct V4L2 loopback device.</p>
+        <p id="socket-status">Connecting...</p>
       </section>
-      <section class="panel">
-        <canvas id="canvas" width="640" height="360"></canvas>
+      <section class="streams">
+        <article class="panel">
+          <h2>ROS Topic</h2>
+          <p><code>front_nav_cam</code></p>
+          <div class="meta">
+            <span id="front_nav_cam-status">Waiting for socket...</span>
+            <span id="front_nav_cam-counts">config=0 key=0 delta=0</span>
+          </div>
+          <canvas id="front_nav_cam-canvas" width="320" height="180"></canvas>
+        </article>
+        <article class="panel">
+          <h2>V4L2 Loopback</h2>
+          <p><code>loopback_cam</code></p>
+          <div class="meta">
+            <span id="loopback_cam-status">Waiting for socket...</span>
+            <span id="loopback_cam-counts">config=0 key=0 delta=0</span>
+          </div>
+          <canvas id="loopback_cam-canvas" width="320" height="180"></canvas>
+        </article>
       </section>
     </main>
     <script>
-      const STREAM_ID = 'front_nav_cam'
+      const STREAM_IDS = ['front_nav_cam', 'loopback_cam']
       const gatewayUrl = new URL(window.location.href)
       gatewayUrl.protocol = gatewayUrl.protocol === 'https:' ? 'wss:' : 'ws:'
       gatewayUrl.pathname = '/video-ws'
       gatewayUrl.search = ''
       gatewayUrl.hash = ''
       const wsUrl = gatewayUrl.toString()
-      const statusEl = document.getElementById('status')
-      const countsEl = document.getElementById('counts')
-      const canvas = document.getElementById('canvas')
-      const ctx = canvas.getContext('2d')
-      let decoder = null
-      let decoderConfig = null
-      let payloadFormat = 'avcc'
-      let configCount = 0
-      let keyCount = 0
-      let deltaCount = 0
-
-      function setStatus(text, className = '') {
-        statusEl.textContent = text
-        statusEl.className = className
-      }
-
-      function updateCounts() {
-        countsEl.textContent = `config=${configCount} key=${keyCount} delta=${deltaCount}`
-      }
+      const socketStatusEl = document.getElementById('socket-status')
 
       function findStartCodeLength(bytes, offset) {
         if (offset + 3 > bytes.length) return 0
@@ -251,9 +292,7 @@ cat >"${VIEWER_HTML}" <<'EOF'
 
       async function selectDecoderConfiguration(message) {
         const candidates = buildDecoderCandidates(message)
-        if (typeof VideoDecoder.isConfigSupported !== 'function') {
-          return candidates[0]
-        }
+        if (typeof VideoDecoder.isConfigSupported !== 'function') return candidates[0]
         for (const candidate of candidates) {
           try {
             const result = await VideoDecoder.isConfigSupported(candidate.config)
@@ -299,70 +338,124 @@ cat >"${VIEWER_HTML}" <<'EOF'
         return null
       }
 
+      function setSocketStatus(text, className = '') {
+        socketStatusEl.textContent = text
+        socketStatusEl.className = className
+      }
+
+      const streams = Object.fromEntries(
+        STREAM_IDS.map((streamId) => [
+          streamId,
+          {
+            streamId,
+            canvas: document.getElementById(`${streamId}-canvas`),
+            statusEl: document.getElementById(`${streamId}-status`),
+            countsEl: document.getElementById(`${streamId}-counts`),
+            decoder: null,
+            decoderConfig: null,
+            payloadFormat: 'avcc',
+            configCount: 0,
+            keyCount: 0,
+            deltaCount: 0,
+          },
+        ])
+      )
+
+      function setStreamStatus(stream, text, className = '') {
+        stream.statusEl.textContent = text
+        stream.statusEl.className = className
+      }
+
+      function updateCounts(stream) {
+        stream.countsEl.textContent = `config=${stream.configCount} key=${stream.keyCount} delta=${stream.deltaCount}`
+      }
+
       if (!('VideoDecoder' in window)) {
-        setStatus('WebCodecs is unavailable in this browser', 'error')
+        setSocketStatus('WebCodecs is unavailable in this browser', 'status-error')
+        for (const stream of Object.values(streams)) {
+          setStreamStatus(stream, 'WebCodecs unavailable', 'status-error')
+        }
       } else {
-        decoder = new VideoDecoder({
-          output(frame) {
-            if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
-              canvas.width = frame.displayWidth
-              canvas.height = frame.displayHeight
-            }
-            ctx.drawImage(frame, 0, 0, canvas.width, canvas.height)
-            frame.close()
-            setStatus('Live', 'live')
-          },
-          error(error) {
-            setStatus(`Decoder error: ${error.message}`, 'error')
-          },
-        })
+        for (const stream of Object.values(streams)) {
+          stream.decoder = new VideoDecoder({
+            output(frame) {
+              const canvas = stream.canvas
+              const ctx = canvas.getContext('2d')
+              if (!ctx) {
+                frame.close()
+                return
+              }
+              if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
+                canvas.width = frame.displayWidth
+                canvas.height = frame.displayHeight
+              }
+              ctx.drawImage(frame, 0, 0, canvas.width, canvas.height)
+              frame.close()
+              setStreamStatus(stream, 'Live', 'status-live')
+            },
+            error(error) {
+              setStreamStatus(stream, `Decoder error: ${error.message}`, 'status-error')
+            },
+          })
+        }
 
         const ws = new WebSocket(wsUrl)
         ws.binaryType = 'arraybuffer'
         ws.addEventListener('open', () => {
-          setStatus('Subscribed, waiting for config...')
-          ws.send(JSON.stringify({ type: 'subscribe', stream_id: STREAM_ID }))
+          setSocketStatus('Connected', 'status-live')
+          for (const streamId of STREAM_IDS) {
+            ws.send(JSON.stringify({ type: 'subscribe', stream_id: streamId }))
+            setStreamStatus(streams[streamId], 'Subscribed, waiting for config...')
+          }
         })
         ws.addEventListener('message', (event) => {
           const message = decodeMessage(event.data)
-          if (!message || message.streamId !== STREAM_ID) return
+          if (!message) return
+          const stream = streams[message.streamId]
+          if (!stream) return
 
           if (message.kind === 'config') {
             void (async () => {
-              configCount += 1
-              updateCounts()
+              stream.configCount += 1
+              updateCounts(stream)
               const supported = await selectDecoderConfiguration(message)
-              if (!supported) {
-                decoderConfig = null
-                setStatus('WebCodecs does not support this H.264 stream', 'error')
+              if (!supported || !stream.decoder) {
+                stream.decoderConfig = null
+                setStreamStatus(stream, 'WebCodecs does not support this H.264 stream', 'status-error')
                 return
               }
-              decoderConfig = supported.config
-              payloadFormat = supported.payloadFormat
-              decoder.reset()
-              decoder.configure(decoderConfig)
-              setStatus('Configured, waiting for frame...')
+              stream.decoderConfig = supported.config
+              stream.payloadFormat = supported.payloadFormat
+              stream.decoder.reset()
+              stream.decoder.configure(stream.decoderConfig)
+              setStreamStatus(stream, 'Configured, waiting for frame...')
             })()
             return
           }
 
-          if (!decoderConfig) return
-          if ((message.flags & 1) !== 0) keyCount += 1
-          else deltaCount += 1
-          updateCounts()
-          decoder.decode(
+          if (!stream.decoderConfig || !stream.decoder) return
+          if ((message.flags & 1) !== 0) stream.keyCount += 1
+          else stream.deltaCount += 1
+          updateCounts(stream)
+          stream.decoder.decode(
             new EncodedVideoChunk({
               type: (message.flags & 1) !== 0 ? 'key' : 'delta',
               timestamp: message.timestamp,
-              data: payloadFormat === 'annexb' ? message.payload : annexBToAvcc(message.payload),
+              data:
+                stream.payloadFormat === 'annexb'
+                  ? message.payload
+                  : annexBToAvcc(message.payload),
             })
           )
         })
         ws.addEventListener('close', () => {
-          setStatus('WebSocket closed', 'error')
+          setSocketStatus('WebSocket closed', 'status-error')
+          for (const stream of Object.values(streams)) {
+            setStreamStatus(stream, 'WebSocket closed', 'status-error')
+          }
         })
         ws.addEventListener('error', () => {
-          setStatus('WebSocket error', 'error')
+          setSocketStatus('WebSocket error', 'status-error')
         })
       }
     </script>
@@ -388,18 +481,8 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === '/' || req.url.startsWith('/?')) {
-    const body = fs.readFileSync(viewerHtml)
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store',
-    })
-    res.end(body)
-    return
-  }
-
-  if (req.url === '/favicon.ico') {
-    res.writeHead(204)
-    res.end()
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end(fs.readFileSync(viewerHtml))
     return
   }
 
@@ -408,12 +491,9 @@ const server = http.createServer((req, res) => {
       {
         host: '127.0.0.1',
         port: gatewayPort,
-        method: req.method,
         path: req.url,
-        headers: {
-          ...req.headers,
-          host: `127.0.0.1:${gatewayPort}`,
-        },
+        method: req.method,
+        headers: req.headers,
       },
       (upstreamRes) => {
         res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers)
@@ -421,52 +501,47 @@ const server = http.createServer((req, res) => {
       }
     )
     upstream.on('error', (error) => {
-      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
-      res.end(`proxy error: ${error.message}`)
+      res.writeHead(502)
+      res.end(String(error))
     })
     req.pipe(upstream)
     return
   }
 
-  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+  res.writeHead(404)
   res.end('not found')
 })
 
-server.on('upgrade', (req, socket, head) => {
-  if (!req.url || req.url !== '/video-ws') {
+server.on('upgrade', (req, socket) => {
+  if (req.url !== '/video-ws') {
     socket.destroy()
     return
   }
 
-  socket.on('error', () => {})
-
   const upstream = net.connect(gatewayPort, '127.0.0.1', () => {
-    const headers = []
-    for (let index = 0; index < req.rawHeaders.length; index += 2) {
-      const name = req.rawHeaders[index]
-      const lower = name.toLowerCase()
-      if (lower === 'host') {
-        headers.push(`${name}: 127.0.0.1:${gatewayPort}`)
-        continue
-      }
-      headers.push(`${name}: ${req.rawHeaders[index + 1]}`)
+    const headers = [
+      'GET /video-ws HTTP/1.1',
+      'Host: 127.0.0.1',
+      'Connection: Upgrade',
+      'Upgrade: websocket',
+      `Sec-WebSocket-Key: ${req.headers['sec-websocket-key'] || ''}`,
+      `Sec-WebSocket-Version: ${req.headers['sec-websocket-version'] || '13'}`,
+    ]
+
+    if (req.headers.origin) headers.push(`Origin: ${req.headers.origin}`)
+    if (req.headers['sec-websocket-protocol']) {
+      headers.push(`Sec-WebSocket-Protocol: ${req.headers['sec-websocket-protocol']}`)
     }
-    upstream.write(
-      `GET ${req.url} HTTP/${req.httpVersion}\r\n${headers.join('\r\n')}\r\n\r\n`
-    )
-    if (head.length > 0) {
-      upstream.write(head)
-    }
-    socket.pipe(upstream)
-    upstream.pipe(socket)
+    headers.push('\r\n')
+    upstream.write(headers.join('\r\n'))
   })
 
-  upstream.on('error', () => {
-    socket.destroy()
-  })
-  upstream.on('close', () => {
-    socket.destroy()
-  })
+  upstream.on('data', (chunk) => socket.write(chunk))
+  socket.on('data', (chunk) => upstream.write(chunk))
+  upstream.on('error', () => socket.destroy())
+  upstream.on('close', () => socket.destroy())
+  socket.on('error', () => upstream.destroy())
+  socket.on('close', () => upstream.destroy())
 })
 
 server.listen(viewerPort, bindHost, () => {
@@ -479,7 +554,7 @@ start_bg() {
   PIDS+=("$!")
 }
 
-wait_for_port() {
+wait_for_http() {
   local url="$1"
   for _ in $(seq 1 60); do
     if curl -fsS "${url}" >/dev/null 2>&1; then
@@ -493,8 +568,19 @@ wait_for_port() {
 
 rm -f "${SIK_A}" "${SIK_B}"
 
+sudo -n modprobe v4l2loopback devices=1 video_nr="${V4L2_VIDEO_NR}" card_label=codex-loopback exclusive_caps=1
+LOOPBACK_LOADED=1
+sleep 1
+
 start_bg socat -d -d pty,raw,echo=0,link="${SIK_A}" pty,raw,echo=0,link="${SIK_B}"
 sleep 1
+
+start_bg gst-launch-1.0 -q \
+  videotestsrc is-live=true pattern=smpte \
+  ! video/x-raw,width=320,height=180,framerate=30/1 \
+  ! videoconvert \
+  ! video/x-raw,format=YUY2 \
+  ! v4l2sink device="${V4L2_DEVICE}" sync=false
 
 start_bg bash -lc "
   source /opt/ros/humble/setup.bash &&
@@ -503,7 +589,7 @@ start_bg bash -lc "
   npm start -- --device '${SIK_A}' --baud 57600 --host '${BIND_HOST}' --port '${GATEWAY_PORT}' --video-config '${VIDEO_CONFIG}' --video-jitter-ms 0
 "
 
-wait_for_port "http://127.0.0.1:${GATEWAY_PORT}/video/streams"
+wait_for_http "http://127.0.0.1:${GATEWAY_PORT}/video/streams"
 
 start_bg bash -lc "
   source /opt/ros/humble/setup.bash &&
@@ -540,49 +626,42 @@ class Publisher(Node):
     )
 
     def __init__(self):
-        super().__init__('video_e2e_publisher')
+        super().__init__('video_test_pattern_publisher')
+        self.publisher = self.create_publisher(Image, '/front_camera/image_raw', 10)
+        self.start = time.monotonic()
         self.width = 320
         self.height = 180
-        self.step = self.width * 3
-        self.pub = self.create_publisher(Image, '/front_camera/image_raw', 10)
-        self.start_time = time.monotonic()
-        self.base_frame = self.build_base_frame()
-        self.create_timer(1.0 / 30.0, self.tick)
-
-    def build_base_frame(self):
-        frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        self.frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         bar_width = self.width // len(self.BAR_COLORS)
         for index, color in enumerate(self.BAR_COLORS):
-            x0 = index * bar_width
-            x1 = self.width if index == len(self.BAR_COLORS) - 1 else (index + 1) * bar_width
-            frame[:, x0:x1] = color
-        frame[self.height - 40 :, :] = (16, 16, 16)
-        return frame
+            start_x = index * bar_width
+            end_x = self.width if index == len(self.BAR_COLORS) - 1 else (index + 1) * bar_width
+            self.frame[:, start_x:end_x, :] = color
+        self.create_timer(1.0 / 30.0, self.tick)
 
     def tick(self):
-        elapsed = time.monotonic() - self.start_time
-        frame = self.base_frame.copy()
-        cv2.rectangle(frame, (8, 8), (176, 54), (0, 0, 0), thickness=-1)
+        elapsed = time.monotonic() - self.start
+        frame = self.frame.copy()
+        seconds_text = f'ROS {elapsed:06.2f}s'
+        cv2.rectangle(frame, (10, 10), (190, 52), (0, 0, 0), thickness=-1)
         cv2.putText(
             frame,
-            f'{elapsed:06.2f}s',
-            (16, 42),
-            cv2.FONT_HERSHEY_DUPLEX,
-            0.85,
+            seconds_text,
+            (18, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
             (255, 255, 255),
-            1,
+            2,
             cv2.LINE_AA,
         )
         msg = Image()
-        msg.header.frame_id = 'camera'
+        msg.header.stamp = self.get_clock().now().to_msg()
         msg.height = self.height
         msg.width = self.width
         msg.encoding = 'rgb8'
-        msg.is_bigendian = 0
-        msg.step = self.step
+        msg.step = self.width * 3
         msg.data = frame.tobytes()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        self.pub.publish(msg)
+        self.publisher.publish(msg)
 
 rclpy.init()
 node = Publisher()
@@ -594,34 +673,17 @@ finally:
 PY
 "
 
-start_bg bash -lc "
-  BIND_HOST='${BIND_HOST}' VIEWER_PORT='${VIEWER_PORT}' GATEWAY_PORT='${GATEWAY_PORT}' VIEWER_HTML='${VIEWER_HTML}' node '${VIEWER_PROXY_JS}'
-"
+start_bg env \
+  BIND_HOST="${BIND_HOST}" \
+  VIEWER_PORT="${VIEWER_PORT}" \
+  GATEWAY_PORT="${GATEWAY_PORT}" \
+  VIEWER_HTML="${VIEWER_HTML}" \
+  node "${VIEWER_PROXY_JS}"
 
-wait_for_port "http://127.0.0.1:${VIEWER_PORT}"
+wait_for_http "http://127.0.0.1:${VIEWER_PORT}/"
 
-REMOTE_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"
-if [[ -z "${REMOTE_HOST}" ]]; then
-  REMOTE_HOST="127.0.0.1"
-fi
+echo "Viewer: http://$(hostname -I | awk '{print $1}'):${VIEWER_PORT}"
+echo "Metadata: http://$(hostname -I | awk '{print $1}'):${VIEWER_PORT}/video/streams"
+echo "Config: ${VIDEO_CONFIG}"
 
-cat <<EOF
-
-Local MR2 video E2E stack is running.
-
-Viewer URL:
-  http://${REMOTE_HOST}:${VIEWER_PORT}
-
-Gateway metadata URL:
-  http://${REMOTE_HOST}:${VIEWER_PORT}/video/streams
-
-Bind address:
-  ${BIND_HOST}
-
-Temporary files live under:
-  ${TMP_DIR}
-
-Press Ctrl-C to stop everything.
-EOF
-
-wait -n "${PIDS[@]}"
+wait
