@@ -118,8 +118,15 @@ base/gateway/
 │   │   ├── rocket_m2_client.js
 │   │   ├── ros_topic_relay.js
 │   │   ├── serial_link.js
+│   │   ├── ws_route_registry.js
 │   │   └── ws_hub.js
 │   ├── config.js                   # CLI/env parsing
+│   ├── video/
+│   │   ├── h264.js                 # Annex B parsing + access unit grouping
+│   │   ├── protocol.js             # binary /video-ws message framing
+│   │   ├── receiver.js             # one GStreamer child per stream
+│   │   ├── service.js              # stream registry + client delivery
+│   │   └── stream_config.js        # central JSON config loading/validation
 │   └── rocket_m2.js                # Rocket M2 parsing/state helpers
 └── test/                           # unit tests for extracted modules
 ```
@@ -164,6 +171,21 @@ npm start -- \
   --antenna-device /dev/ttyARDUINO
 ```
 
+Example with video streaming enabled:
+
+```bash
+cd base/gateway
+npm start -- \
+  --device /dev/ttySIK \
+  --baud 57600 \
+  --port 8081 \
+  --video-config ../../rover/ros2_ws/src/mr2_launch/config/video_streams.json \
+  --video-jitter-ms 40
+```
+
+The base station needs a GStreamer runtime with `gst-launch-1.0`, `rtph264depay`,
+`h264parse`, and `fdsink` available.
+
 ### Config Sources
 
 Config is loaded in this order:
@@ -185,6 +207,16 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 | `--port` | `SIK_WS_PORT` | `8081` |
 | `--heartbeat-hz` | `SIK_HEARTBEAT_HZ` | `2` |
 | `--link-timeout-ms` | `SIK_LINK_TIMEOUT_MS` | `2000` |
+
+### Video Streaming
+
+| CLI flag | Environment variable | Default |
+| --- | --- | --- |
+| `--video-config` | `VIDEO_CONFIG_PATH` | `rover/ros2_ws/src/mr2_launch/config/video_streams.json` |
+| `--video-gst-binary` | `VIDEO_GST_BINARY` | `gst-launch-1.0` |
+| `--video-jitter-ms` | `VIDEO_JITTER_LATENCY_MS` | `40` |
+| `--video-restart-ms` | `VIDEO_RECEIVER_RESTART_MS` | `1000` |
+| `--video-client-max-buffered-bytes` | `VIDEO_CLIENT_MAX_BUFFERED_BYTES` | `1048576` |
 
 ### Base Antenna Tracking
 
@@ -217,9 +249,29 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 
 Rocket M2 polling auto-enables if IP, user, and password are configured.
 
-## WebSocket Interface
+## Socket Interface
 
 Clients connect to the same HTTP server port configured by `--port`.
+
+### Control WebSocket
+
+- Path: `/sik-ws`
+- Content: JSON command / telemetry messages
+
+### Video WebSocket
+
+- Path: `/video-ws`
+- Content: binary `config` and `chunk` messages carrying H.264 access units
+- Browser clients should subscribe by sending JSON messages like:
+
+```json
+{"type":"subscribe","stream_id":"front_nav_cam"}
+```
+
+### Video Metadata Endpoint
+
+- Path: `/video/streams`
+- Content: JSON stream definitions derived from the central `video_streams.json` file
 
 ### Dashboard -> Gateway
 
