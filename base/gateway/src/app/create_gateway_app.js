@@ -20,7 +20,10 @@ const { createGatewayHttpHandler } = require('../runtime/http_handlers')
 const { RocketM2Client } = require('../runtime/rocket_m2_client')
 const { startRosTopicRelay } = require('../runtime/ros_topic_relay')
 const { SikSerialLink } = require('../runtime/serial_link')
+const { createWsRouteRegistry } = require('../runtime/ws_route_registry')
 const { createWsHub } = require('../runtime/ws_hub')
+const { createVideoGateway } = require('../video/service')
+const { loadVideoConfig } = require('../video/stream_config')
 
 // Compose the gateway runtime out of small adapters so the entrypoint stays thin
 // and each integration point can be tested independently.
@@ -28,6 +31,7 @@ function createGatewayApp(options = {}) {
   const config = options.config
   const env = options.env || process.env
   const execFileAsync = options.execFileAsync || promisify(execFile)
+  const videoConfig = loadVideoConfig(config.videoConfigPath)
 
   const nextSeq = createSequencer()
   const serialLink = new SikSerialLink({
@@ -43,6 +47,7 @@ function createGatewayApp(options = {}) {
   let antennaTracker = null
   let rosTopicRelay = { stop() {} }
   let serverListening = false
+  let videoGateway = null
 
   const rocketM2Client = new RocketM2Client({
     config,
@@ -58,11 +63,14 @@ function createGatewayApp(options = {}) {
       env,
       log,
       getRocketM2State: () => rocketM2Client.getState(),
+      getVideoStreams: () => (videoGateway ? videoGateway.getBrowserStreams() : []),
     })
   )
+  const routeRegistry = createWsRouteRegistry({ server })
 
   const wsHub = createWsHub({
-    server,
+    path: '/sik-ws',
+    routeRegistry,
     onMessage: handleDashboardMessage,
     getInitialMessages: () => {
       const messages = [getLinkStatus()]
@@ -72,6 +80,16 @@ function createGatewayApp(options = {}) {
       }
       return messages
     },
+  })
+  videoGateway = createVideoGateway({
+    clientMaxBufferedBytes: config.videoClientMaxBufferedBytes,
+    gstBinary: config.videoGstBinary,
+    jitterLatencyMs: config.videoJitterLatencyMs,
+    log,
+    path: '/video-ws',
+    restartMs: config.videoReceiverRestartMs,
+    routeRegistry,
+    videoConfig,
   })
 
   serialLink.on('frame', (msgId, payload) => {
@@ -280,6 +298,7 @@ function createGatewayApp(options = {}) {
         }
       },
     })
+    videoGateway.start()
 
     await new Promise((resolve) => {
       server.listen(config.port, () => {
@@ -331,7 +350,12 @@ function createGatewayApp(options = {}) {
     }
 
     serialLink.stop()
+    if (videoGateway) {
+      videoGateway.stop()
+      videoGateway = null
+    }
     wsHub.close()
+    routeRegistry.close()
 
     if (serverListening) {
       await new Promise((resolve) => {

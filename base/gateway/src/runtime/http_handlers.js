@@ -98,6 +98,8 @@ function createGatewayHttpHandler(options = {}) {
     typeof options.getRocketM2State === 'function'
       ? options.getRocketM2State
       : () => ({ enabled: false, configured: false, status: null })
+  const getVideoStreams =
+    typeof options.getVideoStreams === 'function' ? options.getVideoStreams : () => []
 
   return function gatewayHttpHandler(req, res) {
     if (req.method === 'GET' && req.url && req.url.startsWith('/transitive/token')) {
@@ -108,6 +110,15 @@ function createGatewayHttpHandler(options = {}) {
     if (req.method === 'GET' && req.url && req.url.startsWith('/rocket-m2/status')) {
       const rocketM2State = getRocketM2State()
       handleRocketM2Status(req, res, rocketM2State)
+      return
+    }
+
+    if (req.method === 'GET' && req.url && req.url.startsWith('/video/streams')) {
+      res.writeHead(200, {
+        'Cache-Control': 'no-store',
+        'Content-Type': 'application/json',
+      })
+      res.end(JSON.stringify({ streams: getVideoStreams() }))
       return
     }
 

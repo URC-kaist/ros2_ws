@@ -6,6 +6,7 @@ const assert = require('node:assert/strict')
 const {
   handleRocketM2Status,
   handleTransitiveToken,
+  createGatewayHttpHandler,
 } = require('../src/runtime/http_handlers')
 
 function createResponseRecorder() {
@@ -82,4 +83,34 @@ test('handleTransitiveToken fails cleanly when secret is missing', () => {
   assert.equal(res.statusCode, 500)
   assert.deepEqual(JSON.parse(res.body), { error: 'TRANSITIVE_JWT_SECRET not set' })
   assert.ok(logs.some((entry) => entry.includes('TRANSITIVE_JWT_SECRET not set')))
+})
+
+test('createGatewayHttpHandler serves video stream metadata', () => {
+  const handler = createGatewayHttpHandler({
+    getVideoStreams: () => [
+      {
+        stream_id: 'front_nav_cam',
+        udp_port: 5000,
+      },
+    ],
+  })
+  const res = createResponseRecorder()
+
+  handler(
+    {
+      method: 'GET',
+      url: '/video/streams',
+    },
+    res
+  )
+
+  assert.equal(res.statusCode, 200)
+  assert.deepEqual(JSON.parse(res.body), {
+    streams: [
+      {
+        stream_id: 'front_nav_cam',
+        udp_port: 5000,
+      },
+    ],
+  })
 })
