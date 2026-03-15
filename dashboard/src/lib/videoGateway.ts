@@ -2,9 +2,12 @@ import { decodeVideoMessage, type VideoGatewayMessage } from './videoProtocol'
 
 export type VideoStreamInfo = {
   stream_id: string
-  ros_topic: string
+  source_type: 'ros_topic' | 'v4l2'
+  ros_topic: string | null
   udp_port: number
-  ros_encoding: string
+  ros_encoding: string | null
+  v4l2_device: string | null
+  v4l2_pixel_format: string | null
   width: number | null
   height: number | null
   framerate: number | null

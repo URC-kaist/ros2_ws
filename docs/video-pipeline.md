@@ -25,14 +25,47 @@ The authoritative stream mapping lives in:
 Each stream entry defines:
 
 - `stream_id`
-- `ros_topic`
 - `udp_port`
-- `ros_encoding`
+- `source`
 - optional `width`
 - optional `height`
 - optional `framerate`
 - encoder settings
 - display metadata
+
+Preferred source forms:
+
+```json
+{
+  "stream_id": "front_nav_cam",
+  "source": {
+    "type": "ros_topic",
+    "ros_topic": "/front_camera/image_raw",
+    "ros_encoding": "rgb8"
+  },
+  "udp_port": 5000
+}
+```
+
+```json
+{
+  "stream_id": "front_usb_cam",
+  "source": {
+    "type": "v4l2",
+    "device": "/dev/video0",
+    "pixel_format": "YUY2"
+  },
+  "udp_port": 5002,
+  "width": 1280,
+  "height": 720,
+  "framerate": 30
+}
+```
+
+Current compatibility note:
+
+- legacy top-level `ros_topic` + `ros_encoding` entries still load
+- new configs should prefer the explicit `source` object
 
 The intended mapping rule is:
 
@@ -44,15 +77,23 @@ The rover publisher is implemented in:
 
 - `rover/ros2_ws/src/mr2_video_streaming/src/video_streaming_node.cpp`
 
-Per configured stream, the node:
+Per configured stream, the node does one of two things:
 
-- subscribes to `sensor_msgs/msg/Image`
-- accepts only `rgb8` and `bgr8`
-- normalizes frames to internal RGB
-- lazily creates one GStreamer pipeline on first valid frame
-- pushes frames into `appsrc`
-- timestamps frames with fixed-duration PTS/DTS
-- keeps `appsrc` and queue depth bounded so stale frames are dropped
+- `source.type = ros_topic`
+  - subscribes to `sensor_msgs/msg/Image`
+  - accepts only `rgb8` and `bgr8`
+  - normalizes frames to internal RGB
+  - lazily creates one GStreamer pipeline on first valid frame
+  - pushes frames into `appsrc`
+- `source.type = v4l2`
+  - starts a direct `v4l2src` GStreamer pipeline at node startup
+  - optionally constrains the device by width, height, framerate, and pixel format
+  - uses `jpegdec` automatically when `pixel_format` is `MJPG` or `JPEG`
+
+For both source types, the rover node:
+
+- timestamps encoded frames for low-latency live streaming
+- keeps queue depth bounded so stale frames are dropped
 
 Conceptual rover pipeline:
 
@@ -61,6 +102,22 @@ appsrc
   ! queue leaky=downstream max-size-buffers=1
   ! videoconvert
   ! video/x-raw,format=I420
+  ! x264enc ...
+  ! h264parse config-interval=1
+  ! rtph264pay pt=96 mtu=1200 config-interval=1
+  ! udpsink host=<base_host> port=<udp_port> sync=false async=false
+```
+
+Conceptual direct V4L2 pipeline:
+
+```text
+v4l2src device=<device> do-timestamp=true
+  ! queue leaky=downstream max-size-buffers=1
+  ! [image/jpeg ... ! jpegdec] or [video/x-raw ...]
+  ! videorate
+  ! videoscale
+  ! videoconvert
+  ! video/x-raw,format=I420[,width=...][,height=...][,framerate=.../1]
   ! x264enc ...
   ! h264parse config-interval=1
   ! rtph264pay pt=96 mtu=1200 config-interval=1
@@ -156,6 +213,14 @@ The browser:
 
 The dashboard resolves `/video-ws` and `/video/streams` relative to the
 current browser origin unless explicit environment overrides are set.
+
+`/video/streams` exposes the configured source metadata per stream, including:
+
+- `source_type`
+- `ros_topic`
+- `ros_encoding`
+- `v4l2_device`
+- `v4l2_pixel_format`
 
 ## WebSocket Protocol
 

@@ -1,8 +1,10 @@
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -21,6 +23,8 @@ namespace mr2_video_streaming {
 
 using json = nlohmann::json;
 
+enum class StreamSourceType { RosTopic, V4L2 };
+
 struct EncoderConfig {
   int bitrate_kbps{1500};
   int keyframe_interval{30};
@@ -30,14 +34,50 @@ struct EncoderConfig {
 
 struct StreamConfig {
   std::string stream_id;
+  StreamSourceType source_type{StreamSourceType::RosTopic};
   std::string ros_topic;
-  int udp_port{0};
   std::string ros_encoding;
+  std::string v4l2_device;
+  std::string v4l2_pixel_format;
+  int udp_port{0};
   int width{0};
   int height{0};
   int framerate{15};
   EncoderConfig encoder;
 };
+
+std::string uppercase(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+    return static_cast<char>(std::toupper(ch));
+  });
+  return value;
+}
+
+bool is_supported_ros_encoding(const std::string & encoding) {
+  return encoding == "rgb8" || encoding == "bgr8";
+}
+
+std::string source_type_to_string(StreamSourceType source_type) {
+  switch (source_type) {
+    case StreamSourceType::RosTopic:
+      return "ros_topic";
+    case StreamSourceType::V4L2:
+      return "v4l2";
+  }
+  return "unknown";
+}
+
+std::string quote_gstreamer_string(const std::string & value) {
+  std::string quoted = "\"";
+  for (const char ch : value) {
+    if (ch == '\\' || ch == '"') {
+      quoted.push_back('\\');
+    }
+    quoted.push_back(ch);
+  }
+  quoted.push_back('"');
+  return quoted;
+}
 
 class StreamPipeline {
  public:
@@ -49,12 +89,23 @@ class StreamPipeline {
 
   ~StreamPipeline() { shutdown(); }
 
+  void start_if_needed() {
+    if (config_.source_type != StreamSourceType::V4L2 || pipeline_ != nullptr) {
+      return;
+    }
+    start_v4l2_pipeline();
+  }
+
   void push_frame(const sensor_msgs::msg::Image & msg) {
+    if (config_.source_type != StreamSourceType::RosTopic) {
+      return;
+    }
+
     if (!validate_encoding(msg.encoding)) {
       return;
     }
 
-    if (!ensure_pipeline(static_cast<int>(msg.width), static_cast<int>(msg.height))) {
+    if (!ensure_ros_pipeline(static_cast<int>(msg.width), static_cast<int>(msg.height))) {
       return;
     }
 
@@ -97,7 +148,7 @@ class StreamPipeline {
       return false;
     }
 
-    if (encoding != "rgb8" && encoding != "bgr8") {
+    if (!is_supported_ros_encoding(encoding)) {
       RCLCPP_WARN(
           logger_,
           "Stream %s received unsupported encoding %s",
@@ -109,7 +160,58 @@ class StreamPipeline {
     return true;
   }
 
-  bool ensure_pipeline(int frame_width, int frame_height) {
+  std::string build_encoded_sink_branch() const {
+    std::ostringstream branch;
+    branch << "! x264enc bitrate=" << config_.encoder.bitrate_kbps
+           << " speed-preset=" << config_.encoder.speed_preset
+           << " tune=" << config_.encoder.tune
+           << " key-int-max=" << config_.encoder.keyframe_interval
+           << " bframes=0 byte-stream=true threads=1 "
+           << "! h264parse config-interval=1 "
+           << "! rtph264pay pt=96 mtu=1200 config-interval=1 "
+           << "! udpsink host=" << quote_gstreamer_string(base_host_)
+           << " port=" << config_.udp_port
+           << " sync=false async=false";
+    return branch.str();
+  }
+
+  std::string build_raw_output_caps() const {
+    std::ostringstream caps;
+    caps << "video/x-raw,format=I420";
+    if (width_ > 0) {
+      caps << ",width=" << width_;
+    }
+    if (height_ > 0) {
+      caps << ",height=" << height_;
+    }
+    if (config_.framerate > 0) {
+      caps << ",framerate=" << std::max(1, config_.framerate) << "/1";
+    }
+    return caps.str();
+  }
+
+  std::string build_v4l2_source_caps() const {
+    std::ostringstream caps;
+    const std::string pixel_format = uppercase(config_.v4l2_pixel_format);
+    const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
+
+    caps << (is_jpeg ? "image/jpeg" : "video/x-raw");
+    if (!pixel_format.empty() && !is_jpeg) {
+      caps << ",format=" << pixel_format;
+    }
+    if (config_.width > 0) {
+      caps << ",width=" << config_.width;
+    }
+    if (config_.height > 0) {
+      caps << ",height=" << config_.height;
+    }
+    if (config_.framerate > 0) {
+      caps << ",framerate=" << std::max(1, config_.framerate) << "/1";
+    }
+    return caps.str();
+  }
+
+  bool ensure_ros_pipeline(int frame_width, int frame_height) {
     if (pipeline_ != nullptr) {
       if (frame_width != width_ || frame_height != height_) {
         RCLCPP_WARN(
@@ -145,74 +247,14 @@ class StreamPipeline {
         << "appsrc name=src is-live=true format=time block=false do-timestamp=false max-buffers=1 "
         << "! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 "
         << "! videoconvert "
-        << "! video/x-raw,format=I420 "
-        << "! x264enc bitrate=" << config_.encoder.bitrate_kbps
-        << " speed-preset=" << config_.encoder.speed_preset
-        << " tune=" << config_.encoder.tune
-        << " key-int-max=" << config_.encoder.keyframe_interval
-        << " bframes=0 byte-stream=true threads=1 "
-        << "! h264parse config-interval=1 "
-        << "! rtph264pay pt=96 mtu=1200 config-interval=1 "
-        << "! udpsink host=" << base_host_
-        << " port=" << config_.udp_port
-        << " sync=false async=false";
+        << "! " << build_raw_output_caps() << " "
+        << build_encoded_sink_branch();
 
-    GError * error = nullptr;
-    pipeline_ = gst_parse_launch(pipeline_description.str().c_str(), &error);
-    if (pipeline_ == nullptr) {
-      std::string message = error != nullptr ? error->message : "unknown error";
-      if (error != nullptr) {
-        g_error_free(error);
-      }
-      throw std::runtime_error("failed to create pipeline for " + config_.stream_id + ": " + message);
-    }
-
-    appsrc_ = gst_bin_get_by_name(GST_BIN(pipeline_), "src");
-    if (appsrc_ == nullptr) {
-      throw std::runtime_error("failed to resolve appsrc for stream " + config_.stream_id);
-    }
-
-    GstCaps * caps = gst_caps_new_simple(
-        "video/x-raw",
-        "format",
-        G_TYPE_STRING,
-        "RGB",
-        "width",
-        G_TYPE_INT,
-        width_,
-        "height",
-        G_TYPE_INT,
-        height_,
-        "framerate",
-        GST_TYPE_FRACTION,
-        std::max(1, config_.framerate),
-        1,
-        nullptr);
-    g_object_set(
-        G_OBJECT(appsrc_),
-        "caps",
-        caps,
-        "is-live",
-        TRUE,
-        "format",
-        GST_FORMAT_TIME,
-        "block",
-        FALSE,
-        "do-timestamp",
-        FALSE,
-        "max-buffers",
-        1,
-        nullptr);
-    gst_caps_unref(caps);
-
-    const GstStateChangeReturn state_change = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
-    if (state_change == GST_STATE_CHANGE_FAILURE) {
-      throw std::runtime_error("failed to start pipeline for stream " + config_.stream_id);
-    }
+    start_pipeline(pipeline_description.str(), true);
 
     RCLCPP_INFO(
         logger_,
-        "Started video stream %s topic=%s port=%d size=%dx%d fps=%d",
+        "Started ROS video stream %s topic=%s port=%d size=%dx%d fps=%d",
         config_.stream_id.c_str(),
         config_.ros_topic.c_str(),
         config_.udp_port,
@@ -220,6 +262,108 @@ class StreamPipeline {
         height_,
         config_.framerate);
     return true;
+  }
+
+  void start_v4l2_pipeline() {
+    width_ = config_.width;
+    height_ = config_.height;
+
+    const std::string pixel_format = uppercase(config_.v4l2_pixel_format);
+    const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
+
+    std::ostringstream pipeline_description;
+    pipeline_description
+        << "v4l2src device=" << quote_gstreamer_string(config_.v4l2_device)
+        << " do-timestamp=true "
+        << "! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ";
+
+    const std::string source_caps = build_v4l2_source_caps();
+    if (!source_caps.empty()) {
+      pipeline_description << "! " << source_caps << " ";
+    }
+    if (is_jpeg) {
+      pipeline_description << "! jpegdec ";
+    }
+    pipeline_description
+        << "! videorate "
+        << "! videoscale "
+        << "! videoconvert "
+        << "! " << build_raw_output_caps() << " "
+        << build_encoded_sink_branch();
+
+    start_pipeline(pipeline_description.str(), false);
+
+    std::ostringstream details;
+    details << "Started V4L2 video stream " << config_.stream_id
+            << " device=" << config_.v4l2_device
+            << " port=" << config_.udp_port;
+    if (config_.width > 0 && config_.height > 0) {
+      details << " size=" << config_.width << "x" << config_.height;
+    }
+    if (config_.framerate > 0) {
+      details << " fps=" << config_.framerate;
+    }
+    if (!config_.v4l2_pixel_format.empty()) {
+      details << " pixel_format=" << config_.v4l2_pixel_format;
+    }
+    RCLCPP_INFO(logger_, "%s", details.str().c_str());
+  }
+
+  void start_pipeline(const std::string & description, bool needs_appsrc) {
+    GError * error = nullptr;
+    pipeline_ = gst_parse_launch(description.c_str(), &error);
+    if (pipeline_ == nullptr) {
+      const std::string message = error != nullptr ? error->message : "unknown error";
+      if (error != nullptr) {
+        g_error_free(error);
+      }
+      throw std::runtime_error("failed to create pipeline for " + config_.stream_id + ": " + message);
+    }
+
+    if (needs_appsrc) {
+      appsrc_ = gst_bin_get_by_name(GST_BIN(pipeline_), "src");
+      if (appsrc_ == nullptr) {
+        throw std::runtime_error("failed to resolve appsrc for stream " + config_.stream_id);
+      }
+
+      GstCaps * caps = gst_caps_new_simple(
+          "video/x-raw",
+          "format",
+          G_TYPE_STRING,
+          "RGB",
+          "width",
+          G_TYPE_INT,
+          width_,
+          "height",
+          G_TYPE_INT,
+          height_,
+          "framerate",
+          GST_TYPE_FRACTION,
+          std::max(1, config_.framerate),
+          1,
+          nullptr);
+      g_object_set(
+          G_OBJECT(appsrc_),
+          "caps",
+          caps,
+          "is-live",
+          TRUE,
+          "format",
+          GST_FORMAT_TIME,
+          "block",
+          FALSE,
+          "do-timestamp",
+          FALSE,
+          "max-buffers",
+          1,
+          nullptr);
+      gst_caps_unref(caps);
+    }
+
+    const GstStateChangeReturn state_change = gst_element_set_state(pipeline_, GST_STATE_PLAYING);
+    if (state_change == GST_STATE_CHANGE_FAILURE) {
+      throw std::runtime_error("failed to start pipeline for stream " + config_.stream_id);
+    }
   }
 
   bool normalize_to_rgb(const sensor_msgs::msg::Image & msg, std::vector<uint8_t> & output) {
@@ -283,9 +427,7 @@ class StreamPipeline {
 StreamConfig parse_stream_config(const json & item) {
   StreamConfig config;
   config.stream_id = item.at("stream_id").get<std::string>();
-  config.ros_topic = item.at("ros_topic").get<std::string>();
   config.udp_port = item.at("udp_port").get<int>();
-  config.ros_encoding = item.at("ros_encoding").get<std::string>();
   config.width = item.value("width", 0);
   config.height = item.value("height", 0);
   config.framerate = std::max(1, item.value("framerate", 15));
@@ -296,9 +438,34 @@ StreamConfig parse_stream_config(const json & item) {
   config.encoder.speed_preset = encoder.value("speed_preset", std::string("ultrafast"));
   config.encoder.tune = encoder.value("tune", std::string("zerolatency"));
 
-  if (config.ros_encoding != "rgb8" && config.ros_encoding != "bgr8") {
-    throw std::runtime_error(
-        "stream " + config.stream_id + " has unsupported ros_encoding " + config.ros_encoding);
+  if (item.contains("source")) {
+    const json source = item.at("source");
+    const std::string source_type = source.at("type").get<std::string>();
+    if (source_type == "ros_topic") {
+      config.source_type = StreamSourceType::RosTopic;
+      config.ros_topic = source.at("ros_topic").get<std::string>();
+      config.ros_encoding = source.at("ros_encoding").get<std::string>();
+    } else if (source_type == "v4l2") {
+      config.source_type = StreamSourceType::V4L2;
+      config.v4l2_device = source.at("device").get<std::string>();
+      config.v4l2_pixel_format = source.value("pixel_format", std::string());
+    } else {
+      throw std::runtime_error(
+          "stream " + config.stream_id + " has unsupported source.type " + source_type);
+    }
+  } else {
+    config.source_type = StreamSourceType::RosTopic;
+    config.ros_topic = item.at("ros_topic").get<std::string>();
+    config.ros_encoding = item.at("ros_encoding").get<std::string>();
+  }
+
+  if (config.source_type == StreamSourceType::RosTopic) {
+    if (!is_supported_ros_encoding(config.ros_encoding)) {
+      throw std::runtime_error(
+          "stream " + config.stream_id + " has unsupported ros_encoding " + config.ros_encoding);
+    }
+  } else if (config.v4l2_device.empty()) {
+    throw std::runtime_error("stream " + config.stream_id + " is missing source.device");
   }
 
   return config;
@@ -318,8 +485,27 @@ std::vector<StreamConfig> load_streams_from_file(const std::string & config_path
 
   std::vector<StreamConfig> streams;
   streams.reserve(streams_json.size());
+  std::set<std::string> stream_ids;
+  std::set<std::string> ros_topics;
+  std::set<std::string> v4l2_devices;
+  std::set<int> udp_ports;
+
   for (const auto & item : streams_json) {
-    streams.push_back(parse_stream_config(item));
+    StreamConfig stream = parse_stream_config(item);
+    if (!stream_ids.insert(stream.stream_id).second) {
+      throw std::runtime_error("duplicate stream_id " + stream.stream_id);
+    }
+    if (!udp_ports.insert(stream.udp_port).second) {
+      throw std::runtime_error("duplicate udp_port " + std::to_string(stream.udp_port));
+    }
+    if (stream.source_type == StreamSourceType::RosTopic) {
+      if (!ros_topics.insert(stream.ros_topic).second) {
+        throw std::runtime_error("duplicate ros_topic " + stream.ros_topic);
+      }
+    } else if (!v4l2_devices.insert(stream.v4l2_device).second) {
+      throw std::runtime_error("duplicate v4l2 device " + stream.v4l2_device);
+    }
+    streams.push_back(std::move(stream));
   }
   return streams;
 }
@@ -337,22 +523,35 @@ class VideoStreamingNode : public rclcpp::Node {
     const auto streams = load_streams_from_file(video_config_path_);
     for (const auto & stream : streams) {
       auto pipeline = std::make_shared<StreamPipeline>(stream, base_host_, get_logger());
-      auto subscription = create_subscription<sensor_msgs::msg::Image>(
-          stream.ros_topic,
-          rclcpp::SensorDataQoS(),
-          [pipeline](const sensor_msgs::msg::Image::SharedPtr msg) {
-            pipeline->push_frame(*msg);
-          });
+
+      if (stream.source_type == StreamSourceType::RosTopic) {
+        auto subscription = create_subscription<sensor_msgs::msg::Image>(
+            stream.ros_topic,
+            rclcpp::SensorDataQoS(),
+            [pipeline](const sensor_msgs::msg::Image::SharedPtr msg) {
+              pipeline->push_frame(*msg);
+            });
+        subscriptions_.push_back(subscription);
+      } else {
+        pipeline->start_if_needed();
+      }
 
       pipelines_.push_back(pipeline);
-      subscriptions_.push_back(subscription);
-      RCLCPP_INFO(
-          get_logger(),
-          "Configured video stream %s topic=%s port=%d encoding=%s",
-          stream.stream_id.c_str(),
-          stream.ros_topic.c_str(),
-          stream.udp_port,
-          stream.ros_encoding.c_str());
+
+      std::ostringstream details;
+      details << "Configured video stream " << stream.stream_id
+              << " source=" << source_type_to_string(stream.source_type)
+              << " port=" << stream.udp_port;
+      if (stream.source_type == StreamSourceType::RosTopic) {
+        details << " topic=" << stream.ros_topic
+                << " encoding=" << stream.ros_encoding;
+      } else {
+        details << " device=" << stream.v4l2_device;
+        if (!stream.v4l2_pixel_format.empty()) {
+          details << " pixel_format=" << stream.v4l2_pixel_format;
+        }
+      }
+      RCLCPP_INFO(get_logger(), "%s", details.str().c_str());
     }
   }
 

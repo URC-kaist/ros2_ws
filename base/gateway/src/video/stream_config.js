@@ -3,6 +3,7 @@
 const fs = require('fs')
 
 const SUPPORTED_ROS_ENCODINGS = new Set(['rgb8', 'bgr8'])
+const SUPPORTED_SOURCE_TYPES = new Set(['ros_topic', 'v4l2'])
 
 function assertNonEmptyString(value, label) {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -20,13 +21,21 @@ function parseOptionalPositiveInt(value, label) {
   return parsed
 }
 
+function parseOptionalString(value, label) {
+  if (value == null) return null
+  return assertNonEmptyString(value, label)
+}
+
 function normalizeEncoder(raw = {}, index = 0) {
   if (raw == null) return {}
   if (typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error(`streams[${index}].encoder must be an object when provided`)
   }
 
-  const bitrateKbps = parseOptionalPositiveInt(raw.bitrate_kbps, `streams[${index}].encoder.bitrate_kbps`)
+  const bitrateKbps = parseOptionalPositiveInt(
+    raw.bitrate_kbps,
+    `streams[${index}].encoder.bitrate_kbps`
+  )
   const keyframeInterval = parseOptionalPositiveInt(
     raw.keyframe_interval,
     `streams[${index}].encoder.keyframe_interval`
@@ -74,19 +83,9 @@ function normalizeDisplay(raw = {}, index = 0) {
   return display
 }
 
-function normalizeStream(raw, index) {
-  if (typeof raw !== 'object' || raw == null || Array.isArray(raw)) {
-    throw new Error(`streams[${index}] must be an object`)
-  }
-
-  const streamId = assertNonEmptyString(raw.stream_id, `streams[${index}].stream_id`)
+function normalizeLegacyRosSource(raw, index) {
   const rosTopic = assertNonEmptyString(raw.ros_topic, `streams[${index}].ros_topic`)
-  const udpPort = parseOptionalPositiveInt(raw.udp_port, `streams[${index}].udp_port`)
   const rosEncoding = assertNonEmptyString(raw.ros_encoding, `streams[${index}].ros_encoding`)
-
-  if (udpPort == null || udpPort > 65535) {
-    throw new Error(`streams[${index}].udp_port must be a valid UDP port`)
-  }
 
   if (!SUPPORTED_ROS_ENCODINGS.has(rosEncoding)) {
     throw new Error(
@@ -97,15 +96,93 @@ function normalizeStream(raw, index) {
   }
 
   return {
-    stream_id: streamId,
+    source_type: 'ros_topic',
     ros_topic: rosTopic,
-    udp_port: udpPort,
     ros_encoding: rosEncoding,
+    v4l2_device: null,
+    v4l2_pixel_format: null,
+  }
+}
+
+function normalizeTaggedSource(rawSource, index) {
+  if (typeof rawSource !== 'object' || rawSource == null || Array.isArray(rawSource)) {
+    throw new Error(`streams[${index}].source must be an object`)
+  }
+
+  const sourceType = assertNonEmptyString(rawSource.type, `streams[${index}].source.type`)
+  if (!SUPPORTED_SOURCE_TYPES.has(sourceType)) {
+    throw new Error(
+      `streams[${index}].source.type must be one of ${Array.from(SUPPORTED_SOURCE_TYPES).join(', ')}`
+    )
+  }
+
+  if (sourceType === 'ros_topic') {
+    const rosTopic = assertNonEmptyString(
+      rawSource.ros_topic,
+      `streams[${index}].source.ros_topic`
+    )
+    const rosEncoding = assertNonEmptyString(
+      rawSource.ros_encoding,
+      `streams[${index}].source.ros_encoding`
+    )
+
+    if (!SUPPORTED_ROS_ENCODINGS.has(rosEncoding)) {
+      throw new Error(
+        `streams[${index}].source.ros_encoding must be one of ${Array.from(
+          SUPPORTED_ROS_ENCODINGS
+        ).join(', ')}`
+      )
+    }
+
+    return {
+      source_type: sourceType,
+      ros_topic: rosTopic,
+      ros_encoding: rosEncoding,
+      v4l2_device: null,
+      v4l2_pixel_format: null,
+    }
+  }
+
+  return {
+    source_type: sourceType,
+    ros_topic: null,
+    ros_encoding: null,
+    v4l2_device: assertNonEmptyString(rawSource.device, `streams[${index}].source.device`),
+    v4l2_pixel_format: parseOptionalString(
+      rawSource.pixel_format,
+      `streams[${index}].source.pixel_format`
+    ),
+  }
+}
+
+function normalizeSource(raw, index) {
+  if (raw.source != null) {
+    return normalizeTaggedSource(raw.source, index)
+  }
+  return normalizeLegacyRosSource(raw, index)
+}
+
+function normalizeStream(raw, index) {
+  if (typeof raw !== 'object' || raw == null || Array.isArray(raw)) {
+    throw new Error(`streams[${index}] must be an object`)
+  }
+
+  const streamId = assertNonEmptyString(raw.stream_id, `streams[${index}].stream_id`)
+  const udpPort = parseOptionalPositiveInt(raw.udp_port, `streams[${index}].udp_port`)
+
+  if (udpPort == null || udpPort > 65535) {
+    throw new Error(`streams[${index}].udp_port must be a valid UDP port`)
+  }
+
+  return {
+    stream_id: streamId,
+    udp_port: udpPort,
     width: parseOptionalPositiveInt(raw.width, `streams[${index}].width`),
     height: parseOptionalPositiveInt(raw.height, `streams[${index}].height`),
     framerate: parseOptionalPositiveInt(raw.framerate, `streams[${index}].framerate`),
     encoder: normalizeEncoder(raw.encoder, index),
     display: normalizeDisplay(raw.display, index),
+    ...normalizeSource(raw, index),
   }
 }
 
@@ -122,6 +199,7 @@ function normalizeVideoConfig(raw) {
   const streamIds = new Set()
   const udpPorts = new Set()
   const rosTopics = new Set()
+  const v4l2Devices = new Set()
 
   for (const stream of streams) {
     if (streamIds.has(stream.stream_id)) {
@@ -130,12 +208,16 @@ function normalizeVideoConfig(raw) {
     if (udpPorts.has(stream.udp_port)) {
       throw new Error(`duplicate udp_port: ${stream.udp_port}`)
     }
-    if (rosTopics.has(stream.ros_topic)) {
+    if (stream.ros_topic && rosTopics.has(stream.ros_topic)) {
       throw new Error(`duplicate ros_topic: ${stream.ros_topic}`)
+    }
+    if (stream.v4l2_device && v4l2Devices.has(stream.v4l2_device)) {
+      throw new Error(`duplicate v4l2 device: ${stream.v4l2_device}`)
     }
     streamIds.add(stream.stream_id)
     udpPorts.add(stream.udp_port)
-    rosTopics.add(stream.ros_topic)
+    if (stream.ros_topic) rosTopics.add(stream.ros_topic)
+    if (stream.v4l2_device) v4l2Devices.add(stream.v4l2_device)
   }
 
   return {
@@ -154,9 +236,12 @@ function listBrowserStreams(videoConfig) {
   return videoConfig.streams
     .map((stream) => ({
       stream_id: stream.stream_id,
+      source_type: stream.source_type,
       ros_topic: stream.ros_topic,
-      udp_port: stream.udp_port,
       ros_encoding: stream.ros_encoding,
+      v4l2_device: stream.v4l2_device,
+      v4l2_pixel_format: stream.v4l2_pixel_format,
+      udp_port: stream.udp_port,
       width: stream.width,
       height: stream.height,
       framerate: stream.framerate,
@@ -174,6 +259,7 @@ function listBrowserStreams(videoConfig) {
 
 module.exports = {
   SUPPORTED_ROS_ENCODINGS,
+  SUPPORTED_SOURCE_TYPES,
   listBrowserStreams,
   loadVideoConfig,
   normalizeVideoConfig,
