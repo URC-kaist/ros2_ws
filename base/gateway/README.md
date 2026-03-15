@@ -13,6 +13,9 @@ It does four jobs:
 It implements the MR2 SiK protocol described in
 `rover/ros2_ws/src/mr2_sik_bridge/README.md`.
 
+For the dedicated video pipeline details, see
+[`docs/video-pipeline.md`](../../docs/video-pipeline.md).
+
 ## Runtime Topology
 
 ```mermaid
