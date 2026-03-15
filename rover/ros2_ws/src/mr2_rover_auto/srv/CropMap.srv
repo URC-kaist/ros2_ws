@@ -1,0 +1,18 @@
+# Mission goal in WGS84 (degrees)
+float64 goal_latitude
+float64 goal_longitude
+---
+bool success
+string message
+string crop_image_path
+string crop_yaml_path
+float64 current_map_x
+float64 current_map_y
+float64 goal_map_x
+float64 goal_map_y
+float64 roi_bottom_left_x
+float64 roi_bottom_left_y
+float64 roi_side_length_m
+float64 map_origin_x
+float64 map_origin_y
+uint8 load_map_result

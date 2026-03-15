@@ -1,7 +1,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <rclcpp/executors/multi_threaded_executor.hpp>
 
 #include <nav2_msgs/srv/clear_entire_costmap.hpp>
+#include <mr2_rover_auto/srv/crop_map.hpp>
 
 #include <mr2_action_interface/action/gnss_only.hpp>
 #include <mr2_action_interface/action/cover_vision.hpp>
@@ -11,6 +13,8 @@
 
 #include <cstdint>
 #include <chrono>
+#include <cmath>
+#include <future>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -36,6 +40,15 @@ public:
     clear_local_costmap_service_ = this->declare_parameter<std::string>(
       "clear_local_costmap_service",
       "local_costmap/clear_entirely_local_costmap");
+    map_cropper_service_ = this->declare_parameter<std::string>(
+      "map_cropper_service",
+      "/map_cropper/crop_map");
+    map_cropper_wait_timeout_sec_ = this->declare_parameter<double>(
+      "map_cropper_wait_timeout_sec",
+      2.0);
+    map_cropper_response_timeout_sec_ = this->declare_parameter<double>(
+      "map_cropper_response_timeout_sec",
+      15.0);
 
     gnss_client_ = rclcpp_action::create_client<GnssOnly>(this, gnss_action_name_);
     cover_client_ = rclcpp_action::create_client<CoverVision>(this, cover_action_name_);
@@ -44,6 +57,9 @@ public:
       this->create_client<nav2_msgs::srv::ClearEntireCostmap>(clear_global_costmap_service_);
     clear_local_client_ =
       this->create_client<nav2_msgs::srv::ClearEntireCostmap>(clear_local_costmap_service_);
+    map_cropper_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    map_cropper_client_ = this->create_client<mr2_rover_auto::srv::CropMap>(
+      map_cropper_service_, rmw_qos_profile_services_default, map_cropper_group_);
 
     mission_list_sub_ = this->create_subscription<MissionList>(
       mission_list_topic_, 10,
@@ -189,6 +205,16 @@ private:
     total_waypoints_ = 0;
     distance_remaining_ = -1.0f;
     state_ = STATE_RUNNING;
+    last_detail_.clear();
+
+    if (active_mission_.mission_type == MISSION_GNSS_ONLY ||
+      active_mission_.mission_type == MISSION_COVER_VISION)
+    {
+      if (!call_map_cropper_locked(active_mission_)) {
+        state_ = STATE_FAILED;
+        return;
+      }
+    }
 
     switch (active_mission_.mission_type) {
       case MISSION_GNSS_ONLY:
@@ -418,6 +444,39 @@ private:
     }
   }
 
+  bool call_map_cropper_locked(const MissionSpec & spec)
+  {
+    if (!std::isfinite(spec.target_latitude) || !std::isfinite(spec.target_longitude)) {
+      last_detail_ = "Map crop skipped: invalid target lat/lon";
+      return false;
+    }
+
+    const auto wait_timeout = std::chrono::duration<double>(map_cropper_wait_timeout_sec_);
+    if (!map_cropper_client_->wait_for_service(wait_timeout)) {
+      last_detail_ = "map_cropper service unavailable";
+      return false;
+    }
+
+    auto request = std::make_shared<mr2_rover_auto::srv::CropMap::Request>();
+    request->goal_latitude = spec.target_latitude;
+    request->goal_longitude = spec.target_longitude;
+
+    auto future = map_cropper_client_->async_send_request(request);
+    const auto response_timeout = std::chrono::duration<double>(map_cropper_response_timeout_sec_);
+    if (future.wait_for(response_timeout) != std::future_status::ready) {
+      last_detail_ = "map_cropper request timed out";
+      return false;
+    }
+
+    const auto response = future.get();
+    if (!response->success) {
+      last_detail_ = "map_cropper failed: " + response->message;
+      return false;
+    }
+
+    return true;
+  }
+
   void publish_status()
   {
     MissionStatus status;
@@ -463,6 +522,8 @@ private:
   rclcpp_action::Client<CoverVision>::SharedPtr cover_client_;
   rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedPtr clear_global_client_;
   rclcpp::Client<nav2_msgs::srv::ClearEntireCostmap>::SharedPtr clear_local_client_;
+  rclcpp::CallbackGroup::SharedPtr map_cropper_group_;
+  rclcpp::Client<mr2_rover_auto::srv::CropMap>::SharedPtr map_cropper_client_;
 
   rclcpp::Subscription<MissionList>::SharedPtr mission_list_sub_;
   rclcpp::Subscription<MissionControl>::SharedPtr mission_control_sub_;
@@ -476,6 +537,9 @@ private:
   std::string cover_action_name_;
   std::string clear_global_costmap_service_;
   std::string clear_local_costmap_service_;
+  std::string map_cropper_service_;
+  double map_cropper_wait_timeout_sec_{2.0};
+  double map_cropper_response_timeout_sec_{15.0};
 
   void cancel_arrival_delay_locked()
   {
@@ -526,7 +590,10 @@ private:
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<MissionMaster>());
+  auto node = std::make_shared<MissionMaster>();
+  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 2);
+  executor.add_node(node);
+  executor.spin();
   rclcpp::shutdown();
   return 0;
 }

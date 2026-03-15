@@ -15,6 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -47,8 +48,13 @@ find_package(filters REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common filters)
+find_package(OpenCV REQUIRED COMPONENTS core imgcodecs)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${PCL_INCLUDE_DIRS})
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/CropMap.srv"
+)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${PCL_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 # Grid map eigen plugin headers live in include/grid_map_core/eigen_plugins
 # Ensure all targets see the grid_map_core include directory.
 include_directories(${grid_map_core_INCLUDE_DIRS})
@@ -131,6 +137,20 @@ endif()
 # Use plain signature to match ament_target_dependencies linkage.
 target_link_libraries(path_to_geopath_node ${GEOGRAPHICLIB_LINK_TARGET})
 
+add_executable(map_cropper src/map_cropper.cpp)
+ament_target_dependencies(map_cropper
+  rclcpp nav2_msgs ament_index_cpp tf2 tf2_ros robot_localization
+)
+target_link_libraries(map_cropper ${OpenCV_LIBS})
+
+rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+if(typesupport_target)
+  target_link_libraries(mission_master ${typesupport_target})
+  target_link_libraries(map_cropper ${typesupport_target})
+endif()
+add_dependencies(mission_master ${PROJECT_NAME}__rosidl_generator_cpp)
+add_dependencies(map_cropper ${PROJECT_NAME}__rosidl_generator_cpp)
+
 install(TARGETS
   gps_heading_gps_node
   gnss_only_server
@@ -144,13 +164,16 @@ install(TARGETS
   gridmap_to_occupancy_node
   gridmap_to_pointcloud_node
   path_to_geopath_node
+  map_cropper
   DESTINATION lib/${PROJECT_NAME}/
 )
 
 install( DIRECTORY include DESTINATION include )
+install( DIRECTORY srv DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY launch DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY config DESTINATION share/${PROJECT_NAME}/ )
 install( DIRECTORY behavior_trees DESTINATION share/${PROJECT_NAME}/)
 install( DIRECTORY maps DESTINATION share/${PROJECT_NAME}/ )
 
+ament_export_dependencies(rosidl_default_runtime)
 ament_package()

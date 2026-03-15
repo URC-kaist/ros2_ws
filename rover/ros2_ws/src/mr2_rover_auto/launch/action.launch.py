@@ -74,4 +74,14 @@ def generate_launch_description():
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
             ],
         ),
+
+        Node(
+            package='mr2_rover_auto',
+            executable='map_cropper',
+            name='map_cropper',
+            output='screen',
+            parameters=[
+                {"use_sim_time": LaunchConfiguration("use_sim_time")}
+            ],
+        ),
     ])

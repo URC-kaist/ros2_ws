@@ -9,6 +9,7 @@
 
   <!-- Core build tool -->
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
   <!-- Dependencies for launch files -->
   <exec_depend>launch</exec_depend>
@@ -36,6 +37,7 @@
   <exec_depend>mr2_action_interface</exec_depend>
   <build_depend>aruco_opencv_msgs</build_depend>
   <build_depend>geographiclib</build_depend>
+  <build_depend>robot_localization</build_depend>
   <exec_depend>aruco_opencv</exec_depend>
   <exec_depend>aruco_opencv_msgs</exec_depend>
   <exec_depend>robot_localization</exec_depend>
@@ -50,6 +52,7 @@
   <build_depend>filters</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>pcl_conversions</build_depend>
+  <build_depend>libopencv-dev</build_depend>
   <exec_depend>grid_map_ros</exec_depend>
   <exec_depend>grid_map_core</exec_depend>
   <exec_depend>grid_map_msgs</exec_depend>
@@ -57,7 +60,11 @@
   <exec_depend>filters</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>pcl_conversions</exec_depend>
+  <exec_depend>libopencv-dev</exec_depend>
   <exec_depend>imu_filter_madgwick</exec_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
   
   <export>
     <build_type>ament_cmake</build_type>
