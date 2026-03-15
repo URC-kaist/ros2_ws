@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getRosBridgeClient } from '../lib/rosBridge'
+import { useRosBridge } from '../hooks/useRosBridge'
+import type {
+  GetSpectrumRequest,
+  GetSpectrumResponse,
+  SpectrumMsg,
+} from '../lib/rosMessages'
 import './SpectrophotometerCard.css'
 
 type UPlotInstance = { destroy: () => void; setData: (data: number[][]) => void }
@@ -27,24 +32,6 @@ type UPlotOptions = {
     | Record<string, never>
     | { label: string; stroke: string; width: number; fill: string }
   >
-}
-
-type SpectrumMsg = {
-  header?: { stamp?: { sec?: number; nanosec?: number }; frame_id?: string }
-  wavelength_nm: number[]
-  intensity: number[]
-  mode: number
-}
-
-type GetSpectrumRequest = {
-  use_absorbance: boolean
-  publish_topic: boolean
-}
-
-type GetSpectrumResponse = {
-  success: boolean
-  message: string
-  spectrum: SpectrumMsg
 }
 
 const SERVICE_NAME = '/get_spectrum'
@@ -88,7 +75,7 @@ const makePlotOptions = (label: string, width: number, height: number): UPlotOpt
 })
 
 const SpectrophotometerCard = () => {
-  const [rosConnected, setRosConnected] = useState(false)
+  const { ros, connected: rosConnected } = useRosBridge()
   const [useAbsorbance, setUseAbsorbance] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,13 +88,6 @@ const SpectrophotometerCard = () => {
   const modeLabel = useAbsorbance ? 'Absorbance' : 'Transmittance'
 
   useEffect(() => {
-    const ros = getRosBridgeClient()
-    ros.connect()
-    const offConnection = ros.onConnectionStatus(setRosConnected)
-    return () => offConnection()
-  }, [])
-
-  useEffect(() => {
     if (typeof window === 'undefined') return
     const ctor = (window as unknown as { uPlot?: UPlotConstructor }).uPlot
     if (!ctor) {
@@ -118,8 +98,6 @@ const SpectrophotometerCard = () => {
   }, [])
 
   const handleCapture = useCallback(async () => {
-    const ros = getRosBridgeClient()
-    ros.connect()
     setIsLoading(true)
     setError(null)
 
@@ -154,7 +132,7 @@ const SpectrophotometerCard = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [useAbsorbance])
+  }, [ros, useAbsorbance])
 
   useEffect(() => {
     const container = plotContainerRef.current
@@ -181,13 +159,13 @@ const SpectrophotometerCard = () => {
 
     plotInstanceRef.current?.destroy()
     const options = makePlotOptions(modeLabel, plotSize.width, plotSize.height)
-    const initial = spectrum
+    const initial: [number[], number[]] = spectrum
       ? [spectrum.wavelength_nm, spectrum.intensity]
       : [[], []]
     const plot = new uplotCtor(options, initial, container)
     plotInstanceRef.current = plot
     return () => plot.destroy()
-  }, [plotSize, modeLabel, uplotCtor])
+  }, [plotSize, modeLabel, spectrum, uplotCtor])
 
   useEffect(() => {
     const plot = plotInstanceRef.current

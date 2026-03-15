@@ -124,7 +124,7 @@
 
     <link name="rgbd_camera"/>
     <joint name="base_to_rgbd_camera" type="fixed">
-      <origin xyz="${length/2.0 + 0.14} 0 0" rpy="0 ${front_camera_pitch} 0"/>
+      <origin xyz="${length/2.0 + 0.14} 0 0" rpy="0 ${front_camera_pitch} 0"/> <!-- For Gazebo rendering, add 1cm to 0.14 -->
       <parent link="base_chassis"/>
       <child link="rgbd_camera"/>
     </joint>

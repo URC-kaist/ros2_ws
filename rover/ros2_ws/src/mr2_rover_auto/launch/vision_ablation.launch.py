@@ -50,6 +50,11 @@ def generate_launch_description():
                 description="RealSense camera base topic for YOLO (e.g., /rgbd_camera)",
             ),
             DeclareLaunchArgument(
+                "yolo_model_path",
+                default_value="yolov11.pt",
+                description="YOLO model path. Absolute paths are supported.",
+            ),
+            DeclareLaunchArgument(
                 "yolo_output_topic",
                 default_value="/vision_ablation/yolo/object_pose",
                 description="Output topic for YOLO detections",
@@ -108,6 +113,7 @@ def generate_launch_description():
                         "annotated_topic": "yolo/annotated_image",
                         "pose_topic": LaunchConfiguration("yolo_pose_topic_prefix"),
                         "camera_frame_is_optical": real_and_detector,
+                        "model_path": LaunchConfiguration("yolo_model_path"),
                         "class_id_map": "0:2,1:0,2:1",
                         "use_sim_time": use_sim_time,
                     }

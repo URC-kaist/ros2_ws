@@ -7,8 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.app.json"
+    "typecheck": "tsc -p tsconfig.app.json",
+    "check": "npm run typecheck && npm run lint && npm run build"
   },
   "dependencies": {
     "@fontsource/dm-mono": "^5.2.7",

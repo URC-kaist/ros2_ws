@@ -1,7 +1,7 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -10,6 +10,13 @@ def generate_launch_description():
     mr2_launch_share = FindPackageShare("mr2_launch")
     rover_description_share = FindPackageShare("mr2_rover_description")
     rover_auto_share = FindPackageShare("mr2_rover_auto")
+    yolo_model_path = LaunchConfiguration("yolo_model_path")
+
+    yolo_model_path_arg = DeclareLaunchArgument(
+        "yolo_model_path",
+        default_value="yolov11.pt",
+        description="YOLO model path. Absolute paths are supported.",
+    )
 
     rviz2 = Node(
         package="rviz2",
@@ -67,6 +74,7 @@ def generate_launch_description():
             "force_enable": "true",
             "real_and_detector": "true",
             "yolo_class_id": "0",
+            "yolo_model_path": yolo_model_path,
         }.items(),
     )
 
@@ -121,6 +129,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            yolo_model_path_arg,
             rviz2,
             real_launch,
             realsense_rgbd_launch,

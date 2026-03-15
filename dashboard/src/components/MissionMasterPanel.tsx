@@ -1,30 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { getRosBridgeClient } from '../lib/rosBridge'
-import { getSikGatewayClient } from '../lib/sikGateway'
-import type { MissionSpec } from './MapPreview'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import { useRosBridge } from '../hooks/useRosBridge'
+import { useSikGateway } from '../hooks/useSikGateway'
+import {
+  createMissionSpec,
+  csvToMissionList,
+  DETECTION_METHODS,
+  getInvalidMissionFields,
+  missionListToCsv,
+  MISSION_TYPES,
+  OBJECT_TYPES,
+  type MissionSpec,
+} from '../lib/missions'
+import type { MissionControlMsg, MissionListMsg, MissionStatusMsg } from '../lib/rosMessages'
 import './MissionMasterPanel.css'
-
-type MissionListMsg = {
-  stamp?: { sec?: number; nanosec?: number }
-  missions?: MissionSpec[]
-}
-
-type MissionControlMsg = {
-  command: number
-  clear_costmap: boolean
-  mission_id: number
-}
-
-type MissionStatusMsg = {
-  stamp?: { sec?: number; nanosec?: number }
-  active_mission?: MissionSpec
-  state?: number
-  arrival?: boolean
-  current_waypoint_index?: number
-  total_waypoints?: number
-  distance_remaining?: number
-  detail?: string
-}
 
 const COMMANDS = [
   { id: 1, label: 'Pause' },
@@ -40,86 +28,10 @@ const STATE_LABELS: Record<number, string> = {
   4: 'FAILED',
 }
 
-const MISSION_TYPES = [
-  { value: 0, label: 'UNKNOWN' },
-  { value: 1, label: 'GNSS_ONLY' },
-  { value: 2, label: 'COVER_VISION' },
-]
-
-const DETECTION_METHODS = [
-  { value: 0, label: 'NONE' },
-  { value: 1, label: 'ARUCO' },
-  { value: 2, label: 'YOLO' },
-]
-
-const OBJECT_TYPES = [
-  { value: 0, label: 'MALLET' },
-  { value: 1, label: 'PICK' },
-  { value: 2, label: 'BOTTLE' },
-]
-
-const MISSION_TYPE_VALUES = new Set(MISSION_TYPES.map((item) => item.value))
-const DETECTION_METHOD_VALUES = new Set(DETECTION_METHODS.map((item) => item.value))
-const OBJECT_TYPE_VALUES = new Set(OBJECT_TYPES.map((item) => item.value))
-
 type InvalidFieldMap = Record<number, Record<string, boolean>>
 
 const STORAGE_SLOT_COUNT = 3
 const STORAGE_PREFIX = 'missionListSlot'
-const CSV_HEADERS = [
-  'mission_id',
-  'mission_type',
-  'detection_method',
-  'object_type',
-  'target_latitude',
-  'target_longitude',
-  'target_radius',
-  'waypoint_count',
-] as const
-
-const missionListToCsv = (missions: MissionSpec[]) => {
-  const header = CSV_HEADERS.join(',')
-  const rows = missions.map((mission) => {
-    const record = mission as Record<string, number>
-    return CSV_HEADERS.map((key) =>
-      Number.isFinite(record[key]) ? String(record[key]) : ''
-    ).join(',')
-  })
-  return [header, ...rows].join('\n')
-}
-
-const csvToMissionList = (csv: string) => {
-  const rows = csv
-    .split(/\r?\n/)
-    .map((row) => row.trim())
-    .filter(Boolean)
-  if (!rows.length) return []
-  const firstCells = rows[0].split(',').map((cell) => cell.trim().toLowerCase())
-  const hasHeader = CSV_HEADERS.every(
-    (header, index) => firstCells[index] === header.toLowerCase()
-  )
-  const start = hasHeader ? 1 : 0
-  const missions: MissionSpec[] = []
-  for (let i = start; i < rows.length; i += 1) {
-    const cells = rows[i].split(',').map((cell) => cell.trim())
-    if (cells.length < CSV_HEADERS.length) continue
-    const values = cells
-      .slice(0, CSV_HEADERS.length)
-      .map((value) => Number.parseFloat(value))
-    if (values.some((value) => !Number.isFinite(value))) continue
-    missions.push({
-      mission_id: values[0],
-      mission_type: values[1],
-      detection_method: values[2],
-      object_type: values[3],
-      target_latitude: values[4],
-      target_longitude: values[5],
-      target_radius: values[6],
-      waypoint_count: values[7],
-    })
-  }
-  return missions
-}
 
 type MissionMasterPanelProps = {
   missionList: MissionSpec[]
@@ -136,13 +48,13 @@ const MissionMasterPanel = ({
   onMissionListChange,
   onMissionPreview,
 }: MissionMasterPanelProps) => {
-  const rosRef = useRef(getRosBridgeClient())
-  const gatewayRef = useRef(getSikGatewayClient())
+  const { ros, connected: rosConnected } = useRosBridge()
+  const { gateway } = useSikGateway()
   const [clearCostmap, setClearCostmap] = useState(false)
   const [missionId, setMissionId] = useState('0')
   const [status, setStatus] = useState<MissionStatusMsg | null>(null)
   const [statusAt, setStatusAt] = useState<number | null>(null)
-  const [rosConnected, setRosConnected] = useState(false)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [invalidFields, setInvalidFields] = useState<InvalidFieldMap>({})
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -152,21 +64,6 @@ const MissionMasterPanel = ({
   )
 
   useEffect(() => {
-    const ros = rosRef.current
-    ros.connect()
-    const unsub = ros.onConnectionStatus((connected) => {
-      setRosConnected(connected)
-    })
-    return () => unsub()
-  }, [])
-
-  useEffect(() => {
-    gatewayRef.current.connect()
-  }, [])
-
-  useEffect(() => {
-    const ros = rosRef.current
-    ros.connect()
     const unsubscribe = ros.subscribe<MissionStatusMsg>(
       '/mission_status',
       'mr2_action_interface/msg/MissionStatus',
@@ -177,6 +74,15 @@ const MissionMasterPanel = ({
       { throttleRate: 500 }
     )
     return () => unsubscribe()
+  }, [ros])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+    return () => {
+      window.clearInterval(timer)
+    }
   }, [])
 
   const validateMissionList = () => {
@@ -187,32 +93,7 @@ const MissionMasterPanel = ({
     }
 
     missionList.forEach((mission, index) => {
-      if (!MISSION_TYPE_VALUES.has(mission.mission_type)) clampIssues(index, 'mission_type')
-      if (!DETECTION_METHOD_VALUES.has(mission.detection_method))
-        clampIssues(index, 'detection_method')
-      if (!OBJECT_TYPE_VALUES.has(mission.object_type)) clampIssues(index, 'object_type')
-      if (!Number.isFinite(mission.mission_id) || mission.mission_id < 0)
-        clampIssues(index, 'mission_id')
-      if (
-        !Number.isFinite(mission.target_latitude) ||
-        mission.target_latitude < -90 ||
-        mission.target_latitude > 90
-      )
-        clampIssues(index, 'target_latitude')
-      if (
-        !Number.isFinite(mission.target_longitude) ||
-        mission.target_longitude < -180 ||
-        mission.target_longitude > 180
-      )
-        clampIssues(index, 'target_longitude')
-      if (
-        !Number.isFinite(mission.target_radius) ||
-        mission.target_radius < 0 ||
-        mission.target_radius > 99
-      )
-        clampIssues(index, 'target_radius')
-      if (!Number.isFinite(mission.waypoint_count) || mission.waypoint_count < 0)
-        clampIssues(index, 'waypoint_count')
+      getInvalidMissionFields(mission).forEach((field) => clampIssues(index, field))
     })
 
     setInvalidFields(nextInvalid)
@@ -220,7 +101,6 @@ const MissionMasterPanel = ({
   }
 
   const handleSendMissionList = () => {
-    const ros = rosRef.current
     if (!validateMissionList()) return
 
     const now = Date.now()
@@ -246,7 +126,7 @@ const MissionMasterPanel = ({
       clear_costmap: clearCostmap,
       mission_id: Number.isFinite(id) ? id : 0,
     }
-    gatewayRef.current.sendMissionControl(msg)
+    gateway.sendMissionControl(msg)
   }
 
   const statusLabel =
@@ -255,8 +135,8 @@ const MissionMasterPanel = ({
   const arrivalLabel = status?.arrival ? 'ARRIVAL' : '—'
   const active = status?.active_mission
   const lastStatusAge =
-    statusAt != null ? `${((Date.now() - statusAt) / 1000).toFixed(1)}s ago` : '—'
-  const statusStale = statusAt == null || Date.now() - statusAt > 1000
+    statusAt != null ? `${((nowMs - statusAt) / 1000).toFixed(1)}s ago` : '—'
+  const statusStale = statusAt == null || nowMs - statusAt > 1000
   const statusFlash = !statusStale && !!status?.arrival
   const ledMode = (() => {
     if (statusStale || !status) return 'off'
@@ -370,16 +250,10 @@ const MissionMasterPanel = ({
       ) + 1
     onMissionListChange([
       ...missionList,
-      {
-        mission_id: nextId,
-        mission_type: 1,
-        detection_method: 0,
-        object_type: 0,
+      createMissionSpec(nextId, {
         target_latitude: 0,
         target_longitude: 0,
-        target_radius: 0,
-        waypoint_count: 0,
-      },
+      }),
     ])
   }
 
