@@ -385,6 +385,9 @@ cat >"${VIEWER_HTML}" <<'EOF'
           setStreamStatus(stream, 'WebCodecs unavailable', 'status-error')
         }
       } else {
+        let reconnectTimer = null
+        let socketAttempt = 0
+
         for (const stream of Object.values(streams)) {
           stream.decoder = new VideoDecoder({
             output(frame) {
@@ -408,64 +411,92 @@ cat >"${VIEWER_HTML}" <<'EOF'
           })
         }
 
-        const ws = new WebSocket(wsUrl)
-        ws.binaryType = 'arraybuffer'
-        ws.addEventListener('open', () => {
-          setSocketStatus('Connected', 'status-live')
-          for (const streamId of STREAM_IDS) {
-            ws.send(JSON.stringify({ type: 'subscribe', stream_id: streamId }))
-            setStreamStatus(streams[streamId], 'Subscribed, waiting for config...')
-          }
-        })
-        ws.addEventListener('message', (event) => {
-          const message = decodeMessage(event.data)
-          if (!message) return
-          const stream = streams[message.streamId]
-          if (!stream) return
+        function scheduleReconnect() {
+          if (reconnectTimer != null) return
+          reconnectTimer = window.setTimeout(() => {
+            reconnectTimer = null
+            connectSocket()
+          }, 1000)
+        }
 
-          if (message.kind === 'config') {
-            void (async () => {
-              stream.configCount += 1
-              updateCounts(stream)
-              const supported = await selectDecoderConfiguration(message)
-              if (!supported || !stream.decoder) {
-                stream.decoderConfig = null
-                setStreamStatus(stream, 'WebCodecs does not support this H.264 stream', 'status-error')
-                return
-              }
-              stream.decoderConfig = supported.config
-              stream.payloadFormat = supported.payloadFormat
-              stream.decoder.reset()
-              stream.decoder.configure(stream.decoderConfig)
-              setStreamStatus(stream, 'Configured, waiting for frame...')
-            })()
-            return
-          }
-
-          if (!stream.decoderConfig || !stream.decoder) return
-          if ((message.flags & 1) !== 0) stream.keyCount += 1
-          else stream.deltaCount += 1
-          updateCounts(stream)
-          stream.decoder.decode(
-            new EncodedVideoChunk({
-              type: (message.flags & 1) !== 0 ? 'key' : 'delta',
-              timestamp: message.timestamp,
-              data:
-                stream.payloadFormat === 'annexb'
-                  ? message.payload
-                  : annexBToAvcc(message.payload),
-            })
-          )
-        })
-        ws.addEventListener('close', () => {
-          setSocketStatus('WebSocket closed', 'status-error')
+        function connectSocket() {
+          socketAttempt += 1
+          setSocketStatus(`Connecting (attempt ${socketAttempt})...`)
           for (const stream of Object.values(streams)) {
-            setStreamStatus(stream, 'WebSocket closed', 'status-error')
+            setStreamStatus(stream, 'Waiting for socket...')
           }
-        })
-        ws.addEventListener('error', () => {
-          setSocketStatus('WebSocket error', 'status-error')
-        })
+
+          const ws = new WebSocket(wsUrl)
+          ws.binaryType = 'arraybuffer'
+
+          ws.addEventListener('open', () => {
+            socketAttempt = 0
+            setSocketStatus('Connected', 'status-live')
+            for (const streamId of STREAM_IDS) {
+              ws.send(JSON.stringify({ type: 'subscribe', stream_id: streamId }))
+              setStreamStatus(streams[streamId], 'Subscribed, waiting for config...')
+            }
+          })
+
+          ws.addEventListener('message', (event) => {
+            const message = decodeMessage(event.data)
+            if (!message) return
+            const stream = streams[message.streamId]
+            if (!stream) return
+
+            if (message.kind === 'config') {
+              void (async () => {
+                stream.configCount += 1
+                updateCounts(stream)
+                const supported = await selectDecoderConfiguration(message)
+                if (!supported || !stream.decoder) {
+                  stream.decoderConfig = null
+                  setStreamStatus(stream, 'WebCodecs does not support this H.264 stream', 'status-error')
+                  return
+                }
+                stream.decoderConfig = supported.config
+                stream.payloadFormat = supported.payloadFormat
+                stream.decoder.reset()
+                stream.decoder.configure(stream.decoderConfig)
+                setStreamStatus(stream, 'Configured, waiting for frame...')
+              })()
+              return
+            }
+
+            if (!stream.decoderConfig || !stream.decoder) return
+            if ((message.flags & 1) !== 0) stream.keyCount += 1
+            else stream.deltaCount += 1
+            updateCounts(stream)
+            stream.decoder.decode(
+              new EncodedVideoChunk({
+                type: (message.flags & 1) !== 0 ? 'key' : 'delta',
+                timestamp: message.timestamp,
+                data:
+                  stream.payloadFormat === 'annexb'
+                    ? message.payload
+                    : annexBToAvcc(message.payload),
+              })
+            )
+          })
+
+          ws.addEventListener('close', () => {
+            setSocketStatus('WebSocket closed, retrying...', 'status-error')
+            for (const stream of Object.values(streams)) {
+              setStreamStatus(stream, 'Socket closed, retrying...', 'status-error')
+            }
+            scheduleReconnect()
+          })
+
+          ws.addEventListener('error', () => {
+            setSocketStatus('WebSocket error, retrying...', 'status-error')
+            for (const stream of Object.values(streams)) {
+              setStreamStatus(stream, 'Socket error, retrying...', 'status-error')
+            }
+            scheduleReconnect()
+          })
+        }
+
+        connectSocket()
       }
     </script>
   </body>
