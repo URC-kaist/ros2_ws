@@ -83,27 +83,6 @@ function normalizeDisplay(raw = {}, index = 0) {
   return display
 }
 
-function normalizeLegacyRosSource(raw, index) {
-  const rosTopic = assertNonEmptyString(raw.ros_topic, `streams[${index}].ros_topic`)
-  const rosEncoding = assertNonEmptyString(raw.ros_encoding, `streams[${index}].ros_encoding`)
-
-  if (!SUPPORTED_ROS_ENCODINGS.has(rosEncoding)) {
-    throw new Error(
-      `streams[${index}].ros_encoding must be one of ${Array.from(
-        SUPPORTED_ROS_ENCODINGS
-      ).join(', ')}`
-    )
-  }
-
-  return {
-    source_type: 'ros_topic',
-    ros_topic: rosTopic,
-    ros_encoding: rosEncoding,
-    v4l2_device: null,
-    v4l2_pixel_format: null,
-  }
-}
-
 function normalizeTaggedSource(rawSource, index) {
   if (typeof rawSource !== 'object' || rawSource == null || Array.isArray(rawSource)) {
     throw new Error(`streams[${index}].source must be an object`)
@@ -156,10 +135,10 @@ function normalizeTaggedSource(rawSource, index) {
 }
 
 function normalizeSource(raw, index) {
-  if (raw.source != null) {
-    return normalizeTaggedSource(raw.source, index)
+  if (raw.source == null) {
+    throw new Error(`streams[${index}].source is required`)
   }
-  return normalizeLegacyRosSource(raw, index)
+  return normalizeTaggedSource(raw.source, index)
 }
 
 function normalizeStream(raw, index) {
