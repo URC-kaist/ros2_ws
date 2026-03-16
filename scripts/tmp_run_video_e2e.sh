@@ -552,7 +552,7 @@ const server = http.createServer((req, res) => {
   res.end('not found')
 })
 
-server.on('upgrade', (req, socket) => {
+server.on('upgrade', (req, socket, head) => {
   if (req.url !== '/video-ws') {
     socket.destroy()
     return
@@ -574,6 +574,9 @@ server.on('upgrade', (req, socket) => {
     }
     headers.push('\r\n')
     upstream.write(headers.join('\r\n'))
+    if (head && head.length > 0) {
+      upstream.write(head)
+    }
   })
 
   upstream.on('data', (chunk) => socket.write(chunk))
