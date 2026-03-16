@@ -6,7 +6,17 @@ const path = require('path')
 const DEFAULTS = {
   device: '/dev/ttySIK',
   baud: 57600,
+  host: '0.0.0.0',
   port: 8081,
+  videoConfigPath: path.resolve(
+    __dirname,
+    '../../../rover/ros2_ws/src/mr2_launch/config/video_streams.json'
+  ),
+  videoGstBinary: 'gst-launch-1.0',
+  videoJitterLatencyMs: 40,
+  videoReceiverRestartMs: 1000,
+  videoAvailabilityStaleMs: 1500,
+  videoClientMaxBufferedBytes: 1048576,
   heartbeatHz: 2,
   linkTimeoutMs: 2000,
   antennaEnable: false,
@@ -76,7 +86,34 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
   return {
     device: getArg(args, '--device') || env.SIK_DEVICE || DEFAULTS.device,
     baud: toInt(getArg(args, '--baud') || env.SIK_BAUD || DEFAULTS.baud),
+    host: getArg(args, '--host') || env.SIK_WS_HOST || DEFAULTS.host,
     port: toInt(getArg(args, '--port') || env.SIK_WS_PORT || DEFAULTS.port),
+    videoConfigPath:
+      getArg(args, '--video-config') || env.VIDEO_CONFIG_PATH || DEFAULTS.videoConfigPath,
+    videoGstBinary:
+      getArg(args, '--video-gst-binary') ||
+      env.VIDEO_GST_BINARY ||
+      DEFAULTS.videoGstBinary,
+    videoJitterLatencyMs: toInt(
+      getArg(args, '--video-jitter-ms') ||
+        env.VIDEO_JITTER_LATENCY_MS ||
+        DEFAULTS.videoJitterLatencyMs
+    ),
+    videoReceiverRestartMs: toInt(
+      getArg(args, '--video-restart-ms') ||
+        env.VIDEO_RECEIVER_RESTART_MS ||
+        DEFAULTS.videoReceiverRestartMs
+    ),
+    videoAvailabilityStaleMs: toInt(
+      getArg(args, '--video-availability-stale-ms') ||
+        env.VIDEO_AVAILABILITY_STALE_MS ||
+        DEFAULTS.videoAvailabilityStaleMs
+    ),
+    videoClientMaxBufferedBytes: toInt(
+      getArg(args, '--video-client-max-buffered-bytes') ||
+        env.VIDEO_CLIENT_MAX_BUFFERED_BYTES ||
+        DEFAULTS.videoClientMaxBufferedBytes
+    ),
     heartbeatHz: toFloat(
       getArg(args, '--heartbeat-hz') || env.SIK_HEARTBEAT_HZ || DEFAULTS.heartbeatHz
     ),

@@ -12,6 +12,57 @@ This is required by `mr2_yolo_perception` because
 [yolo_rgbd_detector.py](./ros2_ws/src/mr2_yolo_perception/mr2_yolo_perception/yolo_rgbd_detector.py)
 imports `from ultralytics import YOLO`, and there is no working `rosdep` key for it in this workspace.
 
+## Video Streaming Prerequisites
+
+The rover-side video path depends on GStreamer development and runtime packages.
+At minimum, the rover machine needs:
+
+```bash
+sudo apt install -y \
+  libgstreamer1.0-dev \
+  libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-tools \
+  gstreamer1.0-plugins-base \
+  gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-ugly
+```
+
+The central stream mapping lives at
+[`ros2_ws/src/mr2_launch/config/video_streams.json`](./ros2_ws/src/mr2_launch/config/video_streams.json).
+That file is the source of truth for:
+
+- ROS image topic to stream ID mapping
+- UDP port allocation
+- expected ROS encoding (`rgb8` / `bgr8`)
+- optional display metadata consumed by the dashboard
+
+## Launching Rover Video Streaming
+
+You can launch the video streamer directly:
+
+```bash
+cd ~/mr2-stack/rover/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mr2_launch video_streaming.launch.py \
+  video_base_host:=192.168.1.50
+```
+
+Or enable it through the main real-rover launch:
+
+```bash
+cd ~/mr2-stack/rover/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mr2_launch rover_real.launch.py \
+  enable_video_streaming:=true \
+  video_base_host:=192.168.1.50
+```
+
+The node creates one GStreamer `appsrc -> x264enc -> rtph264pay -> udpsink`
+pipeline per configured stream and normalizes supported ROS images to RGB before
+encoding.
+
 ## OpenCV/ROS Humble Repair Notes (Jetson)
 
 ### Problem

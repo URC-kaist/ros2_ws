@@ -41,6 +41,12 @@ class FakeWebSocketServer extends EventEmitter {
     this.closed = false
   }
 
+  handleUpgrade(_request, _socket, _head, callback) {
+    const client = new FakeClient()
+    this.clients.add(client)
+    callback(client)
+  }
+
   close() {
     this.closed = true
   }
@@ -48,13 +54,28 @@ class FakeWebSocketServer extends EventEmitter {
 
 test('createWsHub sends initial messages, forwards JSON, and broadcasts', () => {
   const received = []
+  const routeRegistry = {
+    path: null,
+    wss: null,
+    register(path, wss) {
+      this.path = path
+      this.wss = wss
+    },
+    unregister(path) {
+      if (this.path === path) {
+        this.path = null
+        this.wss = null
+      }
+    },
+  }
   const hub = createWsHub({
-    server: {},
     WebSocketServerImpl: FakeWebSocketServer,
+    routeRegistry,
     getInitialMessages: () => [{ type: 'link_status', connected: true }],
     onMessage: (message) => received.push(message),
   })
 
+  assert.equal(routeRegistry.path, '/sik-ws')
   const client = new FakeClient()
   hub.wss.emit('connection', client)
   hub.wss.clients.add(client)
@@ -71,4 +92,5 @@ test('createWsHub sends initial messages, forwards JSON, and broadcasts', () => 
   hub.close()
   assert.equal(client.terminated, true)
   assert.equal(hub.wss.closed, true)
+  assert.equal(routeRegistry.path, null)
 })

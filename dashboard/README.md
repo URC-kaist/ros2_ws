@@ -4,30 +4,27 @@ The dashboard is the browser frontend for MR2 base-station operations. It is a
 Vite + React + TypeScript application that combines:
 
 - `rosbridge` for ROS topics and services
-- the MR2 base gateway for SiK telemetry, mission control, antenna status, and
-  Rocket M2 status
-- Transitive token minting for browser video feeds
+- the MR2 base gateway for SiK telemetry, mission control, antenna status,
+  Rocket M2 status, and browser video delivery
 
 ## Runtime Model
 
-The dashboard talks to three external systems:
+The dashboard talks to two external systems:
 
 1. `rosbridge`
    Used for diagnostics, mission topics, map-coordinate conversion via `/toLL`,
    science capture services, and autonomy visualization topics.
-2. base gateway WebSocket
+2. base gateway
    Used for rover telemetry, battery/link state, mission control, drive/arm
-   commands, base antenna heading, and Rocket M2 state.
-3. Transitive token endpoint
-   Used to mint JWTs for browser video capabilities when a token is not passed
-   directly into the component.
+   commands, base antenna heading, Rocket M2 state, and browser video streams.
 
 If no explicit environment overrides are provided, the dashboard assumes it is
 served behind the same host that proxies:
 
 - `/rosbridge-ws`
 - `/sik-ws`
-- `/transitive/token`
+- `/video-ws`
+- `/video/streams`
 
 ## Quick Start
 
@@ -49,17 +46,18 @@ For a simple same-host setup:
    `ws://<host>/rosbridge-ws`.
 2. Leave `VITE_SIK_WS_URL` unset if the browser can reach
    `ws://<host>/sik-ws`.
-3. Leave `VITE_TRANSITIVE_TOKEN_URL` unset if the browser can reach
-   `http(s)://<host>/transitive/token`.
-4. Only fill in the Transitive query variables if your token service expects
-   them.
+3. Leave `VITE_VIDEO_WS_URL` unset if the browser can reach
+   `ws://<host>/video-ws`.
+4. Leave `VITE_VIDEO_STREAMS_URL` unset if the browser can reach
+   `http(s)://<host>/video/streams`.
 
 For a split-host setup:
 
 1. Set `VITE_ROSBRIDGE_URL` to the real rosbridge WebSocket URL.
 2. Set `VITE_SIK_WS_URL` to the real gateway WebSocket URL.
-3. Set `VITE_TRANSITIVE_TOKEN_URL` to the real token endpoint URL.
-4. Restart `npm run dev` after changing env files.
+3. Set `VITE_VIDEO_WS_URL` to the real video WebSocket URL.
+4. Set `VITE_VIDEO_STREAMS_URL` to the real video metadata endpoint URL.
+5. Restart `npm run dev` after changing env files.
 
 ## Environment Files
 
@@ -79,20 +77,8 @@ template includes every environment variable currently read by the dashboard.
 | --- | --- | --- |
 | `VITE_ROSBRIDGE_URL` | Full rosbridge WebSocket URL | `ws(s)://<current-host>/rosbridge-ws` |
 | `VITE_SIK_WS_URL` | Full base gateway WebSocket URL | `ws(s)://<current-host>/sik-ws` |
-| `VITE_TRANSITIVE_TOKEN_URL` | HTTP endpoint used to mint a Transitive JWT | `http(s)://<current-origin>/transitive/token` |
-
-### Transitive Token Query Parameters
-
-These are optional. They are appended as query parameters when requesting the
-token endpoint above.
-
-| Variable | Purpose |
-| --- | --- |
-| `VITE_TRANSITIVE_ID` | Transitive installation or tenant identifier |
-| `VITE_TRANSITIVE_DEVICE` | Device identifier to request capability access for |
-| `VITE_TRANSITIVE_CAPABILITY` | Capability string requested from the token service |
-| `VITE_TRANSITIVE_USER_ID` | User identifier included in token requests |
-| `VITE_TRANSITIVE_VALIDITY` | Token validity period passed through to the token service |
+| `VITE_VIDEO_WS_URL` | Full video WebSocket URL | `ws(s)://<current-host>/video-ws` |
+| `VITE_VIDEO_STREAMS_URL` | Video metadata endpoint | `http(s)://<current-origin>/video/streams` |
 
 ### Science Export Metadata
 
@@ -153,6 +139,14 @@ It owns:
 - Rocket M2 status
 - outbound control messages such as drive, arm, mission control, heartbeat, and
   base heading
+
+The video gateway client is implemented in
+[`dashboard/src/lib/videoGateway.ts`](/home/gmmyung/mr2-stack/dashboard/src/lib/videoGateway.ts).
+It owns:
+
+- stream discovery via `/video/streams`
+- per-stream subscriptions over `/video-ws`
+- browser-side H.264 chunk delivery to the WebCodecs renderer
 
 ## Current Refactor Status
 

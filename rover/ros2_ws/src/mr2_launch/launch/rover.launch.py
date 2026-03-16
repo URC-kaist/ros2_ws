@@ -137,6 +137,23 @@ def generate_launch_description():
         default_value="true",
         description="Start YOLO RGBD detector node",
     )
+    enable_video_streaming_arg = DeclareLaunchArgument(
+        "enable_video_streaming",
+        default_value="false",
+        description="Start the rover H.264 RTP/UDP video streaming node",
+    )
+    video_base_host_arg = DeclareLaunchArgument(
+        "video_base_host",
+        default_value="127.0.0.1",
+        description="Base-station host/IP for rover RTP/UDP video streams",
+    )
+    video_config_arg = DeclareLaunchArgument(
+        "video_config",
+        default_value=PathJoinSubstitution(
+            [FindPackageShare("mr2_launch"), "config", "video_streams.json"]
+        ),
+        description="Central JSON video stream configuration file",
+    )
     yolo_cam_topic_arg = DeclareLaunchArgument(
         "yolo_cam_topic",
         default_value="/rgbd_camera",
@@ -209,6 +226,18 @@ def generate_launch_description():
             "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
         }.items(),
         condition=real_condition,
+    )
+    video_streaming_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [FindPackageShare("mr2_launch"), "launch", "video_streaming.launch.py"]
+            )
+        ),
+        launch_arguments={
+            "video_config": LaunchConfiguration("video_config"),
+            "video_base_host": LaunchConfiguration("video_base_host"),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration("enable_video_streaming")),
     )
 
     localization_delay = PythonExpression(
@@ -442,6 +471,9 @@ def generate_launch_description():
         enable_aruco_arg,
         aruco_cam_topic_arg,
         enable_yolo_arg,
+        enable_video_streaming_arg,
+        video_base_host_arg,
+        video_config_arg,
         yolo_cam_topic_arg,
         use_sim_time_param,
         rover_launch,
@@ -455,6 +487,7 @@ def generate_launch_description():
         sik_sim_launch,
         sik_bridge,
         sik_bridge_sim,
+        video_streaming_launch,
         foxglove_bridge,
         rosbridge_ws,
         rviz2,

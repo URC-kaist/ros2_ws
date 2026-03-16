@@ -6,9 +6,16 @@ function createWsHub(options = {}) {
   const onMessage = typeof options.onMessage === 'function' ? options.onMessage : () => {}
   const getInitialMessages =
     typeof options.getInitialMessages === 'function' ? options.getInitialMessages : () => []
+  const routeRegistry = options.routeRegistry
+  const path = options.path || '/sik-ws'
   const WebSocketServerImpl = options.WebSocketServerImpl || require('ws').WebSocketServer
 
-  const wss = new WebSocketServerImpl({ server: options.server })
+  if (!routeRegistry || typeof routeRegistry.register !== 'function') {
+    throw new Error('createWsHub requires a routeRegistry')
+  }
+
+  const wss = new WebSocketServerImpl({ noServer: true })
+  routeRegistry.register(path, wss)
   wss.on('connection', (ws) => {
     ws.on('message', (data) => {
       let message
@@ -36,6 +43,7 @@ function createWsHub(options = {}) {
       }
     },
     close() {
+      routeRegistry.unregister(path)
       for (const client of wss.clients) {
         client.terminate()
       }

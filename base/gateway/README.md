@@ -8,11 +8,13 @@ It does four jobs:
 1. Accept dashboard commands over WebSocket and forward them over SiK.
 2. Receive rover telemetry over SiK and rebroadcast it to dashboard clients.
 3. Optionally relay selected ROS 2 base topics over SiK.
-4. Optionally expose base-side HTTP utilities such as Transitive token minting
-   and Rocket M2 status.
+4. Optionally expose base-side HTTP utilities such as Rocket M2 status.
 
 It implements the MR2 SiK protocol described in
 `rover/ros2_ws/src/mr2_sik_bridge/README.md`.
+
+For the dedicated video pipeline details, see
+[`docs/video-pipeline.md`](../../docs/video-pipeline.md).
 
 ## Runtime Topology
 
@@ -50,7 +52,6 @@ flowchart LR
     ros_topics[ROS 2 topics]
     antenna_hw[Antenna controller<br/>/dev/ttyARDUINO]
     rocket_hw[Rocket M2 management UI]
-    transitive[Transitive token clients]
   end
 
   entry --> config
@@ -69,7 +70,6 @@ flowchart LR
   tracker --> antenna_proto
 
   dashboard <-->|WebSocket commands<br/>telemetry / status| wshub
-  transitive -->|GET /transitive/token| http
   dashboard -->|GET /rocket-m2/status| http
 
   serial <-->|bytes over /dev/ttySIK| rover_bridge
@@ -118,8 +118,15 @@ base/gateway/
 │   │   ├── rocket_m2_client.js
 │   │   ├── ros_topic_relay.js
 │   │   ├── serial_link.js
+│   │   ├── ws_route_registry.js
 │   │   └── ws_hub.js
 │   ├── config.js                   # CLI/env parsing
+│   ├── video/
+│   │   ├── h264.js                 # Annex B parsing + access unit grouping
+│   │   ├── protocol.js             # binary /video-ws message framing
+│   │   ├── receiver.js             # one GStreamer child per stream
+│   │   ├── service.js              # stream registry + client delivery
+│   │   └── stream_config.js        # central JSON config loading/validation
 │   └── rocket_m2.js                # Rocket M2 parsing/state helpers
 └── test/                           # unit tests for extracted modules
 ```
@@ -164,6 +171,21 @@ npm start -- \
   --antenna-device /dev/ttyARDUINO
 ```
 
+Example with video streaming enabled:
+
+```bash
+cd base/gateway
+npm start -- \
+  --device /dev/ttySIK \
+  --baud 57600 \
+  --port 8081 \
+  --video-config ../../rover/ros2_ws/src/mr2_launch/config/video_streams.json \
+  --video-jitter-ms 40
+```
+
+The base station needs a GStreamer runtime with `gst-launch-1.0`, `rtph264depay`,
+`h264parse`, and `fdsink` available.
+
 ### Config Sources
 
 Config is loaded in this order:
@@ -185,6 +207,16 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 | `--port` | `SIK_WS_PORT` | `8081` |
 | `--heartbeat-hz` | `SIK_HEARTBEAT_HZ` | `2` |
 | `--link-timeout-ms` | `SIK_LINK_TIMEOUT_MS` | `2000` |
+
+### Video Streaming
+
+| CLI flag | Environment variable | Default |
+| --- | --- | --- |
+| `--video-config` | `VIDEO_CONFIG_PATH` | `rover/ros2_ws/src/mr2_launch/config/video_streams.json` |
+| `--video-gst-binary` | `VIDEO_GST_BINARY` | `gst-launch-1.0` |
+| `--video-jitter-ms` | `VIDEO_JITTER_LATENCY_MS` | `40` |
+| `--video-restart-ms` | `VIDEO_RECEIVER_RESTART_MS` | `1000` |
+| `--video-client-max-buffered-bytes` | `VIDEO_CLIENT_MAX_BUFFERED_BYTES` | `1048576` |
 
 ### Base Antenna Tracking
 
@@ -217,9 +249,29 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 
 Rocket M2 polling auto-enables if IP, user, and password are configured.
 
-## WebSocket Interface
+## Socket Interface
 
 Clients connect to the same HTTP server port configured by `--port`.
+
+### Control WebSocket
+
+- Path: `/sik-ws`
+- Content: JSON command / telemetry messages
+
+### Video WebSocket
+
+- Path: `/video-ws`
+- Content: binary `config` and `chunk` messages carrying H.264 access units
+- Browser clients should subscribe by sending JSON messages like:
+
+```json
+{"type":"subscribe","stream_id":"front_nav_cam"}
+```
+
+### Video Metadata Endpoint
+
+- Path: `/video/streams`
+- Content: JSON stream definitions derived from the central `video_streams.json` file
 
 ### Dashboard -> Gateway
 
@@ -256,30 +308,6 @@ Notes:
   becomes `false` if no heartbeat is received within `SIK_LINK_TIMEOUT_MS`.
 
 ## HTTP Endpoints
-
-### `GET /transitive/token`
-
-Mints a Transitive JWT for the dashboard.
-
-Required environment:
-
-- `TRANSITIVE_JWT_SECRET`
-
-Optional environment:
-
-- `TRANSITIVE_ID` default `unknown`
-- `TRANSITIVE_DEVICE` default `unknown`
-- `TRANSITIVE_CAPABILITY` default `@transitive-robotics/webrtc-video`
-- `TRANSITIVE_USER_ID` default `operator`
-- `TRANSITIVE_VALIDITY` default `86400`
-
-Optional query parameters override the environment values:
-
-- `id`
-- `device`
-- `capability`
-- `userId`
-- `validity`
 
 ### `GET /rocket-m2/status`
 

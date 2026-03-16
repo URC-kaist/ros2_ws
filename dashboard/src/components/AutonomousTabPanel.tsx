@@ -1,7 +1,7 @@
 import AutonomyHealthCard from './AutonomyHealthCard'
+import ConfiguredVideoGrid from './ConfiguredVideoGrid'
 import MapPreview from './MapPreview'
 import MissionMasterPanel from './MissionMasterPanel'
-import TransitiveVideoCard from './TransitiveVideoCard'
 import type { MissionSpec } from '../lib/missions'
 
 type AutonomousTabPanelProps = {
@@ -35,29 +35,7 @@ const AutonomousTabPanel = ({
             onGrabCoordinate={onGrabCoordinate}
           />
         </article>
-        <article className="card video-feed-card">
-          <h3>Vision</h3>
-          <div className="video-feed-grid">
-            <div className="video-feed-item">
-              <span className="video-feed-label">ArUco</span>
-              <TransitiveVideoCard
-                embedded
-                source="/aruco_tracker/debug"
-                videoWidth={320}
-                videoHeight={180}
-              />
-            </div>
-            <div className="video-feed-item">
-              <span className="video-feed-label">YOLO</span>
-              <TransitiveVideoCard
-                embedded
-                source="/yolo/annotated_image"
-                videoWidth={320}
-                videoHeight={180}
-              />
-            </div>
-          </div>
-        </article>
+        <ConfiguredVideoGrid title="Vision" panel="autonomous" />
       </div>
       <div className="autonomy-right">
         <AutonomyHealthCard />
