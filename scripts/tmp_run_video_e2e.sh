@@ -656,25 +656,14 @@ class Publisher(Node):
     def tick(self):
         elapsed = time.monotonic() - self.start
         frame = self.frame.copy()
-        label_text = 'FRONT NAV'
-        seconds_text = f'{elapsed:06.2f}s elapsed'
-        cv2.rectangle(frame, (10, 10), (214, 68), (0, 0, 0), thickness=-1)
-        cv2.putText(
-            frame,
-            label_text,
-            (18, 33),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.62,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA,
-        )
+        seconds_text = f'ROS {elapsed:06.2f}s'
+        cv2.rectangle(frame, (10, 10), (190, 52), (0, 0, 0), thickness=-1)
         cv2.putText(
             frame,
             seconds_text,
-            (18, 58),
+            (18, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.62,
+            0.8,
             (255, 255, 255),
             2,
             cv2.LINE_AA,
