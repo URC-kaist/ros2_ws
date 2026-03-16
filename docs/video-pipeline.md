@@ -222,6 +222,33 @@ current browser origin unless explicit environment overrides are set.
 - `v4l2_device`
 - `v4l2_pixel_format`
 
+## Browser Caveats
+
+### Safari raw-IP WebSocket instability
+
+Observed during local testing:
+
+- Firefox handled the temporary video viewer reliably, including gateway restart
+  and reconnect behavior.
+- Recent Safari builds were intermittently flaky when the viewer page and
+  `/video-ws` were accessed over a raw IP address such as
+  `http://100.x.y.z:18081` and `ws://100.x.y.z:18081/video-ws`.
+- The failure mode looked like a first-load browser issue: the page could appear
+  stuck even though the same stack worked in Firefox, and a refresh or a second
+  navigation could unstick it.
+
+Current interpretation:
+
+- treat this as a Safari/browser-path issue before treating it as a rover/base
+  video pipeline defect
+- do not rely on Safari Web Inspector alone to prove that a subscribe message
+  was or was not sent
+
+Recommended workaround when testing with Safari:
+
+- use a hostname instead of a raw IP address if possible
+- prefer `https` + `wss` over plain `http` + `ws` when available
+
 ## WebSocket Protocol
 
 The video socket is separate from the control socket:

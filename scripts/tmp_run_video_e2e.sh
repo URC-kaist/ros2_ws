@@ -385,8 +385,138 @@ cat >"${VIEWER_HTML}" <<'EOF'
           setStreamStatus(stream, 'WebCodecs unavailable', 'status-error')
         }
       } else {
-        let reconnectTimer = null
-        let socketAttempt = 0
+        const RECONNECT_BASE_MS = 500
+        const RECONNECT_MAX_MS = 5000
+
+        class VideoGatewayClient {
+          constructor(url) {
+            this.url = url
+            this.ws = null
+            this.reconnectTimer = null
+            this.reconnectDelayMs = RECONNECT_BASE_MS
+            this.listeners = new Map()
+            this.subscribedStreams = new Set()
+          }
+
+          subscribe(streamId, listener) {
+            let streamListeners = this.listeners.get(streamId)
+            if (!streamListeners) {
+              streamListeners = new Set()
+              this.listeners.set(streamId, streamListeners)
+            }
+            streamListeners.add(listener)
+            this.connect()
+            if (streamListeners.size === 1) {
+              this.sendSubscription('subscribe', streamId)
+            }
+
+            return () => {
+              const current = this.listeners.get(streamId)
+              if (!current) return
+              current.delete(listener)
+              if (current.size === 0) {
+                this.listeners.delete(streamId)
+                this.sendSubscription('unsubscribe', streamId)
+              }
+              if (this.listeners.size === 0) {
+                this.disconnect()
+              }
+            }
+          }
+
+          connect() {
+            if (this.ws) return
+            this.clearReconnectTimer()
+            setSocketStatus('Connecting...')
+            for (const stream of Object.values(streams)) {
+              setStreamStatus(stream, 'Waiting for socket...')
+            }
+
+            const ws = new WebSocket(this.url)
+            ws.binaryType = 'arraybuffer'
+            ws.addEventListener('open', () => {
+              if (this.ws !== ws) return
+              this.reconnectDelayMs = RECONNECT_BASE_MS
+              this.subscribedStreams.clear()
+              setSocketStatus('Connected', 'status-live')
+              for (const streamId of this.listeners.keys()) {
+                this.sendSubscription('subscribe', streamId)
+                setStreamStatus(streams[streamId], 'Subscribed, waiting for config...')
+              }
+            })
+            ws.addEventListener('message', (event) => {
+              if (this.ws !== ws) return
+              const message = decodeMessage(event.data)
+              if (!message) return
+              const streamListeners = this.listeners.get(message.streamId)
+              if (!streamListeners) return
+              for (const listener of streamListeners) {
+                listener(message)
+              }
+            })
+            ws.addEventListener('close', () => {
+              if (this.ws !== ws) return
+              this.ws = null
+              this.subscribedStreams.clear()
+              setSocketStatus('WebSocket closed, retrying...', 'status-error')
+              for (const stream of Object.values(streams)) {
+                setStreamStatus(stream, 'Socket closed, retrying...', 'status-error')
+              }
+              if (this.listeners.size > 0) {
+                this.scheduleReconnect()
+              }
+            })
+            ws.addEventListener('error', () => {
+              if (this.ws !== ws) return
+              setSocketStatus('WebSocket error, retrying...', 'status-error')
+              for (const stream of Object.values(streams)) {
+                setStreamStatus(stream, 'Socket error, retrying...', 'status-error')
+              }
+              ws.close()
+            })
+
+            this.ws = ws
+          }
+
+          disconnect() {
+            this.clearReconnectTimer()
+            if (!this.ws) return
+            this.ws.close()
+            this.ws = null
+            this.subscribedStreams.clear()
+          }
+
+          scheduleReconnect() {
+            if (this.reconnectTimer != null) return
+            this.reconnectTimer = window.setTimeout(() => {
+              this.reconnectTimer = null
+              this.connect()
+              this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, RECONNECT_MAX_MS)
+            }, this.reconnectDelayMs)
+          }
+
+          clearReconnectTimer() {
+            if (this.reconnectTimer == null) return
+            window.clearTimeout(this.reconnectTimer)
+            this.reconnectTimer = null
+          }
+
+          sendSubscription(type, streamId) {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+            if (type === 'subscribe' && this.subscribedStreams.has(streamId)) return
+            if (type === 'subscribe') {
+              this.subscribedStreams.add(streamId)
+            } else {
+              this.subscribedStreams.delete(streamId)
+            }
+            this.ws.send(
+              JSON.stringify({
+                type,
+                stream_id: streamId,
+              })
+            )
+          }
+        }
 
         for (const stream of Object.values(streams)) {
           stream.decoder = new VideoDecoder({
@@ -411,39 +541,11 @@ cat >"${VIEWER_HTML}" <<'EOF'
           })
         }
 
-        function scheduleReconnect() {
-          if (reconnectTimer != null) return
-          reconnectTimer = window.setTimeout(() => {
-            reconnectTimer = null
-            connectSocket()
-          }, 1000)
-        }
+        const client = new VideoGatewayClient(wsUrl)
 
-        function connectSocket() {
-          socketAttempt += 1
-          setSocketStatus(`Connecting (attempt ${socketAttempt})...`)
-          for (const stream of Object.values(streams)) {
-            setStreamStatus(stream, 'Waiting for socket...')
-          }
-
-          const ws = new WebSocket(wsUrl)
-          ws.binaryType = 'arraybuffer'
-
-          ws.addEventListener('open', () => {
-            socketAttempt = 0
-            setSocketStatus('Connected', 'status-live')
-            for (const streamId of STREAM_IDS) {
-              ws.send(JSON.stringify({ type: 'subscribe', stream_id: streamId }))
-              setStreamStatus(streams[streamId], 'Subscribed, waiting for config...')
-            }
-          })
-
-          ws.addEventListener('message', (event) => {
-            const message = decodeMessage(event.data)
-            if (!message) return
-            const stream = streams[message.streamId]
-            if (!stream) return
-
+        for (const streamId of STREAM_IDS) {
+          const stream = streams[streamId]
+          client.subscribe(streamId, (message) => {
             if (message.kind === 'config') {
               void (async () => {
                 stream.configCount += 1
@@ -478,25 +580,7 @@ cat >"${VIEWER_HTML}" <<'EOF'
               })
             )
           })
-
-          ws.addEventListener('close', () => {
-            setSocketStatus('WebSocket closed, retrying...', 'status-error')
-            for (const stream of Object.values(streams)) {
-              setStreamStatus(stream, 'Socket closed, retrying...', 'status-error')
-            }
-            scheduleReconnect()
-          })
-
-          ws.addEventListener('error', () => {
-            setSocketStatus('WebSocket error, retrying...', 'status-error')
-            for (const stream of Object.values(streams)) {
-              setStreamStatus(stream, 'Socket error, retrying...', 'status-error')
-            }
-            scheduleReconnect()
-          })
         }
-
-        connectSocket()
       }
     </script>
   </body>
@@ -521,7 +605,12 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === '/' || req.url.startsWith('/?')) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+    })
     res.end(fs.readFileSync(viewerHtml))
     return
   }

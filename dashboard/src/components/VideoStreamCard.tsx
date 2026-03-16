@@ -338,7 +338,7 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
       payloadFormatRef.current = 'avcc'
       waitingForKeyframeRef.current = true
     }
-  }, [stream.available, stream.height, stream.stream_id, stream.width])
+  }, [stream.stream_id])
 
   return (
     <div className="video-stream-card" style={videoStyle}>

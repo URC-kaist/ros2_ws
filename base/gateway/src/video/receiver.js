@@ -42,12 +42,12 @@ function createVideoStreamReceiver(options = {}) {
       : () => {}
   const gstBinary = options.gstBinary || 'gst-launch-1.0'
   const restartMs = Math.max(250, Math.floor(options.restartMs || 1000))
-  const idleFlushMs = Math.max(1, Math.floor(options.idleFlushMs || 10))
+  const availabilityStaleMs = Math.max(250, Math.floor(options.availabilityStaleMs || 1000))
 
   let child = null
   let stopping = false
   let restartTimer = null
-  let flushTimer = null
+  let availabilityTimer = null
   let parser = new AnnexBAccessUnitParser()
   let available = false
 
@@ -57,30 +57,19 @@ function createVideoStreamReceiver(options = {}) {
     onAvailabilityChange(stream.stream_id, nextAvailable)
   }
 
-  function clearFlushTimer() {
-    if (!flushTimer) return
-    clearTimeout(flushTimer)
-    flushTimer = null
+  function clearAvailabilityTimer() {
+    if (!availabilityTimer) return
+    clearTimeout(availabilityTimer)
+    availabilityTimer = null
   }
 
-  function flushParser() {
-    clearFlushTimer()
-    for (const accessUnit of parser.flush()) {
-      if (!accessUnit.payload || accessUnit.payload.length === 0) continue
-      setAvailability(true)
-      onAccessUnit(stream.stream_id, {
-        ...accessUnit,
-        timestamp_us: Date.now() * 1000,
-      })
-    }
-    parser = new AnnexBAccessUnitParser()
-  }
-
-  function scheduleFlush() {
-    clearFlushTimer()
-    flushTimer = setTimeout(() => {
-      flushParser()
-    }, idleFlushMs)
+  function touchAvailability() {
+    setAvailability(true)
+    clearAvailabilityTimer()
+    availabilityTimer = setTimeout(() => {
+      availabilityTimer = null
+      setAvailability(false)
+    }, availabilityStaleMs)
   }
 
   function scheduleRestart() {
@@ -92,16 +81,14 @@ function createVideoStreamReceiver(options = {}) {
   }
 
   function handleStdout(chunk) {
-    clearFlushTimer()
     for (const accessUnit of parser.push(chunk)) {
       if (!accessUnit.payload || accessUnit.payload.length === 0) continue
-      setAvailability(true)
+      touchAvailability()
       onAccessUnit(stream.stream_id, {
         ...accessUnit,
         timestamp_us: Date.now() * 1000,
       })
     }
-    scheduleFlush()
   }
 
   function handleStderr(chunk) {
@@ -128,7 +115,7 @@ function createVideoStreamReceiver(options = {}) {
     function finalizeChild(logMessage) {
       if (ended) return
       ended = true
-      clearFlushTimer()
+      clearAvailabilityTimer()
       parser = new AnnexBAccessUnitParser()
       child = null
       setAvailability(false)
@@ -156,7 +143,7 @@ function createVideoStreamReceiver(options = {}) {
 
   function stop() {
     stopping = true
-    clearFlushTimer()
+    clearAvailabilityTimer()
     if (restartTimer) {
       clearTimeout(restartTimer)
       restartTimer = null

@@ -8,23 +8,38 @@ export function useVideoStreams(panel?: string) {
 
   useEffect(() => {
     let active = true
+    let intervalId: number | null = null
 
-    setLoading(true)
-    setError(null)
-    fetchVideoStreams()
-      .then((nextStreams) => {
+    const loadStreams = async (showLoading: boolean) => {
+      if (showLoading) {
+        setLoading(true)
+      }
+
+      try {
+        const nextStreams = await fetchVideoStreams()
         if (!active) return
         setStreams(nextStreams)
-        setLoading(false)
-      })
-      .catch((err: unknown) => {
+        setError(null)
+      } catch (err: unknown) {
         if (!active) return
-        setLoading(false)
         setError(err instanceof Error ? err.message : 'Failed to load video streams')
-      })
+      } finally {
+        if (active && showLoading) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadStreams(true)
+    intervalId = window.setInterval(() => {
+      void loadStreams(false)
+    }, 2000)
 
     return () => {
       active = false
+      if (intervalId != null) {
+        window.clearInterval(intervalId)
+      }
     }
   }, [])
 

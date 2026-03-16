@@ -44,6 +44,7 @@ test('createVideoStreamReceiver drops trailing partial access units when the chi
       child = new EventEmitter()
       child.stdout = new EventEmitter()
       child.stderr = new EventEmitter()
+      child.kill = () => {}
       return child
     },
   })
@@ -54,4 +55,40 @@ test('createVideoStreamReceiver drops trailing partial access units when the chi
   receiver.stop()
 
   assert.deepEqual(accessUnits, [])
+})
+
+test('createVideoStreamReceiver marks streams unavailable after inactivity', async () => {
+  let child = null
+  const availability = []
+  const receiver = createVideoStreamReceiver({
+    availabilityStaleMs: 20,
+    stream: {
+      stream_id: 'front_nav_cam',
+      udp_port: 5000,
+    },
+    onAvailabilityChange: (_streamId, nextAvailable) => availability.push(nextAvailable),
+    restartMs: 1000,
+    spawnImpl: () => {
+      child = new EventEmitter()
+      child.stdout = new EventEmitter()
+      child.stderr = new EventEmitter()
+      child.kill = () => {}
+      return child
+    },
+  })
+
+  receiver.start()
+  child.stdout.emit(
+    'data',
+    Buffer.from([
+      0x00, 0x00, 0x00, 0x01, 0x65, 0xe0,
+      0x00, 0x00, 0x00, 0x01, 0x41, 0xe0,
+      0x00, 0x00, 0x00, 0x01, 0x41, 0xe0,
+    ])
+  )
+
+  await new Promise((resolve) => setTimeout(resolve, 40))
+  receiver.stop()
+
+  assert.deepEqual(availability, [true, false])
 })

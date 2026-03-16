@@ -15,6 +15,7 @@ const DEFAULTS = {
   videoGstBinary: 'gst-launch-1.0',
   videoJitterLatencyMs: 40,
   videoReceiverRestartMs: 1000,
+  videoAvailabilityStaleMs: 1500,
   videoClientMaxBufferedBytes: 1048576,
   heartbeatHz: 2,
   linkTimeoutMs: 2000,
@@ -102,6 +103,11 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
       getArg(args, '--video-restart-ms') ||
         env.VIDEO_RECEIVER_RESTART_MS ||
         DEFAULTS.videoReceiverRestartMs
+    ),
+    videoAvailabilityStaleMs: toInt(
+      getArg(args, '--video-availability-stale-ms') ||
+        env.VIDEO_AVAILABILITY_STALE_MS ||
+        DEFAULTS.videoAvailabilityStaleMs
     ),
     videoClientMaxBufferedBytes: toInt(
       getArg(args, '--video-client-max-buffered-bytes') ||

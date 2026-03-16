@@ -61,6 +61,7 @@ function createVideoGateway(options = {}) {
 
   const receivers = videoConfig.streams.map((stream) =>
     createVideoStreamReceiverImpl({
+      availabilityStaleMs: options.availabilityStaleMs,
       gstBinary: options.gstBinary,
       idleFlushMs: options.idleFlushMs,
       jitterLatencyMs: options.jitterLatencyMs,
@@ -120,6 +121,20 @@ function createVideoGateway(options = {}) {
 
     if (accessUnit.codec && state.codec !== accessUnit.codec) {
       state.codec = accessUnit.codec
+      changed = true
+    }
+
+    if (Number.isInteger(accessUnit.width) && accessUnit.width > 0 && state.width !== accessUnit.width) {
+      state.width = accessUnit.width
+      changed = true
+    }
+
+    if (
+      Number.isInteger(accessUnit.height) &&
+      accessUnit.height > 0 &&
+      state.height !== accessUnit.height
+    ) {
+      state.height = accessUnit.height
       changed = true
     }
 
@@ -280,10 +295,15 @@ function createVideoGateway(options = {}) {
 
   return {
     getBrowserStreams() {
-      return listBrowserStreams(videoConfig).map((stream) => ({
-        ...stream,
-        available: streamStates.get(stream.stream_id)?.available === true,
-      }))
+      return listBrowserStreams(videoConfig).map((stream) => {
+        const state = streamStates.get(stream.stream_id)
+        return {
+          ...stream,
+          width: state && state.width > 0 ? state.width : stream.width,
+          height: state && state.height > 0 ? state.height : stream.height,
+          available: state?.available === true,
+        }
+      })
     },
     start() {
       for (const receiver of receivers) {

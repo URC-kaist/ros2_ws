@@ -24,6 +24,8 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       '/tmp/video_streams.json',
       '--video-jitter-ms',
       '55',
+      '--video-availability-stale-ms',
+      '2222',
     ],
     {
       SIK_DEVICE: '/tmp/ignored',
@@ -34,6 +36,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       ROCKET_M2_ENABLE: 'false',
       VIDEO_CONFIG_PATH: '/tmp/ignored_video_streams.json',
       VIDEO_JITTER_LATENCY_MS: '90',
+      VIDEO_AVAILABILITY_STALE_MS: '9999',
     }
   )
 
@@ -45,6 +48,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
   assert.equal(config.rocketM2Enable, true)
   assert.equal(config.videoConfigPath, '/tmp/video_streams.json')
   assert.equal(config.videoJitterLatencyMs, 55)
+  assert.equal(config.videoAvailabilityStaleMs, 2222)
   assert.equal('cmdHz' in config, false)
   assert.equal('cmdTimeoutMs' in config, false)
 })
@@ -59,4 +63,5 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   assert.equal(config.antennaEnable, false)
   assert.match(config.videoConfigPath, /video_streams\.json$/)
   assert.equal(config.videoReceiverRestartMs, 1000)
+  assert.equal(config.videoAvailabilityStaleMs, 1500)
 })

@@ -2,11 +2,13 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const path = require('path')
 
 const {
   SUPPORTED_ROS_ENCODINGS,
   SUPPORTED_SOURCE_TYPES,
   listBrowserStreams,
+  loadVideoConfig,
   normalizeVideoConfig,
 } = require('../src/video/stream_config')
 
@@ -166,4 +168,16 @@ test('listBrowserStreams sorts by display order and exposes source metadata', ()
   assert.equal(browserStreams[1].source_type, 'v4l2')
   assert.equal(browserStreams[1].v4l2_device, '/dev/video2')
   assert.equal('encoder' in browserStreams[0], false)
+})
+
+test('loadVideoConfig accepts the checked-in central video config', () => {
+  const configPath = path.resolve(
+    __dirname,
+    '../../../rover/ros2_ws/src/mr2_launch/config/video_streams.json'
+  )
+  const config = loadVideoConfig(configPath)
+
+  assert.ok(Array.isArray(config.streams))
+  assert.ok(config.streams.length > 0)
+  assert.ok(config.streams.every((stream) => typeof stream.stream_id === 'string'))
 })

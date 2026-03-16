@@ -88,6 +88,7 @@ class VideoGatewayClient {
     const ws = new WebSocket(this.url)
     ws.binaryType = 'arraybuffer'
     ws.addEventListener('open', () => {
+      if (this.ws !== ws) return
       this.reconnectDelayMs = RECONNECT_BASE_MS
       this.subscribedStreams.clear()
       for (const streamId of this.listeners.keys()) {
@@ -95,6 +96,7 @@ class VideoGatewayClient {
       }
     })
     ws.addEventListener('message', (event) => {
+      if (this.ws !== ws) return
       if (!(event.data instanceof ArrayBuffer)) return
       const message = decodeVideoMessage(event.data)
       if (!message) return
@@ -105,6 +107,7 @@ class VideoGatewayClient {
       }
     })
     ws.addEventListener('close', () => {
+      if (this.ws !== ws) return
       this.ws = null
       this.subscribedStreams.clear()
       if (this.listeners.size > 0) {
@@ -112,6 +115,7 @@ class VideoGatewayClient {
       }
     })
     ws.addEventListener('error', () => {
+      if (this.ws !== ws) return
       ws.close()
     })
 

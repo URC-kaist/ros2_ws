@@ -3,7 +3,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { AnnexBAccessUnitParser, deriveCodecString } = require('../src/video/h264')
+const { AnnexBAccessUnitParser, deriveCodecString, parseSpsDimensions } = require('../src/video/h264')
 
 function annexb(bytes) {
   return Buffer.from([0x00, 0x00, 0x00, 0x01, ...bytes])
@@ -45,4 +45,12 @@ test('AnnexBAccessUnitParser splits on new VCL access units', () => {
 
 test('deriveCodecString returns null when SPS bytes are incomplete', () => {
   assert.equal(deriveCodecString(Buffer.from([0x67, 0x42, 0xe0])), null)
+})
+
+test('parseSpsDimensions derives coded size from SPS bytes', () => {
+  const sps = Buffer.from(
+    '67f4001e90d9680a03db016a0c0c0c80000003008000001e478b1750',
+    'hex'
+  )
+  assert.deepEqual(parseSpsDimensions(sps), { width: 640, height: 480 })
 })

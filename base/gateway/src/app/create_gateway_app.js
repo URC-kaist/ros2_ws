@@ -82,6 +82,7 @@ function createGatewayApp(options = {}) {
     },
   })
   videoGateway = createVideoGateway({
+    availabilityStaleMs: config.videoAvailabilityStaleMs,
     clientMaxBufferedBytes: config.videoClientMaxBufferedBytes,
     gstBinary: config.videoGstBinary,
     jitterLatencyMs: config.videoJitterLatencyMs,

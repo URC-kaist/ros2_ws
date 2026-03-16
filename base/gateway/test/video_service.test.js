@@ -76,7 +76,7 @@ function createRouteRegistry() {
   }
 }
 
-function createVideoConfig() {
+function createVideoConfig(overrides = {}) {
   return {
     streams: [
       {
@@ -91,6 +91,7 @@ function createVideoConfig() {
         height: 480,
         framerate: 15,
         display: {},
+        ...overrides,
       },
     ],
   }
@@ -166,4 +167,52 @@ test('video gateway drops non-picture access units and re-sends config after res
 
   gateway.stop()
   assert.equal(client.terminated, true)
+})
+
+test('video gateway exposes SPS-derived dimensions through browser stream metadata', () => {
+  const routeRegistry = createRouteRegistry()
+  const receiverHarness = createReceiverHarness()
+  const gateway = createVideoGateway({
+    WebSocketServerImpl: FakeWebSocketServer,
+    createVideoStreamReceiverImpl: receiverHarness.factory,
+    routeRegistry,
+    videoConfig: createVideoConfig({ width: null, height: null }),
+  })
+
+  const receiver = receiverHarness.callbacksByStream.get('front_nav_cam')
+  assert.ok(receiver)
+
+  receiver.onAccessUnit('front_nav_cam', {
+    codec: 'avc1.F4001E',
+    delta: false,
+    height: 480,
+    key: false,
+    payload: Buffer.from([0x00, 0x00, 0x00, 0x01, 0x67]),
+    pps: null,
+    sps: Buffer.from(
+      '67f4001e90d9680a03db016a0c0c0c80000003008000001e478b1750',
+      'hex'
+    ),
+    timestamp_us: 1000,
+    width: 640,
+  })
+
+  assert.deepEqual(gateway.getBrowserStreams(), [
+    {
+      available: false,
+      display: {},
+      framerate: 15,
+      height: 480,
+      ros_encoding: 'rgb8',
+      ros_topic: '/front_camera/image_raw',
+      source_type: 'ros_topic',
+      stream_id: 'front_nav_cam',
+      udp_port: 5000,
+      v4l2_device: null,
+      v4l2_pixel_format: null,
+      width: 640,
+    },
+  ])
+
+  gateway.stop()
 })
