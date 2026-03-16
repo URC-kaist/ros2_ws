@@ -147,6 +147,8 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
   const decoderRef = useRef<VideoDecoder | null>(null)
   const decoderConfigRef = useRef<VideoDecoderConfig | null>(null)
   const payloadFormatRef = useRef<H264PayloadFormat>('avcc')
+  const configGenerationRef = useRef(0)
+  const waitingForKeyframeRef = useRef(true)
   const [status, setStatus] = useState(
     stream.available ? 'Waiting for codec config...' : 'Waiting for video ingest...'
   )
@@ -163,93 +165,178 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
 
   useEffect(() => {
     let active = true
+    let decoderGeneration = 0
 
     if (typeof VideoDecoder === 'undefined') {
       setStatus('WebCodecs is unavailable in this browser')
       return
     }
 
-    const decoder = new VideoDecoder({
-      output: (frame) => {
-        const canvas = canvasRef.current
-        if (!canvas) {
-          frame.close()
-          return
-        }
+    function describeError(error: unknown) {
+      return error instanceof Error ? error.message : String(error)
+    }
 
-        const width = frame.displayWidth || stream.width || 640
-        const height = frame.displayHeight || stream.height || 360
-        if (canvas.width !== width || canvas.height !== height) {
-          canvas.width = width
-          canvas.height = height
-        }
+    function closeDecoder(decoder: VideoDecoder | null) {
+      if (!decoder) return
+      try {
+        decoder.close()
+      } catch {
+        // Ignore repeated-close and invalid-state cleanup paths.
+      }
+    }
 
-        const context = canvas.getContext('2d')
-        if (!context) {
+    function createDecoder() {
+      decoderGeneration += 1
+      const generation = decoderGeneration
+      const decoder = new VideoDecoder({
+        output: (frame) => {
+          if (!active || generation !== decoderGeneration) {
+            frame.close()
+            return
+          }
+
+          const canvas = canvasRef.current
+          if (!canvas) {
+            frame.close()
+            return
+          }
+
+          const width = frame.displayWidth || stream.width || 640
+          const height = frame.displayHeight || stream.height || 360
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width
+            canvas.height = height
+          }
+
+          const context = canvas.getContext('2d')
+          if (!context) {
+            frame.close()
+            return
+          }
+          context.drawImage(frame, 0, 0, canvas.width, canvas.height)
           frame.close()
-          return
-        }
-        context.drawImage(frame, 0, 0, canvas.width, canvas.height)
-        frame.close()
-        setHasFrame(true)
-        setStatus('Live')
-      },
-      error: (error) => {
-        setStatus(`Decoder error: ${error.message}`)
-      },
-    })
-    decoderRef.current = decoder
+          waitingForKeyframeRef.current = false
+          setHasFrame(true)
+          setStatus('Live')
+        },
+        error: (error) => {
+          if (!active || generation !== decoderGeneration) return
+          recoverDecoder(`Decoder error: ${error.message}`)
+        },
+      })
+      decoderRef.current = decoder
+      return decoder
+    }
+
+    function recoverDecoder(reason: string) {
+      waitingForKeyframeRef.current = true
+      const decoderConfig = decoderConfigRef.current
+      const payloadFormat = payloadFormatRef.current
+      closeDecoder(decoderRef.current)
+      decoderRef.current = null
+
+      if (!decoderConfig) {
+        setStatus(reason)
+        return
+      }
+
+      try {
+        const recovered = createDecoder()
+        recovered.configure(decoderConfig)
+        payloadFormatRef.current = payloadFormat
+        setStatus(`${reason}; waiting for keyframe...`)
+      } catch (recoveryError) {
+        decoderConfigRef.current = null
+        setStatus(`Decoder error: ${describeError(recoveryError)}`)
+      }
+    }
+
+    createDecoder()
 
     const unsubscribe = getVideoGatewayClient().subscribe(stream.stream_id, (message) => {
       if (message.kind === 'config') {
+        const generation = configGenerationRef.current + 1
+        configGenerationRef.current = generation
+        decoderConfigRef.current = null
+        waitingForKeyframeRef.current = true
+        setStatus('Configuring decoder...')
+
         void (async () => {
           const supported = await selectDecoderConfiguration(message)
-          if (!active) return
+          if (!active || generation !== configGenerationRef.current) return
           if (!supported) {
             decoderConfigRef.current = null
             setStatus('WebCodecs does not support this H.264 stream')
             return
           }
 
-          decoder.reset()
-          decoder.configure(supported.config)
-          decoderConfigRef.current = supported.config
-          payloadFormatRef.current = supported.payloadFormat
-          setStatus('Waiting for keyframe...')
+          try {
+            const decoder =
+              decoderRef.current && decoderRef.current.state !== 'closed'
+                ? decoderRef.current
+                : createDecoder()
+            decoder.reset()
+            decoder.configure(supported.config)
+            decoderConfigRef.current = supported.config
+            payloadFormatRef.current = supported.payloadFormat
+            waitingForKeyframeRef.current = true
+            setStatus('Waiting for keyframe...')
+          } catch (error) {
+            decoderConfigRef.current = null
+            setStatus(`Decoder error: ${describeError(error)}`)
+          }
         })()
         return
       }
 
       const chunk = message as VideoChunkMessage
-      if (!decoderConfigRef.current) {
+      const decoderConfig = decoderConfigRef.current
+      const decoder = decoderRef.current
+      if (!decoderConfig || !decoder) {
+        return
+      }
+      if (waitingForKeyframeRef.current && !chunk.key) {
         return
       }
       if (decoder.decodeQueueSize > 3 && !chunk.key) {
         return
       }
       if (decoder.decodeQueueSize > 5 && chunk.key) {
-        decoder.reset()
-        decoder.configure(decoderConfigRef.current)
+        try {
+          decoder.reset()
+          decoder.configure(decoderConfig)
+        } catch (error) {
+          recoverDecoder(`Decoder error: ${describeError(error)}`)
+          return
+        }
       }
 
       const payload =
         payloadFormatRef.current === 'annexb' ? chunk.payload : annexBToAvcc(chunk.payload)
-      decoder.decode(
-        new EncodedVideoChunk({
-          type: chunk.key ? 'key' : 'delta',
-          timestamp: chunk.timestampUs,
-          data: payload,
-        })
-      )
+      if (chunk.key) {
+        waitingForKeyframeRef.current = false
+      }
+      try {
+        decoder.decode(
+          new EncodedVideoChunk({
+            type: chunk.key ? 'key' : 'delta',
+            timestamp: chunk.timestampUs,
+            data: payload,
+          })
+        )
+      } catch (error) {
+        recoverDecoder(`Decoder error: ${describeError(error)}`)
+      }
     })
 
     return () => {
       active = false
       unsubscribe()
-      decoder.close()
+      closeDecoder(decoderRef.current)
       decoderRef.current = null
       decoderConfigRef.current = null
       payloadFormatRef.current = 'avcc'
+      waitingForKeyframeRef.current = true
     }
   }, [stream.available, stream.height, stream.stream_id, stream.width])
 

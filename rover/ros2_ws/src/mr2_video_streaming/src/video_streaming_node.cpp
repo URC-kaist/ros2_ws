@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cerrno>
 #include <cctype>
 #include <csignal>
@@ -96,10 +97,72 @@ class StreamPipeline {
   ~StreamPipeline() { shutdown(); }
 
   void start_if_needed() {
-    if (config_.source_type != StreamSourceType::V4L2 || pipeline_ != nullptr) {
+    if (config_.source_type != StreamSourceType::V4L2 || pipeline_ != nullptr || gst_child_pid_ > 0) {
       return;
     }
     start_v4l2_pipeline();
+  }
+
+  void poll_runtime() {
+    if (config_.source_type != StreamSourceType::V4L2 || stopping_) {
+      return;
+    }
+
+    if (gst_child_pid_ > 0) {
+      int status = 0;
+      const pid_t result = waitpid(gst_child_pid_, &status, WNOHANG);
+      if (result == 0) {
+        return;
+      }
+
+      if (result == gst_child_pid_) {
+        if (WIFEXITED(status)) {
+          RCLCPP_WARN(
+              logger_,
+              "V4L2 sender child for stream %s exited with code %d; scheduling restart",
+              config_.stream_id.c_str(),
+              WEXITSTATUS(status));
+        } else if (WIFSIGNALED(status)) {
+          RCLCPP_WARN(
+              logger_,
+              "V4L2 sender child for stream %s exited on signal %d; scheduling restart",
+              config_.stream_id.c_str(),
+              WTERMSIG(status));
+        } else {
+          RCLCPP_WARN(
+              logger_,
+              "V4L2 sender child for stream %s exited unexpectedly; scheduling restart",
+              config_.stream_id.c_str());
+        }
+        gst_child_pid_ = -1;
+        next_v4l2_restart_at_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+      } else if (result < 0) {
+        if (errno != ECHILD) {
+          RCLCPP_ERROR(
+              logger_,
+              "waitpid failed for V4L2 sender child on stream %s: %s",
+              config_.stream_id.c_str(),
+              std::strerror(errno));
+          return;
+        }
+
+        gst_child_pid_ = -1;
+        next_v4l2_restart_at_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+      }
+    }
+
+    if (gst_child_pid_ <= 0 && std::chrono::steady_clock::now() >= next_v4l2_restart_at_) {
+      try {
+        start_v4l2_pipeline();
+      } catch (const std::exception & error) {
+        next_v4l2_restart_at_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+        RCLCPP_ERROR(
+            logger_,
+            "Failed to restart V4L2 sender for stream %s: %s",
+            config_.stream_id.c_str(),
+            error.what());
+      }
+    }
   }
 
   void push_frame(const sensor_msgs::msg::Image & msg) {
@@ -202,6 +265,9 @@ class StreamPipeline {
     const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
 
     caps << (is_jpeg ? "image/jpeg" : "video/x-raw");
+    if (!is_jpeg && !pixel_format.empty()) {
+      caps << ",format=" << pixel_format;
+    }
     if (config_.width > 0) {
       caps << ",width=" << config_.width;
     }
@@ -268,6 +334,10 @@ class StreamPipeline {
   }
 
   void start_v4l2_pipeline() {
+    if (gst_child_pid_ > 0) {
+      return;
+    }
+
     width_ = config_.width;
     height_ = config_.height;
 
@@ -322,6 +392,7 @@ class StreamPipeline {
         });
 
     start_gst_launch_child(args);
+    next_v4l2_restart_at_ = std::chrono::steady_clock::time_point::max();
 
     std::ostringstream details;
     details << "Started V4L2 video stream " << config_.stream_id
@@ -443,6 +514,7 @@ class StreamPipeline {
   }
 
   void shutdown() {
+    stopping_ = true;
     if (gst_child_pid_ > 0) {
       kill(gst_child_pid_, SIGTERM);
       waitpid(gst_child_pid_, nullptr, 0);
@@ -481,6 +553,9 @@ class StreamPipeline {
   int height_{0};
   GstClockTime frame_duration_ns_{0};
   GstClockTime frame_index_{0};
+  bool stopping_{false};
+  std::chrono::steady_clock::time_point next_v4l2_restart_at_{
+      std::chrono::steady_clock::time_point::max()};
 
   static gboolean handle_bus_message(GstBus * /* bus */, GstMessage * message, gpointer user_data) {
     auto * self = static_cast<StreamPipeline *>(user_data);
@@ -713,6 +788,12 @@ class VideoStreamingNode : public rclcpp::Node {
       }
       RCLCPP_INFO(get_logger(), "%s", details.str().c_str());
     }
+
+    monitor_timer_ = create_wall_timer(std::chrono::milliseconds(500), [this]() {
+      for (const auto & pipeline : pipelines_) {
+        pipeline->poll_runtime();
+      }
+    });
   }
 
   ~VideoStreamingNode() override {
@@ -733,6 +814,7 @@ class VideoStreamingNode : public rclcpp::Node {
   std::string base_host_;
   GMainLoop * gst_main_loop_{nullptr};
   std::thread gst_main_loop_thread_;
+  rclcpp::TimerBase::SharedPtr monitor_timer_;
   std::vector<std::shared_ptr<StreamPipeline>> pipelines_;
   std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subscriptions_;
 };

@@ -44,6 +44,8 @@ function createVideoGateway(options = {}) {
     Math.floor(options.clientMaxBufferedBytes || 1048576)
   )
   const WebSocketServerImpl = options.WebSocketServerImpl || WebSocketServer
+  const createVideoStreamReceiverImpl =
+    options.createVideoStreamReceiverImpl || createVideoStreamReceiver
   const spawnImpl = options.spawnImpl
 
   const streamStates = new Map(
@@ -58,7 +60,7 @@ function createVideoGateway(options = {}) {
   routeRegistry.register(path, wss)
 
   const receivers = videoConfig.streams.map((stream) =>
-    createVideoStreamReceiver({
+    createVideoStreamReceiverImpl({
       gstBinary: options.gstBinary,
       idleFlushMs: options.idleFlushMs,
       jitterLatencyMs: options.jitterLatencyMs,
@@ -93,6 +95,13 @@ function createVideoGateway(options = {}) {
     state.available = available
     if (!available) {
       state.latestKeyAccessUnit = null
+      state.configVersion += 1
+      for (const client of subscriptionsByStream.get(streamId) || []) {
+        const subscription = client.subscriptions.get(streamId)
+        if (subscription) {
+          subscription.needsBootstrap = true
+        }
+      }
     }
   }
 
@@ -207,6 +216,10 @@ function createVideoGateway(options = {}) {
     if (!state) return
 
     updateCodecState(state, accessUnit)
+
+    if (!accessUnit.key && !accessUnit.delta) {
+      return
+    }
 
     if (accessUnit.key && state.sps && state.pps) {
       state.latestKeyAccessUnit = {

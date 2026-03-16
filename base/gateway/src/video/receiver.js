@@ -123,22 +123,34 @@ function createVideoStreamReceiver(options = {}) {
     child = spawnImpl(gstBinary, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    let ended = false
+
+    function finalizeChild(logMessage) {
+      if (ended) return
+      ended = true
+      clearFlushTimer()
+      parser = new AnnexBAccessUnitParser()
+      child = null
+      setAvailability(false)
+      if (logMessage) {
+        log(logMessage)
+      }
+      scheduleRestart()
+    }
 
     child.stdout.on('data', handleStdout)
     child.stderr.on('data', handleStderr)
+    child.on('error', (error) => {
+      finalizeChild(
+        `[video:${stream.stream_id}] receiver process error: ${error.message || String(error)}`
+      )
+    })
     child.on('exit', (code, signal) => {
-      clearFlushTimer()
-      if (!stopping) {
-        flushParser()
-      }
-      child = null
-      setAvailability(false)
-      log(
+      finalizeChild(
         `[video:${stream.stream_id}] receiver exited code=${code ?? 'null'} signal=${
           signal || 'null'
         }`
       )
-      scheduleRestart()
     })
   }
 

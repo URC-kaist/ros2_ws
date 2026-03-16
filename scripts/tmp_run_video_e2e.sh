@@ -708,7 +708,7 @@ class Publisher(Node):
         msg.width = self.width
         msg.encoding = 'rgb8'
         msg.step = self.width * 3
-        msg.data = frame.tobytes()
+        msg.data = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB).tobytes()
         self.publisher.publish(msg)
 
 rclpy.init()
