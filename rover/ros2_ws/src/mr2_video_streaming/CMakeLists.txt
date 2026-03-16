@@ -6,6 +6,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -20,7 +21,10 @@ add_executable(video_streaming_node
   src/video_streaming_node.cpp
 )
 target_compile_features(video_streaming_node PUBLIC cxx_std_17)
-target_link_libraries(video_streaming_node PkgConfig::GSTREAMER)
+target_link_libraries(video_streaming_node
+  PkgConfig::GSTREAMER
+  nlohmann_json::nlohmann_json
+)
 ament_target_dependencies(video_streaming_node
   rclcpp
   sensor_msgs

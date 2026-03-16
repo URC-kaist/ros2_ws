@@ -745,15 +745,16 @@ class VideoStreamingNode : public rclcpp::Node {
   VideoStreamingNode()
       : rclcpp::Node("video_streaming"),
         video_config_path_(declare_parameter<std::string>("video_config_path", "")),
-        base_host_(declare_parameter<std::string>("base_host", "127.0.0.1")),
-        gst_main_loop_(g_main_loop_new(nullptr, FALSE)) {
+        base_host_(declare_parameter<std::string>("base_host", "127.0.0.1")) {
     if (video_config_path_.empty()) {
       throw std::runtime_error("video_config_path parameter is required");
     }
 
-    gst_main_loop_thread_ = std::thread([this]() {
-      g_main_loop_run(gst_main_loop_);
-    });
+    std::unique_ptr<GMainLoop, decltype(&g_main_loop_unref)> gst_main_loop(
+        g_main_loop_new(nullptr, FALSE), &g_main_loop_unref);
+    if (!gst_main_loop) {
+      throw std::runtime_error("failed to allocate GMainLoop");
+    }
 
     const auto streams = load_streams_from_file(video_config_path_);
     for (const auto & stream : streams) {
@@ -794,6 +795,12 @@ class VideoStreamingNode : public rclcpp::Node {
         pipeline->poll_runtime();
       }
     });
+
+    gst_main_loop_ = gst_main_loop.get();
+    gst_main_loop_thread_ = std::thread([this]() {
+      g_main_loop_run(gst_main_loop_);
+    });
+    gst_main_loop.release();
   }
 
   ~VideoStreamingNode() override {
