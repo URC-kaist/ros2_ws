@@ -137,11 +137,20 @@ cat >"${VIEWER_HTML}" <<'EOF'
       }
       .meta {
         display: flex;
-        justify-content: space-between;
+        flex-wrap: wrap;
+        align-items: baseline;
         gap: 12px;
         margin: 8px 0 12px;
         color: rgba(231, 237, 244, 0.78);
         font-size: 14px;
+      }
+      .meta > span {
+        flex: 1 1 180px;
+        min-width: 0;
+      }
+      .meta > span:last-child {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
       }
       .status-live {
         color: #89f0de;
