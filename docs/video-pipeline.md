@@ -62,10 +62,10 @@ Preferred source forms:
 }
 ```
 
-Current compatibility note:
+Configuration note:
 
-- legacy top-level `ros_topic` + `ros_encoding` entries still load
-- new configs should prefer the explicit `source` object
+- every stream must declare an explicit `source` object
+- top-level `ros_topic` / `ros_encoding` entries are not supported
 
 The intended mapping rule is:
 

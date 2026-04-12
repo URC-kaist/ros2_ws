@@ -12,15 +12,18 @@ const {
   normalizeVideoConfig,
 } = require('../src/video/stream_config')
 
-test('normalizeVideoConfig accepts legacy ROS streams and preserves metadata', () => {
+test('normalizeVideoConfig accepts tagged ROS sources and preserves metadata', () => {
   const config = normalizeVideoConfig({
     version: 1,
     streams: [
       {
         stream_id: 'front_nav_cam',
-        ros_topic: '/front_camera/image_raw',
+        source: {
+          type: 'ros_topic',
+          ros_topic: '/front_camera/image_raw',
+          ros_encoding: 'rgb8',
+        },
         udp_port: 5000,
-        ros_encoding: 'rgb8',
         width: 640,
         height: 480,
         framerate: 15,
@@ -78,15 +81,21 @@ test('normalizeVideoConfig rejects duplicate identifiers and unsupported encodin
         streams: [
           {
             stream_id: 'front_nav_cam',
-            ros_topic: '/front_camera/image_raw',
+            source: {
+              type: 'ros_topic',
+              ros_topic: '/front_camera/image_raw',
+              ros_encoding: 'rgb8',
+            },
             udp_port: 5000,
-            ros_encoding: 'rgb8',
           },
           {
             stream_id: 'front_nav_cam',
-            ros_topic: '/rgbd_camera/color/image_raw',
+            source: {
+              type: 'ros_topic',
+              ros_topic: '/rgbd_camera/color/image_raw',
+              ros_encoding: 'rgb8',
+            },
             udp_port: 5002,
-            ros_encoding: 'rgb8',
           },
         ],
       }),
@@ -99,13 +108,29 @@ test('normalizeVideoConfig rejects duplicate identifiers and unsupported encodin
         streams: [
           {
             stream_id: 'depth_cam',
-            ros_topic: '/depth/image_raw',
+            source: {
+              type: 'ros_topic',
+              ros_topic: '/depth/image_raw',
+              ros_encoding: 'mono16',
+            },
             udp_port: 5004,
-            ros_encoding: 'mono16',
           },
         ],
       }),
     /ros_encoding/
+  )
+
+  assert.throws(
+    () =>
+      normalizeVideoConfig({
+        streams: [
+          {
+            stream_id: 'missing_source',
+            udp_port: 5006,
+          },
+        ],
+      }),
+    /source is required/
   )
 
   assert.throws(
@@ -150,9 +175,12 @@ test('listBrowserStreams sorts by display order and exposes source metadata', ()
         },
         {
           stream_id: 'first',
-          ros_topic: '/first',
+          source: {
+            type: 'ros_topic',
+            ros_topic: '/first',
+            ros_encoding: 'rgb8',
+          },
           udp_port: 5000,
-          ros_encoding: 'rgb8',
           display: { label: 'First', panel: 'delivery', order: 1 },
           encoder: { bitrate_kbps: 1400 },
         },

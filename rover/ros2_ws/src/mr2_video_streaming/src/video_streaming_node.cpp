@@ -668,25 +668,23 @@ StreamConfig parse_stream_config(const json & item) {
   config.encoder.speed_preset = encoder.value("speed_preset", std::string("ultrafast"));
   config.encoder.tune = encoder.value("tune", std::string("zerolatency"));
 
-  if (item.contains("source")) {
-    const json source = item.at("source");
-    const std::string source_type = source.at("type").get<std::string>();
-    if (source_type == "ros_topic") {
-      config.source_type = StreamSourceType::RosTopic;
-      config.ros_topic = source.at("ros_topic").get<std::string>();
-      config.ros_encoding = source.at("ros_encoding").get<std::string>();
-    } else if (source_type == "v4l2") {
-      config.source_type = StreamSourceType::V4L2;
-      config.v4l2_device = source.at("device").get<std::string>();
-      config.v4l2_pixel_format = source.value("pixel_format", std::string());
-    } else {
-      throw std::runtime_error(
-          "stream " + config.stream_id + " has unsupported source.type " + source_type);
-    }
-  } else {
+  if (!item.contains("source")) {
+    throw std::runtime_error("stream " + config.stream_id + " is missing source");
+  }
+
+  const json source = item.at("source");
+  const std::string source_type = source.at("type").get<std::string>();
+  if (source_type == "ros_topic") {
     config.source_type = StreamSourceType::RosTopic;
-    config.ros_topic = item.at("ros_topic").get<std::string>();
-    config.ros_encoding = item.at("ros_encoding").get<std::string>();
+    config.ros_topic = source.at("ros_topic").get<std::string>();
+    config.ros_encoding = source.at("ros_encoding").get<std::string>();
+  } else if (source_type == "v4l2") {
+    config.source_type = StreamSourceType::V4L2;
+    config.v4l2_device = source.at("device").get<std::string>();
+    config.v4l2_pixel_format = source.value("pixel_format", std::string());
+  } else {
+    throw std::runtime_error(
+        "stream " + config.stream_id + " has unsupported source.type " + source_type);
   }
 
   if (config.source_type == StreamSourceType::RosTopic) {
