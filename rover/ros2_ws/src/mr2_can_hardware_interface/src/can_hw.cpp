@@ -20,7 +20,6 @@
 #include "transmission_interface/transmission_interface_exception.hpp"
 
 #include "mr2_can_bus_core/can_device.hpp"
-#include "mr2_can_hardware_interface/homing_policy.hpp"
 
 using hardware_interface::CallbackReturn;
 using hardware_interface::return_type;
@@ -48,16 +47,6 @@ public:
       return CallbackReturn::ERROR;
     }
 
-    try {
-      homing_loader_ = std::make_shared<pluginlib::ClassLoader<HomingPolicy>>(
-          "mr2_can_hardware_interface",
-          "mr2_can_hardware_interface::HomingPolicy");
-    } catch (const pluginlib::PluginlibException &ex) {
-      RCLCPP_ERROR(node_->get_logger(),
-                   "Failed to load homing policy plugins: %s", ex.what());
-      return CallbackReturn::ERROR;
-    }
-
     joint_index_.clear();
     actuator_index_.clear();
     joints_.clear();
@@ -65,21 +54,9 @@ public:
     transmissions_.clear();
     device_states_.clear();
     devs_.clear();
-    homing_instances_.clear();
-    homing_active_ = false;
-    homed_ = false;
-    homing_failed_ = false;
-    homing_error_message_.clear();
 
     transmission_interface::SimpleTransmissionLoader simple_loader;
     transmission_interface::FourBarLinkageTransmissionLoader four_bar_loader;
-
-    struct HomingConfig {
-      std::string plugin;
-      HomingPolicy::ParamMap params;
-      std::string joint_name;
-    };
-    std::vector<HomingConfig> homing_configs;
 
     for (const auto &joint : info_.joints) {
       auto &joint_data = get_joint(joint.name);
@@ -152,6 +129,12 @@ public:
         return CallbackReturn::ERROR;
       }
 
+      const auto origin_offset_it = joint.parameters.find("origin_offset");
+      if (origin_offset_it != joint.parameters.end()) {
+        joint_data.uses_boot_origin = true;
+        joint_data.origin_offset = std::stod(origin_offset_it->second);
+      }
+
       auto &actuator = get_actuator(joint_data.actuator_name);
       if (joint_data.command_interface == hardware_interface::HW_IF_VELOCITY) {
         actuator.uses_velocity_command = true;
@@ -196,24 +179,6 @@ public:
         actuator.configured = true;
         actuator.device = &device_state;
         devs_.push_back(std::move(dev));
-      }
-
-      const auto homing_plugin_it = joint.parameters.find("homing_plugin");
-      if (homing_plugin_it != joint.parameters.end()) {
-        HomingConfig cfg;
-        cfg.plugin = homing_plugin_it->second;
-        cfg.joint_name = joint.name;
-
-        for (const auto &param : joint.parameters) {
-          if (param.first.rfind("homing_", 0) == 0 &&
-              param.first != "homing_plugin") {
-            const std::string key =
-                param.first.substr(std::string("homing_").size());
-            cfg.params[key] = param.second;
-          }
-        }
-
-        homing_configs.push_back(std::move(cfg));
       }
     }
 
@@ -370,61 +335,6 @@ public:
 
       transmissions_.push_back(std::move(transmission));
     }
-
-    if (!homing_configs.empty()) {
-      for (const auto &cfg : homing_configs) {
-        if (cfg.plugin.empty()) {
-          RCLCPP_ERROR(node_->get_logger(),
-                       "Homing configuration for joint '%s' missing plugin.",
-                       cfg.joint_name.c_str());
-          return CallbackReturn::ERROR;
-        }
-
-        std::shared_ptr<HomingPolicy> policy;
-        try {
-          policy = homing_loader_->createSharedInstance(cfg.plugin);
-        } catch (const pluginlib::PluginlibException &ex) {
-          RCLCPP_ERROR(node_->get_logger(),
-                       "Failed to load homing policy '%s': %s",
-                       cfg.plugin.c_str(), ex.what());
-          return CallbackReturn::ERROR;
-        }
-
-        auto it = joint_index_.find(cfg.joint_name);
-        if (it == joint_index_.end()) {
-          RCLCPP_ERROR(node_->get_logger(),
-                       "Homing configuration references unknown joint '%s'",
-                       cfg.joint_name.c_str());
-          return CallbackReturn::ERROR;
-        }
-
-        auto &joint = joints_[it->second];
-        HomingPolicy::JointHandle handle{
-            joint.name,
-            &joint.command,
-            &joint.state,
-            joint.has_velocity_state ? &joint.velocity : nullptr,
-            &joint.offset};
-
-        policy->configure(node_, handle, cfg.params);
-        if (policy->has_error()) {
-          RCLCPP_ERROR(node_->get_logger(),
-                       "Homing policy for joint '%s' failed to configure: %s",
-                       cfg.joint_name.c_str(), policy->error_message().c_str());
-          return CallbackReturn::ERROR;
-        }
-
-        if (auto dev = policy->homing_device()) {
-          devs_.push_back(std::move(dev));
-        }
-
-        homing_instances_.push_back({cfg.joint_name, policy});
-      }
-
-      RCLCPP_INFO(node_->get_logger(), "Configured %zu homing policy plugins.",
-                  homing_instances_.size());
-    }
-
     if (transmissions_.empty()) {
       RCLCPP_ERROR(node_->get_logger(),
                    "No transmissions defined for CAN hardware interface");
@@ -490,36 +400,26 @@ public:
   CallbackReturn
   on_activate(const rclcpp_lifecycle::State &previous_state) override {
     (void)previous_state;
-    const auto now = node_->get_clock()->now();
-    homing_failed_ = false;
-    homing_error_message_.clear();
+    for (auto &joint : joints_) {
+      joint.boot_reference_valid = false;
+      joint.boot_reference_position =
+          std::numeric_limits<double>::quiet_NaN();
 
-    if (homing_instances_.empty()) {
-      homed_ = true;
-      homing_active_ = false;
-      return CallbackReturn::SUCCESS;
-    }
-
-    homed_ = false;
-    homing_active_ = true;
-
-    for (auto &instance : homing_instances_) {
-      if (!instance.policy) {
-        continue;
+      if (joint.command_interface == hardware_interface::HW_IF_POSITION) {
+        joint.command = std::numeric_limits<double>::quiet_NaN();
+        joint.transmission_passthrough =
+            std::numeric_limits<double>::quiet_NaN();
+        joint.transmission_velocity = 0.0;
+      } else {
+        joint.command = 0.0;
       }
-      instance.policy->reset();
-      instance.policy->begin(now);
     }
-
-    RCLCPP_INFO(node_->get_logger(), "Starting homing sequence (%zu policies)",
-                homing_instances_.size());
     return CallbackReturn::SUCCESS;
   }
 
   CallbackReturn
   on_deactivate(const rclcpp_lifecycle::State &previous_state) override {
     (void)previous_state;
-    homing_active_ = false;
     return CallbackReturn::SUCCESS;
   }
 
@@ -546,9 +446,32 @@ public:
     }
 
     for (auto &joint : joints_) {
-      joint.state = joint.transmission_passthrough - joint.offset;
-      joint.velocity = joint.transmission_velocity;
-      joint.effort = joint.transmission_effort;
+      const double actuator_position = joint.transmission_passthrough;
+      if (joint.uses_boot_origin && std::isfinite(actuator_position) &&
+          !joint.boot_reference_valid) {
+        joint.boot_reference_position = actuator_position;
+        joint.boot_reference_valid = true;
+      }
+
+      if (joint.uses_boot_origin && joint.boot_reference_valid &&
+          std::isfinite(actuator_position)) {
+        joint.state = actuator_position - joint.boot_reference_position +
+                      joint.origin_offset;
+      } else if (!std::isfinite(joint.state)) {
+        joint.state = joint.uses_boot_origin ? joint.origin_offset : 0.0;
+      }
+
+      if (std::isfinite(joint.transmission_velocity)) {
+        joint.velocity = joint.transmission_velocity;
+      } else if (!std::isfinite(joint.velocity)) {
+        joint.velocity = 0.0;
+      }
+
+      if (std::isfinite(joint.transmission_effort)) {
+        joint.effort = joint.transmission_effort;
+      } else if (!std::isfinite(joint.effort)) {
+        joint.effort = 0.0;
+      }
     }
 
     return return_type::OK;
@@ -556,60 +479,8 @@ public:
 
   return_type write(const rclcpp::Time &now,
                     const rclcpp::Duration &period) override {
-    if (homing_failed_) {
-      return return_type::ERROR;
-    }
-
-    if (homing_active_) {
-      for (auto &instance : homing_instances_) {
-        if (instance.policy) {
-          instance.policy->update(now, period);
-        }
-      }
-
-      bool all_finished = true;
-      for (auto &instance : homing_instances_) {
-        if (!instance.policy) {
-          continue;
-        }
-
-        if (instance.policy->has_error()) {
-          homing_failed_ = true;
-          homing_error_message_ = instance.policy->error_message();
-          RCLCPP_ERROR(node_->get_logger(),
-                       "Homing policy '%s' reported error: %s",
-                       instance.joint_name.c_str(),
-                       homing_error_message_.c_str());
-          homing_active_ = false;
-          return return_type::ERROR;
-        }
-
-        if (!instance.policy->is_finished()) {
-          all_finished = false;
-        }
-      }
-
-      if (all_finished) {
-        for (auto &instance : homing_instances_) {
-          if (instance.policy) {
-            instance.policy->finalize(now);
-          }
-        }
-        homing_active_ = false;
-        homed_ = true;
-        RCLCPP_INFO(node_->get_logger(),
-                    "Homing sequence completed successfully.");
-      }
-    }
-
-    // Avoid clamping homing motions by joint limits; some homing policies
-    // intentionally drive past the nominal window. Apply limits only when
-    // homing is inactive or has completed.
-    const bool apply_joint_limits = !homing_active_ || homed_;
-
     for (auto &joint : joints_) {
-      if (apply_joint_limits &&
-          joint.command_interface == hardware_interface::HW_IF_POSITION) {
+      if (joint.command_interface == hardware_interface::HW_IF_POSITION) {
         double limited_command = joint.command;
         if (std::isfinite(limited_command)) {
           if (std::isfinite(joint.lower_limit)) {
@@ -620,13 +491,30 @@ public:
           }
           joint.command = limited_command;
         }
-      }
-
-      if (joint.command_interface == hardware_interface::HW_IF_POSITION) {
-        joint.transmission_passthrough = joint.command + joint.offset;
+        if (!std::isfinite(joint.command)) {
+          joint.transmission_passthrough =
+              std::numeric_limits<double>::quiet_NaN();
+        } else if (joint.uses_boot_origin) {
+          if (joint.boot_reference_valid) {
+            joint.transmission_passthrough =
+                joint.command - joint.origin_offset +
+                joint.boot_reference_position;
+          } else {
+            joint.transmission_passthrough =
+                std::numeric_limits<double>::quiet_NaN();
+          }
+        } else {
+          joint.transmission_passthrough = joint.command;
+        }
         joint.transmission_velocity = 0.0;
       } else {
-        joint.transmission_passthrough = joint.state + joint.offset;
+        if (joint.uses_boot_origin && joint.boot_reference_valid &&
+            std::isfinite(joint.state)) {
+          joint.transmission_passthrough =
+              joint.state - joint.origin_offset + joint.boot_reference_position;
+        } else {
+          joint.transmission_passthrough = joint.state;
+        }
         joint.transmission_velocity = joint.command;
       }
       joint.transmission_effort = 0.0;
@@ -671,7 +559,8 @@ private:
     double effort{std::numeric_limits<double>::quiet_NaN()};
     double lower_limit{-std::numeric_limits<double>::infinity()};
     double upper_limit{std::numeric_limits<double>::infinity()};
-    double offset{0.0};
+    double origin_offset{0.0};
+    double boot_reference_position{std::numeric_limits<double>::quiet_NaN()};
     double transmission_passthrough{std::numeric_limits<double>::quiet_NaN()};
     double transmission_velocity{std::numeric_limits<double>::quiet_NaN()};
     double transmission_effort{std::numeric_limits<double>::quiet_NaN()};
@@ -679,6 +568,8 @@ private:
     std::string actuator_name;
     bool has_velocity_state{false};
     bool has_effort_state{false};
+    bool uses_boot_origin{false};
+    bool boot_reference_valid{false};
   };
 
   struct DevicePointers {
@@ -725,17 +616,7 @@ private:
 
     return actuators_[it->second];
   }
-
-  CallbackReturn register_named_states(
-      const std::vector<std::pair<std::string, double *>> &) = delete;
-
-  struct HomingInstance {
-    std::string joint_name;
-    std::shared_ptr<HomingPolicy> policy;
-  };
-
   std::shared_ptr<pluginlib::ClassLoader<CanDevice>> loader_;
-  std::shared_ptr<pluginlib::ClassLoader<HomingPolicy>> homing_loader_;
   std::vector<std::shared_ptr<CanDevice>> devs_;
 
   std::unordered_map<std::string, size_t> joint_index_;
@@ -745,12 +626,6 @@ private:
   std::vector<std::shared_ptr<transmission_interface::Transmission>>
       transmissions_;
   std::unordered_map<std::string, DevicePointers> device_states_;
-
-  std::vector<HomingInstance> homing_instances_;
-  bool homing_active_{false};
-  bool homed_{false};
-  bool homing_failed_{false};
-  std::string homing_error_message_;
 
   rclcpp::Node::SharedPtr node_;
 };

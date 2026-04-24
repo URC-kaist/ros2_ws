@@ -14,11 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(transmission_interface REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
-  src/can_hw.cpp
-  src/homing/absolute_encoder_policy.cpp
-  src/homing/limit_switch_policy.cpp
-  src/homing_sensors/absolute_encoder_device.cpp
-  src/homing_sensors/limit_switch_device.cpp)
+  src/can_hw.cpp)
 
 target_include_directories(${PROJECT_NAME}
   PUBLIC

@@ -17,7 +17,7 @@ from mr2_rover_description.launch_common import (
 
 
 def generate_launch_description():
-    # Launches the single-joint example that homes using an absolute encoder.
+    # Launches the single-joint example in boot-origin mode.
     pkg_share = FindPackageShare("mr2_rover_description")
     xacro_file = PathJoinSubstitution([
         pkg_share,
@@ -53,39 +53,11 @@ def generate_launch_description():
         description="Start mock AK servo that emulates CAN feedback",
     )
 
-    abs_can_id = LaunchConfiguration("absolute_encoder_can_id")
-    abs_can_id_arg = DeclareLaunchArgument(
-        "absolute_encoder_can_id",
-        default_value="384",
-        description="CAN ID (decimal) for the absolute encoder device",
-    )
-
-    abs_ticks_per_rev = LaunchConfiguration("absolute_encoder_ticks_per_rev")
-    abs_ticks_per_rev_arg = DeclareLaunchArgument(
-        "absolute_encoder_ticks_per_rev",
-        default_value="4096",
-        description="Ticks per revolution reported by the absolute encoder",
-    )
-
-    abs_direction = LaunchConfiguration("absolute_encoder_direction")
-    abs_direction_arg = DeclareLaunchArgument(
-        "absolute_encoder_direction",
-        default_value="1.0",
-        description="Direction multiplier applied to the encoder (+1 or -1)",
-    )
-
-    homing_encoder_direction = LaunchConfiguration("homing_encoder_direction")
-    homing_encoder_direction_arg = DeclareLaunchArgument(
-        "homing_encoder_direction",
-        default_value=abs_direction,
-        description="Multiplier applied inside the homing policy (+1 or -1)",
-    )
-
-    homing_home_offset = LaunchConfiguration("homing_home_offset")
-    homing_home_offset_arg = DeclareLaunchArgument(
-        "homing_home_offset",
+    origin_offset = LaunchConfiguration("origin_offset")
+    origin_offset_arg = DeclareLaunchArgument(
+        "origin_offset",
         default_value="0.0",
-        description="Offset (rad) added to the encoder angle before computing the joint home",
+        description="Logical joint value assigned to the startup physical pose",
     )
 
     robot_description = {
@@ -96,16 +68,8 @@ def generate_launch_description():
             can_iface,
             " motor_id:=",
             motor_id,
-            " absolute_encoder_can_id:=",
-            abs_can_id,
-            " absolute_encoder_ticks_per_rev:=",
-            abs_ticks_per_rev,
-            " absolute_encoder_direction:=",
-            abs_direction,
-            " homing_encoder_direction:=",
-            homing_encoder_direction,
-            " homing_home_offset:=",
-            homing_home_offset,
+            " origin_offset:=",
+            origin_offset,
         ])
     }
 
@@ -124,14 +88,6 @@ def generate_launch_description():
             "can_iface": can_iface,
             "motor_id": ParameterValue(motor_id, value_type=int),
             "initial_position": 1.0,
-            "limit_switch_enabled": False,
-            "absolute_encoder_enabled": True,
-            "absolute_encoder_can_id": ParameterValue(
-                abs_can_id, value_type=int),
-            "absolute_encoder_ticks_per_rev": ParameterValue(
-                abs_ticks_per_rev, value_type=float),
-            "absolute_encoder_direction": ParameterValue(
-                abs_direction, value_type=float),
         }],
         condition=IfCondition(use_mock_servo),
         output="screen",
@@ -149,11 +105,7 @@ def generate_launch_description():
             can_iface_arg,
             motor_id_arg,
             use_mock_servo_arg,
-            abs_can_id_arg,
-            abs_ticks_per_rev_arg,
-            abs_direction_arg,
-            homing_encoder_direction_arg,
-            homing_home_offset_arg,
+            origin_offset_arg,
             robot_state_publisher_node,
             mock_servo_node,
             ros2_control_node,

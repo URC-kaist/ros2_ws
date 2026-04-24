@@ -3,8 +3,6 @@
   <xacro:arg name="can_iface" default="can0"/>
   <xacro:arg name="motor_a_id" default="102"/>
   <xacro:arg name="motor_b_id" default="103"/>
-  <xacro:arg name="input_limit_can_id" default="183"/>
-  <xacro:arg name="output_abs_can_id" default="0x182"/>
 
   <link name="base_link">
     <visual>
@@ -74,14 +72,6 @@
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
       <param name="motor_id">$(arg motor_a_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
-      <!-- <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param> -->
-      <!-- <param name="homing_device_can_iface">$(arg can_iface)</param> -->
-      <!-- <param name="homing_device_can_id">$(arg input_limit_can_id)</param> -->
-      <!-- <param name="homing_device_active_high">true</param> -->
-      <!-- <param name="homing_search_direction">negative</param> -->
-      <!-- <param name="homing_approach_speed">0.35</param> -->
-      <!-- <param name="homing_fine_speed">0.05</param> -->
-      <!-- <param name="homing_backoff_distance">0.12</param> -->
     </joint>
 
     <joint name="output_joint">
@@ -93,10 +83,6 @@
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
       <param name="motor_id">$(arg motor_b_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
-      <!-- <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param> -->
-      <!-- <param name="homing_device_can_iface">$(arg can_iface)</param> -->
-      <!-- <param name="homing_device_can_id">$(arg output_abs_can_id)</param> -->
-      <!-- <param name="homing_device_ticks_per_rev">4096</param> -->
     </joint>
 
     <transmission name="four_bar_transmission">

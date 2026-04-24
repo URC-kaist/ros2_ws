@@ -55,20 +55,6 @@ def generate_launch_description():
         description="Motor ID assigned to the output joint actuator",
     )
 
-    input_limit_can_id = LaunchConfiguration("input_limit_can_id")
-    input_limit_can_id_arg = DeclareLaunchArgument(
-        "input_limit_can_id",
-        default_value="0x183",
-        description="CAN ID of the limit switch sensor guarding the input joint",
-    )
-
-    output_abs_can_id = LaunchConfiguration("output_abs_can_id")
-    output_abs_can_id_arg = DeclareLaunchArgument(
-        "output_abs_can_id",
-        default_value="0x182",
-        description="CAN ID of the absolute encoder on the output joint",
-    )
-
     use_mock_servos, use_mock_servos_arg = declare_use_mock_servos(
         default="true",
         description="Start mock AK servo nodes that emulate the two CAN motors",
@@ -84,10 +70,6 @@ def generate_launch_description():
             motor_a_id,
             " motor_b_id:=",
             motor_b_id,
-            " input_limit_can_id:=",
-            input_limit_can_id,
-            " output_abs_can_id:=",
-            output_abs_can_id,
         ])
     }
 
@@ -106,10 +88,6 @@ def generate_launch_description():
         parameters=[{
             "can_iface": can_iface,
             "motor_id": ParameterValue(motor_a_id, value_type=int),
-            "limit_switch_enabled": True,
-            "limit_switch_trigger_position": -1.0,
-            "limit_switch_trigger_when_below": True,
-            "limit_switch_active_high": True,
         }],
         condition=IfCondition(use_mock_servos),
         output="screen",
@@ -121,7 +99,6 @@ def generate_launch_description():
         parameters=[{
             "can_iface": can_iface,
             "motor_id": ParameterValue(motor_b_id, value_type=int),
-            "absolute_encoder_enabled": True,
         }],
         condition=IfCondition(use_mock_servos),
         output="screen",
@@ -139,8 +116,6 @@ def generate_launch_description():
             can_iface_arg,
             motor_a_arg,
             motor_b_arg,
-            input_limit_can_id_arg,
-            output_abs_can_id_arg,
             use_mock_servos_arg,
             robot_state_publisher_node,
             ros2_control_node,

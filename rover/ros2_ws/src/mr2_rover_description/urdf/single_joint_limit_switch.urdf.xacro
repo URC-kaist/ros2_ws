@@ -1,18 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="single_joint_limit_switch">
-  <!-- Single-joint example that homes using a limit switch. -->
+  <!-- Single-joint example using direct mode with no startup origin capture. -->
   <xacro:arg name="can_iface" default="can0"/>
   <xacro:arg name="motor_id" default="4"/>
-  <xacro:arg name="limit_switch_can_id" default="385"/>
-  <xacro:arg name="limit_switch_active_high" default="true"/>
   <xacro:arg name="joint_lower_limit" default="-4"/>
   <xacro:arg name="joint_upper_limit" default="4"/>
-  <xacro:arg name="homing_search_direction" default="negative"/>
-  <xacro:arg name="homing_position" default="0.5"/>
-  <xacro:arg name="homing_approach_speed" default="0.05"/>
-  <xacro:arg name="homing_backoff_speed" default="0.05"/>
-  <xacro:arg name="homing_fine_speed" default="0.01"/>
-  <xacro:arg name="homing_backoff_distance" default="0.05"/>
   <xacro:property name="actuator_name" value="motor$(arg motor_id)"/>
 
   <link name="base_link">
@@ -63,17 +55,6 @@
       <param name="can_iface">$(arg can_iface)</param>
       <param name="joint_lower_limit">$(arg joint_lower_limit)</param>
       <param name="joint_upper_limit">$(arg joint_upper_limit)</param>
-      <param name="homing_plugin">mr2_can_hardware_interface/LimitSwitchPolicy</param>
-      <param name="homing_device_can_iface">$(arg can_iface)</param>
-      <param name="homing_device_can_id">$(arg limit_switch_can_id)</param>
-      <param name="homing_device_active_high">$(arg limit_switch_active_high)</param>
-      <param name="homing_device_active_high">$(arg limit_switch_active_high)</param>
-      <param name="homing_search_direction">$(arg homing_search_direction)</param>
-      <param name="homing_position">$(arg homing_position)</param>
-      <param name="homing_approach_speed">$(arg homing_approach_speed)</param>
-      <param name="homing_backoff_speed">$(arg homing_backoff_speed)</param>
-      <param name="homing_fine_speed">$(arg homing_fine_speed)</param>
-      <param name="homing_backoff_distance">$(arg homing_backoff_distance)</param>
     </joint>
 
     <transmission name="joint1_transmission">

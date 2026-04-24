@@ -102,18 +102,6 @@ public:
 
   void export_state(double *&position, double *&velocity,
                     double *&effort) override {
-    // Guard against propagating NaNs into TF/robot_state_publisher before
-    // valid feedback arrives. Default to 0 so transforms stay normalized.
-    if (!std::isfinite(position_rad_)) {
-      position_rad_ = 0.0;
-    }
-    if (!std::isfinite(velocity_rad_)) {
-      velocity_rad_ = 0.0;
-    }
-    if (!std::isfinite(effort_amp_)) {
-      effort_amp_ = 0.0;
-    }
-
     position = &position_rad_;
     velocity = &velocity_rad_;
     effort = &effort_amp_;

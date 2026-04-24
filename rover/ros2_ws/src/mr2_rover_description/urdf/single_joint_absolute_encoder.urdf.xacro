@@ -2,12 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="single_joint_abs">
   <xacro:arg name="can_iface" default="can0"/>
   <xacro:arg name="motor_id" default="4"/>
-  <!-- Absolute encoder CAN ID provided in decimal to match mock node expectations -->
-  <xacro:arg name="absolute_encoder_can_id" default="384"/>
-  <xacro:arg name="absolute_encoder_ticks_per_rev" default="4096"/>
-  <xacro:arg name="absolute_encoder_direction" default="1.0"/>
-  <xacro:arg name="homing_encoder_direction" default="1.0"/>
-  <xacro:arg name="homing_home_offset" default="0.0"/>
+  <xacro:arg name="origin_offset" default="0.0"/>
   <xacro:property name="actuator_name" value="motor$(arg motor_id)"/>
 
   <link name="base_link">
@@ -56,14 +51,7 @@
       <param name="device_plugin">mr2_devices_ak_servo/AkServoDevice</param>
       <param name="motor_id">$(arg motor_id)</param>
       <param name="can_iface">$(arg can_iface)</param>
-      <param name="homing_plugin">mr2_can_hardware_interface/AbsoluteEncoderPolicy</param>
-      <param name="homing_device_can_iface">$(arg can_iface)</param>
-      <param name="homing_device_can_id">$(arg absolute_encoder_can_id)</param>
-      <param name="homing_device_ticks_per_rev">$(arg absolute_encoder_ticks_per_rev)</param>
-      <param name="homing_device_direction">$(arg absolute_encoder_direction)</param>
-      <!-- AbsoluteEncoderPolicy specific parameters -->
-      <param name="homing_home_offset">$(arg homing_home_offset)</param>
-      <param name="homing_encoder_direction">$(arg homing_encoder_direction)</param>
+      <param name="origin_offset">$(arg origin_offset)</param>
     </joint>
 
     <transmission name="joint1_transmission">
