@@ -162,7 +162,9 @@ class BaseStationAntenna extends EventEmitter {
   sendMoveRad(rad, seqValue = this._nextSeq()) {
     // The controller only accepts a mechanical range of +/- 90 degrees.
     const clamped = clamp(rad, -Math.PI / 2, Math.PI / 2)
-    const q = q16_16(clamped)
+    // Hardware orientation is mirrored relative to logical heading commands.
+    const hardwareRad = -clamped
+    const q = q16_16(hardwareRad)
     const payload = Buffer.alloc(4)
     payload.writeInt32LE(q, 0)
     const frame = this._buildFrame(CMD_MOVE_TO_RAD, seqValue, payload)

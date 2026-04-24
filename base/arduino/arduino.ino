@@ -19,10 +19,10 @@ constexpr uint8_t PIN_PWM  = 5;
 constexpr uint8_t PIN_DIR  = 4;
 constexpr uint8_t ENC_A    = 2;
 constexpr uint8_t ENC_B    = 3;
-constexpr uint8_t HOME_PIN = 7;               // NC + INPUT_PULLUP
+constexpr uint8_t HOME_PIN = 7;               // switch to GND + INPUT_PULLUP
 
-// With NC + INPUT_PULLUP wiring, a "pressed" switch reads HIGH.
-constexpr uint8_t HOME_ACTIVE_LEVEL = HIGH;
+// With INPUT_PULLUP and a switch to GND, a triggered switch reads LOW.
+constexpr uint8_t HOME_ACTIVE_LEVEL = LOW;
 
 // ---------------------- Encoder ----------------------
 constexpr long COUNTS_PER_REV = 3614;          // output shaft counts per revolution
@@ -36,8 +36,8 @@ constexpr float    CTRL_DT = 1.0f / CTRL_HZ;
 // ---------------------- Motion conversion ----------------------
 // Angle conversion factor preserved from the original code.
 // rad -> revolutions = rad / (2*pi) => counts = rev * CPR * (GEAR_NUM / GEAR_DEN)
-constexpr float GEAR_NUM = 57.0f;
-constexpr float GEAR_DEN = 13.0f;
+constexpr float GEAR_NUM = 80.0f;
+constexpr float GEAR_DEN = 20.0f;
 constexpr float TWO_PI_F = 6.2831853071795864769f;
 
 // Clamp commanded angle range.
@@ -93,9 +93,9 @@ constexpr long BACKOFF_COUNTS     = 80;
 constexpr long HOME_RELEASE_COUNTS= 120;
 constexpr long HOME_OFFSET_COUNTS =
   (long)((0.15f / TWO_PI_F) * (float)COUNTS_PER_REV * (GEAR_NUM / GEAR_DEN)); // +0.15 rad
-// Search range in counts (apply gear ratio as requested).
+// Search range in counts: one output shaft revolution with gear ratio applied.
 constexpr long HOME_SEARCH_MAX_COUNTS =
-  (long)((COUNTS_PER_REV * (GEAR_NUM / GEAR_DEN)) * (40.0f / 360.0f)); // ~40 deg
+  (long)((float)COUNTS_PER_REV * (GEAR_NUM / GEAR_DEN));
 constexpr uint16_t AUTO_RETURN_IDLE_MS = 1000;
 constexpr float AUTO_RETURN_RAD = 0.0f;
 
