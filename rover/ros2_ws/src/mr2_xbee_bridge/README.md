@@ -1,6 +1,6 @@
-# MR2 SiK Bridge
+# MR2 XBEE Bridge
 
-This package provides encoding/decoding utilities for the MR2 SiK serial
+This package provides encoding/decoding utilities for the MR2 XBEE serial
 protocol and a ROS 2 bridge node that interfaces with the serial link. The
 packet helpers focus on framing, CRC verification, and translation between
 binary payloads and strongly-typed C++ structs.
@@ -79,7 +79,7 @@ Suggested rate: 2–5 Hz
 Expected behavior in higher-level code:
 - Dashboard sends heartbeats to the bridge; if they stop for the deadman timeout
   window, publish zero drive and arm twist commands continuously until they resume.
-- The ROS bridge also emits heartbeats back over the SiK link to indicate the
+- The ROS bridge also emits heartbeats back over the XBEE link to indicate the
   bridge is alive (used by the gateway/UI link status).
 
 ### MISSION_CONTROL (msg_id 0x04)
@@ -174,7 +174,7 @@ rover before publishing a single `rtcm_msgs/Message` on `/base/rtcm`.
 
 ## Library API
 
-Header: `mr2_sik_bridge/packets.hpp`
+Header: `mr2_xbee_bridge/packets.hpp`
 
 Key functions:
 - `encode_cmd_drive`, `encode_cmd_arm_twist`, `encode_cmd_arm_gripper`, `encode_heartbeat`,
@@ -187,7 +187,7 @@ Key functions:
 ## Behavior Expectations (out of scope for this package)
 
 This package does not implement serial I/O, timeouts, or ROS publishers.
-A higher-level SiK bridge node should:
+A higher-level XBEE bridge node should:
 - Enforce heartbeat timeouts and publish zero commands on loss.
 - Map decoded drive/arm/gripper commands into ROS topics.
 - Convert ROS battery telemetry into the compact payload above.

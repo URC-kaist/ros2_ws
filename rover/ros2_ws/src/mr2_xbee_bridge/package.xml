@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>mr2_sik_bridge</name>
+  <name>mr2_xbee_bridge</name>
   <version>0.1.0</version>
-  <description>ROS 2 bridge node for MR2 SiK serial protocol.</description>
+  <description>ROS 2 bridge node for MR2 XBEE serial protocol.</description>
   <maintainer email="todo@example.com">TODO</maintainer>
   <license>Apache-2.0</license>
 

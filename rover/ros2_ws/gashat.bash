@@ -37,7 +37,7 @@ ROS_CMD=$(
 set -e
 source "$ROS_SETUP"
 source "$WS_SETUP"
-exec ros2 launch mr2_launch rover_real.launch.py enable_manipulator_module:=false enable_autonomous_module:=false enable_sik_sim:=true
+exec ros2 launch mr2_launch rover_real.launch.py enable_manipulator_module:=true enable_autonomous_module:=false enable_xbee_sim:=true use_servo:=true
 CMD
 )
 
@@ -45,7 +45,7 @@ GATEWAY_CMD=$(
   cat <<'CMD'
 set -e
 cd "$REPO_ROOT/base/gateway"
-exec npm start -- --device /tmp/sik_sim1 --baud 57600 --port 8081
+exec npm start -- --device /tmp/xbee_sim1 --baud 57600 --port 8081
 CMD
 )
 

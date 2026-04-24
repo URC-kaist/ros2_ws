@@ -63,7 +63,7 @@ def find_working_camera(max_index: int = 5) -> Optional[int]:
 
 DEFAULT_V4L2_CONTROLS = (
     "auto_exposure=1,"
-    "exposure_time_absolute=6000,"
+    "exposure_time_absolute=3000,"
     "exposure_dynamic_framerate=1,"
     "white_balance_automatic=0,"
     "white_balance_temperature=4600,"

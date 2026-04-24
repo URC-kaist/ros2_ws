@@ -5,7 +5,7 @@
 #include <optional>
 #include <vector>
 
-namespace mr2_sik_bridge {
+namespace mr2_xbee_bridge {
 
 constexpr uint8_t kMagic = 0xA5;
 
@@ -139,4 +139,4 @@ std::optional<BaseSvin> decode_base_svin(const Frame &frame);
 std::optional<BaseRtcm> decode_base_rtcm(const Frame &frame);
 std::optional<BaseRtcmFrag> decode_base_rtcm_frag(const Frame &frame);
 
-}  // namespace mr2_sik_bridge
+}  // namespace mr2_xbee_bridge

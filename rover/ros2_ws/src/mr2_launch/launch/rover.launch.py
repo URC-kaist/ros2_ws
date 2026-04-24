@@ -97,30 +97,30 @@ def generate_launch_description():
         default_value="false",
         description="If true, launch MoveIt Servo instead of move_group",
     )
-    sik_sim_device_arg = DeclareLaunchArgument(
-        "sik_sim_device",
-        default_value="/tmp/sik_sim0",
-        description="Path to the PTY device that the SiK bridge will open in sim mode",
+    xbee_sim_device_arg = DeclareLaunchArgument(
+        "xbee_sim_device",
+        default_value="/tmp/xbee_sim0",
+        description="Path to the PTY device that the XBEE bridge will open in sim mode",
     )
-    sik_sim_peer_arg = DeclareLaunchArgument(
-        "sik_sim_peer",
-        default_value="/tmp/sik_sim1",
+    xbee_sim_peer_arg = DeclareLaunchArgument(
+        "xbee_sim_peer",
+        default_value="/tmp/xbee_sim1",
         description="Path to the peer PTY that external tools can attach to",
     )
-    sik_sim_baud_arg = DeclareLaunchArgument(
-        "sik_sim_baud",
+    xbee_sim_baud_arg = DeclareLaunchArgument(
+        "xbee_sim_baud",
         default_value="57600",
-        description="Baud rate for the simulated SiK link",
+        description="Baud rate for the simulated XBEE link",
     )
-    sik_device_arg = DeclareLaunchArgument(
-        "sik_device",
-        default_value="/dev/ttyUSB0",
-        description="Serial device for the real SiK bridge",
+    xbee_device_arg = DeclareLaunchArgument(
+        "xbee_device",
+        default_value="/dev/ttyXBEE",
+        description="Serial device for the real XBEE bridge",
     )
-    sik_baud_arg = DeclareLaunchArgument(
-        "sik_baud",
+    xbee_baud_arg = DeclareLaunchArgument(
+        "xbee_baud",
         default_value="57600",
-        description="Baud rate for the real SiK bridge",
+        description="Baud rate for the real XBEE bridge",
     )
     enable_aruco_arg = DeclareLaunchArgument(
         "enable_aruco",
@@ -168,7 +168,7 @@ def generate_launch_description():
         PythonExpression(["'", LaunchConfiguration("mode"), "' == 'real'"])
     )
     enable_manipulator_module = LaunchConfiguration("enable_manipulator_module")
-    sik_sim_condition = sim_condition
+    xbee_sim_condition = sim_condition
     use_sim_time_param = SetParameter(
         name="use_sim_time", value=LaunchConfiguration("use_sim_time")
     )
@@ -180,17 +180,17 @@ def generate_launch_description():
         output="screen",
     )
 
-    sik_sim_launch = IncludeLaunchDescription(
+    xbee_sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [FindPackageShare("mr2_launch"), "launch", "sik_sim.launch.py"]
+                [FindPackageShare("mr2_launch"), "launch", "xbee_sim.launch.py"]
             )
         ),
         launch_arguments={
-            "sik_sim_device": LaunchConfiguration("sik_sim_device"),
-            "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
+            "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
+            "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
         }.items(),
-        condition=sik_sim_condition,
+        condition=xbee_sim_condition,
     )
 
     rover_launch = IncludeLaunchDescription(
@@ -365,32 +365,32 @@ def generate_launch_description():
         condition=UnlessCondition(LaunchConfiguration("headless")),
     )
 
-    sik_bridge = Node(
-        package="mr2_sik_bridge",
-        executable="sik_bridge_node",
-        name="sik_bridge",
+    xbee_bridge = Node(
+        package="mr2_xbee_bridge",
+        executable="xbee_bridge_node",
+        name="xbee_bridge",
         output="screen",
         parameters=[
-            {"device": LaunchConfiguration("sik_device")},
-            {"baud": LaunchConfiguration("sik_baud")},
+            {"device": LaunchConfiguration("xbee_device")},
+            {"baud": LaunchConfiguration("xbee_baud")},
             {"heartbeat_timeout_ms": 500},
             {"cmd_vel_topic": "/base/cmd_vel"},
         ],
         condition=real_condition,
     )
-    sik_bridge_sim = Node(
-        package="mr2_sik_bridge",
-        executable="sik_bridge_node",
-        name="sik_bridge_sim",
+    xbee_bridge_sim = Node(
+        package="mr2_xbee_bridge",
+        executable="xbee_bridge_node",
+        name="xbee_bridge_sim",
         output="screen",
         parameters=[
-            {"device": LaunchConfiguration("sik_sim_device")},
-            {"baud": LaunchConfiguration("sik_sim_baud")},
+            {"device": LaunchConfiguration("xbee_sim_device")},
+            {"baud": LaunchConfiguration("xbee_sim_baud")},
             {"heartbeat_timeout_ms": 500},
             {"log_frames": False},
             {"cmd_vel_topic": "/base/cmd_vel"},
         ],
-        condition=sik_sim_condition,
+        condition=xbee_sim_condition,
     )
 
     foxglove_bridge = Node(
@@ -463,11 +463,11 @@ def generate_launch_description():
         enable_autonomous_module_arg,
         enable_autonomous_module_sim_arg,
         use_servo_arg,
-        sik_sim_device_arg,
-        sik_sim_peer_arg,
-        sik_sim_baud_arg,
-        sik_device_arg,
-        sik_baud_arg,
+        xbee_sim_device_arg,
+        xbee_sim_peer_arg,
+        xbee_sim_baud_arg,
+        xbee_device_arg,
+        xbee_baud_arg,
         enable_aruco_arg,
         aruco_cam_topic_arg,
         enable_yolo_arg,
@@ -484,9 +484,9 @@ def generate_launch_description():
         yolo_detector,
         move_group_launch,
         servo_launch,
-        sik_sim_launch,
-        sik_bridge,
-        sik_bridge_sim,
+        xbee_sim_launch,
+        xbee_bridge,
+        xbee_bridge_sim,
         video_streaming_launch,
         foxglove_bridge,
         rosbridge_ws,

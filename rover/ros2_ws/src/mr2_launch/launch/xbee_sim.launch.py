@@ -6,7 +6,7 @@ from launch.conditions import IfCondition
 
 def generate_launch_description():
     # Always used in sim mode; condition allows caller to turn it off if needed.
-    condition = IfCondition(LaunchConfiguration("enable_sik_sim", default="true"))
+    condition = IfCondition(LaunchConfiguration("enable_xbee_sim", default="true"))
 
     socat_pty = ExecuteProcess(
         cmd=[
@@ -14,10 +14,10 @@ def generate_launch_description():
             "-d",
             "-d",
             PythonExpression(
-                ["'pty,raw,echo=0,link=' + '", LaunchConfiguration("sik_sim_device"), "'"]
+                ["'pty,raw,echo=0,link=' + '", LaunchConfiguration("xbee_sim_device"), "'"]
             ),
             PythonExpression(
-                ["'pty,raw,echo=0,link=' + '", LaunchConfiguration("sik_sim_peer"), "'"]
+                ["'pty,raw,echo=0,link=' + '", LaunchConfiguration("xbee_sim_peer"), "'"]
             ),
         ],
         output="screen",

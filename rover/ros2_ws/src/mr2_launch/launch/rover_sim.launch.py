@@ -40,20 +40,20 @@ def generate_launch_description():
         default_value="true",
         description="Enable autonomous camera module (front_camera) in simulation",
     )
-    sik_sim_device_arg = DeclareLaunchArgument(
-        "sik_sim_device",
-        default_value="/tmp/sik_sim0",
-        description="PTy path the SiK bridge will open in sim mode",
+    xbee_sim_device_arg = DeclareLaunchArgument(
+        "xbee_sim_device",
+        default_value="/tmp/xbee_sim0",
+        description="PTy path the XBEE bridge will open in sim mode",
     )
-    sik_sim_peer_arg = DeclareLaunchArgument(
-        "sik_sim_peer",
-        default_value="/tmp/sik_sim1",
+    xbee_sim_peer_arg = DeclareLaunchArgument(
+        "xbee_sim_peer",
+        default_value="/tmp/xbee_sim1",
         description="Peer PTY path for external attachment",
     )
-    sik_sim_baud_arg = DeclareLaunchArgument(
-        "sik_sim_baud",
+    xbee_sim_baud_arg = DeclareLaunchArgument(
+        "xbee_sim_baud",
         default_value="57600",
-        description="Baud rate for the simulated SiK link",
+        description="Baud rate for the simulated XBEE link",
     )
 
     rover_launch = IncludeLaunchDescription(
@@ -70,9 +70,9 @@ def generate_launch_description():
             "can_iface": LaunchConfiguration("can_iface"),
             "enable_manipulator_module_sim": LaunchConfiguration("enable_manipulator_module"),
             "enable_autonomous_module_sim": LaunchConfiguration("enable_autonomous_module"),
-            "sik_sim_device": LaunchConfiguration("sik_sim_device"),
-            "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
-            "sik_sim_baud": LaunchConfiguration("sik_sim_baud"),
+            "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
+            "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
+            "xbee_sim_baud": LaunchConfiguration("xbee_sim_baud"),
         }.items(),
     )
 
@@ -84,9 +84,9 @@ def generate_launch_description():
             can_iface_arg,
             enable_manipulator_module_arg,
             enable_autonomous_module_arg,
-            sik_sim_device_arg,
-            sik_sim_peer_arg,
-            sik_sim_baud_arg,
+            xbee_sim_device_arg,
+            xbee_sim_peer_arg,
+            xbee_sim_baud_arg,
             rover_launch,
         ]
     )

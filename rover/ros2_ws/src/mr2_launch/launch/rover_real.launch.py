@@ -113,51 +113,51 @@ def generate_launch_description():
         default_value="/rgbd_camera",
         description="RealSense camera base topic for YOLO (e.g., /rgbd_camera)",
     )
-    enable_sik_sim_arg = DeclareLaunchArgument(
-        "enable_sik_sim",
+    enable_xbee_sim_arg = DeclareLaunchArgument(
+        "enable_xbee_sim",
         default_value="false",
-        description="Start socat to emulate a SiK serial port pair in real mode",
+        description="Start socat to emulate a XBEE serial port pair in real mode",
     )
-    sik_sim_device_arg = DeclareLaunchArgument(
-        "sik_sim_device",
-        default_value="/tmp/sik_sim0",
-        description="PTy path the SiK bridge will open when socat emulation is enabled",
+    xbee_sim_device_arg = DeclareLaunchArgument(
+        "xbee_sim_device",
+        default_value="/tmp/xbee_sim0",
+        description="PTy path the XBEE bridge will open when socat emulation is enabled",
     )
-    sik_sim_peer_arg = DeclareLaunchArgument(
-        "sik_sim_peer",
-        default_value="/tmp/sik_sim1",
+    xbee_sim_peer_arg = DeclareLaunchArgument(
+        "xbee_sim_peer",
+        default_value="/tmp/xbee_sim1",
         description="Peer PTY path for external attachment when socat emulation is enabled",
     )
-    sik_sim_baud_arg = DeclareLaunchArgument(
-        "sik_sim_baud",
+    xbee_sim_baud_arg = DeclareLaunchArgument(
+        "xbee_sim_baud",
         default_value="57600",
-        description="Baud rate for the emulated SiK link",
+        description="Baud rate for the emulated XBEE link",
     )
-    sik_device_arg = DeclareLaunchArgument(
-        "sik_device",
+    xbee_device_arg = DeclareLaunchArgument(
+        "xbee_device",
         default_value=PythonExpression(
             [
                 "'",
-                LaunchConfiguration("sik_sim_device"),
+                LaunchConfiguration("xbee_sim_device"),
                 "' if '",
-                LaunchConfiguration("enable_sik_sim"),
-                "' == 'true' else '/dev/ttyUSB0'",
+                LaunchConfiguration("enable_xbee_sim"),
+                "' == 'true' else '/dev/ttyXBEE'",
             ]
         ),
-        description="Serial device for the SiK bridge (defaults to emulated PTY when enabled)",
+        description="Serial device for the XBEE bridge (defaults to emulated PTY when enabled)",
     )
-    sik_baud_arg = DeclareLaunchArgument(
-        "sik_baud",
+    xbee_baud_arg = DeclareLaunchArgument(
+        "xbee_baud",
         default_value=PythonExpression(
             [
                 "'",
-                LaunchConfiguration("sik_sim_baud"),
+                LaunchConfiguration("xbee_sim_baud"),
                 "' if '",
-                LaunchConfiguration("enable_sik_sim"),
+                LaunchConfiguration("enable_xbee_sim"),
                 "' == 'true' else '57600'",
             ]
         ),
-        description="Baud rate for the SiK bridge (defaults to emulated baud when enabled)",
+        description="Baud rate for the XBEE bridge (defaults to emulated baud when enabled)",
     )
     left_gnss_serial_arg = DeclareLaunchArgument(
         "left_gnss_serial",
@@ -240,18 +240,18 @@ def generate_launch_description():
         description="Standard CAN ID for the LED controller",
     )
 
-    sik_sim_launch = IncludeLaunchDescription(
+    xbee_sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [FindPackageShare("mr2_launch"), "launch", "sik_sim.launch.py"]
+                [FindPackageShare("mr2_launch"), "launch", "xbee_sim.launch.py"]
             )
         ),
         launch_arguments={
-            "enable_sik_sim": LaunchConfiguration("enable_sik_sim"),
-            "sik_sim_device": LaunchConfiguration("sik_sim_device"),
-            "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
+            "enable_xbee_sim": LaunchConfiguration("enable_xbee_sim"),
+            "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
+            "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
         }.items(),
-        condition=IfCondition(LaunchConfiguration("enable_sik_sim")),
+        condition=IfCondition(LaunchConfiguration("enable_xbee_sim")),
     )
 
     realsense_launch = IncludeLaunchDescription(
@@ -340,11 +340,11 @@ def generate_launch_description():
             "enable_manipulator_module": LaunchConfiguration("enable_manipulator_module"),
             "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
             "use_servo": LaunchConfiguration("use_servo"),
-            "sik_device": LaunchConfiguration("sik_device"),
-            "sik_baud": LaunchConfiguration("sik_baud"),
-            "sik_sim_device": LaunchConfiguration("sik_sim_device"),
-            "sik_sim_peer": LaunchConfiguration("sik_sim_peer"),
-            "sik_sim_baud": LaunchConfiguration("sik_sim_baud"),
+            "xbee_device": LaunchConfiguration("xbee_device"),
+            "xbee_baud": LaunchConfiguration("xbee_baud"),
+            "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
+            "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
+            "xbee_sim_baud": LaunchConfiguration("xbee_sim_baud"),
             "enable_aruco": LaunchConfiguration("enable_autonomous_module"),
             "aruco_cam_topic": "/front_camera/image_raw",
             "enable_yolo": LaunchConfiguration("enable_yolo"),
@@ -522,12 +522,12 @@ def generate_launch_description():
             use_mock_servos_arg,
             enable_manipulator_module_arg,
             use_servo_arg,
-            enable_sik_sim_arg,
-            sik_sim_device_arg,
-            sik_sim_peer_arg,
-            sik_sim_baud_arg,
-            sik_device_arg,
-            sik_baud_arg,
+            enable_xbee_sim_arg,
+            xbee_sim_device_arg,
+            xbee_sim_peer_arg,
+            xbee_sim_baud_arg,
+            xbee_device_arg,
+            xbee_baud_arg,
             enable_autonomous_module_arg,
             enable_yolo_arg,
             enable_video_streaming_arg,
@@ -550,7 +550,7 @@ def generate_launch_description():
             ntrip_maxage_conn_arg,
             enable_led_arg,
             led_can_id_arg,
-            sik_sim_launch,
+            xbee_sim_launch,
             realsense_launch,
             front_uvc_launch,
             video_streaming_launch,

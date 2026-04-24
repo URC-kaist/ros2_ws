@@ -1,8 +1,8 @@
-#include "mr2_sik_bridge/packets.hpp"
+#include "mr2_xbee_bridge/packets.hpp"
 
 #include <cstring>
 
-namespace mr2_sik_bridge {
+namespace mr2_xbee_bridge {
 namespace {
 
 constexpr size_t kHeaderSize = 4;
@@ -552,4 +552,4 @@ std::optional<BaseRtcmFrag> decode_base_rtcm_frag(const Frame &frame) {
   return frag;
 }
 
-}  // namespace mr2_sik_bridge
+}  // namespace mr2_xbee_bridge

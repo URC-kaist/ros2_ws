@@ -23,7 +23,7 @@
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "mr2_action_interface/msg/mission_control.hpp"
 #include "mr2_battery_monitor/msg/pack_telemetry.hpp"
-#include "mr2_sik_bridge/packets.hpp"
+#include "mr2_xbee_bridge/packets.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
@@ -31,22 +31,22 @@
 #include "ublox_ubx_msgs/msg/ubx_nav_svin.hpp"
 #include "rtcm_msgs/msg/message.hpp"
 
-namespace mr2_sik_bridge {
+namespace mr2_xbee_bridge {
 
-using mr2_sik_bridge::CmdArmTwist;
-using mr2_sik_bridge::CmdDrive;
-using mr2_sik_bridge::Frame;
-using mr2_sik_bridge::Heartbeat;
-using mr2_sik_bridge::MissionControl;
-using mr2_sik_bridge::TelemBattery;
-using mr2_sik_bridge::TelemNav;
-using mr2_sik_bridge::CmdArmGripper;
+using mr2_xbee_bridge::CmdArmTwist;
+using mr2_xbee_bridge::CmdDrive;
+using mr2_xbee_bridge::Frame;
+using mr2_xbee_bridge::Heartbeat;
+using mr2_xbee_bridge::MissionControl;
+using mr2_xbee_bridge::TelemBattery;
+using mr2_xbee_bridge::TelemNav;
+using mr2_xbee_bridge::CmdArmGripper;
 
-class SikBridgeNode : public rclcpp::Node {
+class XbeeBridgeNode : public rclcpp::Node {
  public:
-  SikBridgeNode()
-      : rclcpp::Node("sik_bridge"),
-        device_(declare_parameter<std::string>("device", "/dev/ttySIK")),
+  XbeeBridgeNode()
+      : rclcpp::Node("xbee_bridge"),
+        device_(declare_parameter<std::string>("device", "/dev/ttyXBEE")),
         baud_(declare_parameter<int>("baud", 57600)),
         heartbeat_timeout_ms_(
             declare_parameter<int>("heartbeat_timeout_ms", 500)),
@@ -123,14 +123,14 @@ class SikBridgeNode : public rclcpp::Node {
         std::chrono::duration<double>(1.0 / std::max(1.0, zero_publish_rate_hz_));
     zero_timer_ = create_wall_timer(
         std::chrono::duration_cast<std::chrono::nanoseconds>(zero_period),
-        std::bind(&SikBridgeNode::zero_check, this));
+        std::bind(&XbeeBridgeNode::zero_check, this));
 
     if (heartbeat_tx_rate_hz_ > 0.0) {
       const auto heartbeat_period = std::chrono::duration<double>(
           1.0 / std::max(heartbeat_tx_rate_hz_, 0.1));
       heartbeat_tx_timer_ = create_wall_timer(
           std::chrono::duration_cast<std::chrono::nanoseconds>(heartbeat_period),
-          std::bind(&SikBridgeNode::send_heartbeat_, this));
+          std::bind(&XbeeBridgeNode::send_heartbeat_, this));
     }
 
     if (nav_tx_rate_hz_ > 0.0) {
@@ -138,7 +138,7 @@ class SikBridgeNode : public rclcpp::Node {
           std::chrono::duration<double>(1.0 / std::max(nav_tx_rate_hz_, 0.1));
       nav_tx_timer_ = create_wall_timer(
           std::chrono::duration_cast<std::chrono::nanoseconds>(nav_period),
-          std::bind(&SikBridgeNode::send_nav_, this));
+          std::bind(&XbeeBridgeNode::send_nav_, this));
     }
 
     last_heartbeat_ = now();
@@ -146,7 +146,7 @@ class SikBridgeNode : public rclcpp::Node {
     last_battery_tx_[1] = now() - rclcpp::Duration::from_seconds(10.0);
   }
 
-  ~SikBridgeNode() override {
+  ~XbeeBridgeNode() override {
     request_shutdown_();
     if (reader_thread_.joinable()) {
       reader_thread_.join();
@@ -273,7 +273,7 @@ class SikBridgeNode : public rclcpp::Node {
         break;
       }
 
-      if (buffer[offset] != mr2_sik_bridge::kMagic) {
+      if (buffer[offset] != mr2_xbee_bridge::kMagic) {
         ++offset;
         continue;
       }
@@ -284,11 +284,11 @@ class SikBridgeNode : public rclcpp::Node {
         break;
       }
 
-      auto frame = mr2_sik_bridge::decode_frame(buffer.data() + offset, frame_size);
+      auto frame = mr2_xbee_bridge::decode_frame(buffer.data() + offset, frame_size);
       if (!frame) {
         if (log_frames_) {
           RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                               "Invalid SiK frame dropped");
+                               "Invalid XBEE frame dropped");
         }
         ++offset;
         continue;
@@ -310,43 +310,43 @@ class SikBridgeNode : public rclcpp::Node {
 
   void handle_frame_(const Frame &frame) {
     switch (frame.header.msg_id) {
-      case mr2_sik_bridge::MsgId::kCmdDrive: {
-        auto cmd = mr2_sik_bridge::decode_cmd_drive(frame);
+      case mr2_xbee_bridge::MsgId::kCmdDrive: {
+        auto cmd = mr2_xbee_bridge::decode_cmd_drive(frame);
         if (cmd) {
           handle_cmd_drive_(*cmd);
         }
         break;
       }
-      case mr2_sik_bridge::MsgId::kCmdArmTwist: {
-        auto cmd = mr2_sik_bridge::decode_cmd_arm_twist(frame);
+      case mr2_xbee_bridge::MsgId::kCmdArmTwist: {
+        auto cmd = mr2_xbee_bridge::decode_cmd_arm_twist(frame);
         if (cmd) {
           handle_cmd_arm_(*cmd);
         }
         break;
       }
-      case mr2_sik_bridge::MsgId::kHeartbeat: {
-        auto hb = mr2_sik_bridge::decode_heartbeat(frame);
+      case mr2_xbee_bridge::MsgId::kHeartbeat: {
+        auto hb = mr2_xbee_bridge::decode_heartbeat(frame);
         if (hb) {
           last_heartbeat_ = now();
         }
         break;
       }
-      case mr2_sik_bridge::MsgId::kMissionControl: {
-        auto ctrl = mr2_sik_bridge::decode_mission_control(frame);
+      case mr2_xbee_bridge::MsgId::kMissionControl: {
+        auto ctrl = mr2_xbee_bridge::decode_mission_control(frame);
         if (ctrl) {
           handle_mission_control_(*ctrl);
         }
         break;
       }
-      case mr2_sik_bridge::MsgId::kCmdArmGripper: {
-        auto cmd = mr2_sik_bridge::decode_cmd_arm_gripper(frame);
+      case mr2_xbee_bridge::MsgId::kCmdArmGripper: {
+        auto cmd = mr2_xbee_bridge::decode_cmd_arm_gripper(frame);
         if (cmd) {
           handle_cmd_arm_gripper_(*cmd);
         }
         break;
       }
-      case mr2_sik_bridge::MsgId::kBaseSvin: {
-        auto svin = mr2_sik_bridge::decode_base_svin(frame);
+      case mr2_xbee_bridge::MsgId::kBaseSvin: {
+        auto svin = mr2_xbee_bridge::decode_base_svin(frame);
         if (svin && base_svin_pub_) {
           ublox_ubx_msgs::msg::UBXNavSvin msg;
           msg.header.stamp = now();
@@ -364,8 +364,8 @@ class SikBridgeNode : public rclcpp::Node {
         }
         break;
       }
-      case mr2_sik_bridge::MsgId::kBaseRtcm: {
-        auto rtcm = mr2_sik_bridge::decode_base_rtcm(frame);
+      case mr2_xbee_bridge::MsgId::kBaseRtcm: {
+        auto rtcm = mr2_xbee_bridge::decode_base_rtcm(frame);
         if (rtcm && base_rtcm_pub_) {
           rtcm_msgs::msg::Message msg;
           msg.header.stamp = now();
@@ -375,8 +375,8 @@ class SikBridgeNode : public rclcpp::Node {
         }
         break;
       }
-      case mr2_sik_bridge::MsgId::kBaseRtcmFrag: {
-        auto frag = mr2_sik_bridge::decode_base_rtcm_frag(frame);
+      case mr2_xbee_bridge::MsgId::kBaseRtcmFrag: {
+        auto frag = mr2_xbee_bridge::decode_base_rtcm_frag(frame);
         if (frag && base_rtcm_pub_) {
           handle_base_rtcm_frag_(frame.header.seq, *frag);
         }
@@ -537,7 +537,7 @@ class SikBridgeNode : public rclcpp::Node {
     Heartbeat hb;
     hb.timestamp_ms =
         static_cast<uint32_t>(now().nanoseconds() / 1000000);
-    auto frame = mr2_sik_bridge::encode_heartbeat(next_seq_(), hb);
+    auto frame = mr2_xbee_bridge::encode_heartbeat(next_seq_(), hb);
     write_frame_(frame);
   }
 
@@ -572,7 +572,7 @@ class SikBridgeNode : public rclcpp::Node {
     telem.pack_voltage_v = pack_voltage_v;
 
     auto frame =
-        mr2_sik_bridge::encode_telem_battery(next_seq_(), telem, battery_id);
+        mr2_xbee_bridge::encode_telem_battery(next_seq_(), telem, battery_id);
     write_frame_(frame);
     last_tx = now_time;
   }
@@ -639,7 +639,7 @@ class SikBridgeNode : public rclcpp::Node {
       nav.cov_yaw_var = nav_cov_yaw_var_;
     }
 
-    auto frame = mr2_sik_bridge::encode_telem_nav(next_seq_(), nav);
+    auto frame = mr2_xbee_bridge::encode_telem_nav(next_seq_(), nav);
     write_frame_(frame);
   }
 
@@ -738,15 +738,15 @@ class SikBridgeNode : public rclcpp::Node {
   float nav_cov_yaw_var_{std::numeric_limits<float>::quiet_NaN()};
 };
 
-}  // namespace mr2_sik_bridge
+}  // namespace mr2_xbee_bridge
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   try {
-    auto node = std::make_shared<mr2_sik_bridge::SikBridgeNode>();
+    auto node = std::make_shared<mr2_xbee_bridge::XbeeBridgeNode>();
     rclcpp::spin(node);
   } catch (const std::exception &e) {
-    RCLCPP_FATAL(rclcpp::get_logger("sik_bridge"), "%s", e.what());
+    RCLCPP_FATAL(rclcpp::get_logger("xbee_bridge"), "%s", e.what());
   }
   rclcpp::shutdown();
   return 0;
