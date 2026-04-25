@@ -1,17 +1,17 @@
 # MR2 Base Gateway
 
 The gateway is the base-station process that sits between the dashboard,
-the SiK radio link, and a few base-side services.
+the XBEE radio link, and a few base-side services.
 
 It does four jobs:
 
-1. Accept dashboard commands over WebSocket and forward them over SiK.
-2. Receive rover telemetry over SiK and rebroadcast it to dashboard clients.
-3. Optionally relay selected ROS 2 base topics over SiK.
+1. Accept dashboard commands over WebSocket and forward them over XBEE.
+2. Receive rover telemetry over XBEE and rebroadcast it to dashboard clients.
+3. Optionally relay selected ROS 2 base topics over XBEE.
 4. Optionally expose base-side HTTP utilities such as Rocket M2 status.
 
-It implements the MR2 SiK protocol described in
-`rover/ros2_ws/src/mr2_sik_bridge/README.md`.
+It implements the MR2 XBEE protocol described in
+`rover/ros2_ws/src/mr2_xbee_bridge/README.md`.
 
 For the dedicated video pipeline details, see
 [`docs/video-pipeline.md`](../../docs/video-pipeline.md).
@@ -30,13 +30,13 @@ flowchart LR
     subgraph runtime[Runtime Adapters]
       wshub[ws_hub.js<br/>dashboard WebSocket clients]
       http[http_handlers.js<br/>HTTP endpoints]
-      serial[serial_link.js<br/>SiK serial port]
+      serial[serial_link.js<br/>XBEE serial port]
       relay[ros_topic_relay.js<br/>/base/ubx_nav_svin<br/>/base/rtcm]
       rocket_client[rocket_m2_client.js<br/>polling / session handling]
     end
 
     subgraph domain[Domain / Protocol]
-      sik[sik.js<br/>SiK frame encode / decode]
+      xbee[xbee.js<br/>XBEE frame encode / decode]
       tracker[antenna/tracker.js<br/>bearing + tracking state]
       antenna_proto[antenna/base_station.js<br/>antenna serial protocol]
       rocket_parse[rocket_m2.js<br/>status normalization]
@@ -44,7 +44,7 @@ flowchart LR
   end
 
   subgraph rover_side[Rover Side]
-    rover_bridge[mr2_sik_bridge]
+    rover_bridge[mr2_xbee_bridge]
     rover_nav[TELEM_NAV / battery / heartbeat]
   end
 
@@ -63,21 +63,21 @@ flowchart LR
   app --> tracker
   app --> rocket_client
 
-  serial <--> sik
-  relay --> sik
-  app --> sik
+  serial <--> xbee
+  relay --> xbee
+  app --> xbee
   rocket_client --> rocket_parse
   tracker --> antenna_proto
 
   dashboard <-->|WebSocket commands<br/>telemetry / status| wshub
   dashboard -->|GET /rocket-m2/status| http
 
-  serial <-->|bytes over /dev/ttySIK| rover_bridge
+  serial <-->|bytes over /dev/ttyXBEE| rover_bridge
   rover_bridge --> rover_nav
   rover_nav -->|TELEM_NAV / battery / heartbeat frames| serial
 
   ros_topics -->|UBXNavSvin / RTCM| relay
-  relay -->|BASE_SVIN / BASE_RTCM frames| sik
+  relay -->|BASE_SVIN / BASE_RTCM frames| xbee
 
   serial -->|decoded TELEM_NAV| app
   app -->|update rover nav| tracker
@@ -112,7 +112,7 @@ base/gateway/
 │   │   ├── base_station.js         # base antenna serial protocol client
 │   │   └── tracker.js              # base antenna tracking logic
 │   ├── protocol/
-│   │   └── sik.js                  # SiK frame/message encode/decode
+│   │   └── xbee.js                  # XBEE frame/message encode/decode
 │   ├── runtime/
 │   │   ├── http_handlers.js
 │   │   ├── rocket_m2_client.js
@@ -155,7 +155,7 @@ Minimal example:
 
 ```bash
 cd base/gateway
-npm start -- --device /dev/ttySIK --baud 57600 --port 8081
+npm start -- --device /dev/ttyXBEE --baud 57600 --port 8081
 ```
 
 Example with antenna tracking enabled:
@@ -163,7 +163,7 @@ Example with antenna tracking enabled:
 ```bash
 cd base/gateway
 npm start -- \
-  --device /dev/ttySIK \
+  --device /dev/ttyXBEE \
   --baud 57600 \
   --port 8081 \
   --heartbeat-hz 2 \
@@ -176,7 +176,7 @@ Example with video streaming enabled:
 ```bash
 cd base/gateway
 npm start -- \
-  --device /dev/ttySIK \
+  --device /dev/ttyXBEE \
   --baud 57600 \
   --port 8081 \
   --video-config ../../rover/ros2_ws/src/mr2_launch/config/video_streams.json \
@@ -202,11 +202,11 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 
 | CLI flag | Environment variable | Default |
 | --- | --- | --- |
-| `--device` | `SIK_DEVICE` | `/dev/ttySIK` |
-| `--baud` | `SIK_BAUD` | `57600` |
-| `--port` | `SIK_WS_PORT` | `8081` |
-| `--heartbeat-hz` | `SIK_HEARTBEAT_HZ` | `2` |
-| `--link-timeout-ms` | `SIK_LINK_TIMEOUT_MS` | `2000` |
+| `--device` | `XBEE_DEVICE` | `/dev/ttyXBEE` |
+| `--baud` | `XBEE_BAUD` | `57600` |
+| `--port` | `XBEE_WS_PORT` | `8081` |
+| `--heartbeat-hz` | `XBEE_HEARTBEAT_HZ` | `2` |
+| `--link-timeout-ms` | `XBEE_LINK_TIMEOUT_MS` | `2000` |
 
 ### Video Streaming
 
@@ -255,7 +255,7 @@ Clients connect to the same HTTP server port configured by `--port`.
 
 ### Control WebSocket
 
-- Path: `/sik-ws`
+- Path: `/xbee-ws`
 - Content: JSON command / telemetry messages
 
 ### Video WebSocket
@@ -303,9 +303,9 @@ Clients connect to the same HTTP server port configured by `--port`.
 
 Notes:
 
-- `battery_id` is `1` or `2`, mapped from SiK telemetry message IDs `0x10` and `0x11`.
-- `link_status.connected` depends on recent incoming SiK heartbeat frames. It
-  becomes `false` if no heartbeat is received within `SIK_LINK_TIMEOUT_MS`.
+- `battery_id` is `1` or `2`, mapped from XBEE telemetry message IDs `0x10` and `0x11`.
+- `link_status.connected` depends on recent incoming XBEE heartbeat frames. It
+  becomes `false` if no heartbeat is received within `XBEE_LINK_TIMEOUT_MS`.
 
 ## HTTP Endpoints
 
@@ -326,7 +326,7 @@ The ROS 2 topic relay subscribes to:
 - `/base/ubx_nav_svin` (`ublox_ubx_msgs/msg/UBXNavSvin`)
 - `/base/rtcm` (`rtcm_msgs/msg/Message`)
 
-Those messages are encoded into SiK frames and forwarded to the rover side.
+Those messages are encoded into XBEE frames and forwarded to the rover side.
 
 This module is named "topic relay" intentionally to avoid confusion with the
 separate websocket-based `rosbridge` ecosystem.

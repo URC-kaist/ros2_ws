@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSikGateway } from '../hooks/useSikGateway'
+import { useXbeeGateway } from '../hooks/useXbeeGateway'
 import './ArmServoCard.css'
 
 type GamepadInfo = { index: number; id: string }
@@ -11,7 +11,7 @@ const CMD_PERIOD_MS = 50
 const GRIPPER_RATE_PER_SEC = 0.08
 
 const ArmServoCard = () => {
-  const { gateway } = useSikGateway()
+  const { gateway } = useXbeeGateway()
   const [gamepads, setGamepads] = useState<GamepadInfo[]>([])
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [connected, setConnected] = useState(false) // gamepad present

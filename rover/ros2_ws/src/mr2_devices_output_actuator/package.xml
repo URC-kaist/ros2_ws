@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>mr2_devices_gripper_motor</name>
+  <name>mr2_devices_output_actuator</name>
   <version>0.0.0</version>
-  <description>CAN gripper motor device plugin speaking the steering centi-degree protocol.</description>
+  <description>CAN output actuator device plugin for the unified MR2 motor firmware.</description>
   <maintainer email="gmmyung@kaist.ac.kr">mr2</maintainer>
   <license>MIT</license>
 

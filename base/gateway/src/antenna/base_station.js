@@ -13,7 +13,7 @@ const CMD_ACK = 0x80
 const CMD_DONE = 0x81
 const CMD_ERROR = 0x82
 
-// The antenna controller uses a compact framed protocol unrelated to the SiK
+// The antenna controller uses a compact framed protocol unrelated to the XBEE
 // radio framing used elsewhere in the gateway.
 function crc16CcittFalse(buffer) {
   let crc = 0xffff

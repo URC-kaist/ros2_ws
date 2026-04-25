@@ -1,4 +1,4 @@
-import type { BaseStatus } from '../lib/sikGateway'
+import type { BaseStatus } from '../lib/xbeeGateway'
 import {
   formatKey,
   formatValue,

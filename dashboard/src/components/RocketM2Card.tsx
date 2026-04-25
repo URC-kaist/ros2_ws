@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSikGateway } from '../hooks/useSikGateway'
-import { type RocketM2Status } from '../lib/sikGateway'
+import { useXbeeGateway } from '../hooks/useXbeeGateway'
+import { type RocketM2Status } from '../lib/xbeeGateway'
 import './RocketM2Card.css'
 
 const STALE_MS = 15000
@@ -22,7 +22,7 @@ const formatChain = (values: number[] | null | undefined, idx: number) => {
 }
 
 const RocketM2Card = () => {
-  const { gateway } = useSikGateway()
+  const { gateway } = useXbeeGateway()
   const [status, setStatus] = useState<RocketM2Status | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
 

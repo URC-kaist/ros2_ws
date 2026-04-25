@@ -14,7 +14,7 @@ const MsgId = {
   BASE_RTCM_FRAG: 0x32,
 }
 
-// SiK payloads use a small custom binary frame: magic, message id, payload
+// XBEE payloads use a small custom binary frame: magic, message id, payload
 // length, sequence number, payload, then CRC16.
 const MAGIC = 0xa5
 

@@ -1,0 +1,8 @@
+<library path="output_actuator_device">
+  <class
+    name="mr2_devices_output_actuator/OutputActuatorDevice"
+    type="mr2_devices_output_actuator::OutputActuatorDevice"
+    base_class_type="CanDevice">
+    <description>Unified output actuator CAN device for angle and velocity firmware modes.</description>
+  </class>
+</library>

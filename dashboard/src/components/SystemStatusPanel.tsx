@@ -19,7 +19,7 @@ const SystemStatusPanel = () => {
       <RocketM2Card />
       <article className="card">
         <h3>Link Budget</h3>
-        <p>SiK telemetry strength and latency.</p>
+        <p>XBEE telemetry strength and latency.</p>
         <div className="status-list">
           <div className="status-item">
             <span>RSSI</span>

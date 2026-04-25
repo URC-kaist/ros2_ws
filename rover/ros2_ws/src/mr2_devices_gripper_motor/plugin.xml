@@ -1,8 +1,0 @@
-<library path="gripper_motor_device">
-  <class
-    name="mr2_devices_gripper_motor/GripperMotorDevice"
-    type="mr2_devices_gripper_motor::GripperMotorDevice"
-    base_class_type="CanDevice">
-    <description>Gripper motor CAN device (position command, position feedback) using centi-degree steering protocol.</description>
-  </class>
-</library>

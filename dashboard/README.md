@@ -4,7 +4,7 @@ The dashboard is the browser frontend for MR2 base-station operations. It is a
 Vite + React + TypeScript application that combines:
 
 - `rosbridge` for ROS topics and services
-- the MR2 base gateway for SiK telemetry, mission control, antenna status,
+- the MR2 base gateway for XBEE telemetry, mission control, antenna status,
   Rocket M2 status, and browser video delivery
 
 ## Runtime Model
@@ -22,7 +22,7 @@ If no explicit environment overrides are provided, the dashboard assumes it is
 served behind the same host that proxies:
 
 - `/rosbridge-ws`
-- `/sik-ws`
+- `/xbee-ws`
 - `/video-ws`
 - `/video/streams`
 
@@ -44,8 +44,8 @@ For a simple same-host setup:
 
 1. Leave `VITE_ROSBRIDGE_URL` unset if the browser can reach
    `ws://<host>/rosbridge-ws`.
-2. Leave `VITE_SIK_WS_URL` unset if the browser can reach
-   `ws://<host>/sik-ws`.
+2. Leave `VITE_XBEE_WS_URL` unset if the browser can reach
+   `ws://<host>/xbee-ws`.
 3. Leave `VITE_VIDEO_WS_URL` unset if the browser can reach
    `ws://<host>/video-ws`.
 4. Leave `VITE_VIDEO_STREAMS_URL` unset if the browser can reach
@@ -54,7 +54,7 @@ For a simple same-host setup:
 For a split-host setup:
 
 1. Set `VITE_ROSBRIDGE_URL` to the real rosbridge WebSocket URL.
-2. Set `VITE_SIK_WS_URL` to the real gateway WebSocket URL.
+2. Set `VITE_XBEE_WS_URL` to the real gateway WebSocket URL.
 3. Set `VITE_VIDEO_WS_URL` to the real video WebSocket URL.
 4. Set `VITE_VIDEO_STREAMS_URL` to the real video metadata endpoint URL.
 5. Restart `npm run dev` after changing env files.
@@ -76,7 +76,7 @@ template includes every environment variable currently read by the dashboard.
 | Variable | Purpose | Default if unset |
 | --- | --- | --- |
 | `VITE_ROSBRIDGE_URL` | Full rosbridge WebSocket URL | `ws(s)://<current-host>/rosbridge-ws` |
-| `VITE_SIK_WS_URL` | Full base gateway WebSocket URL | `ws(s)://<current-host>/sik-ws` |
+| `VITE_XBEE_WS_URL` | Full base gateway WebSocket URL | `ws(s)://<current-host>/xbee-ws` |
 | `VITE_VIDEO_WS_URL` | Full video WebSocket URL | `ws(s)://<current-host>/video-ws` |
 | `VITE_VIDEO_STREAMS_URL` | Video metadata endpoint | `http(s)://<current-origin>/video/streams` |
 
@@ -130,7 +130,7 @@ vendored browser asset under `public/vendor/uplot/`.
 ### Gateway Transport
 
 The base gateway WebSocket client is implemented in
-[`dashboard/src/lib/sikGateway.ts`](/home/gmmyung/mr2-stack/dashboard/src/lib/sikGateway.ts).
+[`dashboard/src/lib/xbeeGateway.ts`](/home/gmmyung/mr2-stack/dashboard/src/lib/xbeeGateway.ts).
 It owns:
 
 - rover telemetry (`telem_nav`, `telem_battery`)

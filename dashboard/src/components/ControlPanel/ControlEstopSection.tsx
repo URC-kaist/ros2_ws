@@ -1,8 +1,8 @@
-import { useSikGateway } from '../../hooks/useSikGateway'
+import { useXbeeGateway } from '../../hooks/useXbeeGateway'
 import './ControlEstopSection.css'
 
 const ControlEstopSection = () => {
-  const { gateway } = useSikGateway()
+  const { gateway } = useXbeeGateway()
 
   const handleEstop = () => {
     gateway.sendMissionControl({

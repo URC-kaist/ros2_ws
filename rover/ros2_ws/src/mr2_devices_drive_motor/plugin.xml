@@ -1,8 +1,0 @@
-<library path="drive_motor_device">
-  <class
-    name="mr2_devices_drive_motor/DriveMotorDevice"
-    type="mr2_devices_drive_motor::DriveMotorDevice"
-    base_class_type="CanDevice">
-    <description>Drive motor CAN device (0x200+id velocity command, 0x400+id velocity feedback, milli-rad/s at output shaft).</description>
-  </class>
-</library>

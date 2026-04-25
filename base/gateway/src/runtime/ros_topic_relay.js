@@ -1,8 +1,8 @@
 'use strict'
 
-const { encodeBaseRtcm, encodeBaseSvin } = require('../protocol/sik')
+const { encodeBaseRtcm, encodeBaseSvin } = require('../protocol/xbee')
 
-// Relay selected base-station ROS topics over SiK. This module is optional at
+// Relay selected base-station ROS topics over XBEE. This module is optional at
 // runtime so the gateway can still start on hosts without ROS installed.
 async function startRosTopicRelay(options = {}) {
   const nextSeq = options.nextSeq
@@ -48,7 +48,7 @@ async function startRosTopicRelay(options = {}) {
         onBaseSurveyIn(msg)
       }
       const nowMs = Date.now()
-      // Survey-in can update quickly; cap transmit rate to keep SiK bandwidth
+      // Survey-in can update quickly; cap transmit rate to keep XBEE bandwidth
       // available for higher-value traffic.
       if (nowMs - lastSvinTxMs < 500) return
       lastSvinTxMs = nowMs
@@ -80,7 +80,7 @@ async function startRosTopicRelay(options = {}) {
   })
 
   rclnodejs.spin(rosNode)
-  log('ROS topic relay started (SVIN + RTCM over SiK)')
+  log('ROS topic relay started (SVIN + RTCM over XBEE)')
 
   return {
     async stop() {

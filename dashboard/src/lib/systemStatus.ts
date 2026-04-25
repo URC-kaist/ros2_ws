@@ -1,5 +1,5 @@
 import type { DiagnosticKeyValue, PackTelemetry } from './rosMessages'
-import type { BaseStatus } from './sikGateway'
+import type { BaseStatus } from './xbeeGateway'
 
 export type TopicSpec = {
   id: string

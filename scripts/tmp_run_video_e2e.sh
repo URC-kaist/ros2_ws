@@ -12,8 +12,8 @@ V4L2_STREAM_ID="loopback_cam"
 V4L2_VIDEO_NR="${V4L2_VIDEO_NR:-30}"
 V4L2_DEVICE="/dev/video${V4L2_VIDEO_NR}"
 
-SIK_A="${TMP_DIR}/sik_a"
-SIK_B="${TMP_DIR}/sik_b"
+XBEE_A="${TMP_DIR}/xbee_a"
+XBEE_B="${TMP_DIR}/xbee_b"
 VIDEO_CONFIG="${TMP_DIR}/video_streams.json"
 VIEWER_HTML="${TMP_DIR}/index.html"
 VIEWER_PROXY_JS="${TMP_DIR}/viewer_proxy.js"
@@ -698,13 +698,13 @@ wait_for_http() {
   return 1
 }
 
-rm -f "${SIK_A}" "${SIK_B}"
+rm -f "${XBEE_A}" "${XBEE_B}"
 
 sudo -n modprobe v4l2loopback devices=1 video_nr="${V4L2_VIDEO_NR}" card_label=codex-loopback exclusive_caps=1
 LOOPBACK_LOADED=1
 sleep 1
 
-start_bg socat -d -d pty,raw,echo=0,link="${SIK_A}" pty,raw,echo=0,link="${SIK_B}"
+start_bg socat -d -d pty,raw,echo=0,link="${XBEE_A}" pty,raw,echo=0,link="${XBEE_B}"
 sleep 1
 
 start_bg gst-launch-1.0 -q \
@@ -723,7 +723,7 @@ start_bg bash -lc "
   source /opt/ros/humble/setup.bash &&
   source '${ROOT_DIR}/rover/ros2_ws/install/setup.bash' &&
   cd '${ROOT_DIR}/base/gateway' &&
-  npm start -- --device '${SIK_A}' --baud 57600 --host '${BIND_HOST}' --port '${GATEWAY_PORT}' --video-config '${VIDEO_CONFIG}' --video-jitter-ms 0
+  npm start -- --device '${XBEE_A}' --baud 57600 --host '${BIND_HOST}' --port '${GATEWAY_PORT}' --video-config '${VIDEO_CONFIG}' --video-jitter-ms 0
 "
 
 wait_for_http "http://127.0.0.1:${GATEWAY_PORT}/video/streams"

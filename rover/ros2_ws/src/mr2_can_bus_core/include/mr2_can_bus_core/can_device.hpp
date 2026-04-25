@@ -22,6 +22,12 @@ public:
                          rclcpp::Node *node) = 0;
 
   /**
+   * Optional lifecycle hooks called by the owning SystemInterface.
+   */
+  virtual bool on_activate() { return true; }
+  virtual void on_deactivate() {}
+
+  /**
    * Called once per controller update cycle – typically send a CAN command.
    */
   virtual void process(const rclcpp::Time &now) = 0;

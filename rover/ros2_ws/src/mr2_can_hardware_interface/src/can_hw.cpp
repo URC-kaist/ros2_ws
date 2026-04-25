@@ -414,12 +414,21 @@ public:
         joint.command = 0.0;
       }
     }
+    for (auto &dev : devs_) {
+      if (!dev->on_activate()) {
+        RCLCPP_ERROR(node_->get_logger(), "CAN device activation failed");
+        return CallbackReturn::ERROR;
+      }
+    }
     return CallbackReturn::SUCCESS;
   }
 
   CallbackReturn
   on_deactivate(const rclcpp_lifecycle::State &previous_state) override {
     (void)previous_state;
+    for (auto &dev : devs_) {
+      dev->on_deactivate();
+    }
     return CallbackReturn::SUCCESS;
   }
 

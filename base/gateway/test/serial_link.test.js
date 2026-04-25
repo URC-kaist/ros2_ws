@@ -4,8 +4,8 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const { EventEmitter } = require('events')
 
-const { encodeFrame, MsgId } = require('../src/protocol/sik')
-const { SikSerialLink } = require('../src/runtime/serial_link')
+const { encodeFrame, MsgId } = require('../src/protocol/xbee')
+const { XbeeSerialLink } = require('../src/runtime/serial_link')
 
 class FakeSerialPort extends EventEmitter {
   constructor(options) {
@@ -24,8 +24,8 @@ class FakeSerialPort extends EventEmitter {
   }
 }
 
-test('SikSerialLink emits decoded frames and tracks writes', () => {
-  const link = new SikSerialLink({
+test('XbeeSerialLink emits decoded frames and tracks writes', () => {
+  const link = new XbeeSerialLink({
     device: '/tmp/fake',
     baud: 57600,
     SerialPortImpl: FakeSerialPort,
@@ -54,8 +54,8 @@ test('SikSerialLink emits decoded frames and tracks writes', () => {
   assert.equal(link.port, null)
 })
 
-test('SikSerialLink refuses writes before open', () => {
-  const link = new SikSerialLink({
+test('XbeeSerialLink refuses writes before open', () => {
+  const link = new XbeeSerialLink({
     device: '/tmp/fake',
     baud: 57600,
     SerialPortImpl: FakeSerialPort,

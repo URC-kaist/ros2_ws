@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { useRosBridge } from '../hooks/useRosBridge'
-import { useSikGateway } from '../hooks/useSikGateway'
+import { useXbeeGateway } from '../hooks/useXbeeGateway'
 import {
   createMissionSpec,
   csvToMissionList,
@@ -49,7 +49,7 @@ const MissionMasterPanel = ({
   onMissionPreview,
 }: MissionMasterPanelProps) => {
   const { ros, connected: rosConnected } = useRosBridge()
-  const { gateway } = useSikGateway()
+  const { gateway } = useXbeeGateway()
   const [clearCostmap, setClearCostmap] = useState(false)
   const [missionId, setMissionId] = useState('0')
   const [status, setStatus] = useState<MissionStatusMsg | null>(null)
@@ -391,7 +391,7 @@ const MissionMasterPanel = ({
                   </button>
                 ))}
               </div>
-              <span className="mission-master__note">Send via SiK</span>
+              <span className="mission-master__note">Send via XBEE</span>
             </div>
           </section>
 

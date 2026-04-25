@@ -27,7 +27,7 @@ source install/setup.bash
 # General entry
 ros2 launch mr2_launch rover_sim.launch.py
 
-ros2 launch mr2_launch rover_real.launch.py enable_manipulator_module:=false enable_sik_sim:=false
+ros2 launch mr2_launch rover_real.launch.py enable_manipulator_module:=false enable_xbee_sim:=false
 
 # Autonomous mission entry
 # You MUST ensure that EVERYTHING is brought up by rover.launch.py beforehand.
@@ -48,10 +48,10 @@ Please install Node.js and npm!
 # Refer to "Nginx host mapping"
 . deploy_dashboard.bash 2> dashboard_err.log
 
-# Base station SIK interface:
+# Base station XBEE interface:
 # under base/gateway/
 # run `npm install` to install dependencies
-npm start -- --device /tmp/sik_sim1 --baud 57600 --port 8081
+npm start -- --device /tmp/xbee_sim1 --baud 57600 --port 8081
 ```
 
 Nginx host mapping (for upstream like `mr2-ubuntu.local`):
@@ -142,7 +142,7 @@ ros2 topic pub -1 /mission_list mr2_action_interface/msg/MissionList "{
 }"
 ```
 
-Pause (optionally clear costmaps), resume, abort: (Sent via Sik!)
+Pause (optionally clear costmaps), resume, abort: (Sent via XBEE!)
 ```bash
 ros2 topic pub -1 /mission_control mr2_action_interface/msg/MissionControl "{command: 1, clear_costmap: true, mission_id: 0}"
 ros2 topic pub -1 /mission_control mr2_action_interface/msg/MissionControl "{command: 2, clear_costmap: false, mission_id: 0}"

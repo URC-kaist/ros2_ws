@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRosBridge } from './useRosBridge'
-import { useSikGateway } from './useSikGateway'
+import { useXbeeGateway } from './useXbeeGateway'
 import type { DiagnosticArray, PackTelemetry } from '../lib/rosMessages'
-import type { BaseStatus } from '../lib/sikGateway'
+import type { BaseStatus } from '../lib/xbeeGateway'
 import {
   BATTERY_SPECS,
   BATTERY_TOPICS,
@@ -16,7 +16,7 @@ import {
 
 export const useSystemStatusCards = () => {
   const { ros } = useRosBridge()
-  const { gateway } = useSikGateway()
+  const { gateway } = useXbeeGateway()
   const [snapshots, setSnapshots] = useState<Record<string, StatusSnapshot | null>>({})
   const [baseStatus, setBaseStatus] = useState<BaseStatus | null>(null)
   const [baseStatusUpdatedAt, setBaseStatusUpdatedAt] = useState<number | null>(null)

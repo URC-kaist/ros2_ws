@@ -1,8 +1,0 @@
-<library path="steering_servo_device">
-  <class
-    name="mr2_devices_steering_servo/SteeringServoDevice"
-    type="mr2_devices_steering_servo::SteeringServoDevice"
-    base_class_type="CanDevice">
-    <description>Steering servo CAN device (position command, position feedback).</description>
-  </class>
-</library>

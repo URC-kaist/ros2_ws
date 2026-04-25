@@ -11,7 +11,7 @@ const {
   encodeBaseRtcm,
   encodeCmdDrive,
   encodeFrame,
-} = require('../src/protocol/sik')
+} = require('../src/protocol/xbee')
 
 test('encodeCmdDrive emits a decodable drive frame', () => {
   const nextSeq = createSequencer()

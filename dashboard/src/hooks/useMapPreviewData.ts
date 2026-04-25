@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRosBridge } from './useRosBridge'
-import { useSikGateway } from './useSikGateway'
+import { useXbeeGateway } from './useXbeeGateway'
 import {
   appendTrailPoint,
   convertGeoPath,
@@ -15,7 +15,7 @@ import type { GeoPathMsg, PoseStamped, ToLLRequest, ToLLResponse } from '../lib/
 
 export const useMapPreviewData = () => {
   const { ros, connected: rosConnected } = useRosBridge()
-  const { gateway } = useSikGateway()
+  const { gateway } = useXbeeGateway()
   const [fix, setFix] = useState<MapCoordinate | null>(null)
   const [headingDeg, setHeadingDeg] = useState<number | null>(null)
   const [cov, setCov] = useState<NavCovariance | null>(null)

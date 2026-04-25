@@ -9,7 +9,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
   const config = parseGatewayConfig(
     [
       '--device',
-      '/tmp/sik0',
+      '/tmp/xbee0',
       '--baud',
       '115200',
       '--heartbeat-hz',
@@ -28,10 +28,10 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       '2222',
     ],
     {
-      SIK_DEVICE: '/tmp/ignored',
-      SIK_BAUD: '9600',
-      SIK_WS_HOST: '127.0.0.1',
-      SIK_HEARTBEAT_HZ: '2',
+      XBEE_DEVICE: '/tmp/ignored',
+      XBEE_BAUD: '9600',
+      XBEE_WS_HOST: '127.0.0.1',
+      XBEE_HEARTBEAT_HZ: '2',
       BASE_ANTENNA_ENABLE: 'false',
       ROCKET_M2_ENABLE: 'false',
       VIDEO_CONFIG_PATH: '/tmp/ignored_video_streams.json',
@@ -40,7 +40,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
     }
   )
 
-  assert.equal(config.device, '/tmp/sik0')
+  assert.equal(config.device, '/tmp/xbee0')
   assert.equal(config.baud, 115200)
   assert.equal(config.host, '0.0.0.0')
   assert.equal(config.heartbeatHz, 5)
@@ -56,7 +56,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
 test('parseGatewayConfig falls back to defaults when values are absent', () => {
   const config = parseGatewayConfig([], {})
 
-  assert.equal(config.device, '/dev/ttySIK')
+  assert.equal(config.device, '/dev/ttyXBEE')
   assert.equal(config.host, '0.0.0.0')
   assert.equal(config.port, 8081)
   assert.equal(config.linkTimeoutMs, 2000)

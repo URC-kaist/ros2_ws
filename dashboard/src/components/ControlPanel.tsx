@@ -3,7 +3,7 @@ import ControlEstopSection from './ControlPanel/ControlEstopSection'
 import ControlPanelHeader from './ControlPanel/ControlPanelHeader'
 import ControlStatusList from './ControlPanel/ControlStatusList'
 import ControlVectorPlot, { type CmdVel } from './ControlPanel/ControlVectorPlot'
-import { useSikGateway } from '../hooks/useSikGateway'
+import { useXbeeGateway } from '../hooks/useXbeeGateway'
 import './ControlPanel/ControlPanel.css'
 
 const sensitivityScale = {
@@ -15,7 +15,7 @@ const sensitivityScale = {
 const RADIUS = 0.57725 // meters
 
 const ControlPanel = () => {
-  const { gateway } = useSikGateway()
+  const { gateway } = useXbeeGateway()
   const cmdVelRef = useRef<CmdVel>({ x: 0, y: 0, yaw: 0 })
   const [sensitivity, setSensitivity] = useState<'low' | 'med' | 'high'>('med')
   const [cmdVel, setCmdVel] = useState<CmdVel>({ x: 0, y: 0, yaw: 0 })

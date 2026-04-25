@@ -15,11 +15,11 @@ const {
   encodeCmdDrive,
   encodeHeartbeat,
   encodeMissionControl,
-} = require('../protocol/sik')
+} = require('../protocol/xbee')
 const { createGatewayHttpHandler } = require('../runtime/http_handlers')
 const { RocketM2Client } = require('../runtime/rocket_m2_client')
 const { startRosTopicRelay } = require('../runtime/ros_topic_relay')
-const { SikSerialLink } = require('../runtime/serial_link')
+const { XbeeSerialLink } = require('../runtime/serial_link')
 const { createWsRouteRegistry } = require('../runtime/ws_route_registry')
 const { createWsHub } = require('../runtime/ws_hub')
 const { createVideoGateway } = require('../video/service')
@@ -34,7 +34,7 @@ function createGatewayApp(options = {}) {
   const videoConfig = loadVideoConfig(config.videoConfigPath)
 
   const nextSeq = createSequencer()
-  const serialLink = new SikSerialLink({
+  const serialLink = new XbeeSerialLink({
     device: config.device,
     baud: config.baud,
     log,
@@ -69,7 +69,7 @@ function createGatewayApp(options = {}) {
   const routeRegistry = createWsRouteRegistry({ server })
 
   const wsHub = createWsHub({
-    path: '/sik-ws',
+    path: '/xbee-ws',
     routeRegistry,
     onMessage: handleDashboardMessage,
     getInitialMessages: () => {

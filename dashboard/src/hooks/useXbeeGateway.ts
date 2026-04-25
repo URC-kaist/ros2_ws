@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { getSikGatewayClient } from '../lib/sikGateway'
+import { getXbeeGatewayClient } from '../lib/xbeeGateway'
 
-export const useSikGateway = () => {
-  const gateway = getSikGatewayClient()
+export const useXbeeGateway = () => {
+  const gateway = getXbeeGatewayClient()
   const [connected, setConnected] = useState(() => gateway.isConnected())
 
   useEffect(() => {

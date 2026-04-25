@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRosBridge } from '../../hooks/useRosBridge'
-import { useSikGateway } from '../../hooks/useSikGateway'
+import { useXbeeGateway } from '../../hooks/useXbeeGateway'
 import type { MissionStatusMsg, UBXNavStatus } from '../../lib/rosMessages'
-import { type LinkStatus, type TelemBattery } from '../../lib/sikGateway'
+import { type LinkStatus, type TelemBattery } from '../../lib/xbeeGateway'
 import './ControlStatusList.css'
 
 type GnssSideId = 'left' | 'right'
@@ -47,7 +47,7 @@ const formatFixOk = (fixOk?: boolean) => {
 
 const ControlStatusList = () => {
   const { ros: rosBridge, connected: rosConnected } = useRosBridge()
-  const { gateway, connected: wsConnected } = useSikGateway()
+  const { gateway, connected: wsConnected } = useXbeeGateway()
   const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
   const [missionStatus, setMissionStatus] = useState<MissionStatusMsg | null>(null)
   const [missionStatusAt, setMissionStatusAt] = useState<number | null>(null)
@@ -215,7 +215,7 @@ const ControlStatusList = () => {
         <div className="status-grid-compact">
           <div className="status-grid-label">
             <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
-            SiK Link
+            XBEE Link
           </div>
           <div className="status-grid-label">
             <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />

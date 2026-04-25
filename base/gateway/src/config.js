@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 
 const DEFAULTS = {
-  device: '/dev/ttySIK',
+  device: '/dev/ttyXBEE',
   baud: 57600,
   host: '0.0.0.0',
   port: 8081,
@@ -84,10 +84,10 @@ function toBool(value) {
 // CLI flags override environment variables, which override hard-coded defaults.
 function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
   return {
-    device: getArg(args, '--device') || env.SIK_DEVICE || DEFAULTS.device,
-    baud: toInt(getArg(args, '--baud') || env.SIK_BAUD || DEFAULTS.baud),
-    host: getArg(args, '--host') || env.SIK_WS_HOST || DEFAULTS.host,
-    port: toInt(getArg(args, '--port') || env.SIK_WS_PORT || DEFAULTS.port),
+    device: getArg(args, '--device') || env.XBEE_DEVICE || DEFAULTS.device,
+    baud: toInt(getArg(args, '--baud') || env.XBEE_BAUD || DEFAULTS.baud),
+    host: getArg(args, '--host') || env.XBEE_WS_HOST || DEFAULTS.host,
+    port: toInt(getArg(args, '--port') || env.XBEE_WS_PORT || DEFAULTS.port),
     videoConfigPath:
       getArg(args, '--video-config') || env.VIDEO_CONFIG_PATH || DEFAULTS.videoConfigPath,
     videoGstBinary:
@@ -115,11 +115,11 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
         DEFAULTS.videoClientMaxBufferedBytes
     ),
     heartbeatHz: toFloat(
-      getArg(args, '--heartbeat-hz') || env.SIK_HEARTBEAT_HZ || DEFAULTS.heartbeatHz
+      getArg(args, '--heartbeat-hz') || env.XBEE_HEARTBEAT_HZ || DEFAULTS.heartbeatHz
     ),
     linkTimeoutMs: toInt(
       getArg(args, '--link-timeout-ms') ||
-        env.SIK_LINK_TIMEOUT_MS ||
+        env.XBEE_LINK_TIMEOUT_MS ||
         DEFAULTS.linkTimeoutMs
     ),
     antennaEnable: toBool(

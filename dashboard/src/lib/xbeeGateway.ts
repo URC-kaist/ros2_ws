@@ -121,14 +121,14 @@ type GatewayMessage =
   | RawRocketM2Status
   | ({ type: 'link_status' } & LinkStatus)
 
-const DEFAULT_PATH = '/sik-ws'
+const DEFAULT_PATH = '/xbee-ws'
 const HEARTBEAT_TIMEOUT_MS = 2000
 const HEARTBEAT_POLL_MS = 500
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 5000
 
 const resolveGatewayUrl = () => {
-  const explicit = import.meta.env.VITE_SIK_WS_URL as string | undefined
+  const explicit = import.meta.env.VITE_XBEE_WS_URL as string | undefined
   if (explicit) {
     return explicit
   }
@@ -139,7 +139,7 @@ const resolveGatewayUrl = () => {
   return `${protocol}//${window.location.host}${DEFAULT_PATH}`
 }
 
-class SikGatewayClient {
+class XbeeGatewayClient {
   private ws: WebSocket | null = null
   private connected = false
   private lastRxAt = 0
@@ -399,11 +399,11 @@ class SikGatewayClient {
   }
 }
 
-let singleton: SikGatewayClient | null = null
+let singleton: XbeeGatewayClient | null = null
 
-export const getSikGatewayClient = () => {
+export const getXbeeGatewayClient = () => {
   if (!singleton) {
-    singleton = new SikGatewayClient(resolveGatewayUrl())
+    singleton = new XbeeGatewayClient(resolveGatewayUrl())
   }
   return singleton
 }

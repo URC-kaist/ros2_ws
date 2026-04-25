@@ -7,7 +7,7 @@ function createWsHub(options = {}) {
   const getInitialMessages =
     typeof options.getInitialMessages === 'function' ? options.getInitialMessages : () => []
   const routeRegistry = options.routeRegistry
-  const path = options.path || '/sik-ws'
+  const path = options.path || '/xbee-ws'
   const WebSocketServerImpl = options.WebSocketServerImpl || require('ws').WebSocketServer
 
   if (!routeRegistry || typeof routeRegistry.register !== 'function') {

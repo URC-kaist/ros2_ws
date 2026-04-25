@@ -75,7 +75,7 @@ test('createWsHub sends initial messages, forwards JSON, and broadcasts', () => 
     onMessage: (message) => received.push(message),
   })
 
-  assert.equal(routeRegistry.path, '/sik-ws')
+  assert.equal(routeRegistry.path, '/xbee-ws')
   const client = new FakeClient()
   hub.wss.emit('connection', client)
   hub.wss.clients.add(client)
