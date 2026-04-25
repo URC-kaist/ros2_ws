@@ -61,6 +61,7 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   assert.equal(config.port, 8081)
   assert.equal(config.linkTimeoutMs, 2000)
   assert.equal(config.antennaEnable, false)
+  assert.equal(config.rocketM2Ip, '192.168.1.100')
   assert.match(config.videoConfigPath, /video_streams\.json$/)
   assert.equal(config.videoReceiverRestartMs, 1000)
   assert.equal(config.videoAvailabilityStaleMs, 1500)

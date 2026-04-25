@@ -33,7 +33,7 @@ const DEFAULTS = {
   antennaAllowProvisional: true,
   baseHeadingOffsetDeg: 0,
   rocketM2Enable: false,
-  rocketM2Ip: '',
+  rocketM2Ip: '192.168.1.100',
   rocketM2User: '',
   rocketM2Pass: '',
   rocketM2PollMs: 5000,

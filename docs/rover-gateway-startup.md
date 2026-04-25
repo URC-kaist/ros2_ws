@@ -27,6 +27,12 @@ The gateway currently connects to the emulated XBEE peer:
 /tmp/xbee_sim1
 ```
 
+The gateway targets the base Rocket M2 management address:
+
+```bash
+192.168.1.100
+```
+
 ## Prerequisites
 
 - ROS 2 Humble is installed.

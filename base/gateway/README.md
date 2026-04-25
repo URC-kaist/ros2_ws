@@ -241,7 +241,7 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 | CLI flag | Environment variable | Default |
 | --- | --- | --- |
 | `--rocket-m2-enable` | `ROCKET_M2_ENABLE` | `false` |
-| `--rocket-m2-ip` | `ROCKET_M2_IP` | empty |
+| `--rocket-m2-ip` | `ROCKET_M2_IP` | `192.168.1.100` |
 | `--rocket-m2-user` | `ROCKET_M2_USER` | empty |
 | `--rocket-m2-pass` | `ROCKET_M2_PASS` | empty |
 | `--rocket-m2-poll-ms` | `ROCKET_M2_POLL_MS` | `5000` |
