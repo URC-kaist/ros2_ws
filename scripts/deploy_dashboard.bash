@@ -9,6 +9,7 @@ npm install
 npm run build
 
 sudo mkdir -p /var/www/mr2-dashboard
+sudo mkdir -p /var/www/mr2-tiles
 sudo rsync -a --delete "$repo_root/dashboard/dist/" /var/www/mr2-dashboard/
 
 if ! command -v nginx >/dev/null 2>&1; then
