@@ -1,6 +1,8 @@
 sik_gateway/node_modules
 base_gateway/node_modules
 base_gateway/.env.local
+.codex
+**/.codex
 
 /.vscode
 base/gateway/node_modules

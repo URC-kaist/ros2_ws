@@ -3,6 +3,8 @@
 ### Docs
 
 - [docs/README.md](docs/README.md): top-level documentation index
+- [docs/rover-gateway-startup.md](docs/rover-gateway-startup.md): hardware
+  rover launch and base gateway startup helper
 - [docs/video-pipeline.md](docs/video-pipeline.md): rover-to-base-to-browser
   video transport, framing, and bootstrap behavior
 
@@ -52,6 +54,9 @@ Please install Node.js and npm!
 # under base/gateway/
 # run `npm install` to install dependencies
 npm start -- --device /tmp/xbee_sim1 --baud 57600 --port 8081
+
+# Hardware rover + base gateway helper:
+./rover/ros2_ws/scripts/start_rover_gateway.bash
 ```
 
 Nginx host mapping (for upstream like `mr2-ubuntu.local`):

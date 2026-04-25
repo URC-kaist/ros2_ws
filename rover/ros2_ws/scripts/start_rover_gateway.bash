@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# -------- config (EDIT THESE) --------
-# Where your repo root is (so relative cd works)
+# Start the rover ROS launch and base gateway in detached screen sessions.
+# Override these with environment variables when the repo or ROS install lives
+# somewhere else:
+#   REPO_ROOT=/path/to/mr2-stack
+#   ROS_SETUP=/opt/ros/humble/setup.bash
+#   WS_SETUP=/path/to/ros2_ws/install/setup.bash
 REPO_ROOT="${REPO_ROOT:-$HOME/mr2-stack}"
-
-# ROS 2 environment(s) to source
 ROS_SETUP="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
 WS_SETUP="${WS_SETUP:-$REPO_ROOT/rover/ros2_ws/install/setup.bash}"
-# -------------------------------------
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Missing command: $1" >&2; exit 1; }; }
 need_cmd screen
