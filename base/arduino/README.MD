@@ -135,6 +135,7 @@ NOTE: Below examples show the “format” only; actual CRC must be computed usi
 
 ## 8) Tunable Firmware Constants (arduino.ino)
 - `HOME_DIR` = `1` (+1 / -1): homing direction sign.
+- `HOME_ACTIVE_LEVEL` = `HIGH`: installed home switch active state.
 - `HOME_PWM_FAST` = `60`, `HOME_PWM_SLOW` = `40`: PWM values used during homing search/backoff/approach/release.
 - `BACKOFF_COUNTS` = `80`, `HOME_RELEASE_COUNTS` = `120`: encoder counts for backoff and release distances.
 - `HOME_OFFSET_COUNTS` = `(0.15 rad)` converted to counts: position assigned when the switch first triggers.

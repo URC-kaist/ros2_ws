@@ -19,10 +19,11 @@ constexpr uint8_t PIN_PWM  = 5;
 constexpr uint8_t PIN_DIR  = 4;
 constexpr uint8_t ENC_A    = 2;
 constexpr uint8_t ENC_B    = 3;
-constexpr uint8_t HOME_PIN = 7;               // switch to GND + INPUT_PULLUP
+constexpr uint8_t HOME_PIN = 7;               // switch input + INPUT_PULLUP
 
-// With INPUT_PULLUP and a switch to GND, a triggered switch reads LOW.
-constexpr uint8_t HOME_ACTIVE_LEVEL = LOW;
+// The installed base-station home switch is wired active-high, so a triggered
+// switch reads HIGH. Flip this to LOW for a switch-to-GND INPUT_PULLUP setup.
+constexpr uint8_t HOME_ACTIVE_LEVEL = HIGH;
 
 // ---------------------- Encoder ----------------------
 constexpr long COUNTS_PER_REV = 3614;          // output shaft counts per revolution
