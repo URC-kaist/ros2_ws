@@ -134,7 +134,7 @@ def generate_launch_description():
     )
     video_base_host_arg = DeclareLaunchArgument(
         "video_base_host",
-        default_value="127.0.0.1",
+        default_value="192.168.1.101",
         description="Base-station host/IP for rover RTP/UDP video streams",
     )
     video_config_arg = DeclareLaunchArgument(

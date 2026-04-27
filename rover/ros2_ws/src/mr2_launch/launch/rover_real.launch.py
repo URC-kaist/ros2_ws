@@ -98,7 +98,7 @@ def generate_launch_description():
     )
     video_base_host_arg = DeclareLaunchArgument(
         "video_base_host",
-        default_value="127.0.0.1",
+        default_value="192.168.1.101",
         description="Base-station host/IP for rover RTP/UDP video streams",
     )
     video_config_arg = DeclareLaunchArgument(
@@ -262,19 +262,6 @@ def generate_launch_description():
         }.items(),
         condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
     )
-    video_streaming_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("mr2_launch"), "launch", "video_streaming.launch.py"]
-            )
-        ),
-        launch_arguments={
-            "video_config": LaunchConfiguration("video_config"),
-            "video_base_host": LaunchConfiguration("video_base_host"),
-        }.items(),
-        condition=IfCondition(LaunchConfiguration("enable_video_streaming")),
-    )
-
     traversability_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -328,6 +315,9 @@ def generate_launch_description():
             "enable_aruco": LaunchConfiguration("enable_autonomous_module"),
             "aruco_cam_topic": "/front_camera/image_raw",
             "enable_yolo": LaunchConfiguration("enable_yolo"),
+            "enable_video_streaming": LaunchConfiguration("enable_video_streaming"),
+            "video_base_host": LaunchConfiguration("video_base_host"),
+            "video_config": LaunchConfiguration("video_config"),
             "yolo_cam_topic": LaunchConfiguration("yolo_cam_topic"),
         }.items(),
     )
@@ -531,7 +521,6 @@ def generate_launch_description():
             xbee_sim_launch,
             realsense_launch,
             front_uvc_launch,
-            video_streaming_launch,
             # traversability_launch, # launched by navigation.launch.py
             ntrip_client_launch,
             rover_launch,
