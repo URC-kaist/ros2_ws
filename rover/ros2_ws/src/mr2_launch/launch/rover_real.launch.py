@@ -11,9 +11,12 @@ from launch.substitutions import (
 )
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from mr2_launch.env import load_mr2_env
 
 
 def generate_launch_description():
+    load_mr2_env(required=["MR2_BASE_IP"])
+
     # Optional manual datum setter for navsat_transform if base survey-in message
     # is not available on the rover network. Disabled by default.
     set_manual_datum_arg = DeclareLaunchArgument(

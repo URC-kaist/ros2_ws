@@ -15,9 +15,12 @@ from launch.substitutions import (
 from launch_ros.actions import Node, SetParameter
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+from mr2_launch.env import load_mr2_env
 
 
 def generate_launch_description():
+    load_mr2_env(required=["MR2_BASE_IP"])
+
     # ─── Arguments ───────────────────────────────────────────────────────────────
     default_rviz = PathJoinSubstitution([
         FindPackageShare("mr2_launch"),

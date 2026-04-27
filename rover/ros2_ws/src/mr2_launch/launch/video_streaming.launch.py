@@ -3,9 +3,12 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from mr2_launch.env import load_mr2_env
 
 
 def generate_launch_description():
+    load_mr2_env(required=["MR2_BASE_IP"])
+
     video_config_arg = DeclareLaunchArgument(
         "video_config",
         default_value=PathJoinSubstitution(

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <set>
@@ -821,7 +822,61 @@ class VideoStreamingNode : public rclcpp::Node {
     if (env_base_ip != nullptr && env_base_ip[0] != '\0') {
       return env_base_ip;
     }
+    const auto env_file_base_ip = read_env_file_value("MR2_BASE_IP");
+    if (!env_file_base_ip.empty()) {
+      return env_file_base_ip;
+    }
     throw std::runtime_error("MR2_BASE_IP environment variable is required");
+  }
+
+  static std::string read_env_file_value(const std::string & name) {
+    std::error_code ec;
+    auto directory = std::filesystem::current_path(ec);
+    if (ec) {
+      return "";
+    }
+
+    while (true) {
+      const auto env_path = directory / ".env";
+      if (std::filesystem::is_regular_file(env_path, ec)) {
+        std::ifstream input(env_path);
+        std::string line;
+        while (std::getline(input, line)) {
+          const auto first = line.find_first_not_of(" \t");
+          if (first == std::string::npos || line[first] == '#') {
+            continue;
+          }
+          const auto equals = line.find('=', first);
+          if (equals == std::string::npos) {
+            continue;
+          }
+          const auto key_end = line.find_last_not_of(" \t", equals - 1);
+          const auto key = line.substr(first, key_end - first + 1);
+          if (key != name) {
+            continue;
+          }
+          const auto value_start = line.find_first_not_of(" \t", equals + 1);
+          if (value_start == std::string::npos) {
+            return "";
+          }
+          const auto value_end = line.find_last_not_of(" \t\r");
+          auto value = line.substr(value_start, value_end - value_start + 1);
+          if (value.size() >= 2 &&
+              ((value.front() == '"' && value.back() == '"') ||
+               (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+          }
+          return value;
+        }
+      }
+
+      const auto parent = directory.parent_path();
+      if (parent == directory) {
+        break;
+      }
+      directory = parent;
+    }
+    return "";
   }
 
   std::string video_config_path_;
