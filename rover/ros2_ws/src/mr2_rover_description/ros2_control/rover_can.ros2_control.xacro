@@ -14,10 +14,12 @@
         <state_interface name="position"/>
         <param name="actuator">steering_fl</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">2</param>
+        <param name="node_id">3</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">angle</param>
         <param name="desired_profile">As5600</param>
+        <param name="expected_output_min_deg">-120.0</param>
+        <param name="expected_output_max_deg">120.0</param>
         <param name="auto_arm">true</param>
       </joint>
 
@@ -26,10 +28,12 @@
         <state_interface name="position"/>
         <param name="actuator">steering_fr</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">3</param>
+        <param name="node_id">1</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">angle</param>
         <param name="desired_profile">As5600</param>
+        <param name="expected_output_min_deg">-120.0</param>
+        <param name="expected_output_max_deg">120.0</param>
         <param name="auto_arm">true</param>
       </joint>
 
@@ -42,6 +46,8 @@
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">angle</param>
         <param name="desired_profile">As5600</param>
+        <param name="expected_output_min_deg">-120.0</param>
+        <param name="expected_output_max_deg">120.0</param>
         <param name="auto_arm">true</param>
       </joint>
 
@@ -50,10 +56,12 @@
         <state_interface name="position"/>
         <param name="actuator">steering_rr</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">1</param>
+        <param name="node_id">2</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">angle</param>
         <param name="desired_profile">As5600</param>
+        <param name="expected_output_min_deg">-120.0</param>
+        <param name="expected_output_max_deg">120.0</param>
         <param name="auto_arm">true</param>
       </joint>
 
@@ -63,7 +71,7 @@
         <state_interface name="velocity"/>
         <param name="actuator">drive_fl</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">18</param>
+        <param name="node_id">7</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">velocity</param>
         <param name="desired_profile">VelocityOnly</param>
@@ -76,7 +84,7 @@
         <state_interface name="velocity"/>
         <param name="actuator">drive_fr</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">19</param>
+        <param name="node_id">5</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">velocity</param>
         <param name="desired_profile">VelocityOnly</param>
@@ -89,7 +97,7 @@
         <state_interface name="velocity"/>
         <param name="actuator">drive_rl</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">20</param>
+        <param name="node_id">8</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">velocity</param>
         <param name="desired_profile">VelocityOnly</param>
@@ -102,7 +110,7 @@
         <state_interface name="velocity"/>
         <param name="actuator">drive_rr</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">17</param>
+        <param name="node_id">6</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">velocity</param>
         <param name="desired_profile">VelocityOnly</param>
@@ -200,7 +208,7 @@
         <state_interface name="position"/>
         <param name="actuator">gripper_motor</param>
         <param name="device_plugin">mr2_devices_output_actuator/OutputActuatorDevice</param>
-        <param name="node_id">7</param>
+        <param name="node_id">9</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">angle</param>
         <param name="desired_profile">As5600</param>

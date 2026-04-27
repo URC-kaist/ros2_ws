@@ -1,9 +1,16 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "builtin_interfaces/msg/time.hpp"
 #include "mr2_can_bus_core/can_bus_registry.hpp"
 #include "mr2_can_bus_core/can_device.hpp"
+#include "mr2_devices_output_actuator/msg/actuator_config_status.hpp"
+#include "mr2_devices_output_actuator/msg/output_angle_status.hpp"
+#include "mr2_devices_output_actuator/msg/output_velocity_status.hpp"
+#include "mr2_devices_output_actuator/msg/runtime_diagnostic.hpp"
+#include "mr2_devices_output_actuator/msg/travel_limits_status.hpp"
 #include "pluginlib/class_list_macros.hpp"
-#include "rclcpp/logging.hpp"
 #include "rclcpp/clock.hpp"
+#include "rclcpp/logging.hpp"
+#include "rclcpp/qos.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -12,11 +19,23 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
 
 namespace mr2_devices_output_actuator {
+
+using ActuatorConfigStatusMsg =
+    mr2_devices_output_actuator::msg::ActuatorConfigStatus;
+using OutputAngleStatusMsg =
+    mr2_devices_output_actuator::msg::OutputAngleStatus;
+using OutputVelocityStatusMsg =
+    mr2_devices_output_actuator::msg::OutputVelocityStatus;
+using RuntimeDiagnosticMsg =
+    mr2_devices_output_actuator::msg::RuntimeDiagnostic;
+using TravelLimitsStatusMsg =
+    mr2_devices_output_actuator::msg::TravelLimitsStatus;
 
 namespace {
 
@@ -30,9 +49,13 @@ constexpr uint16_t kProfileCommandBase = 0x220;
 constexpr uint16_t kPowerCommandBase = 0x230;
 constexpr uint16_t kRuntimeDiagBase = 0x5F0;
 constexpr uint32_t kStandardIdMask = 0x7FF;
+constexpr uint16_t kMinReleasedNodeId = 1;
+constexpr uint16_t kMaxReleasedNodeId = 15;
+constexpr uint8_t kRuntimeDiagMagic = 0xFB;
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kRadToDeg = 180.0 / kPi;
 constexpr double kDegToRad = kPi / 180.0;
+constexpr double kAngleToleranceRad = 0.001 * kDegToRad;
 
 enum class CommandChannel { Angle, Velocity };
 
@@ -41,6 +64,11 @@ enum class Profile : uint8_t {
   As5600 = 1,
   TmagLut = 2,
   DirectInput = 3,
+};
+
+enum class ControlMode : uint8_t {
+  OutputAngle = 1,
+  OutputVelocity = 2,
 };
 
 bool parse_bool(const std::string &value) {
@@ -114,6 +142,10 @@ double mdeg_s_to_rad_s(int32_t mdeg_s) {
   return (static_cast<double>(mdeg_s) / 1000.0) * kDegToRad;
 }
 
+bool profile_requires_output_feedback(Profile profile) {
+  return profile != Profile::VelocityOnly;
+}
+
 } // namespace
 
 class OutputActuatorDevice : public CanDevice {
@@ -135,8 +167,9 @@ public:
       throw std::runtime_error("Missing node_id parameter");
     }
     node_id_ = static_cast<uint16_t>(std::stoi(node_id_it->second));
-    if (kRuntimeDiagBase + node_id_ > kStandardIdMask) {
-      throw std::runtime_error("node_id exceeds 11-bit CAN ID space");
+    if (node_id_ < kMinReleasedNodeId || node_id_ > kMaxReleasedNodeId) {
+      throw std::runtime_error(
+          "node_id must be in 1..15 for the NoFW 0x10-spaced frame family");
     }
 
     int bitrate = 1'000'000;
@@ -180,6 +213,30 @@ public:
       activation_timeout_ms_ = std::max(1, std::stoi(timeout_it->second));
     }
 
+    const auto actuator_it = info.parameters.find("actuator");
+    const std::string default_status_topic_base =
+        "output_actuator/" +
+        (actuator_it != info.parameters.end() ? actuator_it->second
+                                              : info.name);
+    const auto status_topic_base_it =
+        info.parameters.find("status_topic_base");
+    status_topic_base_ = status_topic_base_it != info.parameters.end()
+                             ? status_topic_base_it->second
+                             : default_status_topic_base;
+
+    const auto expected_min_it =
+        info.parameters.find("expected_output_min_deg");
+    if (expected_min_it != info.parameters.end()) {
+      expected_output_min_rad_ =
+          std::stod(expected_min_it->second) * kDegToRad;
+    }
+    const auto expected_max_it =
+        info.parameters.find("expected_output_max_deg");
+    if (expected_max_it != info.parameters.end()) {
+      expected_output_max_rad_ =
+          std::stod(expected_max_it->second) * kDegToRad;
+    }
+
     bus_ = CanBusRegistry::get(iface_, bitrate);
     if (!bus_) {
       throw std::runtime_error("Cannot open CAN bus");
@@ -195,6 +252,25 @@ public:
                [this](const can_frame &f) { on_config_status(f); });
     add_filter(bus_, kRuntimeDiagBase + node_id_, kStandardIdMask,
                [this](const can_frame &f) { on_runtime_diag(f); });
+
+    if (node_) {
+      const auto qos = rclcpp::QoS(rclcpp::KeepLast(10));
+      angle_status_pub_ =
+          node_->create_publisher<OutputAngleStatusMsg>(
+              status_topic_base_ + "/angle_status", qos);
+      velocity_status_pub_ =
+          node_->create_publisher<OutputVelocityStatusMsg>(
+              status_topic_base_ + "/velocity_status", qos);
+      travel_limits_status_pub_ =
+          node_->create_publisher<TravelLimitsStatusMsg>(
+              status_topic_base_ + "/travel_limits_status", qos);
+      config_status_pub_ =
+          node_->create_publisher<ActuatorConfigStatusMsg>(
+              status_topic_base_ + "/config_status", qos);
+      runtime_diagnostic_pub_ =
+          node_->create_publisher<RuntimeDiagnosticMsg>(
+              status_topic_base_ + "/runtime_diagnostic", qos);
+    }
 
     last_integrate_time_ns_ = clock_.now().nanoseconds();
   }
@@ -222,10 +298,14 @@ public:
       }
     }
 
-    if (active_profile_.load() != static_cast<uint8_t>(desired_profile_)) {
+    if (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
+        active_profile_.load() != static_cast<uint8_t>(desired_profile_)) {
+      config_status_seen_ = false;
       send_profile_command(desired_profile_);
       if (!wait_for([this] {
             return diag_seen_.load() &&
+                   stored_profile_.load() ==
+                       static_cast<uint8_t>(desired_profile_) &&
                    active_profile_.load() ==
                        static_cast<uint8_t>(desired_profile_);
           },
@@ -236,12 +316,6 @@ public:
       }
     }
 
-    if (need_calibration_.load()) {
-      RCLCPP_ERROR(logger_, "Actuator %u reports calibration required",
-                   node_id_);
-      return false;
-    }
-
     if (require_limits_status_ &&
         !wait_for([this] { return limits_status_seen_.load(); },
                   "limits status")) {
@@ -250,6 +324,12 @@ public:
     if (require_config_status_ &&
         !wait_for([this] { return config_status_seen_.load(); },
                   "config status")) {
+      return false;
+    }
+    if (!validate_config_status()) {
+      return false;
+    }
+    if (!validate_runtime_diag_ready("before arm")) {
       return false;
     }
 
@@ -269,6 +349,9 @@ public:
           return diag_seen_.load() && armed_.load();
         },
                   "armed diagnostic")) {
+      return false;
+    }
+    if (!validate_runtime_diag_ready("after arm")) {
       return false;
     }
 
@@ -331,8 +414,170 @@ public:
   void export_command(double *&command) override { command = &desired_command_; }
 
 private:
-  bool valid_frame(const can_frame &frame, uint8_t min_dlc) const {
-    return (frame.can_id & CAN_EFF_FLAG) == 0 && frame.can_dlc >= min_dlc;
+  bool valid_frame(const can_frame &frame, uint8_t expected_dlc) const {
+    return (frame.can_id & CAN_EFF_FLAG) == 0 &&
+           (frame.can_id & CAN_RTR_FLAG) == 0 && frame.can_dlc == expected_dlc;
+  }
+
+  builtin_interfaces::msg::Time stamp_now() const {
+    const auto now = node_ ? node_->now() : rclcpp::Clock(RCL_SYSTEM_TIME).now();
+    const int64_t ns = now.nanoseconds();
+    builtin_interfaces::msg::Time stamp;
+    stamp.sec = static_cast<int32_t>(ns / 1000000000LL);
+    stamp.nanosec = static_cast<uint32_t>(ns % 1000000000LL);
+    return stamp;
+  }
+
+  uint8_t expected_control_mode() const {
+    return static_cast<uint8_t>(channel_ == CommandChannel::Angle
+                                    ? ControlMode::OutputAngle
+                                    : ControlMode::OutputVelocity);
+  }
+
+  bool validate_config_status() const {
+    if (!config_status_seen_.load()) {
+      return true;
+    }
+
+    if (stored_output_encoder_type_.load() !=
+        static_cast<uint8_t>(desired_profile_)) {
+      RCLCPP_ERROR(logger_,
+                   "Actuator %u config profile mismatch: stored=%u expected=%u",
+                   node_id_, stored_output_encoder_type_.load(),
+                   static_cast<uint8_t>(desired_profile_));
+      return false;
+    }
+    if (config_default_control_mode_.load() != expected_control_mode()) {
+      RCLCPP_ERROR(logger_,
+                   "Actuator %u config default mode mismatch: got=%u expected=%u",
+                   node_id_, config_default_control_mode_.load(),
+                   expected_control_mode());
+      return false;
+    }
+    if (channel_ == CommandChannel::Angle && !config_angle_mode_enabled_.load()) {
+      RCLCPP_ERROR(logger_, "Actuator %u config reports angle mode disabled",
+                   node_id_);
+      return false;
+    }
+    if (channel_ == CommandChannel::Velocity &&
+        !config_velocity_mode_enabled_.load()) {
+      RCLCPP_ERROR(logger_, "Actuator %u config reports velocity mode disabled",
+                   node_id_);
+      return false;
+    }
+    if (expected_output_min_rad_.has_value()) {
+      if (!limits_status_seen_.load()) {
+        RCLCPP_ERROR(logger_,
+                     "Actuator %u missing travel limits status for expected min",
+                     node_id_);
+        return false;
+      }
+      if (std::abs(output_min_rad_ - *expected_output_min_rad_) >
+          kAngleToleranceRad) {
+        RCLCPP_ERROR(logger_,
+                     "Actuator %u min travel mismatch: got=%.3f deg expected=%.3f deg",
+                     node_id_, output_min_rad_ * kRadToDeg,
+                     *expected_output_min_rad_ * kRadToDeg);
+        return false;
+      }
+    }
+    if (expected_output_max_rad_.has_value()) {
+      if (!limits_status_seen_.load()) {
+        RCLCPP_ERROR(logger_,
+                     "Actuator %u missing travel limits status for expected max",
+                     node_id_);
+        return false;
+      }
+      if (std::abs(output_max_rad_ - *expected_output_max_rad_) >
+          kAngleToleranceRad) {
+        RCLCPP_ERROR(logger_,
+                     "Actuator %u max travel mismatch: got=%.3f deg expected=%.3f deg",
+                     node_id_, output_max_rad_ * kRadToDeg,
+                     *expected_output_max_rad_ * kRadToDeg);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool validate_runtime_diag_ready(const char *phase) const {
+    if (!diag_seen_.load()) {
+      RCLCPP_ERROR(logger_, "Actuator %u has no runtime diagnostic", node_id_);
+      return false;
+    }
+    if (runtime_diag_magic_.load() != kRuntimeDiagMagic) {
+      RCLCPP_ERROR(logger_,
+                   "Actuator %u invalid runtime diagnostic magic during %s: 0x%02X",
+                   node_id_, phase, runtime_diag_magic_.load());
+      return false;
+    }
+    if (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
+        active_profile_.load() != static_cast<uint8_t>(desired_profile_)) {
+      RCLCPP_ERROR(
+          logger_,
+          "Actuator %u profile mismatch during %s: stored=%u active=%u expected=%u",
+          node_id_, phase, stored_profile_.load(), active_profile_.load(),
+          static_cast<uint8_t>(desired_profile_));
+      return false;
+    }
+    if (diag_default_control_mode_.load() != expected_control_mode()) {
+      RCLCPP_ERROR(
+          logger_,
+          "Actuator %u diagnostic default mode mismatch during %s: got=%u expected=%u",
+          node_id_, phase, diag_default_control_mode_.load(),
+          expected_control_mode());
+      return false;
+    }
+    if (channel_ == CommandChannel::Angle && !diag_angle_mode_enabled_.load()) {
+      RCLCPP_ERROR(logger_,
+                   "Actuator %u diagnostic reports angle mode disabled during %s",
+                   node_id_, phase);
+      return false;
+    }
+    if (channel_ == CommandChannel::Velocity &&
+        !diag_velocity_mode_enabled_.load()) {
+      RCLCPP_ERROR(
+          logger_,
+          "Actuator %u diagnostic reports velocity mode disabled during %s",
+          node_id_, phase);
+      return false;
+    }
+    if (!trusted_foc_calibration_valid_.load()) {
+      RCLCPP_ERROR(logger_,
+                   "Actuator %u trusted FOC calibration is invalid during %s",
+                   node_id_, phase);
+      return false;
+    }
+    if (profile_requires_output_feedback(desired_profile_) &&
+        !trusted_output_calibration_valid_.load()) {
+      RCLCPP_ERROR(
+          logger_,
+          "Actuator %u trusted output calibration is invalid during %s",
+          node_id_, phase);
+      return false;
+    }
+    if (runtime_fault_.load() != 0) {
+      RCLCPP_ERROR(logger_,
+                   "Actuator %u reports runtime fault %u during %s", node_id_,
+                   runtime_fault_.load(), phase);
+      return false;
+    }
+    if (need_calibration_.load()) {
+      RCLCPP_ERROR(logger_, "Actuator %u reports calibration required during %s",
+                   node_id_, phase);
+      return false;
+    }
+    const bool expected_feedback_required =
+        profile_requires_output_feedback(desired_profile_);
+    if (output_feedback_required_.load() != expected_feedback_required) {
+      RCLCPP_ERROR(
+          logger_,
+          "Actuator %u output feedback requirement mismatch during %s: got=%u expected=%u",
+          node_id_, phase, output_feedback_required_.load() ? 1 : 0,
+          expected_feedback_required ? 1 : 0);
+      return false;
+    }
+    return true;
   }
 
   bool wait_for(const std::function<bool()> &predicate,
@@ -409,6 +654,15 @@ private:
     if (!std::isfinite(hold_position_rad_)) {
       hold_position_rad_ = position_rad_;
     }
+    if (angle_status_pub_) {
+      OutputAngleStatusMsg msg;
+      msg.stamp = stamp_now();
+      msg.node_id = node_id_;
+      msg.angle_mdeg = mdeg;
+      msg.angle_rad = position_rad_;
+      std::copy(frame.data, frame.data + 4, msg.raw_data.begin());
+      angle_status_pub_->publish(msg);
+    }
   }
 
   void on_velocity_status(const can_frame &frame) {
@@ -418,39 +672,107 @@ private:
     const int32_t mdeg_s = decode_i32_le(frame, 0);
     velocity_rad_s_ = mdeg_s_to_rad_s(mdeg_s);
     velocity_status_seen_ = true;
+    if (velocity_status_pub_) {
+      OutputVelocityStatusMsg msg;
+      msg.stamp = stamp_now();
+      msg.node_id = node_id_;
+      msg.velocity_mdeg_s = mdeg_s;
+      msg.velocity_rad_s = velocity_rad_s_;
+      std::copy(frame.data, frame.data + 4, msg.raw_data.begin());
+      velocity_status_pub_->publish(msg);
+    }
   }
 
   void on_limits_status(const can_frame &frame) {
     if (!valid_frame(frame, 8)) {
       return;
     }
-    output_min_rad_ = mdeg_to_rad(decode_i32_le(frame, 0));
-    output_max_rad_ = mdeg_to_rad(decode_i32_le(frame, 4));
+    const int32_t output_min_mdeg = decode_i32_le(frame, 0);
+    const int32_t output_max_mdeg = decode_i32_le(frame, 4);
+    output_min_rad_ = mdeg_to_rad(output_min_mdeg);
+    output_max_rad_ = mdeg_to_rad(output_max_mdeg);
     limits_status_seen_ = true;
+    if (travel_limits_status_pub_) {
+      TravelLimitsStatusMsg msg;
+      msg.stamp = stamp_now();
+      msg.node_id = node_id_;
+      msg.output_min_mdeg = output_min_mdeg;
+      msg.output_max_mdeg = output_max_mdeg;
+      msg.output_min_rad = output_min_rad_;
+      msg.output_max_rad = output_max_rad_;
+      std::copy(frame.data, frame.data + 8, msg.raw_data.begin());
+      travel_limits_status_pub_->publish(msg);
+    }
   }
 
   void on_config_status(const can_frame &frame) {
     if (!valid_frame(frame, 8)) {
       return;
     }
-    gear_ratio_ = static_cast<double>(decode_i32_le(frame, 0)) / 1000.0;
+    const int32_t gear_ratio_milli = decode_i32_le(frame, 0);
+    gear_ratio_ = static_cast<double>(gear_ratio_milli) / 1000.0;
     stored_output_encoder_type_ = frame.data[4];
-    default_control_mode_ = frame.data[5];
-    velocity_mode_enabled_ = (frame.data[6] & 0x01) != 0;
-    angle_mode_enabled_ = (frame.data[6] & 0x02) != 0;
+    config_default_control_mode_ = frame.data[5];
+    config_velocity_mode_enabled_ = (frame.data[6] & 0x01) != 0;
+    config_angle_mode_enabled_ = (frame.data[6] & 0x02) != 0;
     config_status_seen_ = true;
+    if (config_status_pub_) {
+      ActuatorConfigStatusMsg msg;
+      msg.stamp = stamp_now();
+      msg.node_id = node_id_;
+      msg.gear_ratio_milli = gear_ratio_milli;
+      msg.gear_ratio = gear_ratio_;
+      msg.stored_output_encoder_type = stored_output_encoder_type_.load();
+      msg.default_control_mode = config_default_control_mode_.load();
+      msg.velocity_mode_enabled = config_velocity_mode_enabled_.load();
+      msg.output_angle_mode_enabled = config_angle_mode_enabled_.load();
+      msg.reserved = frame.data[7];
+      std::copy(frame.data, frame.data + 8, msg.raw_data.begin());
+      config_status_pub_->publish(msg);
+    }
   }
 
   void on_runtime_diag(const can_frame &frame) {
     if (!valid_frame(frame, 8)) {
       return;
     }
+    runtime_diag_magic_ = frame.data[0];
     stored_profile_ = frame.data[1];
     active_profile_ = frame.data[2];
+    diag_default_control_mode_ = frame.data[3];
+    diag_velocity_mode_enabled_ = (frame.data[4] & 0x01) != 0;
+    diag_angle_mode_enabled_ = (frame.data[4] & 0x02) != 0;
+    trusted_foc_calibration_valid_ = (frame.data[4] & 0x04) != 0;
+    trusted_output_calibration_valid_ = (frame.data[4] & 0x08) != 0;
+    runtime_fault_ = frame.data[5];
     need_calibration_ = (frame.data[6] & 0x01) != 0;
     profile_select_result_ = (frame.data[6] >> 4) & 0x0F;
+    output_feedback_required_ = (frame.data[7] & 0x01) != 0;
     armed_ = (frame.data[7] & 0x02) != 0;
     diag_seen_ = true;
+    if (runtime_diagnostic_pub_) {
+      RuntimeDiagnosticMsg msg;
+      msg.stamp = stamp_now();
+      msg.node_id = node_id_;
+      msg.magic = runtime_diag_magic_.load();
+      msg.stored_output_encoder_type = stored_profile_.load();
+      msg.active_output_encoder_type = active_profile_.load();
+      msg.default_control_mode = diag_default_control_mode_.load();
+      msg.velocity_mode_enabled = diag_velocity_mode_enabled_.load();
+      msg.output_angle_mode_enabled = diag_angle_mode_enabled_.load();
+      msg.trusted_foc_calibration_valid =
+          trusted_foc_calibration_valid_.load();
+      msg.trusted_output_calibration_valid =
+          trusted_output_calibration_valid_.load();
+      msg.calibration_load_status = (frame.data[4] >> 4) & 0x03;
+      msg.runtime_fault = runtime_fault_.load();
+      msg.need_calibration = need_calibration_.load();
+      msg.profile_select_result = profile_select_result_.load();
+      msg.output_feedback_required = output_feedback_required_.load();
+      msg.power_stage_armed = armed_.load();
+      std::copy(frame.data, frame.data + 8, msg.raw_data.begin());
+      runtime_diagnostic_pub_->publish(msg);
+    }
   }
 
   std::shared_ptr<CanBusManager> bus_;
@@ -458,6 +780,7 @@ private:
   rclcpp::Logger logger_{rclcpp::get_logger("output_actuator_device")};
   rclcpp::Clock clock_{RCL_STEADY_TIME};
   std::string iface_;
+  std::string status_topic_base_;
   uint16_t node_id_{0};
 
   CommandChannel channel_{CommandChannel::Angle};
@@ -479,11 +802,19 @@ private:
   std::atomic_bool velocity_status_seen_{false};
   std::atomic_bool need_calibration_{true};
   std::atomic_bool armed_{false};
-  std::atomic_bool velocity_mode_enabled_{false};
-  std::atomic_bool angle_mode_enabled_{false};
+  std::atomic_bool config_velocity_mode_enabled_{false};
+  std::atomic_bool config_angle_mode_enabled_{false};
+  std::atomic_bool diag_velocity_mode_enabled_{false};
+  std::atomic_bool diag_angle_mode_enabled_{false};
+  std::atomic_bool trusted_foc_calibration_valid_{false};
+  std::atomic_bool trusted_output_calibration_valid_{false};
+  std::atomic_bool output_feedback_required_{false};
   std::atomic<uint8_t> profile_select_result_{0};
   std::atomic<uint8_t> stored_output_encoder_type_{0};
-  std::atomic<uint8_t> default_control_mode_{0};
+  std::atomic<uint8_t> config_default_control_mode_{0};
+  std::atomic<uint8_t> diag_default_control_mode_{0};
+  std::atomic<uint8_t> runtime_diag_magic_{0};
+  std::atomic<uint8_t> runtime_fault_{0};
 
   int64_t last_integrate_time_ns_{0};
   double position_rad_{0.0};
@@ -494,6 +825,15 @@ private:
   double output_min_rad_{std::numeric_limits<double>::quiet_NaN()};
   double output_max_rad_{std::numeric_limits<double>::quiet_NaN()};
   double gear_ratio_{std::numeric_limits<double>::quiet_NaN()};
+  std::optional<double> expected_output_min_rad_;
+  std::optional<double> expected_output_max_rad_;
+
+  rclcpp::Publisher<OutputAngleStatusMsg>::SharedPtr angle_status_pub_;
+  rclcpp::Publisher<OutputVelocityStatusMsg>::SharedPtr velocity_status_pub_;
+  rclcpp::Publisher<TravelLimitsStatusMsg>::SharedPtr
+      travel_limits_status_pub_;
+  rclcpp::Publisher<ActuatorConfigStatusMsg>::SharedPtr config_status_pub_;
+  rclcpp::Publisher<RuntimeDiagnosticMsg>::SharedPtr runtime_diagnostic_pub_;
 };
 
 } // namespace mr2_devices_output_actuator

@@ -1,0 +1,17 @@
+builtin_interfaces/Time stamp
+uint16 node_id
+uint8 magic
+uint8 stored_output_encoder_type
+uint8 active_output_encoder_type
+uint8 default_control_mode
+bool velocity_mode_enabled
+bool output_angle_mode_enabled
+bool trusted_foc_calibration_valid
+bool trusted_output_calibration_valid
+uint8 calibration_load_status
+uint8 runtime_fault
+bool need_calibration
+uint8 profile_select_result
+bool output_feedback_required
+bool power_stage_armed
+uint8[8] raw_data

@@ -1,0 +1,10 @@
+builtin_interfaces/Time stamp
+uint16 node_id
+int32 gear_ratio_milli
+float64 gear_ratio
+uint8 stored_output_encoder_type
+uint8 default_control_mode
+bool velocity_mode_enabled
+bool output_angle_mode_enabled
+uint8 reserved
+uint8[8] raw_data
