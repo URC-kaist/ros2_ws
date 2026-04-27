@@ -92,6 +92,29 @@
         "panel": "autonomous",
         "order": 2
       }
+    },
+    {
+      "stream_id": "top_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoTOP",
+        "pixel_format": "MJPG"
+      },
+      "udp_port": 5008,
+      "width": 640,
+      "height": 480,
+      "framerate": 30,
+      "encoder": {
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Top Cam",
+        "panel": "delivery",
+        "order": 3
+      }
     }
   ]
 }
