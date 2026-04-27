@@ -5,7 +5,6 @@ const path = require('path')
 
 const DEFAULTS = {
   device: '/dev/ttyXBEE',
-  baud: 57600,
   host: '0.0.0.0',
   port: 8081,
   videoConfigPath: path.resolve(
@@ -85,7 +84,6 @@ function toBool(value) {
 function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
   return {
     device: getArg(args, '--device') || env.XBEE_DEVICE || DEFAULTS.device,
-    baud: toInt(getArg(args, '--baud') || env.XBEE_BAUD || DEFAULTS.baud),
     host: getArg(args, '--host') || env.XBEE_WS_HOST || DEFAULTS.host,
     port: toInt(getArg(args, '--port') || env.XBEE_WS_PORT || DEFAULTS.port),
     videoConfigPath:

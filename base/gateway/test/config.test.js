@@ -10,8 +10,6 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
     [
       '--device',
       '/tmp/xbee0',
-      '--baud',
-      '115200',
       '--heartbeat-hz',
       '5',
       '--host',
@@ -29,7 +27,6 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
     ],
     {
       XBEE_DEVICE: '/tmp/ignored',
-      XBEE_BAUD: '9600',
       XBEE_WS_HOST: '127.0.0.1',
       XBEE_HEARTBEAT_HZ: '2',
       BASE_ANTENNA_ENABLE: 'false',
@@ -41,7 +38,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
   )
 
   assert.equal(config.device, '/tmp/xbee0')
-  assert.equal(config.baud, 115200)
+  assert.equal('baud' in config, false)
   assert.equal(config.host, '0.0.0.0')
   assert.equal(config.heartbeatHz, 5)
   assert.equal(config.antennaEnable, true)
@@ -57,6 +54,7 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   const config = parseGatewayConfig([], {})
 
   assert.equal(config.device, '/dev/ttyXBEE')
+  assert.equal('baud' in config, false)
   assert.equal(config.host, '0.0.0.0')
   assert.equal(config.port, 8081)
   assert.equal(config.linkTimeoutMs, 2000)

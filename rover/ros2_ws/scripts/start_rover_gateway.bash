@@ -46,7 +46,7 @@ GATEWAY_CMD=$(
   cat <<'CMD'
 set -e
 cd "$REPO_ROOT/base/gateway"
-exec npm start -- --device /tmp/xbee_sim1 --baud 57600 --port 8081 --rocket-m2-ip 192.168.1.100
+exec npm start -- --device /tmp/xbee_sim1 --port 8081 --rocket-m2-ip 192.168.1.100
 CMD
 )
 

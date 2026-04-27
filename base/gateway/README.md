@@ -155,7 +155,7 @@ Minimal example:
 
 ```bash
 cd base/gateway
-npm start -- --device /dev/ttyXBEE --baud 57600 --port 8081
+npm start -- --device /dev/ttyXBEE --port 8081
 ```
 
 Example with antenna tracking enabled:
@@ -164,7 +164,6 @@ Example with antenna tracking enabled:
 cd base/gateway
 npm start -- \
   --device /dev/ttyXBEE \
-  --baud 57600 \
   --port 8081 \
   --heartbeat-hz 2 \
   --antenna-enable true \
@@ -177,7 +176,6 @@ Example with video streaming enabled:
 cd base/gateway
 npm start -- \
   --device /dev/ttyXBEE \
-  --baud 57600 \
   --port 8081 \
   --video-config ../../rover/ros2_ws/src/mr2_launch/config/video_streams.json \
   --video-jitter-ms 40
@@ -203,7 +201,6 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 | CLI flag | Environment variable | Default |
 | --- | --- | --- |
 | `--device` | `XBEE_DEVICE` | `/dev/ttyXBEE` |
-| `--baud` | `XBEE_BAUD` | `57600` |
 | `--port` | `XBEE_WS_PORT` | `8081` |
 | `--heartbeat-hz` | `XBEE_HEARTBEAT_HZ` | `2` |
 | `--link-timeout-ms` | `XBEE_LINK_TIMEOUT_MS` | `2000` |

@@ -25,6 +25,8 @@ const { createWsHub } = require('../runtime/ws_hub')
 const { createVideoGateway } = require('../video/service')
 const { loadVideoConfig } = require('../video/stream_config')
 
+const XBEE_BAUD = 115200
+
 // Compose the gateway runtime out of small adapters so the entrypoint stays thin
 // and each integration point can be tested independently.
 function createGatewayApp(options = {}) {
@@ -36,7 +38,7 @@ function createGatewayApp(options = {}) {
   const nextSeq = createSequencer()
   const serialLink = new XbeeSerialLink({
     device: config.device,
-    baud: config.baud,
+    baud: XBEE_BAUD,
     log,
   })
 
