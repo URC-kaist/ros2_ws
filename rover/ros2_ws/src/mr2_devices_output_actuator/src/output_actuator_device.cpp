@@ -186,6 +186,7 @@ public:
                    hardware_interface::HW_IF_VELOCITY) {
       channel_ = CommandChannel::Velocity;
     }
+    require_limits_status_ = channel_ == CommandChannel::Angle;
 
     const auto profile_it = info.parameters.find("desired_profile");
     if (profile_it != info.parameters.end()) {
