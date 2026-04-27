@@ -4,6 +4,11 @@ import { type RocketM2Status } from '../lib/xbeeGateway'
 import './RocketM2Card.css'
 
 const STALE_MS = 15000
+const TARGETS: Array<{ target: RocketM2Status['target']; label: string }> = [
+  { target: 'base', label: 'Base' },
+  { target: 'drone', label: 'Drone' },
+  { target: 'rover', label: 'Rover' },
+]
 
 const formatDbm = (value: number | null | undefined, digits = 0) => {
   if (!Number.isFinite(value)) return '--'
@@ -23,12 +28,12 @@ const formatChain = (values: number[] | null | undefined, idx: number) => {
 
 const RocketM2Card = () => {
   const { gateway } = useXbeeGateway()
-  const [status, setStatus] = useState<RocketM2Status | null>(null)
+  const [statuses, setStatuses] = useState<Record<string, RocketM2Status>>({})
   const [nowMs, setNowMs] = useState(() => Date.now())
 
   useEffect(() => {
     const unsubscribe = gateway.onRocketM2Status((payload) => {
-      setStatus(payload)
+      setStatuses((current) => ({ ...current, [payload.target]: payload }))
     })
     return () => {
       unsubscribe()
@@ -40,82 +45,91 @@ const RocketM2Card = () => {
     return () => window.clearInterval(interval)
   }, [])
 
-  const meta = useMemo(() => {
+  const rows = useMemo(() => TARGETS.map(({ target, label }) => {
+    const status = statuses[target] ?? null
     const signal = typeof status?.signal === 'number' ? status.signal : null
     const noise = typeof status?.noisef === 'number' ? status.noisef : null
     const snr = signal != null && noise != null ? signal - noise : null
     const lastSuccess = status?.last_success_ms ?? null
     const isStale = lastSuccess == null || nowMs - lastSuccess > STALE_MS
     const isUp = !!status && status.connected && !isStale
+    const hasSuccess = status?.last_success_ms != null
+    const stateLabel = status
+      ? isUp
+        ? 'Up'
+        : !hasSuccess
+          ? 'Down'
+          : isStale
+            ? 'Stale'
+            : status.connected
+              ? 'Degraded'
+              : 'Down'
+      : 'Waiting'
+    const stateClass = !status ? '' : isUp ? 'status-good' : 'status-warn'
+    const updatedLabel = status?.updated_at_ms
+      ? new Date(status.updated_at_ms).toLocaleTimeString()
+      : null
+    const errorText = status?.error && !status.connected ? status.error : null
     return {
+      target,
+      label: status?.label ?? label,
+      status,
       signal,
       noise,
       snr,
-      isStale,
-      isUp,
+      stateLabel,
+      stateClass,
+      updatedLabel,
+      errorText,
     }
-  }, [status, nowMs])
-
-  const hasSuccess = status?.last_success_ms != null
-  const stateLabel = status
-    ? meta.isUp
-      ? 'Up'
-      : !hasSuccess
-        ? 'Down'
-        : meta.isStale
-          ? 'Stale'
-          : status.connected
-            ? 'Degraded'
-            : 'Down'
-    : 'Waiting'
-  const stateClass = !status ? '' : meta.isUp ? 'status-good' : 'status-warn'
-  const updatedLabel = status?.updated_at_ms
-    ? new Date(status.updated_at_ms).toLocaleTimeString()
-    : null
-  const errorText = status?.error && !status.connected ? status.error : null
+  }), [statuses, nowMs])
 
   return (
     <article className="card rocket-m2-card">
-      <h3>Rocket M2 LAN</h3>
-      <p>Rover LAN link status from Rocket M2.</p>
-      <div className="status-list">
-        <div className="status-item">
-          <span>Status</span>
-          <strong className={stateClass}>{stateLabel}</strong>
-        </div>
-        <div className="status-item">
-          <span>Signal</span>
-          <strong>{formatDbm(meta.signal)}</strong>
-        </div>
-        <div className="status-item">
-          <span>RSSI</span>
-          <strong>{formatNumber(status?.rssi)}</strong>
-        </div>
-        <div className="status-item">
-          <span>Noise floor</span>
-          <strong>{formatDbm(meta.noise)}</strong>
-        </div>
-        <div className="status-item">
-          <span>SNR</span>
-          <strong>{meta.snr != null ? `${meta.snr.toFixed(0)} dB` : '--'}</strong>
-        </div>
-        <div className="status-item">
-          <span>Channel</span>
-          <strong>
-            {Number.isFinite(status?.chwidth) ? `${status?.chwidth} MHz` : '--'}
-          </strong>
-        </div>
-        <div className="status-item">
-          <span>Chain 1</span>
-          <strong>{formatChain(status?.chainrssi, 0)}</strong>
-        </div>
-        <div className="status-item">
-          <span>Chain 2</span>
-          <strong>{formatChain(status?.chainrssi, 1)}</strong>
-        </div>
+      <h3>Rocket M2 Links</h3>
+      <p>Base, drone, and rover Rocket M2 management status.</p>
+      <div className="rocket-m2-grid">
+        {rows.map((row) => (
+          <section className="rocket-m2-target" key={row.target}>
+            <div className="rocket-m2-target__header">
+              <strong>{row.label}</strong>
+              <span className={row.stateClass}>{row.stateLabel}</span>
+            </div>
+            <div className="status-list">
+              <div className="status-item">
+                <span>Signal</span>
+                <strong>{formatDbm(row.signal)}</strong>
+              </div>
+              <div className="status-item">
+                <span>RSSI</span>
+                <strong>{formatNumber(row.status?.rssi)}</strong>
+              </div>
+              <div className="status-item">
+                <span>Noise</span>
+                <strong>{formatDbm(row.noise)}</strong>
+              </div>
+              <div className="status-item">
+                <span>SNR</span>
+                <strong>{row.snr != null ? `${row.snr.toFixed(0)} dB` : '--'}</strong>
+              </div>
+              <div className="status-item">
+                <span>Channel</span>
+                <strong>
+                  {Number.isFinite(row.status?.chwidth) ? `${row.status?.chwidth} MHz` : '--'}
+                </strong>
+              </div>
+              <div className="status-item">
+                <span>Chains</span>
+                <strong>
+                  {formatChain(row.status?.chainrssi, 0)} / {formatChain(row.status?.chainrssi, 1)}
+                </strong>
+              </div>
+            </div>
+            {row.errorText ? <div className="rocket-m2-error">Error: {row.errorText}</div> : null}
+            {row.updatedLabel ? <div className="status-updated">Updated {row.updatedLabel}</div> : null}
+          </section>
+        ))}
       </div>
-      {errorText ? <div className="rocket-m2-error">Error: {errorText}</div> : null}
-      {updatedLabel ? <div className="status-updated">Updated {updatedLabel}</div> : null}
     </article>
   )
 }

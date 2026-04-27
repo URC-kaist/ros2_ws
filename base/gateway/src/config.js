@@ -32,7 +32,8 @@ const DEFAULTS = {
   antennaAllowProvisional: true,
   baseHeadingOffsetDeg: 0,
   rocketM2Enable: false,
-  rocketM2Ip: '192.168.1.100',
+  rocketM2Ip: '',
+  rocketM2Targets: [],
   rocketM2User: '',
   rocketM2Pass: '',
   rocketM2PollMs: 5000,
@@ -42,17 +43,30 @@ const DEFAULTS = {
 function loadGatewayEnv(baseDir) {
   // Delay loading dotenv so pure config parsing can be tested without installed deps.
   const dotenv = require('dotenv')
+  const repoRoot = path.resolve(baseDir, '../..')
+  const repoEnvPath = path.join(repoRoot, '.env')
+  const repoEnvLocalPath = path.join(repoRoot, '.env.local')
   const envLocalPath = path.join(baseDir, '.env.local')
   const envPath = path.join(baseDir, '.env')
-  if (fs.existsSync(envLocalPath)) {
-    dotenv.config({ path: envLocalPath })
-    return envLocalPath
+  const loaded = []
+
+  if (fs.existsSync(repoEnvPath)) {
+    dotenv.config({ path: repoEnvPath })
+    loaded.push(repoEnvPath)
+  }
+  if (fs.existsSync(repoEnvLocalPath)) {
+    dotenv.config({ path: repoEnvLocalPath, override: true })
+    loaded.push(repoEnvLocalPath)
   }
   if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath })
-    return envPath
+    dotenv.config({ path: envPath, override: true })
+    loaded.push(envPath)
   }
-  return null
+  if (fs.existsSync(envLocalPath)) {
+    dotenv.config({ path: envLocalPath, override: true })
+    loaded.push(envLocalPath)
+  }
+  return loaded.length > 0 ? loaded : null
 }
 
 function getArg(args, name) {
@@ -82,10 +96,32 @@ function toBool(value) {
 // Resolve runtime config with the standard precedence for this package:
 // CLI flags override environment variables, which override hard-coded defaults.
 function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
+  const rocketM2Targets = [
+    {
+      target: 'base',
+      label: 'Base',
+      ip: getArg(args, '--base-rocket-m2-ip') || env.MR2_BASE_ROCKET_IP || '',
+    },
+    {
+      target: 'drone',
+      label: 'Drone',
+      ip: getArg(args, '--drone-rocket-m2-ip') || env.MR2_DRONE_ROCKET_IP || '',
+    },
+    {
+      target: 'rover',
+      label: 'Rover',
+      ip: getArg(args, '--rover-rocket-m2-ip') || env.MR2_ROVER_ROCKET_IP || '',
+    },
+  ]
+
   return {
-    device: getArg(args, '--device') || env.XBEE_DEVICE || DEFAULTS.device,
-    host: getArg(args, '--host') || env.XBEE_WS_HOST || DEFAULTS.host,
-    port: toInt(getArg(args, '--port') || env.XBEE_WS_PORT || DEFAULTS.port),
+    device:
+      getArg(args, '--base-xbee-device') || env.BASE_XBEE_DEVICE || DEFAULTS.device,
+    host:
+      getArg(args, '--gateway-host') || env.MR2_GATEWAY_HOST || DEFAULTS.host,
+    port: toInt(
+      getArg(args, '--gateway-port') || env.MR2_GATEWAY_PORT || DEFAULTS.port
+    ),
     videoConfigPath:
       getArg(args, '--video-config') || env.VIDEO_CONFIG_PATH || DEFAULTS.videoConfigPath,
     videoGstBinary:
@@ -113,11 +149,13 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
         DEFAULTS.videoClientMaxBufferedBytes
     ),
     heartbeatHz: toFloat(
-      getArg(args, '--heartbeat-hz') || env.XBEE_HEARTBEAT_HZ || DEFAULTS.heartbeatHz
+      getArg(args, '--base-xbee-heartbeat-hz') ||
+        env.BASE_XBEE_HEARTBEAT_HZ ||
+        DEFAULTS.heartbeatHz
     ),
     linkTimeoutMs: toInt(
-      getArg(args, '--link-timeout-ms') ||
-        env.XBEE_LINK_TIMEOUT_MS ||
+      getArg(args, '--base-xbee-link-timeout-ms') ||
+        env.BASE_XBEE_LINK_TIMEOUT_MS ||
         DEFAULTS.linkTimeoutMs
     ),
     antennaEnable: toBool(
@@ -175,7 +213,10 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
     rocketM2Enable: toBool(
       getArg(args, '--rocket-m2-enable') || env.ROCKET_M2_ENABLE || DEFAULTS.rocketM2Enable
     ),
-    rocketM2Ip: getArg(args, '--rocket-m2-ip') || env.ROCKET_M2_IP || DEFAULTS.rocketM2Ip,
+    rocketM2Targets,
+    rocketM2Ip:
+      rocketM2Targets.find((target) => target.target === 'base')?.ip ||
+      DEFAULTS.rocketM2Ip,
     rocketM2User:
       getArg(args, '--rocket-m2-user') || env.ROCKET_M2_USER || DEFAULTS.rocketM2User,
     rocketM2Pass:

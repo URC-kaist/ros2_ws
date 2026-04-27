@@ -155,7 +155,7 @@ Minimal example:
 
 ```bash
 cd base/gateway
-npm start -- --device /dev/ttyXBEE --port 8081
+npm start -- --base-xbee-device /dev/ttyXBEE --gateway-port 8081
 ```
 
 Example with antenna tracking enabled:
@@ -163,9 +163,9 @@ Example with antenna tracking enabled:
 ```bash
 cd base/gateway
 npm start -- \
-  --device /dev/ttyXBEE \
-  --port 8081 \
-  --heartbeat-hz 2 \
+  --base-xbee-device /dev/ttyXBEE \
+  --gateway-port 8081 \
+  --base-xbee-heartbeat-hz 2 \
   --antenna-enable true \
   --antenna-device /dev/ttyARDUINO
 ```
@@ -175,8 +175,8 @@ Example with video streaming enabled:
 ```bash
 cd base/gateway
 npm start -- \
-  --device /dev/ttyXBEE \
-  --port 8081 \
+  --base-xbee-device /dev/ttyXBEE \
+  --gateway-port 8081 \
   --video-config ../../rover/ros2_ws/src/mr2_launch/config/video_streams.json \
   --video-jitter-ms 40
 ```
@@ -189,10 +189,15 @@ The base station needs a GStreamer runtime with `gst-launch-1.0`, `rtph264depay`
 Config is loaded in this order:
 
 1. CLI flags
-2. Environment variables
-3. Built-in defaults
+2. Component-specific environment variables
+3. Top-level MR2 network environment variables
+4. Built-in defaults
 
-At startup the gateway loads `.env.local` if present, otherwise `.env`.
+At startup the gateway loads the repository root `.env`, then root
+`.env.local`, then `base/gateway/.env`, then `base/gateway/.env.local`.
+Later files override earlier files. Use the root `.env` for shared network
+values such as `MR2_GATEWAY_HOST`, `MR2_GATEWAY_PORT`, and
+`MR2_BASE_ROCKET_IP`.
 
 ## Configuration
 
@@ -200,10 +205,11 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 
 | CLI flag | Environment variable | Default |
 | --- | --- | --- |
-| `--device` | `XBEE_DEVICE` | `/dev/ttyXBEE` |
-| `--port` | `XBEE_WS_PORT` | `8081` |
-| `--heartbeat-hz` | `XBEE_HEARTBEAT_HZ` | `2` |
-| `--link-timeout-ms` | `XBEE_LINK_TIMEOUT_MS` | `2000` |
+| `--base-xbee-device` | `BASE_XBEE_DEVICE` | `/dev/ttyXBEE` |
+| `--gateway-host` | `MR2_GATEWAY_HOST` | `0.0.0.0` |
+| `--gateway-port` | `MR2_GATEWAY_PORT` | `8081` |
+| `--base-xbee-heartbeat-hz` | `BASE_XBEE_HEARTBEAT_HZ` | `2` |
+| `--base-xbee-link-timeout-ms` | `BASE_XBEE_LINK_TIMEOUT_MS` | `2000` |
 
 ### Video Streaming
 
@@ -238,7 +244,9 @@ At startup the gateway loads `.env.local` if present, otherwise `.env`.
 | CLI flag | Environment variable | Default |
 | --- | --- | --- |
 | `--rocket-m2-enable` | `ROCKET_M2_ENABLE` | `false` |
-| `--rocket-m2-ip` | `ROCKET_M2_IP` | `192.168.1.100` |
+| `--base-rocket-m2-ip` | `MR2_BASE_ROCKET_IP` | empty |
+| `--drone-rocket-m2-ip` | `MR2_DRONE_ROCKET_IP` | empty |
+| `--rover-rocket-m2-ip` | `MR2_ROVER_ROCKET_IP` | empty |
 | `--rocket-m2-user` | `ROCKET_M2_USER` | empty |
 | `--rocket-m2-pass` | `ROCKET_M2_PASS` | empty |
 | `--rocket-m2-poll-ms` | `ROCKET_M2_POLL_MS` | `5000` |
@@ -248,7 +256,7 @@ Rocket M2 polling auto-enables if IP, user, and password are configured.
 
 ## Socket Interface
 
-Clients connect to the same HTTP server port configured by `--port`.
+Clients connect to the same HTTP server port configured by `--gateway-port`.
 
 ### Control WebSocket
 
@@ -296,23 +304,23 @@ Clients connect to the same HTTP server port configured by `--port`.
 - `base_status`
   Fields: `enabled`, `antenna_ready`, `auto_home`, `heading_offset_deg`, `base_lat_deg`, `base_lon_deg`, `base_alt_m`, `antenna_heading_deg`, `last_cmd_heading_deg`, `last_cmd_age_ms`, `base_fix_age_ms`, `rover_nav_age_ms`, `base_fix_valid`, `rover_nav_valid`, `idle_reason`
 - `rocket_m2_status`
-  Fields: `connected`, `updated_at_ms`, `last_success_ms`, `signal`, `rssi`, `noisef`, `chwidth`, `rx_chainmask`, `chainrssi`, `chainrssimgmt`, `chainrssiext`, `error`
+  Fields: `target` (`base`, `drone`, or `rover`), `label`, `connected`, `updated_at_ms`, `last_success_ms`, `signal`, `rssi`, `noisef`, `chwidth`, `rx_chainmask`, `chainrssi`, `chainrssimgmt`, `chainrssiext`, `error`
 
 Notes:
 
 - `battery_id` is `1` or `2`, mapped from XBEE telemetry message IDs `0x10` and `0x11`.
 - `link_status.connected` depends on recent incoming XBEE heartbeat frames. It
-  becomes `false` if no heartbeat is received within `XBEE_LINK_TIMEOUT_MS`.
+  becomes `false` if no heartbeat is received within `BASE_XBEE_LINK_TIMEOUT_MS`.
 
 ## HTTP Endpoints
 
 ### `GET /rocket-m2/status`
 
-Returns the latest polled Rocket M2 status as JSON.
+Returns the latest polled Rocket M2 statuses as JSON.
 
 Response behavior:
 
-- `200` when status is available
+- `200` with `type: "rocket_m2_statuses"` when at least one target status is available
 - `503` when Rocket M2 is disabled or status is not ready yet
 - `500` when Rocket M2 is enabled but missing required configuration
 

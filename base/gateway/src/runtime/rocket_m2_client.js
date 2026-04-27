@@ -17,6 +17,8 @@ class RocketM2Client {
     this.execFileAsync = options.execFileAsync
     this.log = typeof options.log === 'function' ? options.log : () => {}
     this.onStatus = typeof options.onStatus === 'function' ? options.onStatus : () => {}
+    this.target = options.target || this.config.rocketM2Target || 'base'
+    this.label = options.label || this.config.rocketM2Label || 'Base'
 
     this.status = null
     this.lastSuccessMs = 0
@@ -30,6 +32,8 @@ class RocketM2Client {
     const configured =
       this.config.rocketM2Ip && this.config.rocketM2User && this.config.rocketM2Pass
     return {
+      target: this.target,
+      label: this.label,
       enabled: Boolean(this.config.rocketM2Enable || configured),
       configured: Boolean(configured),
       status: this.status,
@@ -44,23 +48,25 @@ class RocketM2Client {
     const state = this.getState()
     if (!state.enabled) return
     if (!state.configured) {
-      this.log('Rocket M2 enabled but missing ROCKET_M2_IP/USER/PASS')
+      this.log(
+        `Rocket M2 ${this.label} enabled but missing target IP/ROCKET_M2_USER/ROCKET_M2_PASS`
+      )
       return
     }
 
     const pollMs = Math.max(this.config.rocketM2PollMs, 0)
     if (pollMs <= 0) {
-      this.log('Rocket M2 polling disabled (interval <= 0)')
+      this.log(`Rocket M2 ${this.label} polling disabled (interval <= 0)`)
       return
     }
 
     if (!this.cookiePath) {
-      this.cookiePath = path.join(os.tmpdir(), `rocket_m2_${process.pid}.cookies`)
+      this.cookiePath = path.join(os.tmpdir(), `rocket_m2_${this.target}_${process.pid}.cookies`)
     }
 
     this.poll()
     this.pollTimer = setInterval(() => this.poll(), Math.max(pollMs, 500))
-    this.log(`Rocket M2 polling every ${Math.max(pollMs, 500)} ms`)
+    this.log(`Rocket M2 ${this.label} polling every ${Math.max(pollMs, 500)} ms`)
   }
 
   stop() {
@@ -81,6 +87,8 @@ class RocketM2Client {
       this.status = createRocketM2Status(
         {
           connected: true,
+          target: this.target,
+          label: this.label,
           updated_at_ms: nowMs,
           last_success_ms: nowMs,
           error: null,
@@ -92,7 +100,7 @@ class RocketM2Client {
         }
       )
       if (this.lastError) {
-        this.log('Rocket M2 polling recovered')
+        this.log(`Rocket M2 ${this.label} polling recovered`)
         this.lastError = null
       }
     } catch (err) {
@@ -102,6 +110,8 @@ class RocketM2Client {
       this.status = createRocketM2Status(
         {
           connected: false,
+          target: this.target,
+          label: this.label,
           updated_at_ms: nowMs,
           last_success_ms: this.lastSuccessMs || null,
           signal: previous?.signal ?? null,
@@ -120,7 +130,7 @@ class RocketM2Client {
         }
       )
       if (error && error !== this.lastError) {
-        this.log(`Rocket M2 poll failed: ${error}`)
+        this.log(`Rocket M2 ${this.label} poll failed: ${error}`)
         this.lastError = error
       }
     } finally {

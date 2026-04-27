@@ -24,6 +24,8 @@ test('RocketM2Client getState reflects configuration', () => {
   })
 
   assert.deepEqual(client.getState(), {
+    target: 'base',
+    label: 'Base',
     enabled: false,
     configured: false,
     status: null,
@@ -61,6 +63,8 @@ test('RocketM2Client poll publishes successful status', async () => {
 
   assert.equal(execCalls.length, 2)
   assert.equal(statuses.length, 1)
+  assert.equal(statuses[0].target, 'base')
+  assert.equal(statuses[0].label, 'Base')
   assert.equal(statuses[0].connected, true)
   assert.equal(statuses[0].signal, -62)
 })

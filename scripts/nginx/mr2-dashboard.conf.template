@@ -1,0 +1,32 @@
+upstream mr2_gateway {
+  server __MR2_GATEWAY_HOST__:__MR2_GATEWAY_PORT__;
+}
+
+upstream mr2_rover_rosbridge {
+  server __MR2_ROVER_IP__:__MR2_ROSBRIDGE_PORT__;
+}
+
+# Static network map:
+# - base:          __MR2_BASE_IP__
+# - rover:         __MR2_ROVER_IP__
+# - base-rocket:   __MR2_BASE_ROCKET_IP__
+# - drone-rocket:  __MR2_DRONE_ROCKET_IP__
+# - rover-rocket:  __MR2_ROVER_ROCKET_IP__
+server {
+  listen 80;
+  listen [::]:80;
+  server_name base base.local __MR2_BASE_IP__;
+
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  server_name base base.local __MR2_BASE_IP__;
+
+  ssl_certificate /etc/nginx/ssl/mr2-dashboard.crt;
+  ssl_certificate_key /etc/nginx/ssl/mr2-dashboard.key;
+
+  include /etc/nginx/snippets/mr2-dashboard-locations.conf;
+}

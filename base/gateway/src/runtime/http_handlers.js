@@ -4,6 +4,7 @@
 // remains WebSocket plus XBEE, so these handlers stay intentionally narrow.
 function handleRocketM2Status(_req, res, options = {}) {
   const status = options.status || null
+  const statuses = Array.isArray(options.statuses) ? options.statuses : null
   const enabled = options.enabled === true
   const configured = options.configured === true
 
@@ -17,6 +18,26 @@ function handleRocketM2Status(_req, res, options = {}) {
     res.end(JSON.stringify({ error: 'Rocket M2 missing configuration' }))
     return
   }
+  if (statuses) {
+    if (statuses.length === 0) {
+      res.writeHead(503, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Rocket M2 status not ready' }))
+      return
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    })
+    res.end(
+      JSON.stringify({
+        type: 'rocket_m2_statuses',
+        statuses,
+      })
+    )
+    return
+  }
+
   if (!status) {
     res.writeHead(503, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'Rocket M2 status not ready' }))

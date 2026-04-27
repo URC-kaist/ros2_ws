@@ -253,7 +253,7 @@ Recommended workaround when testing with Safari:
 
 The video socket is separate from the control socket:
 
-- control: `/sik-ws`
+- control: `/xbee-ws`
 - video: `/video-ws`
 
 ### Client subscription message
@@ -384,7 +384,7 @@ For local browser verification, the repository also includes:
 
 That temporary runner:
 
-- starts a fake local SiK link
+- starts a fake local XBEE link
 - starts the base gateway
 - starts the rover video node
 - publishes a synthetic ROS image stream

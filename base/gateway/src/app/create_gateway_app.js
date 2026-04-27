@@ -51,20 +51,13 @@ function createGatewayApp(options = {}) {
   let serverListening = false
   let videoGateway = null
 
-  const rocketM2Client = new RocketM2Client({
-    config,
-    execFileAsync,
-    log,
-    onStatus: (status) => {
-      wsHub.broadcast({ type: 'rocket_m2_status', ...status })
-    },
-  })
+  const rocketM2Clients = createRocketM2Clients()
 
   const server = http.createServer(
     createGatewayHttpHandler({
       env,
       log,
-      getRocketM2State: () => rocketM2Client.getState(),
+      getRocketM2State: () => getRocketM2FleetState(),
       getVideoStreams: () => (videoGateway ? videoGateway.getBrowserStreams() : []),
     })
   )
@@ -76,9 +69,11 @@ function createGatewayApp(options = {}) {
     onMessage: handleDashboardMessage,
     getInitialMessages: () => {
       const messages = [getLinkStatus()]
-      const rocketM2Status = rocketM2Client.getStatus()
-      if (rocketM2Status) {
-        messages.push({ type: 'rocket_m2_status', ...rocketM2Status })
+      for (const rocketM2Client of rocketM2Clients) {
+        const rocketM2Status = rocketM2Client.getStatus()
+        if (rocketM2Status) {
+          messages.push({ type: 'rocket_m2_status', ...rocketM2Status })
+        }
       }
       return messages
     },
@@ -102,6 +97,38 @@ function createGatewayApp(options = {}) {
   function log(message) {
     // eslint-disable-next-line no-console
     console.log(`[gateway] ${message}`)
+  }
+
+  function createRocketM2Clients() {
+    const targets = Array.isArray(config.rocketM2Targets) ? config.rocketM2Targets : []
+    return targets.map((target) => {
+      const targetConfig = {
+        ...config,
+        rocketM2Ip: target.ip,
+        rocketM2Target: target.target,
+        rocketM2Label: target.label,
+      }
+      return new RocketM2Client({
+        config: targetConfig,
+        execFileAsync,
+        log,
+        target: target.target,
+        label: target.label,
+        onStatus: (status) => {
+          wsHub.broadcast({ type: 'rocket_m2_status', ...status })
+        },
+      })
+    })
+  }
+
+  function getRocketM2FleetState() {
+    const states = rocketM2Clients.map((client) => client.getState())
+    return {
+      enabled: states.some((state) => state.enabled),
+      configured: states.some((state) => state.configured),
+      targets: states,
+      statuses: states.map((state) => state.status).filter(Boolean),
+    }
   }
 
   function writeFrame(frame) {
@@ -311,7 +338,9 @@ function createGatewayApp(options = {}) {
       })
     })
 
-    rocketM2Client.start()
+    for (const rocketM2Client of rocketM2Clients) {
+      rocketM2Client.start()
+    }
 
     if (config.heartbeatHz > 0) {
       const periodMs = Math.max(1000 / config.heartbeatHz, 100)
@@ -340,7 +369,9 @@ function createGatewayApp(options = {}) {
       antennaStatusTimer = null
     }
 
-    rocketM2Client.stop()
+    for (const rocketM2Client of rocketM2Clients) {
+      rocketM2Client.stop()
+    }
 
     if (antennaTracker) {
       antennaTracker.stop()

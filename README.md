@@ -53,7 +53,7 @@ Please install Node.js and npm!
 # Base station XBEE interface:
 # under base/gateway/
 # run `npm install` to install dependencies
-npm start -- --device /tmp/xbee_sim1 --port 8081
+npm start -- --base-xbee-device /tmp/xbee_sim1 --gateway-port 8081
 
 # Hardware rover + base gateway helper:
 ./rover/ros2_ws/scripts/start_rover_gateway.bash

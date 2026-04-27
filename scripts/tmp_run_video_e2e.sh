@@ -723,7 +723,7 @@ start_bg bash -lc "
   source /opt/ros/humble/setup.bash &&
   source '${ROOT_DIR}/rover/ros2_ws/install/setup.bash' &&
   cd '${ROOT_DIR}/base/gateway' &&
-  npm start -- --device '${XBEE_A}' --host '${BIND_HOST}' --port '${GATEWAY_PORT}' --video-config '${VIDEO_CONFIG}' --video-jitter-ms 0
+  npm start -- --base-xbee-device '${XBEE_A}' --gateway-host '${BIND_HOST}' --gateway-port '${GATEWAY_PORT}' --video-config '${VIDEO_CONFIG}' --video-jitter-ms 0
 "
 
 wait_for_http "http://127.0.0.1:${GATEWAY_PORT}/video/streams"

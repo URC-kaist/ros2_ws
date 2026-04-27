@@ -4,6 +4,8 @@ base_gateway/.env.local
 .codex
 **/.codex
 
+/.env
+/.env.local
 /.vscode
 base/gateway/node_modules
 

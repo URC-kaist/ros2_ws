@@ -8,11 +8,11 @@ const { parseGatewayConfig } = require('../src/config')
 test('parseGatewayConfig prefers argv over env and coerces values', () => {
   const config = parseGatewayConfig(
     [
-      '--device',
+      '--base-xbee-device',
       '/tmp/xbee0',
-      '--heartbeat-hz',
+      '--base-xbee-heartbeat-hz',
       '5',
-      '--host',
+      '--gateway-host',
       '0.0.0.0',
       '--antenna-enable',
       'true',
@@ -26,9 +26,9 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       '2222',
     ],
     {
-      XBEE_DEVICE: '/tmp/ignored',
-      XBEE_WS_HOST: '127.0.0.1',
-      XBEE_HEARTBEAT_HZ: '2',
+      BASE_XBEE_DEVICE: '/tmp/ignored',
+      MR2_GATEWAY_HOST: '127.0.0.1',
+      BASE_XBEE_HEARTBEAT_HZ: '2',
       BASE_ANTENNA_ENABLE: 'false',
       ROCKET_M2_ENABLE: 'false',
       VIDEO_CONFIG_PATH: '/tmp/ignored_video_streams.json',
@@ -59,8 +59,60 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   assert.equal(config.port, 8081)
   assert.equal(config.linkTimeoutMs, 2000)
   assert.equal(config.antennaEnable, false)
-  assert.equal(config.rocketM2Ip, '192.168.1.100')
+  assert.equal(config.rocketM2Ip, '')
   assert.match(config.videoConfigPath, /video_streams\.json$/)
   assert.equal(config.videoReceiverRestartMs, 1000)
   assert.equal(config.videoAvailabilityStaleMs, 1500)
+})
+
+test('parseGatewayConfig accepts top-level MR2 network env fallbacks', () => {
+  const config = parseGatewayConfig([], {
+    MR2_GATEWAY_HOST: '127.0.0.2',
+    MR2_GATEWAY_PORT: '18081',
+    MR2_BASE_ROCKET_IP: '192.168.1.110',
+  })
+
+  assert.equal(config.host, '127.0.0.2')
+  assert.equal(config.port, 18081)
+  assert.equal(config.rocketM2Ip, '192.168.1.110')
+  assert.deepEqual(
+    config.rocketM2Targets.map((target) => [target.target, target.ip]),
+    [
+      ['base', '192.168.1.110'],
+      ['drone', ''],
+      ['rover', ''],
+    ]
+  )
+})
+
+test('parseGatewayConfig ignores removed legacy gateway env and flags', () => {
+  const config = parseGatewayConfig(
+    [
+      '--device',
+      '/tmp/legacy_device',
+      '--host',
+      '127.0.0.9',
+      '--port',
+      '19090',
+      '--heartbeat-hz',
+      '9',
+      '--link-timeout-ms',
+      '9000',
+    ],
+    {
+      XBEE_DEVICE: '/tmp/legacy_env_device',
+      XBEE_WS_HOST: '127.0.0.8',
+      XBEE_WS_PORT: '18080',
+      XBEE_HEARTBEAT_HZ: '8',
+      XBEE_LINK_TIMEOUT_MS: '8000',
+      ROCKET_M2_IP: '192.168.1.200',
+    }
+  )
+
+  assert.equal(config.device, '/dev/ttyXBEE')
+  assert.equal(config.host, '0.0.0.0')
+  assert.equal(config.port, 8081)
+  assert.equal(config.heartbeatHz, 2)
+  assert.equal(config.linkTimeoutMs, 2000)
+  assert.equal(config.rocketM2Ip, '')
 })

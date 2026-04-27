@@ -69,6 +69,8 @@ export type BaseStatus = {
 }
 
 export type RocketM2Status = {
+  target: 'base' | 'drone' | 'rover'
+  label: string
   connected: boolean
   updated_at_ms: number
   last_success_ms: number | null

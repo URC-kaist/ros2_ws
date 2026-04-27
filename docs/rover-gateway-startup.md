@@ -27,10 +27,11 @@ The gateway currently connects to the emulated XBEE peer:
 /tmp/xbee_sim1
 ```
 
-The gateway targets the base Rocket M2 management address:
+The gateway targets the base Rocket M2 management address from the required
+environment variable:
 
 ```bash
-192.168.1.100
+MR2_BASE_ROCKET_IP
 ```
 
 ## Prerequisites
@@ -79,6 +80,18 @@ Defaults:
 - `REPO_ROOT=$HOME/mr2-stack`
 - `ROS_SETUP=/opt/ros/humble/setup.bash`
 - `WS_SETUP=$REPO_ROOT/rover/ros2_ws/install/setup.bash`
+
+Network addresses are loaded from the repository root `.env` and `.env.local`
+before the screen sessions start. Copy `.env.example` to `.env` and edit these
+shared values when the base/rover network changes:
+
+- `MR2_BASE_IP`
+- `MR2_ROVER_IP`
+- `MR2_BASE_ROCKET_IP`
+- `MR2_DRONE_ROCKET_IP`
+- `MR2_ROVER_ROCKET_IP`
+- `MR2_GATEWAY_HOST`
+- `MR2_GATEWAY_PORT`
 
 ## Behavior
 

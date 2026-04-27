@@ -7,6 +7,7 @@ from launch.actions import (
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
 from launch.substitutions import (
+    EnvironmentVariable,
     LaunchConfiguration,
     PathJoinSubstitution,
     PythonExpression,
@@ -134,7 +135,7 @@ def generate_launch_description():
     )
     video_base_host_arg = DeclareLaunchArgument(
         "video_base_host",
-        default_value="192.168.1.101",
+        default_value=EnvironmentVariable("MR2_BASE_IP"),
         description="Base-station host/IP for rover RTP/UDP video streams",
     )
     video_config_arg = DeclareLaunchArgument(

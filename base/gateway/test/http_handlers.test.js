@@ -62,6 +62,38 @@ test('handleRocketM2Status returns current proxied status', () => {
   assert.equal(JSON.parse(res.body).type, 'rocket_m2_status')
 })
 
+test('handleRocketM2Status returns current fleet statuses', () => {
+  const res = createResponseRecorder()
+
+  handleRocketM2Status({}, res, {
+    enabled: true,
+    configured: true,
+    statuses: [
+      {
+        target: 'base',
+        label: 'Base',
+        connected: true,
+        updated_at_ms: 100,
+        last_success_ms: 90,
+        signal: -60,
+        rssi: -59,
+        noisef: -95,
+        chwidth: 20,
+        rx_chainmask: 3,
+        chainrssi: [-60, -61],
+        chainrssimgmt: [],
+        chainrssiext: [],
+        error: null,
+      },
+    ],
+  })
+
+  const body = JSON.parse(res.body)
+  assert.equal(res.statusCode, 200)
+  assert.equal(body.type, 'rocket_m2_statuses')
+  assert.equal(body.statuses[0].target, 'base')
+})
+
 test('createGatewayHttpHandler serves video stream metadata', () => {
   const handler = createGatewayHttpHandler({
     getVideoStreams: () => [

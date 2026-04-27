@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cerrno>
 #include <cctype>
+#include <cstdlib>
 #include <csignal>
 #include <cstring>
 #include <cstdio>
@@ -743,7 +744,7 @@ class VideoStreamingNode : public rclcpp::Node {
   VideoStreamingNode()
       : rclcpp::Node("video_streaming"),
         video_config_path_(declare_parameter<std::string>("video_config_path", "")),
-        base_host_(declare_parameter<std::string>("base_host", "127.0.0.1")) {
+        base_host_(declare_parameter<std::string>("base_host", default_base_host())) {
     if (video_config_path_.empty()) {
       throw std::runtime_error("video_config_path parameter is required");
     }
@@ -815,6 +816,14 @@ class VideoStreamingNode : public rclcpp::Node {
   }
 
  private:
+  static std::string default_base_host() {
+    const char * env_base_ip = std::getenv("MR2_BASE_IP");
+    if (env_base_ip != nullptr && env_base_ip[0] != '\0') {
+      return env_base_ip;
+    }
+    throw std::runtime_error("MR2_BASE_IP environment variable is required");
+  }
+
   std::string video_config_path_;
   std::string base_host_;
   GMainLoop * gst_main_loop_{nullptr};
