@@ -128,11 +128,6 @@ def generate_launch_description():
         default_value="/tmp/xbee_sim1",
         description="Peer PTY path for external attachment when socat emulation is enabled",
     )
-    xbee_sim_baud_arg = DeclareLaunchArgument(
-        "xbee_sim_baud",
-        default_value="57600",
-        description="Baud rate for the emulated XBEE link",
-    )
     xbee_device_arg = DeclareLaunchArgument(
         "xbee_device",
         default_value=PythonExpression(
@@ -145,19 +140,6 @@ def generate_launch_description():
             ]
         ),
         description="Serial device for the XBEE bridge (defaults to emulated PTY when enabled)",
-    )
-    xbee_baud_arg = DeclareLaunchArgument(
-        "xbee_baud",
-        default_value=PythonExpression(
-            [
-                "'",
-                LaunchConfiguration("xbee_sim_baud"),
-                "' if '",
-                LaunchConfiguration("enable_xbee_sim"),
-                "' == 'true' else '57600'",
-            ]
-        ),
-        description="Baud rate for the XBEE bridge (defaults to emulated baud when enabled)",
     )
     left_gnss_serial_arg = DeclareLaunchArgument(
         "left_gnss_serial",
@@ -341,10 +323,8 @@ def generate_launch_description():
             "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
             "use_servo": LaunchConfiguration("use_servo"),
             "xbee_device": LaunchConfiguration("xbee_device"),
-            "xbee_baud": LaunchConfiguration("xbee_baud"),
             "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
             "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
-            "xbee_sim_baud": LaunchConfiguration("xbee_sim_baud"),
             "enable_aruco": LaunchConfiguration("enable_autonomous_module"),
             "aruco_cam_topic": "/front_camera/image_raw",
             "enable_yolo": LaunchConfiguration("enable_yolo"),
@@ -525,9 +505,7 @@ def generate_launch_description():
             enable_xbee_sim_arg,
             xbee_sim_device_arg,
             xbee_sim_peer_arg,
-            xbee_sim_baud_arg,
             xbee_device_arg,
-            xbee_baud_arg,
             enable_autonomous_module_arg,
             enable_yolo_arg,
             enable_video_streaming_arg,

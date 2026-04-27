@@ -47,7 +47,6 @@ class XbeeBridgeNode : public rclcpp::Node {
   XbeeBridgeNode()
       : rclcpp::Node("xbee_bridge"),
         device_(declare_parameter<std::string>("device", "/dev/ttyXBEE")),
-        baud_(declare_parameter<int>("baud", 57600)),
         heartbeat_timeout_ms_(
             declare_parameter<int>("heartbeat_timeout_ms", 500)),
         zero_publish_rate_hz_(
@@ -192,32 +191,12 @@ class XbeeBridgeNode : public rclcpp::Node {
     tio.c_cflag &= ~CSTOPB;
     tio.c_cflag &= ~CRTSCTS;
 
-    const speed_t speed = baud_to_speed_(baud_);
-    if (cfsetispeed(&tio, speed) != 0 || cfsetospeed(&tio, speed) != 0) {
+    if (cfsetispeed(&tio, B115200) != 0 || cfsetospeed(&tio, B115200) != 0) {
       throw std::runtime_error("Failed to set serial baud rate");
     }
 
     if (tcsetattr(fd_, TCSANOW, &tio) != 0) {
       throw std::runtime_error("Failed to apply serial attributes");
-    }
-  }
-
-  static speed_t baud_to_speed_(int baud) {
-    switch (baud) {
-      case 9600:
-        return B9600;
-      case 19200:
-        return B19200;
-      case 38400:
-        return B38400;
-      case 57600:
-        return B57600;
-      case 115200:
-        return B115200;
-      case 230400:
-        return B230400;
-      default:
-        return B57600;
     }
   }
 
@@ -667,7 +646,6 @@ class XbeeBridgeNode : public rclcpp::Node {
 
   // Parameters
   std::string device_;
-  int baud_;
   int heartbeat_timeout_ms_;
   double zero_publish_rate_hz_;
   double battery_tx_rate_hz_;

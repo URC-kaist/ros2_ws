@@ -107,20 +107,10 @@ def generate_launch_description():
         default_value="/tmp/xbee_sim1",
         description="Path to the peer PTY that external tools can attach to",
     )
-    xbee_sim_baud_arg = DeclareLaunchArgument(
-        "xbee_sim_baud",
-        default_value="57600",
-        description="Baud rate for the simulated XBEE link",
-    )
     xbee_device_arg = DeclareLaunchArgument(
         "xbee_device",
         default_value="/dev/ttyXBEE",
         description="Serial device for the real XBEE bridge",
-    )
-    xbee_baud_arg = DeclareLaunchArgument(
-        "xbee_baud",
-        default_value="57600",
-        description="Baud rate for the real XBEE bridge",
     )
     enable_aruco_arg = DeclareLaunchArgument(
         "enable_aruco",
@@ -372,7 +362,6 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {"device": LaunchConfiguration("xbee_device")},
-            {"baud": LaunchConfiguration("xbee_baud")},
             {"heartbeat_timeout_ms": 500},
             {"cmd_vel_topic": "/base/cmd_vel"},
         ],
@@ -385,7 +374,6 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {"device": LaunchConfiguration("xbee_sim_device")},
-            {"baud": LaunchConfiguration("xbee_sim_baud")},
             {"heartbeat_timeout_ms": 500},
             {"log_frames": False},
             {"cmd_vel_topic": "/base/cmd_vel"},
@@ -465,9 +453,7 @@ def generate_launch_description():
         use_servo_arg,
         xbee_sim_device_arg,
         xbee_sim_peer_arg,
-        xbee_sim_baud_arg,
         xbee_device_arg,
-        xbee_baud_arg,
         enable_aruco_arg,
         aruco_cam_topic_arg,
         enable_yolo_arg,
