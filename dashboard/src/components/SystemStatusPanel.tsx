@@ -37,7 +37,6 @@ const SystemStatusPanel = () => {
       </article>
       <article className="card">
         <h3>Event Stream</h3>
-        <p>Command acknowledgements and alerts.</p>
         <ul className="list">
           <li>Autonomy plan synced.</li>
           <li>New waypoint uploaded.</li>

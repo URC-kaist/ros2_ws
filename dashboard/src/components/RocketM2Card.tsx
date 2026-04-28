@@ -91,7 +91,6 @@ const RocketM2Cards = () => {
           <div className="rocket-m2-card__header">
             <div>
               <h3>{row.label} Rocket M2</h3>
-              <p>Management radio status.</p>
             </div>
             <span className={row.stateClass}>{row.stateLabel}</span>
           </div>

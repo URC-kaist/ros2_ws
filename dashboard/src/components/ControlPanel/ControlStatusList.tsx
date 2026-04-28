@@ -258,7 +258,6 @@ const ControlStatusList = () => {
         <div className="status-list status-list--batteries">
           <div className={`status-item battery${battery1Stale ? ' battery-stale' : ''}`}>
             <div className="metric-label">
-              <span>Battery 1</span>
               <strong>{battery1 ? `${battery1Percent.toFixed(0)}%` : '---'}</strong>
             </div>
             <div className="meter">
@@ -274,7 +273,6 @@ const ControlStatusList = () => {
           </div>
           <div className={`status-item battery${battery2Stale ? ' battery-stale' : ''}`}>
             <div className="metric-label">
-              <span>Battery 2</span>
               <strong>{battery2 ? `${battery2Percent.toFixed(0)}%` : '---'}</strong>
             </div>
             <div className="meter">
