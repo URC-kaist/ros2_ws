@@ -466,6 +466,8 @@ public:
           std::isfinite(actuator_position)) {
         joint.state = actuator_position - joint.boot_reference_position +
                       joint.origin_offset;
+      } else if (!joint.uses_boot_origin && std::isfinite(actuator_position)) {
+        joint.state = actuator_position;
       } else if (!std::isfinite(joint.state)) {
         joint.state = joint.uses_boot_origin ? joint.origin_offset : 0.0;
       }
