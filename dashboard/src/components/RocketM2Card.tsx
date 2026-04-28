@@ -26,7 +26,7 @@ const formatChain = (values: number[] | null | undefined, idx: number) => {
   return Number.isFinite(value) ? `${Math.round(value)}` : '--'
 }
 
-const RocketM2Card = () => {
+const RocketM2Cards = () => {
   const { gateway } = useXbeeGateway()
   const [statuses, setStatuses] = useState<Record<string, RocketM2Status>>({})
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -85,53 +85,52 @@ const RocketM2Card = () => {
   }), [statuses, nowMs])
 
   return (
-    <article className="card rocket-m2-card">
-      <h3>Rocket M2 Links</h3>
-      <p>Base, drone, and rover Rocket M2 management status.</p>
-      <div className="rocket-m2-grid">
-        {rows.map((row) => (
-          <section className="rocket-m2-target" key={row.target}>
-            <div className="rocket-m2-target__header">
-              <strong>{row.label}</strong>
-              <span className={row.stateClass}>{row.stateLabel}</span>
+    <>
+      {rows.map((row) => (
+        <article className="card rocket-m2-card" key={row.target}>
+          <div className="rocket-m2-card__header">
+            <div>
+              <h3>{row.label} Rocket M2</h3>
+              <p>Management radio status.</p>
             </div>
-            <div className="status-list">
-              <div className="status-item">
-                <span>Signal</span>
-                <strong>{formatDbm(row.signal)}</strong>
-              </div>
-              <div className="status-item">
-                <span>RSSI</span>
-                <strong>{formatNumber(row.status?.rssi)}</strong>
-              </div>
-              <div className="status-item">
-                <span>Noise</span>
-                <strong>{formatDbm(row.noise)}</strong>
-              </div>
-              <div className="status-item">
-                <span>SNR</span>
-                <strong>{row.snr != null ? `${row.snr.toFixed(0)} dB` : '--'}</strong>
-              </div>
-              <div className="status-item">
-                <span>Channel</span>
-                <strong>
-                  {Number.isFinite(row.status?.chwidth) ? `${row.status?.chwidth} MHz` : '--'}
-                </strong>
-              </div>
-              <div className="status-item">
-                <span>Chains</span>
-                <strong>
-                  {formatChain(row.status?.chainrssi, 0)} / {formatChain(row.status?.chainrssi, 1)}
-                </strong>
-              </div>
+            <span className={row.stateClass}>{row.stateLabel}</span>
+          </div>
+          <div className="status-list">
+            <div className="status-item">
+              <span>Signal</span>
+              <strong>{formatDbm(row.signal)}</strong>
             </div>
-            {row.errorText ? <div className="rocket-m2-error">Error: {row.errorText}</div> : null}
-            {row.updatedLabel ? <div className="status-updated">Updated {row.updatedLabel}</div> : null}
-          </section>
-        ))}
-      </div>
-    </article>
+            <div className="status-item">
+              <span>RSSI</span>
+              <strong>{formatNumber(row.status?.rssi)}</strong>
+            </div>
+            <div className="status-item">
+              <span>Noise</span>
+              <strong>{formatDbm(row.noise)}</strong>
+            </div>
+            <div className="status-item">
+              <span>SNR</span>
+              <strong>{row.snr != null ? `${row.snr.toFixed(0)} dB` : '--'}</strong>
+            </div>
+            <div className="status-item">
+              <span>Channel</span>
+              <strong>
+                {Number.isFinite(row.status?.chwidth) ? `${row.status?.chwidth} MHz` : '--'}
+              </strong>
+            </div>
+            <div className="status-item">
+              <span>Chains</span>
+              <strong>
+                {formatChain(row.status?.chainrssi, 0)} / {formatChain(row.status?.chainrssi, 1)}
+              </strong>
+            </div>
+          </div>
+          {row.errorText ? <div className="rocket-m2-error">Error: {row.errorText}</div> : null}
+          {row.updatedLabel ? <div className="status-updated">Updated {row.updatedLabel}</div> : null}
+        </article>
+      ))}
+    </>
   )
 }
 
-export default RocketM2Card
+export default RocketM2Cards

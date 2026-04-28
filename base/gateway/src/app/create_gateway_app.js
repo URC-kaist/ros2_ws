@@ -182,13 +182,6 @@ function createGatewayApp(options = {}) {
     }
 
     if (type === 'cmd_arm_twist') {
-      log(
-        `cmd_arm_twist rx lin=(${coerceNumber(msg.lin_x_m_s)}, ${coerceNumber(
-          msg.lin_y_m_s
-        )}, ${coerceNumber(msg.lin_z_m_s)}) ang=(${coerceNumber(
-          msg.ang_x_rad_s
-        )}, ${coerceNumber(msg.ang_y_rad_s)}, ${coerceNumber(msg.ang_z_rad_s)})`
-      )
       writeFrame(
         encodeCmdArmTwist(
           {

@@ -61,6 +61,7 @@ function redactRocketM2Secrets(text) {
 function formatRocketM2Error(err) {
   if (!err) return 'Unknown error'
   if (typeof err === 'string') return err
+  if (err.code === 7 || err.code === '7') return 'Rocket M2 is down'
   const parts = []
   if (err.code != null) parts.push(`code=${err.code}`)
   if (err.signal) parts.push(`signal=${err.signal}`)

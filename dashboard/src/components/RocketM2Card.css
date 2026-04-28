@@ -1,23 +1,17 @@
 .rocket-m2-card .status-list {
-  margin-top: 4px;
-}
-
-.rocket-m2-grid {
-  display: grid;
-  gap: 10px;
   margin-top: 8px;
 }
 
-.rocket-m2-target {
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-}
-
-.rocket-m2-target__header {
+.rocket-m2-card__header {
   align-items: center;
   display: flex;
+  gap: 12px;
   justify-content: space-between;
-  margin-bottom: 4px;
+}
+
+.rocket-m2-card__header h3,
+.rocket-m2-card__header p {
+  margin-right: 8px;
 }
 
 .status-good {

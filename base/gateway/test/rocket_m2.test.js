@@ -47,6 +47,16 @@ test('formatRocketM2Error redacts password-like content', () => {
   assert.match(message, /password=\*\*\*/)
 })
 
+test('formatRocketM2Error summarizes connection failures', () => {
+  const message = formatRocketM2Error({
+    code: 7,
+    message:
+      'Command failed: curl -k https://192.168.1.106/login.cgi --data username=mr2&password=secret',
+  })
+
+  assert.equal(message, 'Rocket M2 is down')
+})
+
 test('createRocketM2Status uses explicit timing defaults', () => {
   const status = createRocketM2Status(
     { connected: true, signal: -60 },
