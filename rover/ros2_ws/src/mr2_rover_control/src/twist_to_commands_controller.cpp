@@ -12,7 +12,7 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<std::vector<std::string>>("steering_joints", {});
   auto_declare<double>("wheel_base", 0.95386);
   auto_declare<double>("track_width", 0.6504);
-  auto_declare<double>("wheel_radius", 0.125);
+  auto_declare<double>("wheel_radius", 0.17);
   auto_declare<double>("max_wheel_linear_speed", 0.4);
   auto_declare<double>("max_steer", 2.35619); // +/- 135 degrees
   auto_declare<double>("twist_timeout", 0.5);
