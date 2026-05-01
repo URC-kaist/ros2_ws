@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import ControlEstopSection from './ControlPanel/ControlEstopSection'
-import ControlPanelHeader from './ControlPanel/ControlPanelHeader'
 import ControlStatusList from './ControlPanel/ControlStatusList'
 import ControlVectorPlot, { type CmdVel } from './ControlPanel/ControlVectorPlot'
 import { useXbeeGateway } from '../hooks/useXbeeGateway'
@@ -159,7 +158,6 @@ const ControlPanel = () => {
 
   return (
     <aside className="control-panel">
-      <ControlPanelHeader />
       <ControlStatusList />
       <ControlVectorPlot
         cmdVel={cmdVel}
