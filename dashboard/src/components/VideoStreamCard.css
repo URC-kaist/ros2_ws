@@ -1,6 +1,6 @@
 .video-stream-card {
   position: relative;
-  width: min(100%, var(--video-width, 640px));
+  width: 100%;
   aspect-ratio: var(--video-aspect, 16 / 9);
   overflow: hidden;
   border-radius: 12px;
@@ -19,20 +19,23 @@
 
 .video-stream-overlay {
   position: absolute;
-  inset: auto 10px 10px 10px;
+  inset: auto 8px 8px auto;
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 6px 10px;
+  max-width: calc(100% - 16px);
+  min-height: 22px;
+  padding: 3px 7px;
   border-radius: 999px;
-  background: rgba(7, 10, 18, 0.78);
-  color: #c8d3de;
-  font-size: 0.78rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 10, 18, 0.46);
+  color: rgba(200, 211, 222, 0.78);
+  font-size: 0.68rem;
   letter-spacing: 0.01em;
-  backdrop-filter: blur(10px);
+  line-height: 1;
+  backdrop-filter: blur(6px);
 }
 
 .video-stream-overlay--live {
-  background: rgba(10, 48, 43, 0.76);
-  color: #85f0dd;
+  background: rgba(7, 10, 18, 0.38);
+  color: rgba(200, 211, 222, 0.72);
 }

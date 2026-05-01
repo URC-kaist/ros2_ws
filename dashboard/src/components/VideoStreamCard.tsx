@@ -153,14 +153,17 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
     stream.available ? 'Waiting for codec config...' : 'Waiting for video ingest...'
   )
   const [hasFrame, setHasFrame] = useState(false)
+  const [frameSize, setFrameSize] = useState<{ width: number; height: number } | null>(null)
 
   const videoStyle = useMemo(
-    () =>
-      ({
-        ...(videoWidth ? { '--video-width': `${videoWidth}px` } : {}),
-        ...(videoWidth && videoHeight ? { '--video-aspect': `${videoWidth} / ${videoHeight}` } : {}),
-      }) as CSSProperties,
-    [videoHeight, videoWidth]
+    () => {
+      const width = frameSize?.width ?? videoWidth
+      const height = frameSize?.height ?? videoHeight
+      return ({
+        ...(width && height ? { '--video-aspect': `${width} / ${height}` } : {}),
+      }) as CSSProperties
+    },
+    [frameSize, videoHeight, videoWidth]
   )
 
   useEffect(() => {
@@ -206,6 +209,7 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
           if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width
             canvas.height = height
+            setFrameSize({ width, height })
           }
 
           const context = canvas.getContext('2d')

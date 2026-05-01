@@ -79,8 +79,8 @@ const MapPreview = ({
           onClick={() => setBasemapMode((prev) => (prev === 'local' ? 'esri' : 'local'))}
           style={{
             position: 'absolute',
-            top: 54,
-            right: 10,
+            bottom: 54,
+            left: 12,
             zIndex: 2,
             background: 'rgba(11, 18, 32, 0.85)',
             color: '#cdd6f4',
@@ -98,7 +98,7 @@ const MapPreview = ({
           <div
             style={{
               position: 'absolute',
-              bottom: 54,
+              bottom: 96,
               left: 12,
               zIndex: 2,
               background: 'rgba(53, 211, 195, 0.9)',
