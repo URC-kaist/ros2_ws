@@ -217,7 +217,15 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
             frame.close()
             return
           }
-          context.drawImage(frame, 0, 0, canvas.width, canvas.height)
+          context.fillStyle = '#060910'
+          context.fillRect(0, 0, canvas.width, canvas.height)
+          const frameRatio = width / height
+          const canvasRatio = canvas.width / canvas.height
+          const drawWidth = frameRatio > canvasRatio ? canvas.width : canvas.height * frameRatio
+          const drawHeight = frameRatio > canvasRatio ? canvas.width / frameRatio : canvas.height
+          const offsetX = (canvas.width - drawWidth) * 0.5
+          const offsetY = (canvas.height - drawHeight) * 0.5
+          context.drawImage(frame, offsetX, offsetY, drawWidth, drawHeight)
           frame.close()
           waitingForKeyframeRef.current = false
           setHasFrame(true)
