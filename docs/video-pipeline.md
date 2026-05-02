@@ -66,6 +66,8 @@ Configuration note:
 
 - every stream must declare an explicit `source` object
 - top-level `ros_topic` / `ros_encoding` entries are not supported
+- omit `width` and `height` on ROS topic streams that should preserve the
+  incoming camera frame size
 
 The intended mapping rule is:
 
@@ -101,6 +103,7 @@ Conceptual rover pipeline:
 appsrc
   ! queue leaky=downstream max-size-buffers=1
   ! videoconvert
+  ! videoscale
   ! video/x-raw,format=I420
   ! x264enc ...
   ! h264parse config-interval=1
