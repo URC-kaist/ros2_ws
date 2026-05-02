@@ -190,6 +190,10 @@ class YoloRgbdDetector(Node):
         msg.data = image_u8.tobytes()
         return msg
 
+    def _publish_debug_image(self, image: np.ndarray, header) -> None:
+        msg = self._bgr_to_imgmsg(image, header)
+        self.image_pub.publish(msg)
+
     def _select_detection(
         self, boxes, names
     ) -> Optional[Tuple[int, float, np.ndarray]]:
@@ -368,9 +372,12 @@ class YoloRgbdDetector(Node):
         )
         if not results:
             # self.get_logger().info("YOLO returned no results")
+            self._publish_debug_image(rgb_image, rgb_msg.header)
             return
 
         result = results[0]
+        self._publish_debug_image(result.plot(), rgb_msg.header)
+
         boxes = result.boxes
         effective_class_ids = self._effective_class_ids()
         if not effective_class_ids:
@@ -459,10 +466,6 @@ class YoloRgbdDetector(Node):
                 # )
 
             self.tf_broadcaster.sendTransform(camera_tf)
-
-        annotated = result.plot()
-        annotated_msg = self._bgr_to_imgmsg(annotated, rgb_msg.header)
-        self.image_pub.publish(annotated_msg)
 
         self.get_logger().debug(f"Published pose for class {class_id} (conf={conf:.2f})")
 

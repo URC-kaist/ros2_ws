@@ -209,16 +209,6 @@ class StreamPipeline {
 
  private:
   bool validate_encoding(const std::string & encoding) {
-    if (encoding != config_.ros_encoding) {
-      RCLCPP_WARN(
-          logger_,
-          "Stream %s expected encoding %s but received %s",
-          config_.stream_id.c_str(),
-          config_.ros_encoding.c_str(),
-          encoding.c_str());
-      return false;
-    }
-
     if (!is_supported_ros_encoding(encoding)) {
       RCLCPP_WARN(
           logger_,
@@ -249,11 +239,11 @@ class StreamPipeline {
   std::string build_raw_output_caps() const {
     std::ostringstream caps;
     caps << "video/x-raw,format=I420";
-    if (width_ > 0) {
-      caps << ",width=" << width_;
+    if (output_width_ > 0) {
+      caps << ",width=" << output_width_;
     }
-    if (height_ > 0) {
-      caps << ",height=" << height_;
+    if (output_height_ > 0) {
+      caps << ",height=" << output_height_;
     }
     if (config_.framerate > 0) {
       caps << ",framerate=" << std::max(1, config_.framerate) << "/1";
@@ -284,33 +274,34 @@ class StreamPipeline {
 
   bool ensure_ros_pipeline(int frame_width, int frame_height) {
     if (pipeline_ != nullptr) {
-      if (frame_width != width_ || frame_height != height_) {
+      if (frame_width != input_width_ || frame_height != input_height_) {
         RCLCPP_WARN(
             logger_,
             "Stream %s received unexpected frame dimensions %dx%d (expected %dx%d)",
             config_.stream_id.c_str(),
             frame_width,
             frame_height,
-            width_,
-            height_);
+            input_width_,
+            input_height_);
         return false;
       }
       return true;
     }
 
-    width_ = config_.width > 0 ? config_.width : frame_width;
-    height_ = config_.height > 0 ? config_.height : frame_height;
+    input_width_ = frame_width;
+    input_height_ = frame_height;
+    output_width_ = config_.width > 0 ? config_.width : frame_width;
+    output_height_ = config_.height > 0 ? config_.height : frame_height;
 
-    if (width_ != frame_width || height_ != frame_height) {
-      RCLCPP_WARN(
+    if (output_width_ != frame_width || output_height_ != frame_height) {
+      RCLCPP_INFO(
           logger_,
-          "Stream %s configured for %dx%d but first frame is %dx%d; using configured size and dropping frame",
+          "Stream %s scaling ROS frames from %dx%d to configured size %dx%d",
           config_.stream_id.c_str(),
-          width_,
-          height_,
           frame_width,
-          frame_height);
-      return false;
+          frame_height,
+          output_width_,
+          output_height_);
     }
 
     std::ostringstream pipeline_description;
@@ -318,6 +309,7 @@ class StreamPipeline {
         << "appsrc name=src is-live=true format=time block=false do-timestamp=false max-buffers=1 "
         << "! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 "
         << "! videoconvert "
+        << "! videoscale "
         << "! " << build_raw_output_caps() << " "
         << build_encoded_sink_branch();
 
@@ -329,8 +321,8 @@ class StreamPipeline {
         config_.stream_id.c_str(),
         config_.ros_topic.c_str(),
         config_.udp_port,
-        width_,
-        height_,
+        output_width_,
+        output_height_,
         config_.framerate);
     return true;
   }
@@ -340,8 +332,8 @@ class StreamPipeline {
       return;
     }
 
-    width_ = config_.width;
-    height_ = config_.height;
+    output_width_ = config_.width;
+    output_height_ = config_.height;
 
     const std::string pixel_format = uppercase(config_.v4l2_pixel_format);
     const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
@@ -436,10 +428,10 @@ class StreamPipeline {
           "RGB",
           "width",
           G_TYPE_INT,
-          width_,
+          input_width_,
           "height",
           G_TYPE_INT,
-          height_,
+          input_height_,
           "framerate",
           GST_TYPE_FRACTION,
           std::max(1, config_.framerate),
@@ -551,8 +543,10 @@ class StreamPipeline {
   GstBus * bus_{nullptr};
   guint bus_watch_id_{0};
   pid_t gst_child_pid_{-1};
-  int width_{0};
-  int height_{0};
+  int input_width_{0};
+  int input_height_{0};
+  int output_width_{0};
+  int output_height_{0};
   GstClockTime frame_duration_ns_{0};
   GstClockTime frame_index_{0};
   bool stopping_{false};
