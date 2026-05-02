@@ -149,16 +149,21 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
   const payloadFormatRef = useRef<H264PayloadFormat>('avcc')
   const configGenerationRef = useRef(0)
   const waitingForKeyframeRef = useRef(true)
-  const [status, setStatus] = useState(
-    stream.available ? 'Waiting for codec config...' : 'Waiting for video ingest...'
+  const webCodecsAvailable = typeof VideoDecoder !== 'undefined'
+  const [status, setStatus] = useState(() =>
+    webCodecsAvailable
+      ? stream.available
+        ? 'Waiting for codec config...'
+        : 'Waiting for video ingest...'
+      : 'WebCodecs is unavailable in this browser'
   )
   const [hasFrame, setHasFrame] = useState(false)
   const [frameSize, setFrameSize] = useState<{ width: number; height: number } | null>(null)
 
   const videoStyle = useMemo(
     () => {
-      const width = frameSize?.width ?? videoWidth
-      const height = frameSize?.height ?? videoHeight
+      const width = videoWidth ?? frameSize?.width
+      const height = videoHeight ?? frameSize?.height
       return ({
         ...(width && height ? { '--video-aspect': `${width} / ${height}` } : {}),
       }) as CSSProperties
@@ -170,8 +175,7 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
     let active = true
     let decoderGeneration = 0
 
-    if (typeof VideoDecoder === 'undefined') {
-      setStatus('WebCodecs is unavailable in this browser')
+    if (!webCodecsAvailable) {
       return
     }
 
@@ -204,8 +208,8 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
             return
           }
 
-          const width = frame.displayWidth || stream.width || 640
-          const height = frame.displayHeight || stream.height || 360
+          const width = frame.displayWidth || frame.codedWidth || stream.width || videoWidth || 640
+          const height = frame.displayHeight || frame.codedHeight || stream.height || videoHeight || 360
           if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width
             canvas.height = height
@@ -219,13 +223,25 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
           }
           context.fillStyle = '#060910'
           context.fillRect(0, 0, canvas.width, canvas.height)
-          const frameRatio = width / height
+          const sourceWidth = frame.codedWidth || frame.displayWidth || width
+          const sourceHeight = frame.codedHeight || frame.displayHeight || height
+          const frameRatio = sourceWidth / sourceHeight
           const canvasRatio = canvas.width / canvas.height
           const drawWidth = frameRatio > canvasRatio ? canvas.width : canvas.height * frameRatio
           const drawHeight = frameRatio > canvasRatio ? canvas.width / frameRatio : canvas.height
           const offsetX = (canvas.width - drawWidth) * 0.5
           const offsetY = (canvas.height - drawHeight) * 0.5
-          context.drawImage(frame, offsetX, offsetY, drawWidth, drawHeight)
+          context.drawImage(
+            frame,
+            0,
+            0,
+            sourceWidth,
+            sourceHeight,
+            offsetX,
+            offsetY,
+            drawWidth,
+            drawHeight
+          )
           frame.close()
           waitingForKeyframeRef.current = false
           setHasFrame(true)
@@ -350,7 +366,7 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
       payloadFormatRef.current = 'avcc'
       waitingForKeyframeRef.current = true
     }
-  }, [stream.stream_id])
+  }, [stream.height, stream.stream_id, stream.width, videoHeight, videoWidth, webCodecsAvailable])
 
   return (
     <div className="video-stream-card" style={videoStyle}>

@@ -1,6 +1,8 @@
 .video-stream-card {
   position: relative;
   width: 100%;
+  height: auto;
+  align-self: start;
   aspect-ratio: var(--video-aspect, 16 / 9);
   overflow: hidden;
   border-radius: 12px;

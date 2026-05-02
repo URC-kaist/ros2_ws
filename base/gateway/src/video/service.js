@@ -17,12 +17,12 @@ function createStreamState(stream) {
     available: false,
     codec: null,
     configVersion: 0,
-    height: stream.height || 0,
+    encodedHeight: 0,
+    encodedWidth: 0,
     latestKeyAccessUnit: null,
     pps: null,
     sps: null,
     stream,
-    width: stream.width || 0,
   }
 }
 
@@ -124,17 +124,21 @@ function createVideoGateway(options = {}) {
       changed = true
     }
 
-    if (Number.isInteger(accessUnit.width) && accessUnit.width > 0 && state.width !== accessUnit.width) {
-      state.width = accessUnit.width
+    if (
+      Number.isInteger(accessUnit.width) &&
+      accessUnit.width > 0 &&
+      state.encodedWidth !== accessUnit.width
+    ) {
+      state.encodedWidth = accessUnit.width
       changed = true
     }
 
     if (
       Number.isInteger(accessUnit.height) &&
       accessUnit.height > 0 &&
-      state.height !== accessUnit.height
+      state.encodedHeight !== accessUnit.height
     ) {
-      state.height = accessUnit.height
+      state.encodedHeight = accessUnit.height
       changed = true
     }
 
@@ -170,11 +174,11 @@ function createVideoGateway(options = {}) {
     if (subscription.configVersionSent !== state.configVersion) {
       const configMessage = encodeConfigMessage({
         codec: state.codec || '',
-        height: state.height,
+        height: state.encodedHeight,
         pps: state.pps,
         sps: state.sps,
         stream_id: state.stream.stream_id,
-        width: state.width,
+        width: state.encodedWidth,
       })
       if (!trySend(client, configMessage, state.stream.stream_id)) {
         return false
@@ -297,10 +301,14 @@ function createVideoGateway(options = {}) {
     getBrowserStreams() {
       return listBrowserStreams(videoConfig).map((stream) => {
         const state = streamStates.get(stream.stream_id)
+        const encodedWidth = state && state.encodedWidth > 0 ? state.encodedWidth : null
+        const encodedHeight = state && state.encodedHeight > 0 ? state.encodedHeight : null
         return {
           ...stream,
-          width: state && state.width > 0 ? state.width : stream.width,
-          height: state && state.height > 0 ? state.height : stream.height,
+          width: stream.width || encodedWidth,
+          height: stream.height || encodedHeight,
+          encoded_width: encodedWidth,
+          encoded_height: encodedHeight,
           available: state?.available === true,
         }
       })

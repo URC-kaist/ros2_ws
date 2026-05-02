@@ -201,6 +201,8 @@ test('video gateway exposes SPS-derived dimensions through browser stream metada
     {
       available: false,
       display: {},
+      encoded_height: 480,
+      encoded_width: 640,
       framerate: 15,
       height: 480,
       ros_encoding: 'rgb8',
@@ -213,6 +215,62 @@ test('video gateway exposes SPS-derived dimensions through browser stream metada
       width: 640,
     },
   ])
+
+  gateway.stop()
+})
+
+test('video gateway does not report configured dimensions as encoded dimensions before ingest', () => {
+  const routeRegistry = createRouteRegistry()
+  const receiverHarness = createReceiverHarness()
+  const gateway = createVideoGateway({
+    WebSocketServerImpl: FakeWebSocketServer,
+    createVideoStreamReceiverImpl: receiverHarness.factory,
+    routeRegistry,
+    videoConfig: createVideoConfig({ width: 848, height: 480 }),
+  })
+
+  const [stream] = gateway.getBrowserStreams()
+  assert.equal(stream.width, 848)
+  assert.equal(stream.height, 480)
+  assert.equal(stream.encoded_width, null)
+  assert.equal(stream.encoded_height, null)
+
+  gateway.stop()
+})
+
+test('video gateway preserves configured display dimensions separately from encoded dimensions', () => {
+  const routeRegistry = createRouteRegistry()
+  const receiverHarness = createReceiverHarness()
+  const gateway = createVideoGateway({
+    WebSocketServerImpl: FakeWebSocketServer,
+    createVideoStreamReceiverImpl: receiverHarness.factory,
+    routeRegistry,
+    videoConfig: createVideoConfig({ width: 848, height: 480 }),
+  })
+
+  const receiver = receiverHarness.callbacksByStream.get('front_nav_cam')
+  assert.ok(receiver)
+
+  receiver.onAccessUnit('front_nav_cam', {
+    codec: 'avc1.F4001E',
+    delta: false,
+    height: 480,
+    key: false,
+    payload: Buffer.from([0x00, 0x00, 0x00, 0x01, 0x67]),
+    pps: null,
+    sps: Buffer.from(
+      '67f4001e90d9680a03db016a0c0c0c80000003008000001e478b1750',
+      'hex'
+    ),
+    timestamp_us: 1000,
+    width: 640,
+  })
+
+  const [stream] = gateway.getBrowserStreams()
+  assert.equal(stream.width, 848)
+  assert.equal(stream.height, 480)
+  assert.equal(stream.encoded_width, 640)
+  assert.equal(stream.encoded_height, 480)
 
   gateway.stop()
 })

@@ -16,6 +16,7 @@ type UseMapPreviewMapOptions = {
   onGrabCoordinate?: (coord: { lat: number; lon: number }) => void
   followRover: boolean
   onFollowRoverChange: (follow: boolean) => void
+  roverPerspective: boolean
   fix: MapCoordinate | null
   headingDeg: number | null
   trail: MapCoordinate[]
@@ -33,6 +34,7 @@ export const useMapPreviewMap = ({
   onGrabCoordinate,
   followRover,
   onFollowRoverChange,
+  roverPerspective,
   fix,
   headingDeg,
   trail,
@@ -320,9 +322,25 @@ export const useMapPreviewMap = ({
     }
 
     if (followRover) {
-      map.easeTo({ center: fix, zoom: Math.max(map.getZoom(), 17), duration: 600 })
+      map.easeTo({
+        center: fix,
+        zoom: Math.max(map.getZoom(), 17),
+        bearing: roverPerspective && headingDeg != null ? headingDeg : map.getBearing(),
+        duration: 600,
+      })
     }
-  }, [fix, followRover, mapReady])
+  }, [fix, followRover, headingDeg, mapReady, roverPerspective])
+
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !mapReady) return
+    if (roverPerspective) {
+      if (headingDeg == null) return
+      map.easeTo({ bearing: headingDeg, duration: 300 })
+      return
+    }
+    map.easeTo({ bearing: 0, duration: 300 })
+  }, [headingDeg, mapReady, roverPerspective])
 
   useEffect(() => {
     const map = mapInstanceRef.current

@@ -55,6 +55,8 @@
         "ros_encoding": "bgr8"
       },
       "udp_port": 5004,
+      "width": 848,
+      "height": 480,
       "framerate": 15,
       "encoder": {
         "bitrate_kbps": 1400,

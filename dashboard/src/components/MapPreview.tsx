@@ -27,6 +27,7 @@ const MapPreview = ({
     objectPose,
   } = useMapPreviewData()
   const [followRover, setFollowRover] = useState(true)
+  const [roverPerspective, setRoverPerspective] = useState(false)
   const [basemapMode, setBasemapMode] = useState<'local' | 'esri'>('local')
   const handleFollowRoverChange = useCallback((follow: boolean) => {
     setFollowRover(follow)
@@ -36,6 +37,7 @@ const MapPreview = ({
     onGrabCoordinate,
     followRover,
     onFollowRoverChange: handleFollowRoverChange,
+    roverPerspective,
     fix,
     headingDeg,
     trail,
@@ -76,10 +78,35 @@ const MapPreview = ({
         </button>
         <button
           type="button"
-          onClick={() => setBasemapMode((prev) => (prev === 'local' ? 'esri' : 'local'))}
+          onClick={() => setRoverPerspective((prev) => !prev)}
+          title={
+            roverPerspective
+              ? 'Keep the map rotated to rover heading'
+              : 'Keep north at the top of the map'
+          }
           style={{
             position: 'absolute',
             bottom: 54,
+            left: 12,
+            zIndex: 2,
+            background: roverPerspective ? 'rgba(53, 211, 195, 0.9)' : 'rgba(11, 18, 32, 0.85)',
+            color: roverPerspective ? '#0b1220' : '#cdd6f4',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 10,
+            padding: '8px 12px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+          }}
+        >
+          View: {roverPerspective ? 'Rover' : 'North'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setBasemapMode((prev) => (prev === 'local' ? 'esri' : 'local'))}
+          style={{
+            position: 'absolute',
+            bottom: 96,
             left: 12,
             zIndex: 2,
             background: 'rgba(11, 18, 32, 0.85)',
@@ -98,7 +125,7 @@ const MapPreview = ({
           <div
             style={{
               position: 'absolute',
-              bottom: 96,
+              bottom: 138,
               left: 12,
               zIndex: 2,
               background: 'rgba(53, 211, 195, 0.9)',

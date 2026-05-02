@@ -35,6 +35,7 @@ const AutonomousTabPanel = ({
             onGrabCoordinate={onGrabCoordinate}
           />
         </article>
+        <ConfiguredVideoGrid title="Live Feed" panel="delivery" />
         <ConfiguredVideoGrid title="Vision" panel="autonomous" />
       </div>
       <div className="autonomy-right">

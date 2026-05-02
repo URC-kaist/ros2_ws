@@ -16,7 +16,10 @@ const baseConfig = {
     ecmaVersion: 2020,
     globals: {
       ...globals.browser,
+      EncodedVideoChunk: 'readonly',
       ROSLIB: 'readonly',
+      VideoDecoder: 'readonly',
+      VideoDecoderConfig: 'readonly',
     },
     parserOptions: {
       ecmaVersion: 'latest',

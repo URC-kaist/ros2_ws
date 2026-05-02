@@ -154,7 +154,7 @@
   box-shadow: 0 0 12px rgba(53, 211, 195, 0.5);
 }
 
-.meter-fill.accent {
+.meter-fill.warn {
   background: var(--accent-2);
   box-shadow: 0 0 12px rgba(247, 178, 77, 0.5);
 }
@@ -162,6 +162,11 @@
 .meter-fill.good {
   background: #5de089;
   box-shadow: 0 0 12px rgba(93, 224, 137, 0.5);
+}
+
+.meter-fill.low {
+  background: var(--danger);
+  box-shadow: 0 0 12px rgba(242, 95, 92, 0.5);
 }
 
 .battery-meta {

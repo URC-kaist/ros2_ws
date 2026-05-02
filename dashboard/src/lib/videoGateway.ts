@@ -10,6 +10,8 @@ export type VideoStreamInfo = {
   v4l2_pixel_format: string | null
   width: number | null
   height: number | null
+  encoded_width?: number | null
+  encoded_height?: number | null
   framerate: number | null
   available: boolean
   display: {

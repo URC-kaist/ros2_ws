@@ -144,6 +144,11 @@ const ControlStatusList = () => {
   }
   const battery1Percent = getBatteryPercent(battery1)
   const battery2Percent = getBatteryPercent(battery2)
+  const getBatteryFillClass = (percent: number) => {
+    if (percent <= 20) return 'low'
+    if (percent <= 50) return 'warn'
+    return 'good'
+  }
   // Battery telemetry is ~11.4s in real mode; keep stale threshold above that.
   const batteryStaleMs = 30000
   const battery1Stale = battery1UpdatedAt === 0 || nowMs - battery1UpdatedAt > batteryStaleMs
@@ -261,7 +266,10 @@ const ControlStatusList = () => {
               <strong>{battery1 ? `${battery1Percent.toFixed(0)}%` : '---'}</strong>
             </div>
             <div className="meter">
-              <div className="meter-fill good" style={{ width: `${battery1Percent}%` }} />
+              <div
+                className={`meter-fill ${getBatteryFillClass(battery1Percent)}`}
+                style={{ width: `${battery1Percent}%` }}
+              />
             </div>
             <div className="battery-meta">
               <span>
@@ -276,7 +284,10 @@ const ControlStatusList = () => {
               <strong>{battery2 ? `${battery2Percent.toFixed(0)}%` : '---'}</strong>
             </div>
             <div className="meter">
-              <div className="meter-fill accent" style={{ width: `${battery2Percent}%` }} />
+              <div
+                className={`meter-fill ${getBatteryFillClass(battery2Percent)}`}
+                style={{ width: `${battery2Percent}%` }}
+              />
             </div>
             <div className="battery-meta">
               <span>
