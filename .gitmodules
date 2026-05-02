@@ -3,4 +3,4 @@
 	url = https://github.com/tilk/rtcm_msgs
 [submodule "rover/ros2_ws/src/ublox_dgnss"]
 	path = rover/ros2_ws/src/ublox_dgnss
-	url = https://github.com/URC-kaist/ublox_dgnss.git
+	url = https://github.com/aussierobots/ublox_dgnss.git
