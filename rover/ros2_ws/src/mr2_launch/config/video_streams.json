@@ -113,6 +113,52 @@
         "panel": "delivery",
         "order": 3
       }
+    },
+    {
+      "stream_id": "front_left_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoFL",
+        "pixel_format": "MJPG"
+      },
+      "udp_port": 5010,
+      "width": 848,
+      "height": 480,
+      "framerate": 30,
+      "encoder": {
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Front Left",
+        "panel": "delivery",
+        "order": 4
+      }
+    },
+    {
+      "stream_id": "front_right_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoFR",
+        "pixel_format": "MJPG"
+      },
+      "udp_port": 5012,
+      "width": 848,
+      "height": 480,
+      "framerate": 30,
+      "encoder": {
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Front Right",
+        "panel": "delivery",
+        "order": 5
+      }
     }
   ]
 }
