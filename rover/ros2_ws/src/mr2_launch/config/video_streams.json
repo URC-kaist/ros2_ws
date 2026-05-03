@@ -99,8 +99,8 @@
         "pixel_format": "MJPG"
       },
       "udp_port": 5008,
-      "width": 848,
-      "height": 480,
+      "width": 640,
+      "height": 360,
       "framerate": 30,
       "encoder": {
         "bitrate_kbps": 1800,
@@ -122,8 +122,8 @@
         "pixel_format": "MJPG"
       },
       "udp_port": 5010,
-      "width": 848,
-      "height": 480,
+      "width": 640,
+      "height": 360,
       "framerate": 30,
       "encoder": {
         "bitrate_kbps": 1800,
@@ -145,8 +145,8 @@
         "pixel_format": "MJPG"
       },
       "udp_port": 5012,
-      "width": 848,
-      "height": 480,
+      "width": 640,
+      "height": 360,
       "framerate": 30,
       "encoder": {
         "bitrate_kbps": 1800,
