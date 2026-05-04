@@ -308,10 +308,12 @@ private:
   int8_t last_temperature_c_{0};
   uint8_t last_error_code_{0};
 
-  // Initialize to neutral values so early state publications remain valid.
-  double position_rad_{0.0};
-  double velocity_rad_{0.0};
-  double effort_amp_{0.0};
+  // Keep position invalid until the first real feedback frame arrives. The
+  // hardware interface uses finite actuator position to capture boot-origin
+  // references, so a placeholder value here can become a false zero.
+  double position_rad_{std::numeric_limits<double>::quiet_NaN()};
+  double velocity_rad_{std::numeric_limits<double>::quiet_NaN()};
+  double effort_amp_{std::numeric_limits<double>::quiet_NaN()};
   double command_out_rad_{std::numeric_limits<double>::quiet_NaN()};
   double desired_command_rad_{std::numeric_limits<double>::quiet_NaN()};
   double hold_position_rad_{std::numeric_limits<double>::quiet_NaN()};
