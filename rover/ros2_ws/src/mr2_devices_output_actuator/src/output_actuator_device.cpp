@@ -195,11 +195,6 @@ public:
     if (auto_arm_it != info.parameters.end()) {
       auto_arm_ = parse_bool(auto_arm_it->second);
     }
-    const auto disable_checks_it =
-        info.parameters.find("disable_activation_checks");
-    if (disable_checks_it != info.parameters.end()) {
-      disable_activation_checks_ = parse_bool(disable_checks_it->second);
-    }
     const auto require_limits_it = info.parameters.find("require_limits_status");
     if (require_limits_it != info.parameters.end()) {
       require_limits_status_ = parse_bool(require_limits_it->second);
@@ -287,65 +282,51 @@ public:
       return true;
     }
 
-    if (disable_activation_checks_) {
-      RCLCPP_WARN(logger_,
-                  "Actuator %u activation checks disabled; skipping readiness "
-                  "checks but still requiring arm confirmation",
-                  node_id_);
+    if (!wait_for([this] { return diag_seen_.load(); }, "runtime diagnostic")) {
+      return false;
+    }
+
+    if (armed_) {
       send_power_command(false);
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      if (!wait_for([this] { return diag_seen_.load() && !armed_.load(); },
+                    "disarmed diagnostic")) {
+        return false;
+      }
+    }
+
+    if (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
+        active_profile_.load() != static_cast<uint8_t>(desired_profile_)) {
+      config_status_seen_ = false;
       send_profile_command(desired_profile_);
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    } else {
-      if (!wait_for([this] { return diag_seen_.load(); },
-                    "runtime diagnostic")) {
+      if (!wait_for([this] {
+            return diag_seen_.load() &&
+                   stored_profile_.load() ==
+                       static_cast<uint8_t>(desired_profile_) &&
+                   active_profile_.load() ==
+                       static_cast<uint8_t>(desired_profile_);
+          },
+                    "desired profile diagnostic")) {
+        RCLCPP_ERROR(logger_, "Actuator %u profile select result: %u", node_id_,
+                     profile_select_result_.load());
         return false;
       }
+    }
 
-      if (armed_) {
-        send_power_command(false);
-        if (!wait_for([this] {
-              return diag_seen_.load() && !armed_.load();
-            },
-                      "disarmed diagnostic")) {
-          return false;
-        }
-      }
-
-      if (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
-          active_profile_.load() != static_cast<uint8_t>(desired_profile_)) {
-        config_status_seen_ = false;
-        send_profile_command(desired_profile_);
-        if (!wait_for([this] {
-              return diag_seen_.load() &&
-                     stored_profile_.load() ==
-                         static_cast<uint8_t>(desired_profile_) &&
-                     active_profile_.load() ==
-                         static_cast<uint8_t>(desired_profile_);
-            },
-                      "desired profile diagnostic")) {
-          RCLCPP_ERROR(logger_, "Actuator %u profile select result: %u",
-                       node_id_, profile_select_result_.load());
-          return false;
-        }
-      }
-
-      if (require_limits_status_ &&
-          !wait_for([this] { return limits_status_seen_.load(); },
-                    "limits status")) {
-        return false;
-      }
-      if (require_config_status_ &&
-          !wait_for([this] { return config_status_seen_.load(); },
-                    "config status")) {
-        return false;
-      }
-      if (!validate_config_status()) {
-        return false;
-      }
-      if (!validate_runtime_diag_ready("before arm")) {
-        return false;
-      }
+    if (require_limits_status_ &&
+        !wait_for([this] { return limits_status_seen_.load(); },
+                  "limits status")) {
+      return false;
+    }
+    if (require_config_status_ &&
+        !wait_for([this] { return config_status_seen_.load(); },
+                  "config status")) {
+      return false;
+    }
+    if (!validate_config_status()) {
+      return false;
+    }
+    if (!validate_runtime_diag_ready("before arm")) {
+      return false;
     }
 
     if (channel_ == CommandChannel::Angle) {
@@ -362,10 +343,8 @@ public:
     if (!arm_with_confirmation()) {
       return false;
     }
-    if (!disable_activation_checks_) {
-      if (!validate_runtime_diag_ready("after arm")) {
-        return false;
-      }
+    if (!validate_runtime_diag_ready("after arm")) {
+      return false;
     }
 
     active_ = true;
@@ -826,7 +805,6 @@ private:
   std::atomic<uint8_t> active_profile_{
       static_cast<uint8_t>(Profile::VelocityOnly)};
   bool auto_arm_{true};
-  bool disable_activation_checks_{false};
   bool require_limits_status_{true};
   bool require_config_status_{true};
   int activation_timeout_ms_{1500};
