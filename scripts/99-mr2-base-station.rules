@@ -13,5 +13,8 @@ ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", MODE:="0666", GROUP:="plugdev
 # XBEE radio: /dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30JZD4V-if00-port0
 SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="D30JZD4V", MODE:="0666", GROUP:="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttyXBEE"
 
+# SiK radio: /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="0001", MODE:="0666", GROUP:="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttySIK"
+
 # Arduino FTDI USB serial: /dev/serial/by-id/usb-FTDI_USB_Serial_Converter_FTB6SPL3-if00-port0
 SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="FTB6SPL3", MODE:="0666", GROUP:="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttyARDUINO"
