@@ -10,10 +10,13 @@
 # metadata, so this rule only sets permissions and disables ModemManager.
 ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", MODE:="0666", GROUP:="plugdev", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# SiK radio: /dev/serial/by-id/usb-FTDI_FT231X_USB_UART_D30JZD4V-if00-port0
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="D30JZD4V", MODE:="0666", GROUP:="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttySIK"
+
 # XBEE radio: FTDI FT231X USB UART.
 # Match by VID/PID instead of a single adapter serial so replacement XBEE USB
 # adapters are still detected as /dev/ttyXBEE on the base station.
-SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", MODE:="0666", GROUP:="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttyXBEE"
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}!="D30JZD4V", MODE:="0666", GROUP:="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttyXBEE"
 
 # Arduino FTDI USB serial: /dev/serial/by-id/usb-FTDI_USB_Serial_Converter_FTB6SPL3-if00-port0
 SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="FTB6SPL3", MODE:="0666", GROUP:="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="ttyARDUINO"
