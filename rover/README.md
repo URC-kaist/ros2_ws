@@ -24,7 +24,22 @@ sudo apt install -y \
   gstreamer1.0-tools \
   gstreamer1.0-plugins-base \
   gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-ugly
+  gstreamer1.0-plugins-ugly \
+  gstreamer1.0-plugins-bad
+```
+
+On Jetson, hardware H.264 encoding also needs NVIDIA's GStreamer package:
+
+```bash
+sudo apt install -y nvidia-l4t-gstreamer
+```
+
+Verify the required elements:
+
+```bash
+gst-inspect-1.0 h264parse
+gst-inspect-1.0 nvv4l2h264enc
+gst-inspect-1.0 nvvidconv
 ```
 
 The central stream mapping lives at
@@ -59,9 +74,10 @@ ros2 launch mr2_launch rover_real.launch.py \
   video_base_host:=192.168.1.50
 ```
 
-The node creates one GStreamer `appsrc -> x264enc -> rtph264pay -> udpsink`
-pipeline per configured stream and normalizes supported ROS images to RGB before
-encoding.
+The node creates one GStreamer H.264 RTP pipeline per configured stream and
+normalizes supported ROS images to RGB before encoding. Set
+`encoder.type` to `nvv4l2h264enc` for Jetson hardware encoding, or `x264`
+for the CPU encoder fallback.
 
 ## OpenCV/ROS Humble Repair Notes (Jetson)
 

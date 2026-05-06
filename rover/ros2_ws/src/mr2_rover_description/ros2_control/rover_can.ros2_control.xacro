@@ -277,7 +277,7 @@
           <state_interface name="velocity"/>
         </actuator>
         <joint name="fl_wheel_joint" role="fl_wheel_joint">
-          <mechanical_reduction>1.0</mechanical_reduction>
+          <mechanical_reduction>-1.0</mechanical_reduction>
         </joint>
       </transmission>
 
@@ -313,7 +313,7 @@
           <state_interface name="velocity"/>
         </actuator>
         <joint name="rr_wheel_joint" role="rr_wheel_joint">
-          <mechanical_reduction>-1.0</mechanical_reduction>
+          <mechanical_reduction>1.0</mechanical_reduction>
         </joint>
       </transmission>
 

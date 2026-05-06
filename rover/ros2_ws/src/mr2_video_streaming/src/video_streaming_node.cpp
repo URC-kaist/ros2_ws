@@ -35,6 +35,7 @@ using json = nlohmann::json;
 enum class StreamSourceType { RosTopic, V4L2 };
 
 struct EncoderConfig {
+  std::string type{"x264"};
   int bitrate_kbps{1500};
   int keyframe_interval{30};
   std::string speed_preset{"ultrafast"};
@@ -64,6 +65,16 @@ std::string uppercase(std::string value) {
 
 bool is_supported_ros_encoding(const std::string & encoding) {
   return encoding == "rgb8" || encoding == "bgr8";
+}
+
+bool is_jetson_hardware_encoder(const std::string & encoder_type) {
+  return encoder_type == "nvv4l2h264enc" || encoder_type == "jetson_h264" ||
+         encoder_type == "jetson";
+}
+
+bool is_supported_encoder_type(const std::string & encoder_type) {
+  return encoder_type == "x264" || encoder_type == "x264enc" ||
+         is_jetson_hardware_encoder(encoder_type);
 }
 
 std::string source_type_to_string(StreamSourceType source_type) {
@@ -223,12 +234,20 @@ class StreamPipeline {
 
   std::string build_encoded_sink_branch() const {
     std::ostringstream branch;
-    branch << "! x264enc bitrate=" << config_.encoder.bitrate_kbps
-           << " speed-preset=" << config_.encoder.speed_preset
-           << " tune=" << config_.encoder.tune
-           << " key-int-max=" << config_.encoder.keyframe_interval
-           << " bframes=0 byte-stream=true threads=1 "
-           << "! h264parse config-interval=1 "
+    if (is_jetson_hardware_encoder(config_.encoder.type)) {
+      branch << "! nvvidconv "
+             << "! video/x-raw(memory:NVMM),format=NV12 "
+             << "! nvv4l2h264enc bitrate=" << (config_.encoder.bitrate_kbps * 1000)
+             << " iframeinterval=" << config_.encoder.keyframe_interval
+             << " insert-sps-pps=true maxperf-enable=true control-rate=1 ";
+    } else {
+      branch << "! x264enc bitrate=" << config_.encoder.bitrate_kbps
+             << " speed-preset=" << config_.encoder.speed_preset
+             << " tune=" << config_.encoder.tune
+             << " key-int-max=" << config_.encoder.keyframe_interval
+             << " bframes=0 byte-stream=true threads=1 ";
+    }
+    branch << "! h264parse config-interval=1 "
            << "! rtph264pay pt=96 mtu=1200 config-interval=1 "
            << "! udpsink host=" << quote_gstreamer_string(base_host_)
            << " port=" << config_.udp_port
@@ -349,26 +368,48 @@ class StreamPipeline {
       args.push_back("!");
       args.push_back(source_caps);
     }
-    if (is_jpeg) {
-      args.push_back("!");
-      args.push_back("jpegdec");
+    if (is_jetson_hardware_encoder(config_.encoder.type)) {
+      if (is_jpeg) {
+        args.insert(args.end(), {"!", "nvv4l2decoder", "mjpeg=true"});
+      }
+      args.insert(
+          args.end(),
+          {
+              "!",
+              "nvvidconv",
+              "!",
+              "video/x-raw(memory:NVMM),format=NV12",
+              "!",
+              "nvv4l2h264enc",
+              "bitrate=" + std::to_string(config_.encoder.bitrate_kbps * 1000),
+              "iframeinterval=" + std::to_string(config_.encoder.keyframe_interval),
+              "insert-sps-pps=true",
+              "maxperf-enable=true",
+              "control-rate=1",
+          });
+    } else {
+      if (is_jpeg) {
+        args.push_back("!");
+        args.push_back("jpegdec");
+      }
+      args.insert(args.end(), {"!", "videoconvert", "!", "video/x-raw,format=I420"});
+      args.insert(
+          args.end(),
+          {
+              "!",
+              "x264enc",
+              "bitrate=" + std::to_string(config_.encoder.bitrate_kbps),
+              "speed-preset=" + config_.encoder.speed_preset,
+              "tune=" + config_.encoder.tune,
+              "key-int-max=" + std::to_string(config_.encoder.keyframe_interval),
+              "bframes=0",
+              "byte-stream=true",
+              "threads=1",
+          });
     }
     args.insert(
         args.end(),
         {
-            "!",
-            "videoconvert",
-            "!",
-            "video/x-raw,format=I420",
-            "!",
-            "x264enc",
-            "bitrate=" + std::to_string(config_.encoder.bitrate_kbps),
-            "speed-preset=" + config_.encoder.speed_preset,
-            "tune=" + config_.encoder.tune,
-            "key-int-max=" + std::to_string(config_.encoder.keyframe_interval),
-            "bframes=0",
-            "byte-stream=true",
-            "threads=1",
             "!",
             "h264parse",
             "config-interval=1",
@@ -659,6 +700,11 @@ StreamConfig parse_stream_config(const json & item) {
   config.framerate = std::max(1, item.value("framerate", 15));
 
   const json encoder = item.value("encoder", json::object());
+  config.encoder.type = encoder.value("type", std::string("x264"));
+  if (!is_supported_encoder_type(config.encoder.type)) {
+    throw std::runtime_error(
+        "stream " + config.stream_id + " has unsupported encoder.type " + config.encoder.type);
+  }
   config.encoder.bitrate_kbps = std::max(100, encoder.value("bitrate_kbps", 1500));
   config.encoder.keyframe_interval = std::max(1, encoder.value("keyframe_interval", 30));
   config.encoder.speed_preset = encoder.value("speed_preset", std::string("ultrafast"));

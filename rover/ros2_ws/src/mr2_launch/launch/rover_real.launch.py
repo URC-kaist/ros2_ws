@@ -146,12 +146,12 @@ def generate_launch_description():
     )
     left_gnss_serial_arg = DeclareLaunchArgument(
         "left_gnss_serial",
-        default_value="NorthRx_",
+        default_value="TowerRx_",
         description="USB serial string for the left F9P (empty selects first match)",
     )
     right_gnss_serial_arg = DeclareLaunchArgument(
         "right_gnss_serial",
-        default_value="TowerRx_",
+        default_value="NorthRx_",
         description="USB serial string for the right F9P (empty selects first match)",
     )
     left_gnss_frame_arg = DeclareLaunchArgument(
@@ -265,15 +265,16 @@ def generate_launch_description():
         }.items(),
         condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
     )
-    traversability_launch = IncludeLaunchDescription(
+    navigation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
-                [FindPackageShare("mr2_rover_auto"), "launch", "traversability_pipeline.launch.py"]
+                [FindPackageShare("mr2_rover_auto"), "launch", "navigation.launch.py"]
             )
         ),
         launch_arguments={
-            "use_sim_time": "false",
+            "mode": "real",
         }.items(),
+        condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
     )
 
     ntrip_client_launch = IncludeLaunchDescription(
@@ -524,7 +525,7 @@ def generate_launch_description():
             xbee_sim_launch,
             realsense_launch,
             front_uvc_launch,
-            # traversability_launch, # launched by navigation.launch.py
+            navigation_launch,
             ntrip_client_launch,
             rover_launch,
             ublox_left_launch_delayed,

@@ -35,7 +35,7 @@ find_package(geographic_msgs REQUIRED)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};/usr/share/cmake/geographiclib")
 find_package(GeographicLib REQUIRED)
 find_package(robot_localization REQUIRED)
-find_package(aruco_opencv_msgs REQUIRED)
+find_package(aruco_opencv_msgs QUIET)
 find_package(ublox_ubx_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(mr2_action_interface REQUIRED)
@@ -92,10 +92,17 @@ ament_target_dependencies(cover_vision_yolo_adapter
   rclcpp geometry_msgs mr2_action_interface tf2 tf2_ros tf2_geometry_msgs
 )
 
-add_executable(cover_vision_aruco_adapter src/cover_vision_aruco_adapter.cpp)
-ament_target_dependencies(cover_vision_aruco_adapter
-  rclcpp geometry_msgs mr2_action_interface tf2 tf2_ros tf2_geometry_msgs aruco_opencv_msgs
-)
+set(MR2_ROVER_AUTO_OPTIONAL_TARGETS)
+
+if(aruco_opencv_msgs_FOUND)
+  add_executable(cover_vision_aruco_adapter src/cover_vision_aruco_adapter.cpp)
+  ament_target_dependencies(cover_vision_aruco_adapter
+    rclcpp geometry_msgs mr2_action_interface tf2 tf2_ros tf2_geometry_msgs aruco_opencv_msgs
+  )
+  list(APPEND MR2_ROVER_AUTO_OPTIONAL_TARGETS cover_vision_aruco_adapter)
+else()
+  message(WARNING "aruco_opencv_msgs not found; skipping cover_vision_aruco_adapter")
+endif()
 
 add_executable(mission_master src/mission_master.cpp)
 ament_target_dependencies(mission_master
@@ -156,7 +163,7 @@ install(TARGETS
   gnss_only_server
   cover_vision_server
   cover_vision_yolo_adapter
-  cover_vision_aruco_adapter
+  ${MR2_ROVER_AUTO_OPTIONAL_TARGETS}
   mission_master
   base_datum_setter
   pc2_to_heightmap_node

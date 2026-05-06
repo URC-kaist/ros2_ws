@@ -66,6 +66,8 @@ Configuration note:
 
 - every stream must declare an explicit `source` object
 - top-level `ros_topic` / `ros_encoding` entries are not supported
+- set `encoder.type` to `nvv4l2h264enc` for Jetson hardware H.264 encoding,
+  or `x264` for CPU encoding
 - omit `width` and `height` on ROS topic streams that should preserve the
   incoming camera frame size
 
@@ -105,7 +107,7 @@ appsrc
   ! videoconvert
   ! videoscale
   ! video/x-raw,format=I420
-  ! x264enc ...
+  ! [x264enc ...] or [nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! nvv4l2h264enc ...]
   ! h264parse config-interval=1
   ! rtph264pay pt=96 mtu=1200 config-interval=1
   ! udpsink host=<base_host> port=<udp_port> sync=false async=false
@@ -121,7 +123,7 @@ v4l2src device=<device> do-timestamp=true
   ! videoscale
   ! videoconvert
   ! video/x-raw,format=I420[,width=...][,height=...][,framerate=.../1]
-  ! x264enc ...
+  ! [x264enc ...] or [nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! nvv4l2h264enc ...]
   ! h264parse config-interval=1
   ! rtph264pay pt=96 mtu=1200 config-interval=1
   ! udpsink host=<base_host> port=<udp_port> sync=false async=false

@@ -1,4 +1,3 @@
-import platform
 import yaml
 from launch import LaunchDescription
 from launch.actions import OpaqueFunction
@@ -20,15 +19,6 @@ def _launch_setup(context):
 
     if "rgb_camera.power_line_frequency" not in params:
         params["rgb_camera.power_line_frequency"] = 2
-
-    # Jetson uses pointcloud__neon_.enable; desktop uses pointcloud.enable.
-    # If both are present, prefer NEON on aarch64.
-    has_neon = "pointcloud__neon_.enable" in params
-    has_std = "pointcloud.enable" in params
-    if has_neon and has_std and platform.machine() == "aarch64":
-        params.pop("pointcloud.enable", None)
-    elif has_neon and has_std:
-        params.pop("pointcloud__neon_.enable", None)
 
     camera_name = str(params.get("camera_name", "rgbd_camera"))
     base_frame_id = str(params.get("base_frame_id", "rgbd_camera"))

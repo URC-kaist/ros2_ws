@@ -49,11 +49,6 @@ def generate_launch_description():
         default_value="false",
         description="Run without GUI components",
     )
-    foxglove_port_arg = DeclareLaunchArgument(
-        "foxglove_port",
-        default_value="8765",
-        description="WebSocket port for the Foxglove Bridge",
-    )
     can_iface_arg = DeclareLaunchArgument(
         "can_iface",
         default_value="can0",
@@ -385,47 +380,6 @@ def generate_launch_description():
         condition=xbee_sim_condition,
     )
 
-    foxglove_bridge = Node(
-        package="foxglove_bridge",
-        executable="foxglove_bridge",
-        name="foxglove_bridge",
-        output="screen",
-        parameters=[
-            {"port": ParameterValue(LaunchConfiguration("foxglove_port"), value_type=int)},
-            {"debug": ParameterValue(False, value_type=bool)},
-            {"address": "0.0.0.0"},
-            {"tls": ParameterValue(False, value_type=bool)},
-            {"certfile": ""},
-            {"keyfile": ""},
-            {"topic_whitelist": [".*"]},
-            {"param_whitelist": [".*"]},
-            {"service_whitelist": [".*"]},
-            {"client_topic_whitelist": [".*"]},
-            {"min_qos_depth": 1},
-            {"max_qos_depth": 10},
-            {"num_threads": 0},
-            {"send_buffer_limit": 10000000},
-            {"use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)},
-            {
-                "capabilities": [
-                    "clientPublish",
-                    "parameters",
-                    "parametersSubscribe",
-                    "services",
-                    "connectionGraph",
-                    "assets",
-                ]
-            },
-            {"include_hidden": ParameterValue(False, value_type=bool)},
-            {
-                "asset_uri_allowlist": [
-                    "^package://(?:[-\\w%]+/)*[-\\w%.]+\\.(?:dae|fbx|glb|gltf|jpeg|jpg|mtl|obj|png|stl|tif|tiff|urdf|webp|xacro)$"
-                ]
-            },
-            {"ignore_unresponsive_param_nodes": ParameterValue(True, value_type=bool)},
-        ],
-    )
-
     rosbridge_ws = Node(
         package="rosbridge_server",
         executable="rosbridge_websocket",
@@ -445,7 +399,6 @@ def generate_launch_description():
         mode_arg,
         use_sim_time_arg,
         headless_arg,
-        foxglove_port_arg,
         can_iface_arg,
         controller_config_arg,
         controller_spawn_delay_arg,
@@ -478,7 +431,6 @@ def generate_launch_description():
         xbee_bridge,
         xbee_bridge_sim,
         video_streaming_launch,
-        foxglove_bridge,
         rosbridge_ws,
         rviz2,
     ])
