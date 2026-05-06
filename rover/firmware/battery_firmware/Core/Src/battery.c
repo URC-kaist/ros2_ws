@@ -8,15 +8,15 @@
 #include <string.h>
 
 // ========================== CONFIG / DEBUG ==========================
-#define XGT_DBG 1 // 0: silent, 1: commands+results, 2: verbose (raw bytes)
+#define XGT_DBG 0 // 0: silent, 1: commands+results, 2: verbose (raw bytes)
 #define XGT_RX_SILENCE_MS                                                      \
   500u // idle gap to treat frame as complete (short frames)
 #define XGT_RX_SILENCE_L                                                       \
   800u // idle gap for long frames (not used but supported)
 
-#define XGT_CAN_ID_SUMMARY 0x320u
-#define XGT_CAN_ID_META 0x321u
-#define XGT_CAN_ID_CELL_BASE 0x330u
+#define XGT_CAN_ID_SUMMARY 0x300u
+#define XGT_CAN_ID_META 0x301u
+#define XGT_CAN_ID_CELL_BASE 0x310u
 
 // ====================== Private module state ======================
 static UART_HandleTypeDef *s_huart_batt =
@@ -24,7 +24,7 @@ static UART_HandleTypeDef *s_huart_batt =
 static UART_HandleTypeDef *s_huart_log = NULL; // Optional logging UART
 static FDCAN_HandleTypeDef *s_hfdcan = NULL;   // Optional CAN telemetry bus
 
-static uint32_t s_update_interval_ms = 10000; // poll every 10s
+static uint32_t s_update_interval_ms = 1000; // poll every 1s
 static uint32_t s_last_update_ms = 0;
 static uint32_t s_state_start_ms = 0;
 static uint8_t s_current_cell = 0;
@@ -32,6 +32,7 @@ static uint8_t s_current_cell = 0;
 static uint8_t s_rx_len = 0;
 static uint8_t s_buf[32];
 static uint32_t s_cycle = 0;
+static bool s_cycle_ok = true;
 
 // Battery data
 static uint16_t batt_health_ = 0;  // %
@@ -42,6 +43,17 @@ static uint16_t num_charges_ = 0;  // count
 static float temperature_ = 0.f;   // °C
 static float pack_voltage_ = 0.f;  // V
 static float cell_voltages_[10] = {0};
+
+static void reset_battery_data(void) {
+  batt_health_ = 0;
+  cell_size_ = 0;
+  parallel_cnt_ = 0;
+  charge_ = 0;
+  num_charges_ = 0;
+  temperature_ = 0.0f;
+  pack_voltage_ = 0.0f;
+  memset(cell_voltages_, 0, sizeof(cell_voltages_));
+}
 
 // ================= Nibble/byte bit-reversal lookup =================
 static const uint8_t LOOKUP[16] = {0x0, 0x8, 0x4, 0xC, 0x2, 0xA, 0x6, 0xE,
@@ -336,6 +348,16 @@ static int8_t send_battery(uint8_t *rx_buf, const uint8_t *cmd, uint8_t cmd_len,
   return ok ? 0 : -1;
 }
 
+static bool query_battery(uint8_t *rx_buf, const uint8_t *cmd, uint8_t cmd_len,
+                          uint8_t *rx_len) {
+  int8_t result = send_battery(rx_buf, cmd, cmd_len, rx_len);
+  if (result != 0 || *rx_len < 8u) {
+    s_cycle_ok = false;
+    return false;
+  }
+  return true;
+}
+
 // ========================= State machine ========================
 typedef enum {
   S_IDLE = 0,
@@ -388,6 +410,7 @@ void battery_task(void) {
     s_state = S_WAKE;
     s_state_start_ms = now;
     s_current_cell = 0;
+    s_cycle_ok = true;
     s_cycle++;
   }
   if (s_state == S_IDLE)
@@ -410,9 +433,8 @@ void battery_task(void) {
 
   case S_NUM_CHARGES:
     if ((now - s_state_start_ms) >= 80u) {
-      (void)send_battery(s_buf, CMD_NUM_CHARGES, sizeof(CMD_NUM_CHARGES),
-                         &s_rx_len);
-      if (s_rx_len >= 8) {
+      if (query_battery(s_buf, CMD_NUM_CHARGES, sizeof(CMD_NUM_CHARGES),
+                        &s_rx_len)) {
         num_charges_ = le16_at(&s_buf[4]);
         b_log("[XGT] NumCharges=%u\r\n", num_charges_);
       }
@@ -423,9 +445,8 @@ void battery_task(void) {
 
   case S_CELL_SIZE:
     if ((now - s_state_start_ms) >= 60u) {
-      (void)send_battery(s_buf, CMD_CELL_SIZE, sizeof(CMD_CELL_SIZE),
-                         &s_rx_len);
-      if (s_rx_len >= 8) {
+      if (query_battery(s_buf, CMD_CELL_SIZE, sizeof(CMD_CELL_SIZE),
+                        &s_rx_len)) {
         uint16_t raw = s_buf[5]; // 1-byte raw, scaled to mAh
         cell_size_ = (uint16_t)(raw * 100u);
         b_log("[XGT] CellSize=%u mAh (raw=%u)\r\n", cell_size_, raw);
@@ -437,9 +458,8 @@ void battery_task(void) {
 
   case S_PARALLEL_CNT:
     if ((now - s_state_start_ms) >= 60u) {
-      (void)send_battery(s_buf, CMD_PARALLEL_CNT, sizeof(CMD_PARALLEL_CNT),
-                         &s_rx_len);
-      if (s_rx_len >= 8) {
+      if (query_battery(s_buf, CMD_PARALLEL_CNT, sizeof(CMD_PARALLEL_CNT),
+                        &s_rx_len)) {
         parallel_cnt_ = s_buf[4];
         b_log("[XGT] Parallel=%u\r\n", parallel_cnt_);
       }
@@ -450,9 +470,8 @@ void battery_task(void) {
 
   case S_BATT_HEALTH:
     if ((now - s_state_start_ms) >= 60u) {
-      (void)send_battery(s_buf, CMD_BATT_HEALTH, sizeof(CMD_BATT_HEALTH),
-                         &s_rx_len);
-      if (s_rx_len >= 8) {
+      if (query_battery(s_buf, CMD_BATT_HEALTH, sizeof(CMD_BATT_HEALTH),
+                        &s_rx_len)) {
         uint16_t health_raw = le16_at(&s_buf[4]);
         uint16_t raw_cell_size = (uint16_t)(cell_size_ / 100u);
         if (raw_cell_size > 0 && parallel_cnt_ > 0) {
@@ -472,8 +491,7 @@ void battery_task(void) {
 
   case S_CHARGE:
     if ((now - s_state_start_ms) >= 60u) {
-      (void)send_battery(s_buf, CMD_CHARGE, sizeof(CMD_CHARGE), &s_rx_len);
-      if (s_rx_len >= 8) {
+      if (query_battery(s_buf, CMD_CHARGE, sizeof(CMD_CHARGE), &s_rx_len)) {
         uint16_t charge_raw = le16_at(&s_buf[4]);
         // Makita reports SoC as an 8.8 fixed-point percent. Convert to whole
         // percent with rounding before saturating to 100.
@@ -490,9 +508,8 @@ void battery_task(void) {
 
   case S_TEMPERATURE:
     if ((now - s_state_start_ms) >= 60u) {
-      (void)send_battery(s_buf, CMD_TEMPERATURE, sizeof(CMD_TEMPERATURE),
-                         &s_rx_len);
-      if (s_rx_len >= 8) {
+      if (query_battery(s_buf, CMD_TEMPERATURE, sizeof(CMD_TEMPERATURE),
+                        &s_rx_len)) {
         uint16_t temp_raw = le16_at(&s_buf[4]);
         // From original: T = -30 + (temp_raw - 2431)/10 → tenths: t10 =
         // temp_raw - 2731
@@ -508,9 +525,8 @@ void battery_task(void) {
 
   case S_PACK_VOLT:
     if ((now - s_state_start_ms) >= 60u) {
-      (void)send_battery(s_buf, CMD_PACK_VOLT, sizeof(CMD_PACK_VOLT),
-                         &s_rx_len);
-      if (s_rx_len >= 8) {
+      if (query_battery(s_buf, CMD_PACK_VOLT, sizeof(CMD_PACK_VOLT),
+                        &s_rx_len)) {
         uint16_t vraw = le16_at(&s_buf[4]); // mV
         pack_voltage_ = (float)vraw / 1000.0f;
         b_log("[XGT] Pack=%u mV (%u.%03u V)\r\n", vraw, vraw / 1000,
@@ -532,8 +548,7 @@ void battery_task(void) {
         cmd[4] = reverse_nibbles_via_lookup(addr);
         cmd[1] = reverse_nibbles_via_lookup((uint8_t)(addr + 194));
 
-        (void)send_battery(s_buf, cmd, 8, &s_rx_len);
-        if (s_rx_len >= 8) {
+        if (query_battery(s_buf, cmd, 8, &s_rx_len)) {
           uint16_t mv = le16_at(&s_buf[4]);
           cell_voltages_[s_current_cell - 1] = (float)mv / 1000.0f;
           b_log("[XGT] Cell%u=%u mV\r\n", s_current_cell, mv);
@@ -547,6 +562,10 @@ void battery_task(void) {
     break;
 
   case S_COMPLETE:
+    if (!s_cycle_ok) {
+      b_log("[XGT] incomplete cycle; publishing zero telemetry\r\n");
+      reset_battery_data();
+    }
     b_log("[XGT] Cells: ");
     for (int i = 0; i < 10; i++) {
       uint16_t mv = (uint16_t)(cell_voltages_[i] * 1000.0f + 0.5f);

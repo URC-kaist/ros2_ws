@@ -67,3 +67,18 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     # Add user defined libraries
 )
+
+set(PROBE_RS_CHIP "STM32H523CE" CACHE STRING "probe-rs chip name for flashing")
+
+add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.hex
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.bin
+    COMMENT "Generating ${CMAKE_PROJECT_NAME}.hex and ${CMAKE_PROJECT_NAME}.bin"
+)
+
+add_custom_target(flash
+    COMMAND probe-rs download --chip ${PROBE_RS_CHIP} --binary-format elf $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+    DEPENDS ${CMAKE_PROJECT_NAME}
+    USES_TERMINAL
+    COMMENT "Flashing ${CMAKE_PROJECT_NAME} with probe-rs (${PROBE_RS_CHIP})"
+)

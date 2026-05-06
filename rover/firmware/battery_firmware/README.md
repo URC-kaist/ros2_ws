@@ -5,7 +5,7 @@ The firmware targets an STM32H523 MCU and mediates between a Makita XGT battery
 pack and an on-vehicle CAN network. The battery is polled over the single-wire
 diagnostic bus using USART2 (configured for half-duplex, inverted 9600 8E1), and
 the measured pack data is republished as a set of FDCAN frames on FDCAN1
-(classic CAN, 1 Mbit nominal).
+(classic CAN, 500 kbit/s nominal).
 
 The cooperative state machine inside `Core/Src/battery.c` runs in the foreground
 polling loop and performs every step required to wake the pack, issue Makita
@@ -21,8 +21,8 @@ commands, parse replies, and broadcast the resulting telemetry.
   so an external pull-up is still required.
 - **FDCAN1 (PA11 = RX, PA12 = TX)** – CAN bus interface. The CAN transceiver
   should be powered from 3.3 V (or the appropriate level for your transceiver)
-  and wired to the vehicle's CANH/CANL. Bit timing is 1 Mbit nominal with the
-  default CubeMX settings (prescaler = 2, seg1 = 19, seg2 = 5, SJW = 4).
+  and wired to the vehicle's CANH/CANL. Bit timing is 500 kbit/s nominal with the
+  default CubeMX settings (prescaler = 4, seg1 = 19, seg2 = 5, SJW = 4).
 - **Optional logging UART** – `battery_init()` accepts an additional UART handle
   for console output. Leave it `NULL` to disable logs entirely, or pass any
   UART configured for the desired baud rate; the Makita transport always uses
@@ -65,10 +65,10 @@ messages so the rest of the vehicle can remain agnostic to the Makita single
 wire link.
 
 ### Transport characteristics
-- Classical CAN (no FD/BRS) on FDCAN1 at 1 Mbit nominal, 11-bit identifiers,
+- Classical CAN (no FD/BRS) on FDCAN1 at 500 kbit/s nominal, 11-bit identifiers,
   8-byte data fields.
 - Each polling cycle ends in `publish_fdcan_state()` and emits the entire
-  frame set listed below. The default cadence is one burst every 10 seconds,
+  frame set listed below. The default cadence is one burst every 1 second,
   but it can be adjusted through `s_update_interval_ms`.
 - A 32-bit `cycle counter` increments once per burst and is split between the
   summary and metadata frames so consumers can correlate the packets.
@@ -77,19 +77,19 @@ wire link.
 
 | ID    | Name       | Rate\* | Notes                                                             |
 |-------|------------|--------|-------------------------------------------------------------------|
-| 0x320 | Summary    | 1/`s_update_interval_ms` | High-level SoC, health, temperature, voltage and cycle counter LSBs. |
-| 0x321 | Metadata   | same   | Static ratings plus life counters and the cycle counter MSBs.     |
-| 0x330 | Cells 1–2  | same   | Two cell reports per frame, ascending cell IDs.                   |
-| 0x331 | Cells 3–4  | same   |                                                                   |
-| 0x332 | Cells 5–6  | same   |                                                                   |
-| 0x333 | Cells 7–8  | same   |                                                                   |
-| 0x334 | Cells 9–10 | same   |                                                                   |
+| 0x300 | Summary    | 1/`s_update_interval_ms` | High-level SoC, health, temperature, voltage and cycle counter LSBs. |
+| 0x301 | Metadata   | same   | Static ratings plus life counters and the cycle counter MSBs.     |
+| 0x310 | Cells 1–2  | same   | Two cell reports per frame, ascending cell IDs.                   |
+| 0x311 | Cells 3–4  | same   |                                                                   |
+| 0x312 | Cells 5–6  | same   |                                                                   |
+| 0x313 | Cells 7–8  | same   |                                                                   |
+| 0x314 | Cells 9–10 | same   |                                                                   |
 
-\*With the default 10 s interval all frames are emitted once every 10 seconds.
+\*With the default 1 s interval all frames are emitted once every second.
 
 ### Frame layouts
 
-#### Summary (0x320)
+#### Summary (0x300)
 - **Byte 0** – State of charge in percent (`u8`). Values above 100 % are
   clipped to 100.
 - **Byte 1** – Pack “health” percentage (`u8`) derived from Makita’s
@@ -102,7 +102,7 @@ wire link.
 - **Bytes 6–7** – Lower 16 bits of the cycle counter (`cycle[15:0]`), little
   endian. Combine with the metadata frame to recover the full 32-bit value.
 
-#### Metadata (0x321)
+#### Metadata (0x301)
 - **Bytes 0–1** – Nominal single-cell capacity in milliamp-hours (`u16`
   little endian). The Makita raw value is scaled by 100; for example, a raw
   value of 0x04 becomes bytes `0x90 0x01` (=0x0190=400 mAh per cell).
@@ -116,9 +116,9 @@ wire link.
   (`cycle[31:16]`, little endian). Together with the summary frame you can form
   a monotonically increasing 32-bit counter that increments once per CAN burst.
 
-#### Cell voltage frames (0x330–0x334)
-Each frame carries two cells with the same structure, so 0x330 contains cells
-1 and 2, 0x331 contains 3 and 4, etc. Slots are packed back-to-back:
+#### Cell voltage frames (0x310–0x314)
+Each frame carries two cells with the same structure, so 0x310 contains cells
+1 and 2, 0x311 contains 3 and 4, etc. Slots are packed back-to-back:
 
 ```
 Byte 0 = cell ID (1–10)
@@ -152,6 +152,12 @@ without needing to speak Makita’s single-wire protocol.
 - `battery_firmware.ioc` – CubeMX configuration for reference/regeneration.
 
 ## Build and flash
+Enter the Nix development shell:
+
+```sh
+nix develop path:$PWD
+```
+
 The project uses CMake presets that pull in `cmake/gcc-arm-none-eabi.cmake`.
 
 ```sh
@@ -159,8 +165,16 @@ cmake --preset Debug
 cmake --build --preset Debug
 ```
 
-Flash the resulting `build/Debug/battery_firmware.elf` with STM32CubeProgrammer,
-OpenOCD, pyOCD, or any SWD tool compatible with STM32H5.
+The build emits `build/Debug/battery_firmware.elf`,
+`build/Debug/battery_firmware.hex`, and `build/Debug/battery_firmware.bin`.
+
+Flash with probe-rs:
+
+```sh
+cmake --build --preset Debug --target flash
+```
+
+The flash target uses probe-rs chip name `STM32H523CE`.
 
 ## Operation checklist
 1. Wire PA2 to the Makita diagnostic pin with the proper voltage conditioning.
@@ -168,7 +182,7 @@ OpenOCD, pyOCD, or any SWD tool compatible with STM32H5.
 3. (Optional) Connect a UART to any other port if console logs are desired and
    pass its handle to `battery_init()`.
 4. Power the MCU and the battery pack; the firmware will automatically start
-   polling every 10 seconds, publishing the frames described above.
+   polling every second, publishing the frames described above.
 
 ## Customisation
 - Adjust polling cadence by editing `s_update_interval_ms` in `battery.c`.

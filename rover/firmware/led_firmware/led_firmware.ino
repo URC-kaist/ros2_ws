@@ -40,8 +40,8 @@ static void setMode(Mode m) {
 
   switch (gMode) {
     case MODE_OFF: applySolid(strip.Color(0, 0, 0)); break;
-    case MODE_RED: applySolid(strip.Color(50, 0, 0)); break;
-    case MODE_BLUE: applySolid(strip.Color(0, 0, 50)); break;
+    case MODE_RED: applySolid(strip.Color(65, 0, 0)); break;
+    case MODE_BLUE: applySolid(strip.Color(0, 0, 65)); break;
     case MODE_GREEN_BLINK: applySolid(strip.Color(0, 0, 0)); break;  // start off
     default: applySolid(strip.Color(0, 0, 0)); break;
   }
@@ -72,7 +72,7 @@ static void updateBlink() {
     Serial.println("color change");
     gNextBlinkMs += BLINK_PERIOD_MS;
     gGreenOn = !gGreenOn;
-    applySolid(gGreenOn ? strip.Color(0, 50, 0) : strip.Color(0, 0, 0));
+    applySolid(gGreenOn ? strip.Color(0, 65, 0) : strip.Color(0, 0, 0));
   }
 }
 
@@ -86,8 +86,8 @@ void setup() {
   strip.show();  // clear
   setMode(MODE_GREEN_BLINK);
 
-  // Classic CAN @ 1 Mbps (use x1 since we don't need a faster data phase)
-  ACANFD_STM32_Settings settings(1000 * 1000, DataBitRateFactor::x1);
+  // Classic CAN @ 500 kbps (use x1 since we don't need a faster data phase)
+  ACANFD_STM32_Settings settings(500 * 1000, DataBitRateFactor::x1);
 
   // Accept ONLY our control ID into FIFO0
   ACANFD_STM32_StandardFilters filters;

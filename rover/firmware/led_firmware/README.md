@@ -12,7 +12,7 @@ strip. Incoming CAN frames select a display mode (solid color or green blink).
 ## CAN configuration
 
 - **Library:** `ACANFD_STM32`
-- **Bus type:** Classic CAN (no FD data phase), 1 Mbps nominal.
+- **Bus type:** Classic CAN (no FD data phase), 500 kbps nominal.
 - **Acceptance filter:** Only standard ID `0x123` is accepted into FIFO0.
 
 ## CAN protocol
