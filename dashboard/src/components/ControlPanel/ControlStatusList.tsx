@@ -192,8 +192,8 @@ const ControlStatusList = () => {
       : ledMode === 'autonomous'
         ? 'status-dot-autonomous'
         : ledMode === 'manual'
-          ? 'status-dot-manual'
-          : 'status-dot-off'
+        ? 'status-dot-manual'
+        : 'status-dot-off'
 
   const gnssSummary = useMemo(
     () =>
@@ -220,15 +220,15 @@ const ControlStatusList = () => {
         <div className="status-grid-compact">
           <div className="status-grid-label">
             <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
-            XBEE Link
+            XBEE
           </div>
           <div className="status-grid-label">
             <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />
-            ROS Bridge
+            ROS
           </div>
           <div className="status-grid-label">
             <span className={`status-dot ${missionDotClass}`} aria-hidden="true" />
-            Auto Mission
+            AUTO
           </div>
           <div className="status-grid-value">
             <strong>{linkState}</strong>
@@ -242,19 +242,14 @@ const ControlStatusList = () => {
         </div>
       </section>
       <section className="panel-section">
-        <div className="sidebar-section-title">GNSS Fix</div>
-        <div className="gnss-mini-grid">
+        <div className="gnss-flat-grid">
           {gnssSummary.map((side) => (
-            <div className="gnss-mini-card" key={side.id}>
-              <div className="gnss-mini-title">{side.label}</div>
-              <div className="gnss-mini-kv">
-                <span>Fix</span>
-                <strong>{side.fixType}</strong>
-              </div>
-              <div className="gnss-mini-kv">
-                <span>Fix OK</span>
-                <strong className={side.fixOkTone}>{side.fixOk}</strong>
-              </div>
+            <div className="gnss-flat-row" key={side.id}>
+              <strong className="gnss-flat-title">{side.label}</strong>
+              <span>Fix {side.fixType}</span>
+              <span>
+                Fix OK <strong className={side.fixOkTone}>{side.fixOk}</strong>
+              </span>
             </div>
           ))}
         </div>
