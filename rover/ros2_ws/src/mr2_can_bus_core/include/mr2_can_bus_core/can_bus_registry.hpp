@@ -12,14 +12,13 @@
 class CanBusRegistry {
 public:
   /** Get or create manager for given interface name. */
-  static std::shared_ptr<CanBusManager> get(const std::string &iface,
-                                            int bitrate = 1'000'000) {
+  static std::shared_ptr<CanBusManager> get(const std::string &iface) {
     std::lock_guard<std::mutex> lk(map_mtx());
     auto &weak = map()[iface];
     auto sp = weak.lock();
     if (!sp) {
       sp = std::make_shared<CanBusManager>();
-      if (!sp->start(iface, bitrate)) {
+      if (!sp->start(iface)) {
         map().erase(iface);
         return {};
       }

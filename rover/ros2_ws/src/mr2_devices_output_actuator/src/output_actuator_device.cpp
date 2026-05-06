@@ -172,12 +172,6 @@ public:
           "node_id must be in 1..15 for the NoFW 0x10-spaced frame family");
     }
 
-    int bitrate = 1'000'000;
-    const auto bitrate_it = info.parameters.find("can_bitrate");
-    if (bitrate_it != info.parameters.end()) {
-      bitrate = std::stoi(bitrate_it->second);
-    }
-
     const auto channel_it = info.parameters.find("command_channel");
     if (channel_it != info.parameters.end()) {
       channel_ = parse_command_channel(channel_it->second);
@@ -247,7 +241,7 @@ public:
           std::stod(expected_max_it->second) * kDegToRad;
     }
 
-    bus_ = CanBusRegistry::get(iface_, bitrate);
+    bus_ = CanBusRegistry::get(iface_);
     if (!bus_) {
       throw std::runtime_error("Cannot open CAN bus");
     }

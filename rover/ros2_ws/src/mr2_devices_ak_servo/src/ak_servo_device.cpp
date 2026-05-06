@@ -38,7 +38,7 @@ public:
                             : joint_name_;
 
     /// Retrieve can bus from the registry
-    bus_ = CanBusRegistry::get(iface_, 1'000'000);
+    bus_ = CanBusRegistry::get(iface_);
     if (!bus_) {
       throw std::runtime_error("Cannot open CAN bus");
     }
