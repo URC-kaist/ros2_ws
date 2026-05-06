@@ -167,32 +167,27 @@ const GnssStatusCard = () => {
   )
 
   return (
-    <article className="card card--span-2x1 gnss-card">
-      <header className="gnss-card__header">
-        <h3>GNSS Status</h3>
-      </header>
-      <div className="gnss-card__grid">
-        {sides.map((side) => (
-          <section className="gnss-card__side" key={side.id}>
-            <div className="gnss-card__side-header">
-              <h4>{side.label}</h4>
-              <span className={`gnss-pill gnss-pill--${side.statusTone}`}>
-                {side.statusLabel}
-              </span>
-            </div>
-            <div className="gnss-card__kv">
-              {side.rows.map((row) => (
-                <div className="gnss-card__row" key={row.key}>
-                  <span>{row.key}</span>
-                  <strong>{row.value}</strong>
-                </div>
-              ))}
-            </div>
-            <div className="gnss-updated">Updated {formatUpdatedAt(side.updatedAt)}</div>
-          </section>
-        ))}
-      </div>
-    </article>
+    <>
+      {sides.map((side) => (
+        <article className="card gnss-card" key={side.id}>
+          <div className="gnss-card__header">
+            <h3>{side.label}</h3>
+            <span className={`gnss-pill gnss-pill--${side.statusTone}`}>
+              {side.statusLabel}
+            </span>
+          </div>
+          <div className="gnss-card__kv">
+            {side.rows.map((row) => (
+              <div className="gnss-card__row" key={row.key}>
+                <span>{row.key}</span>
+                <strong>{row.value}</strong>
+              </div>
+            ))}
+          </div>
+          <div className="gnss-updated">Updated {formatUpdatedAt(side.updatedAt)}</div>
+        </article>
+      ))}
+    </>
   )
 }
 

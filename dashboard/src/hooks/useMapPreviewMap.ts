@@ -11,6 +11,8 @@ import type { MissionSpec } from '../lib/missions'
 
 const LOCAL_TILE_BASE = '/tiles'
 
+const toMapBearingDeg = (headingDeg: number) => ((90 - headingDeg) % 360 + 360) % 360
+
 type UseMapPreviewMapOptions = {
   grabFromMap: boolean
   onGrabCoordinate?: (coord: { lat: number; lon: number }) => void
@@ -51,6 +53,7 @@ export const useMapPreviewMap = ({
   const markerRef = useRef<maplibregl.Marker | null>(null)
   const baseMarkerRef = useRef<maplibregl.Marker | null>(null)
   const [mapReady, setMapReady] = useState(false)
+  const roverBearingDeg = headingDeg == null ? null : toMapBearingDeg(headingDeg)
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -325,22 +328,22 @@ export const useMapPreviewMap = ({
       map.easeTo({
         center: fix,
         zoom: Math.max(map.getZoom(), 17),
-        bearing: roverPerspective && headingDeg != null ? headingDeg : map.getBearing(),
+        bearing: roverPerspective && roverBearingDeg != null ? roverBearingDeg : map.getBearing(),
         duration: 600,
       })
     }
-  }, [fix, followRover, headingDeg, mapReady, roverPerspective])
+  }, [fix, followRover, mapReady, roverBearingDeg, roverPerspective])
 
   useEffect(() => {
     const map = mapInstanceRef.current
     if (!map || !mapReady) return
     if (roverPerspective) {
-      if (headingDeg == null) return
-      map.easeTo({ bearing: headingDeg, duration: 300 })
+      if (roverBearingDeg == null) return
+      map.easeTo({ bearing: roverBearingDeg, duration: 300 })
       return
     }
     map.easeTo({ bearing: 0, duration: 300 })
-  }, [headingDeg, mapReady, roverPerspective])
+  }, [mapReady, roverBearingDeg, roverPerspective])
 
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -359,9 +362,9 @@ export const useMapPreviewMap = ({
   }, [baseFix, mapReady])
 
   useEffect(() => {
-    if (!markerRef.current || headingDeg == null) return
-    markerRef.current.setRotation(90 - headingDeg)
-  }, [headingDeg])
+    if (!markerRef.current || roverBearingDeg == null) return
+    markerRef.current.setRotation(roverBearingDeg)
+  }, [roverBearingDeg])
 
   useEffect(() => {
     if (!baseMarkerRef.current || baseHeadingDeg == null) return

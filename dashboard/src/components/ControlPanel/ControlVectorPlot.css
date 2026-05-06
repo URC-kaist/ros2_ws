@@ -14,7 +14,6 @@
 
 .gamepad-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -223,12 +222,6 @@
 .vector-plot-disconnected {
   background: rgba(142, 163, 184, 0.08);
   border-color: rgba(142, 163, 184, 0.2);
-}
-
-@media (max-width: 520px) {
-  .gamepad-row {
-    grid-template-columns: 1fr;
-  }
 }
 
 .vector-plot-disconnected .center-dot {
