@@ -24,7 +24,7 @@ const DEFAULTS = {
   antennaCmdHz: 2,
   antennaStaleMs: 5000,
   antennaHome: true,
-  antennaMaxDeg: 90,
+  antennaMaxDeg: 180,
   antennaSmoothing: 0,
   antennaBootWaitMs: 2000,
   antennaLogMs: 5000,

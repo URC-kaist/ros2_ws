@@ -291,7 +291,7 @@ function createGatewayApp(options = {}) {
         cmdHz: config.antennaCmdHz,
         staleMs: config.antennaStaleMs,
         autoHome: config.antennaHome,
-        maxRad: (Math.max(config.antennaMaxDeg, 0) * Math.PI) / 180,
+        maxRad: (Math.min(Math.max(config.antennaMaxDeg, 0), 180) * Math.PI) / 180,
         smoothing: config.antennaSmoothing,
         bootWaitMs: config.antennaBootWaitMs,
         logHeadingMs: config.antennaLogMs,

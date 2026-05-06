@@ -74,7 +74,7 @@ class AntennaTracker {
     this.headingOffsetDeg = Number.isFinite(options.headingOffsetDeg)
       ? normalizeHeadingDeg(options.headingOffsetDeg)
       : 0
-    this.maxRad = Number.isFinite(options.maxRad) ? options.maxRad : Math.PI / 2
+    this.maxRad = Number.isFinite(options.maxRad) ? options.maxRad : Math.PI
     this.smoothing = Number.isFinite(options.smoothing) ? options.smoothing : 0
     this.autoHome = options.autoHome === true
     this.bootWaitMs = Number.isFinite(options.bootWaitMs) ? options.bootWaitMs : 2000

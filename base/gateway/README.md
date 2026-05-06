@@ -231,7 +231,7 @@ values such as `MR2_GATEWAY_HOST`, `MR2_GATEWAY_PORT`, and
 | `--antenna-cmd-hz` | `BASE_ANTENNA_CMD_HZ` | `2` |
 | `--antenna-stale-ms` | `BASE_ANTENNA_STALE_MS` | `5000` |
 | `--antenna-home` | `BASE_ANTENNA_HOME` | `true` |
-| `--antenna-max-deg` | `BASE_ANTENNA_MAX_DEG` | `90` |
+| `--antenna-max-deg` | `BASE_ANTENNA_MAX_DEG` | `180` |
 | `--antenna-smoothing` | `BASE_ANTENNA_SMOOTHING` | `0` |
 | `--antenna-boot-wait-ms` | `BASE_ANTENNA_BOOT_WAIT_MS` | `2000` |
 | `--antenna-log-ms` | `BASE_ANTENNA_LOG_MS` | `5000` |
