@@ -38,6 +38,11 @@ const DEFAULTS = {
   rocketM2Pass: '',
   rocketM2PollMs: 5000,
   rocketM2TimeoutMs: 4000,
+  mavproxyEnable: true,
+  mavproxyBinary: 'mavproxy.py',
+  mavproxyMasterDevice: '/dev/ttySIK',
+  mavproxyMasterBaud: 57600,
+  mavproxyOut: 'udp:192.168.1.108:14550',
 }
 
 function loadGatewayEnv(baseDir) {
@@ -231,6 +236,24 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
         env.ROCKET_M2_TIMEOUT_MS ||
         DEFAULTS.rocketM2TimeoutMs
     ),
+    mavproxyEnable: toBool(
+      getArg(args, '--mavproxy-enable') || env.MAVPROXY_ENABLE || DEFAULTS.mavproxyEnable
+    ),
+    mavproxyBinary:
+      getArg(args, '--mavproxy-binary') ||
+      env.MAVPROXY_BINARY ||
+      DEFAULTS.mavproxyBinary,
+    mavproxyMasterDevice:
+      getArg(args, '--mavproxy-master-device') ||
+      env.MAVPROXY_MASTER_DEVICE ||
+      DEFAULTS.mavproxyMasterDevice,
+    mavproxyMasterBaud: toInt(
+      getArg(args, '--mavproxy-master-baud') ||
+        env.MAVPROXY_MASTER_BAUD ||
+        DEFAULTS.mavproxyMasterBaud
+    ),
+    mavproxyOut:
+      getArg(args, '--mavproxy-out') || env.MAVPROXY_OUT || DEFAULTS.mavproxyOut,
   }
 }
 

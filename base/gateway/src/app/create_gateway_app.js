@@ -17,6 +17,7 @@ const {
   encodeMissionControl,
 } = require('../protocol/xbee')
 const { createGatewayHttpHandler } = require('../runtime/http_handlers')
+const { startMavproxy } = require('../runtime/mavproxy')
 const { RocketM2Client } = require('../runtime/rocket_m2_client')
 const { startRosTopicRelay } = require('../runtime/ros_topic_relay')
 const { XbeeSerialLink } = require('../runtime/serial_link')
@@ -47,6 +48,7 @@ function createGatewayApp(options = {}) {
   let heartbeatTimer = null
   let antennaStatusTimer = null
   let antennaTracker = null
+  let mavproxy = { stop() {} }
   let rosTopicRelay = { stop() {} }
   let serverListening = false
   let videoGateway = null
@@ -282,6 +284,11 @@ function createGatewayApp(options = {}) {
 
   async function start() {
     serialLink.start()
+    mavproxy = startMavproxy({
+      config,
+      log,
+      spawn: options.mavproxySpawn,
+    })
 
     if (config.antennaEnable) {
       antennaTracker = new AntennaTracker({
@@ -374,6 +381,11 @@ function createGatewayApp(options = {}) {
     if (rosTopicRelay) {
       await Promise.resolve(rosTopicRelay.stop())
       rosTopicRelay = null
+    }
+
+    if (mavproxy) {
+      mavproxy.stop()
+      mavproxy = null
     }
 
     serialLink.stop()

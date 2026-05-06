@@ -24,6 +24,14 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       '55',
       '--video-availability-stale-ms',
       '2222',
+      '--mavproxy-enable',
+      'false',
+      '--mavproxy-master-device',
+      '/tmp/sik0',
+      '--mavproxy-master-baud',
+      '115200',
+      '--mavproxy-out',
+      'udp:127.0.0.1:14550',
     ],
     {
       BASE_XBEE_DEVICE: '/tmp/ignored',
@@ -34,6 +42,10 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       VIDEO_CONFIG_PATH: '/tmp/ignored_video_streams.json',
       VIDEO_JITTER_LATENCY_MS: '90',
       VIDEO_AVAILABILITY_STALE_MS: '9999',
+      MAVPROXY_ENABLE: 'true',
+      MAVPROXY_MASTER_DEVICE: '/dev/ignored',
+      MAVPROXY_MASTER_BAUD: '57600',
+      MAVPROXY_OUT: 'udp:192.168.1.108:14550',
     }
   )
 
@@ -46,6 +58,10 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
   assert.equal(config.videoConfigPath, '/tmp/video_streams.json')
   assert.equal(config.videoJitterLatencyMs, 55)
   assert.equal(config.videoAvailabilityStaleMs, 2222)
+  assert.equal(config.mavproxyEnable, false)
+  assert.equal(config.mavproxyMasterDevice, '/tmp/sik0')
+  assert.equal(config.mavproxyMasterBaud, 115200)
+  assert.equal(config.mavproxyOut, 'udp:127.0.0.1:14550')
   assert.equal('cmdHz' in config, false)
   assert.equal('cmdTimeoutMs' in config, false)
 })
@@ -63,6 +79,11 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   assert.match(config.videoConfigPath, /video_streams\.json$/)
   assert.equal(config.videoReceiverRestartMs, 1000)
   assert.equal(config.videoAvailabilityStaleMs, 1500)
+  assert.equal(config.mavproxyEnable, true)
+  assert.equal(config.mavproxyBinary, 'mavproxy.py')
+  assert.equal(config.mavproxyMasterDevice, '/dev/ttySIK')
+  assert.equal(config.mavproxyMasterBaud, 57600)
+  assert.equal(config.mavproxyOut, 'udp:192.168.1.108:14550')
 })
 
 test('parseGatewayConfig accepts top-level MR2 network env fallbacks', () => {

@@ -184,6 +184,12 @@ npm start -- \
 The base station needs a GStreamer runtime with `gst-launch-1.0`, `rtph264depay`,
 `h264parse`, and `fdsink` available.
 
+MAVProxy starts with the gateway by default:
+
+```bash
+mavproxy.py --master=/dev/ttySIK,57600 --out=udp:192.168.1.108:14550 --non-interactive
+```
+
 ### Config Sources
 
 Config is loaded in this order:
@@ -210,6 +216,16 @@ values such as `MR2_GATEWAY_HOST`, `MR2_GATEWAY_PORT`, and
 | `--gateway-port` | `MR2_GATEWAY_PORT` | `8081` |
 | `--base-xbee-heartbeat-hz` | `BASE_XBEE_HEARTBEAT_HZ` | `2` |
 | `--base-xbee-link-timeout-ms` | `BASE_XBEE_LINK_TIMEOUT_MS` | `2000` |
+
+### MAVProxy
+
+| CLI flag | Environment variable | Default |
+| --- | --- | --- |
+| `--mavproxy-enable` | `MAVPROXY_ENABLE` | `true` |
+| `--mavproxy-binary` | `MAVPROXY_BINARY` | `mavproxy.py` |
+| `--mavproxy-master-device` | `MAVPROXY_MASTER_DEVICE` | `/dev/ttySIK` |
+| `--mavproxy-master-baud` | `MAVPROXY_MASTER_BAUD` | `57600` |
+| `--mavproxy-out` | `MAVPROXY_OUT` | `udp:192.168.1.108:14550` |
 
 ### Video Streaming
 
