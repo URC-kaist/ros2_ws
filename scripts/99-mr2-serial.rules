@@ -12,6 +12,10 @@ SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}==
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoFRONT"
 # Front-left camera (Suyin rev 0x5805, USB path 2.4.1) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.1", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoFL"
+# Left camera (Suyin rev 0x5805, USB path 2.4.2) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.2", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoLEFT"
+# Right camera (Suyin rev 0x5805, USB path 2.4.3) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoRIGHT"
 # Front-right camera (Suyin rev 0x5805, USB path 2.4.4) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.4", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoFR"
 # Top mast camera (Suyin rev 0x5801) — map only the capture node (index 0)

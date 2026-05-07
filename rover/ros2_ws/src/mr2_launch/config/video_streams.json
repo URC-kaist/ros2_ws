@@ -9,8 +9,8 @@
         "ros_encoding": "rgb8"
       },
       "udp_port": 5000,
-      "width": 848,
-      "height": 480,
+      "width": 640,
+      "height": 360,
       "framerate": 15,
       "encoder": {
         "type": "nvv4l2h264enc",
@@ -57,8 +57,8 @@
         "ros_encoding": "bgr8"
       },
       "udp_port": 5004,
-      "width": 848,
-      "height": 480,
+      "width": 640,
+      "height": 360,
       "framerate": 15,
       "encoder": {
         "type": "nvv4l2h264enc",
@@ -165,6 +165,54 @@
         "label": "Front Right",
         "panel": "delivery",
         "order": 5
+      }
+    },
+    {
+      "stream_id": "left_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoLEFT",
+        "pixel_format": "MJPG"
+      },
+      "udp_port": 5014,
+      "width": 640,
+      "height": 360,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Left",
+        "panel": "delivery",
+        "order": 6
+      }
+    },
+    {
+      "stream_id": "right_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoRIGHT",
+        "pixel_format": "MJPG"
+      },
+      "udp_port": 5016,
+      "width": 640,
+      "height": 360,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Right",
+        "panel": "delivery",
+        "order": 7
       }
     }
   ]
