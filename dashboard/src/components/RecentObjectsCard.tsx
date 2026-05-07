@@ -38,6 +38,7 @@ const OBJECT_TOPICS = [
 ] as const
 
 const ANNOTATED_IMAGE_TOPIC = '/yolo/annotated_image'
+const IMAGE_MESSAGE_TYPES = ['sensor_msgs/msg/Image', 'sensor_msgs/Image'] as const
 
 const bytesFromRosData = (data: string | number[]) => {
   if (typeof data !== 'string') {
@@ -132,6 +133,7 @@ const RecentObjectsCard = () => {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageUpdatedAt, setImageUpdatedAt] = useState<number | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
+  const [imageSourceType, setImageSourceType] = useState<string | null>(null)
 
   useEffect(() => {
     const poseUnsubscribers = OBJECT_TOPICS.map((object) =>
@@ -164,26 +166,31 @@ const RecentObjectsCard = () => {
       )
     )
 
-    const imageUnsubscribe = ros.subscribe<RosImageMessage>(
-      ANNOTATED_IMAGE_TOPIC,
-      'sensor_msgs/msg/Image',
-      (message) => {
-        try {
-          setImageUrl(imageMessageToDataUrl(message))
-          setImageUpdatedAt(Date.now())
-          setImageError(null)
-        } catch (error) {
-          setImageError(error instanceof Error ? error.message : 'Image decode failed')
-        }
-      },
-      { throttleRate: 500, queueSize: 1 }
+    const imageUnsubscribers = IMAGE_MESSAGE_TYPES.map((messageType) =>
+      ros.subscribe<RosImageMessage>(
+        ANNOTATED_IMAGE_TOPIC,
+        messageType,
+        (message) => {
+          try {
+            setImageUrl(imageMessageToDataUrl(message))
+            setImageUpdatedAt(Date.now())
+            setImageSourceType(messageType)
+            setImageError(null)
+          } catch (error) {
+            setImageError(error instanceof Error ? error.message : 'Image decode failed')
+          }
+        },
+        { throttleRate: 500, queueSize: 1, compression: 'cbor' }
+      )
     )
 
     return () => {
       for (const unsubscribe of poseUnsubscribers) {
         unsubscribe()
       }
-      imageUnsubscribe()
+      for (const unsubscribe of imageUnsubscribers) {
+        unsubscribe()
+      }
     }
   }, [ros])
 
@@ -205,6 +212,7 @@ const RecentObjectsCard = () => {
       <span className="recent-objects-image-meta">
         {ANNOTATED_IMAGE_TOPIC} ·{' '}
         {imageUpdatedAt ? new Date(imageUpdatedAt).toLocaleTimeString() : '--'}
+        {imageSourceType ? ` · ${imageSourceType}` : ''}
       </span>
       <div className="recent-objects-grid">
         {OBJECT_TOPICS.map((object) => {
