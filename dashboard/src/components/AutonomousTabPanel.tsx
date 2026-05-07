@@ -1,7 +1,7 @@
 import AutonomyHealthCard from './AutonomyHealthCard'
-import ConfiguredVideoGrid from './ConfiguredVideoGrid'
 import MapPreview from './MapPreview'
 import MissionMasterPanel from './MissionMasterPanel'
+import RecentObjectsCard from './RecentObjectsCard'
 import type { MissionSpec } from '../lib/missions'
 
 type AutonomousTabPanelProps = {
@@ -35,11 +35,10 @@ const AutonomousTabPanel = ({
             onGrabCoordinate={onGrabCoordinate}
           />
         </article>
-        <ConfiguredVideoGrid title="Live Feed" panel="delivery" />
-        <ConfiguredVideoGrid title="Vision" panel="autonomous" />
       </div>
       <div className="autonomy-right">
         <AutonomyHealthCard />
+        <RecentObjectsCard />
         <MissionMasterPanel
           missionList={missionList}
           grabFromMap={grabFromMap}

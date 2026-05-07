@@ -13,7 +13,7 @@
 
 .science-layout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 12px;
   align-items: start;
 }
@@ -34,6 +34,12 @@
 .autonomy-right {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.live-feed-panel {
+  display: grid;
   gap: 12px;
   min-width: 0;
 }
@@ -346,14 +352,9 @@
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
   grid-template-areas:
-    "live map"
     "servo map";
   gap: 12px;
   align-items: start;
-}
-
-.delivery-layout .video-feed-card {
-  grid-area: live;
 }
 
 .delivery-layout .delivery-map-card {
@@ -413,6 +414,41 @@
   gap: 10px;
 }
 
+.video-feed-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.video-feed-card--large {
+  gap: 8px;
+}
+
+.video-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.video-feed-reconnect {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(53, 211, 195, 0.35);
+  border-radius: 10px;
+  background: rgba(53, 211, 195, 0.14);
+  color: var(--accent);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.video-feed-reconnect:hover {
+  background: rgba(53, 211, 195, 0.22);
+}
+
 .video-feed-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -447,6 +483,30 @@
 .video-feed-placeholder--compact {
   min-height: 120px;
   font-size: 0.8rem;
+}
+
+.video-feed-card--large .video-feed-grid {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 8px;
+}
+
+.video-feed-card--large .video-feed-item {
+  gap: 4px;
+}
+
+.video-feed-card--large .video-feed-label {
+  font-size: 0.78rem;
+  line-height: 1.1;
+}
+
+.video-feed-card--large .video-feed-placeholder {
+  min-height: 320px;
+  border: 0;
+}
+
+.video-feed-card--large .video-stream-card {
+  border: 0;
+  border-radius: 0;
 }
 
 .science-camera-bank .video-feed-grid {
@@ -487,7 +547,6 @@
   .delivery-layout {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "live"
       "servo"
       "map";
   }
@@ -505,6 +564,10 @@
   }
 
   .video-feed-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .video-feed-card--large .video-feed-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -632,4 +695,109 @@
   color: var(--danger);
   background: rgba(242, 95, 92, 0.18);
   border-color: rgba(242, 95, 92, 0.35);
+}
+
+.recent-objects-card {
+  display: grid;
+  gap: 10px;
+}
+
+.recent-objects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recent-objects-header h3 {
+  margin: 0;
+}
+
+.recent-objects-status {
+  color: var(--danger);
+  font-size: 0.75rem;
+}
+
+.recent-objects-status.connected {
+  color: var(--accent);
+}
+
+.recent-objects-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.recent-objects-image {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.55);
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.recent-objects-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.recent-objects-image-meta {
+  color: var(--muted);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-object {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.36);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.recent-object__meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recent-object__label {
+  color: #eaf1ff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.recent-object__topic,
+.recent-object__age {
+  color: var(--muted);
+  font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-object__pose {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  color: #dfe6fb;
+  font-family: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 1200px) {
+  .recent-objects-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchVideoStreams, type VideoStreamInfo } from '../lib/videoGateway'
 
 export function useVideoStreams(panel?: string) {
   const [streams, setStreams] = useState<VideoStreamInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshIndex, setRefreshIndex] = useState(0)
+
+  const refresh = useCallback(() => {
+    setRefreshIndex((current) => current + 1)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -41,7 +46,7 @@ export function useVideoStreams(panel?: string) {
         window.clearInterval(intervalId)
       }
     }
-  }, [])
+  }, [refreshIndex])
 
   const filteredStreams =
     panel == null ? streams : streams.filter((stream) => stream.display.panel === panel)
@@ -50,5 +55,6 @@ export function useVideoStreams(panel?: string) {
     streams: filteredStreams,
     loading,
     error,
+    refresh,
   }
 }

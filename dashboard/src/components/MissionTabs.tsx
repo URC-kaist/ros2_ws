@@ -2,6 +2,7 @@ import './MissionTabs.css'
 
 const TABS = [
   { id: 'status', label: 'Status' },
+  { id: 'live-feed', label: 'Live Feed' },
   { id: 'science', label: 'Science' },
   { id: 'delivery', label: 'Delivery / Servicing' },
   { id: 'autonomous', label: 'Autonomous' },

@@ -6,9 +6,9 @@ import { useXbeeGateway } from '../hooks/useXbeeGateway'
 import './ControlPanel/ControlPanel.css'
 
 const sensitivityScale = {
-  low: 0.4,
-  med: 0.8,
-  high: 1.2,
+  low: 0.2,
+  med: 0.4,
+  high: 0.8,
 } as const
 
 const RADIUS = 0.57725 // meters

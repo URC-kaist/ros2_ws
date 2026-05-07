@@ -1,14 +1,28 @@
 import type { ReactNode } from 'react'
+import { FiRefreshCw } from 'react-icons/fi'
 import VideoStreamCard from './VideoStreamCard'
 import { useVideoStreams } from '../hooks/useVideoStreams'
+import { getVideoGatewayClient } from '../lib/videoGateway'
 
 type ConfiguredVideoGridProps = {
   title: string
-  panel: string
+  panel?: string
+  large?: boolean
+  showReconnect?: boolean
 }
 
-const ConfiguredVideoGrid = ({ title, panel }: ConfiguredVideoGridProps) => {
-  const { streams, loading, error } = useVideoStreams(panel)
+const ConfiguredVideoGrid = ({
+  title,
+  panel,
+  large = false,
+  showReconnect = false,
+}: ConfiguredVideoGridProps) => {
+  const { streams, loading, error, refresh } = useVideoStreams(panel)
+
+  const handleReconnect = () => {
+    getVideoGatewayClient().reconnect()
+    refresh()
+  }
 
   let content: ReactNode
 
@@ -17,7 +31,11 @@ const ConfiguredVideoGrid = ({ title, panel }: ConfiguredVideoGridProps) => {
   } else if (error) {
     content = <div className="video-feed-placeholder">{error}</div>
   } else if (streams.length === 0) {
-    content = <div className="video-feed-placeholder">No streams configured for {panel}</div>
+    content = (
+      <div className="video-feed-placeholder">
+        No streams configured{panel ? ` for ${panel}` : ''}
+      </div>
+    )
   } else {
     content = (
       <div className="video-feed-grid">
@@ -38,8 +56,22 @@ const ConfiguredVideoGrid = ({ title, panel }: ConfiguredVideoGridProps) => {
   }
 
   return (
-    <article className="card video-feed-card">
-      <h3>{title}</h3>
+    <article className={`video-feed-card ${large ? 'video-feed-card--large' : 'card'}`}>
+      <header className="video-feed-header">
+        <h3>{title}</h3>
+        {showReconnect && (
+          <button
+            className="video-feed-reconnect"
+            type="button"
+            aria-label="Reconnect live feed"
+            title="Reconnect live feed"
+            onClick={handleReconnect}
+          >
+            <FiRefreshCw aria-hidden="true" />
+            <span>Reconnect</span>
+          </button>
+        )}
+      </header>
       {content}
     </article>
   )

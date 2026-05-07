@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import AutonomousTabPanel from './AutonomousTabPanel'
 import DeliveryPanel from './DeliveryPanel'
+import LiveFeedTabPanel from './LiveFeedTabPanel'
 import ScienceTabPanel from './ScienceTabPanel'
 import type { MissionTabId } from './MissionTabs'
 import SystemStatusPanel from './SystemStatusPanel'
@@ -37,6 +38,7 @@ const MissionPanels = ({ activeTab }: MissionPanelsProps) => {
   return (
     <section className="tab-panels">
       {activeTab === 'status' && <SystemStatusPanel />}
+      {activeTab === 'live-feed' && <LiveFeedTabPanel />}
       {activeTab === 'delivery' && <DeliveryPanel />}
       {activeTab === 'science' && <ScienceTabPanel />}
       {activeTab === 'autonomous' && (

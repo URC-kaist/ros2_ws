@@ -83,6 +83,22 @@ class VideoGatewayClient {
     }
   }
 
+  reconnect() {
+    this.clearReconnectTimer()
+    this.reconnectDelayMs = RECONNECT_BASE_MS
+    this.subscribedStreams.clear()
+
+    if (this.ws) {
+      const ws = this.ws
+      this.ws = null
+      ws.close()
+    }
+
+    if (this.listeners.size > 0) {
+      this.connect()
+    }
+  }
+
   private connect() {
     if (this.ws) return
     this.clearReconnectTimer()

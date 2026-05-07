@@ -8,9 +8,9 @@ type ControlSettingsProps = {
 }
 
 const sensitivityValues = {
-  low: 0.4,
-  med: 0.8,
-  high: 1.2,
+  low: 0.2,
+  med: 0.4,
+  high: 0.8,
 } as const
 
 const ControlSettings = ({ sensitivity, onSelect, onClose }: ControlSettingsProps) => {

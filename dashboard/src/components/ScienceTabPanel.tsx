@@ -1,6 +1,5 @@
 import CameraTurretCard from './CameraTurretCard'
 import CentrifugeCard from './CentrifugeCard'
-import ConfiguredVideoGrid from './ConfiguredVideoGrid'
 import MicroscopeViewCard from './MicroscopeViewCard'
 import SpectrophotometerCard from './SpectrophotometerCard'
 
@@ -49,38 +48,6 @@ const ScienceTabPanel = () => {
       <div className="science-column">
         <CentrifugeCard />
         <SpectrophotometerCard />
-      </div>
-      <div className="science-column">
-        <ConfiguredVideoGrid title="Live Feed" panel="delivery" />
-        <article className="card video-feed-card science-camera-bank">
-          <h3>Module Cameras</h3>
-          <div className="video-feed-grid">
-            <div className="video-feed-item">
-              <span className="video-feed-label">Boring Camera</span>
-              <div className="video-feed-placeholder video-feed-placeholder--compact">
-                Awaiting stream...
-              </div>
-            </div>
-            <div className="video-feed-item">
-              <span className="video-feed-label">Pump Camera</span>
-              <div className="video-feed-placeholder video-feed-placeholder--compact">
-                Awaiting stream...
-              </div>
-            </div>
-            <div className="video-feed-item">
-              <span className="video-feed-label">Cache Camera</span>
-              <div className="video-feed-placeholder video-feed-placeholder--compact">
-                Awaiting stream...
-              </div>
-            </div>
-            <div className="video-feed-item">
-              <span className="video-feed-label">Centrifuge Camera</span>
-              <div className="video-feed-placeholder video-feed-placeholder--compact">
-                Awaiting stream...
-              </div>
-            </div>
-          </div>
-        </article>
       </div>
     </div>
   )
