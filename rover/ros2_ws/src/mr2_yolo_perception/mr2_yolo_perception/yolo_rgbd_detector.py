@@ -26,6 +26,10 @@ class YoloRgbdDetector(Node):
         self.declare_parameter("depth_topic", "/rgbd_camera/aligned_depth_to_color/image_raw")
         self.declare_parameter("camera_info_topic", "/rgbd_camera/color/camera_info")
         self.declare_parameter("annotated_topic", "yolo/annotated_image")
+        self.declare_parameter("publish_annotated", True)
+        self.declare_parameter("annotated_fps", 0.0)
+        self.declare_parameter("annotated_publish_period_sec", 5.0)
+        self.declare_parameter("confidence_reset_sec", 60.0)
         self.declare_parameter("pose_topic", "yolo/object_pose")
         self.declare_parameter("target_frame", "")
         self.declare_parameter("model_path", "yolov11.pt")
@@ -46,6 +50,22 @@ class YoloRgbdDetector(Node):
         )
         self.annotated_topic = (
             self.get_parameter("annotated_topic").get_parameter_value().string_value
+        )
+        self.publish_annotated = (
+            self.get_parameter("publish_annotated").get_parameter_value().bool_value
+        )
+        self.annotated_fps = (
+            self.get_parameter("annotated_fps").get_parameter_value().double_value
+        )
+        self.annotated_publish_period_sec = max(
+            0.1,
+            self.get_parameter("annotated_publish_period_sec")
+            .get_parameter_value()
+            .double_value,
+        )
+        self.confidence_reset_sec = max(
+            1.0,
+            self.get_parameter("confidence_reset_sec").get_parameter_value().double_value,
         )
         self.pose_topic = self.get_parameter("pose_topic").get_parameter_value().string_value
         self.target_frame = self.get_parameter("target_frame").get_parameter_value().string_value
@@ -98,7 +118,18 @@ class YoloRgbdDetector(Node):
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             reliability=QoSReliabilityPolicy.RELIABLE,
         )
-        self.image_pub = self.create_publisher(Image, self.annotated_topic, image_qos)
+        self.image_pub = None
+        self.latest_annotated_image = None
+        self.latest_annotated_header = None
+        self.best_conf_by_class = {}
+        self.last_confidence_reset_time = self.get_clock().now()
+        self.seen_detection = False
+        self.annotated_timer = None
+        if self.publish_annotated:
+            self.image_pub = self.create_publisher(Image, self.annotated_topic, image_qos)
+            self.annotated_timer = self.create_timer(
+                self.annotated_publish_period_sec, self._publish_latest_annotated
+            )
         self.pose_pubs = {}
         for class_id in self._effective_class_ids():
             topic = f"{self.pose_topic}/class_{class_id}"
@@ -191,8 +222,114 @@ class YoloRgbdDetector(Node):
         return msg
 
     def _publish_debug_image(self, image: np.ndarray, header) -> None:
+        if self.image_pub is None:
+            return
         msg = self._bgr_to_imgmsg(image, header)
         self.image_pub.publish(msg)
+
+    def _publish_latest_annotated(self) -> None:
+        if self.image_pub is None:
+            return
+        if self.latest_annotated_image is None or self.latest_annotated_header is None:
+            return
+        self._publish_debug_image(self.latest_annotated_image, self.latest_annotated_header)
+
+    def _reset_confidence_window_if_needed(self) -> None:
+        now = self.get_clock().now()
+        elapsed = (now - self.last_confidence_reset_time).nanoseconds * 1e-9
+        if elapsed < self.confidence_reset_sec:
+            return
+        self.best_conf_by_class = {}
+        self.last_confidence_reset_time = now
+
+    def _update_no_detections_image(self, image: np.ndarray, header) -> None:
+        if self.image_pub is None:
+            return
+        annotated = image.copy()
+        text = "NO DETECTIONS"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 1.2
+        thickness = 3
+        (text_w, text_h), _ = cv2.getTextSize(text, font, scale, thickness)
+        x = max(12, (annotated.shape[1] - text_w) // 2)
+        y = max(text_h + 16, (annotated.shape[0] + text_h) // 2)
+        cv2.rectangle(
+            annotated,
+            (x - 12, y - text_h - 12),
+            (x + text_w + 12, y + 12),
+            (0, 0, 0),
+            -1,
+        )
+        cv2.putText(
+            annotated,
+            text,
+            (x, y),
+            font,
+            scale,
+            (255, 255, 255),
+            thickness,
+            cv2.LINE_AA,
+        )
+        self.latest_annotated_image = annotated
+        self.latest_annotated_header = header
+
+    def _class_label(self, class_id: int) -> str:
+        if 0 <= class_id < len(self.semantic_class_names):
+            return self.semantic_class_names[class_id]
+        return f"class_{class_id}"
+
+    def _draw_detections(self, image: np.ndarray, detections: dict) -> np.ndarray:
+        annotated = image.copy()
+        for class_id, (conf, bbox) in detections.items():
+            x1, y1, x2, y2 = [int(round(v)) for v in bbox]
+            x1 = int(np.clip(x1, 0, annotated.shape[1] - 1))
+            x2 = int(np.clip(x2, 0, annotated.shape[1] - 1))
+            y1 = int(np.clip(y1, 0, annotated.shape[0] - 1))
+            y2 = int(np.clip(y2, 0, annotated.shape[0] - 1))
+            color = (0, 165, 255)
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+            label = f"{self._class_label(class_id)} {conf:.2f}"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            scale = 0.6
+            thickness = 2
+            (text_w, text_h), _ = cv2.getTextSize(label, font, scale, thickness)
+            text_y = max(y1, text_h + 8)
+            cv2.rectangle(
+                annotated,
+                (x1, text_y - text_h - 8),
+                (min(x1 + text_w + 8, annotated.shape[1] - 1), text_y + 4),
+                (0, 0, 0),
+                -1,
+            )
+            cv2.putText(
+                annotated,
+                label,
+                (x1 + 4, text_y - 3),
+                font,
+                scale,
+                (255, 255, 255),
+                thickness,
+                cv2.LINE_AA,
+            )
+        return annotated
+
+    def _update_annotated_image_if_new_max(
+        self, image: np.ndarray, header, detections: dict
+    ) -> None:
+        if self.image_pub is None or not detections:
+            return
+        self._reset_confidence_window_if_needed()
+        should_update = False
+        for class_id, (conf, _) in detections.items():
+            best_conf = self.best_conf_by_class.get(class_id, 0.0)
+            if conf > best_conf:
+                self.best_conf_by_class[class_id] = conf
+                should_update = True
+        if not should_update:
+            return
+        self.latest_annotated_image = self._draw_detections(image, detections)
+        self.latest_annotated_header = header
+        self._publish_latest_annotated()
 
     def _select_detection(
         self, boxes, names
@@ -362,6 +499,7 @@ class YoloRgbdDetector(Node):
             return
 
         depth_m = self._depth_to_meters(depth_raw, depth_msg.encoding)
+        self._reset_confidence_window_if_needed()
 
         results = self.model.predict(
             source=rgb_image,
@@ -371,13 +509,11 @@ class YoloRgbdDetector(Node):
             verbose=False,
         )
         if not results:
-            # self.get_logger().info("YOLO returned no results")
-            self._publish_debug_image(rgb_image, rgb_msg.header)
+            if not self.seen_detection:
+                self._update_no_detections_image(rgb_image, rgb_msg.header)
             return
 
         result = results[0]
-        self._publish_debug_image(result.plot(), rgb_msg.header)
-
         boxes = result.boxes
         effective_class_ids = self._effective_class_ids()
         if not effective_class_ids:
@@ -386,6 +522,8 @@ class YoloRgbdDetector(Node):
                 # self.get_logger().info(
                 #     "No detections matched target class or confidence"
                 # )
+                if not self.seen_detection:
+                    self._update_no_detections_image(rgb_image, rgb_msg.header)
                 return
             class_id, conf, bbox = selection
             effective_class_ids = [class_id]
@@ -402,7 +540,12 @@ class YoloRgbdDetector(Node):
                 # self.get_logger().info(
                 #     "No detections matched target class or confidence"
                 # )
+                if not self.seen_detection:
+                    self._update_no_detections_image(rgb_image, rgb_msg.header)
                 return
+
+        self.seen_detection = True
+        self._update_annotated_image_if_new_max(rgb_image, rgb_msg.header, detections)
 
         for class_id, (conf, bbox) in detections.items():
             x1, y1, x2, y2 = bbox
