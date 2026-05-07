@@ -9,6 +9,7 @@ const {
   createSequencer,
   decodeTelemNav,
   encodeBaseRtcm,
+  encodeCmdArmJoint,
   encodeCmdDrive,
   encodeFrame,
 } = require('../src/protocol/xbee')
@@ -37,6 +38,33 @@ test('encodeCmdDrive emits a decodable drive frame', () => {
   assert.equal(seen[0].payload.readFloatLE(4), 1.5)
   assert.equal(seen[0].payload.readFloatLE(8), -0.25)
   assert.equal(seen[0].payload.readFloatLE(12), 0.75)
+})
+
+test('encodeCmdArmJoint emits six joint velocities', () => {
+  const nextSeq = createSequencer()
+  const frame = encodeCmdArmJoint(
+    {
+      timestamp_ms: 789,
+      velocities_rad_s: [0.1, -0.2, 0.3, -0.4, 0.5, -0.6],
+    },
+    nextSeq
+  )
+
+  const seen = []
+  const remaining = consumeFrames(frame, (msgId, payload) => {
+    seen.push({ msgId, payload })
+  })
+
+  assert.equal(remaining.length, 0)
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0].msgId, MsgId.CMD_ARM_JOINT)
+  assert.equal(seen[0].payload.readUInt32LE(0), 789)
+  assert.ok(Math.abs(seen[0].payload.readFloatLE(4) - 0.1) < 1e-6)
+  assert.ok(Math.abs(seen[0].payload.readFloatLE(8) + 0.2) < 1e-6)
+  assert.ok(Math.abs(seen[0].payload.readFloatLE(12) - 0.3) < 1e-6)
+  assert.ok(Math.abs(seen[0].payload.readFloatLE(16) + 0.4) < 1e-6)
+  assert.ok(Math.abs(seen[0].payload.readFloatLE(20) - 0.5) < 1e-6)
+  assert.ok(Math.abs(seen[0].payload.readFloatLE(24) + 0.6) < 1e-6)
 })
 
 test('encodeBaseRtcm fragments oversized RTCM payloads under one sequence id', () => {

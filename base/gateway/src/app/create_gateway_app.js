@@ -11,6 +11,7 @@ const {
   decodeTelemBattery,
   decodeTelemNav,
   encodeCmdArmGripper,
+  encodeCmdArmJoint,
   encodeCmdArmTwist,
   encodeCmdDrive,
   encodeHeartbeat,
@@ -157,6 +158,20 @@ function createGatewayApp(options = {}) {
     return Number.isFinite(num) ? num : 0
   }
 
+  function coerceArmJointVelocities(msg) {
+    const fromArray = Array.isArray(msg.velocities_rad_s)
+      ? msg.velocities_rad_s
+      : Array.isArray(msg.velocities)
+        ? msg.velocities
+        : null
+    if (fromArray) {
+      return Array.from({ length: 6 }, (_, index) => coerceNumber(fromArray[index]))
+    }
+    return [1, 2, 3, 4, 5, 6].map((index) =>
+      coerceNumber(msg[`arm_j${index}_rad_s`] ?? msg[`j${index}_rad_s`])
+    )
+  }
+
   function handleDashboardMessage(msg) {
     if (!msg || typeof msg !== 'object') return
 
@@ -194,6 +209,21 @@ function createGatewayApp(options = {}) {
             ang_x_rad_s: coerceNumber(msg.ang_x_rad_s),
             ang_y_rad_s: coerceNumber(msg.ang_y_rad_s),
             ang_z_rad_s: coerceNumber(msg.ang_z_rad_s),
+          },
+          nextSeq
+        )
+      )
+      return
+    }
+
+    if (type === 'cmd_arm_joint') {
+      const velocities = coerceArmJointVelocities(msg)
+      log(`cmd_arm_joint rx vel=[${velocities.join(',')}]`)
+      writeFrame(
+        encodeCmdArmJoint(
+          {
+            timestamp_ms: Date.now() >>> 0,
+            velocities_rad_s: velocities,
           },
           nextSeq
         )

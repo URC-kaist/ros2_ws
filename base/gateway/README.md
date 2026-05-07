@@ -300,6 +300,8 @@ Clients connect to the same HTTP server port configured by `--gateway-port`.
   Fields: `linear_x_m_s`, `linear_y_m_s`, `angular_z_rad_s`
 - `cmd_arm_twist`
   Fields: `lin_x_m_s`, `lin_y_m_s`, `lin_z_m_s`, `ang_x_rad_s`, `ang_y_rad_s`, `ang_z_rad_s`
+- `cmd_arm_joint`
+  Fields: `velocities_rad_s` as six joint velocities for `arm_j1..arm_j6`; alternatively `arm_j1_rad_s` through `arm_j6_rad_s`
 - `cmd_arm_gripper`
   Fields: `position_norm`
 - `heartbeat`

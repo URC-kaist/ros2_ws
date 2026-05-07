@@ -6,6 +6,7 @@ const MsgId = {
   HEARTBEAT: 0x03,
   MISSION_CONTROL: 0x04,
   CMD_ARM_GRIPPER: 0x05,
+  CMD_ARM_JOINT: 0x06,
   TELEM_BATTERY_1: 0x10,
   TELEM_BATTERY_2: 0x11,
   TELEM_NAV: 0x20,
@@ -96,6 +97,17 @@ function encodeCmdArmGripper(cmd, nextSeq) {
   payload.writeUInt32LE(cmd.timestamp_ms >>> 0, 0)
   payload.writeFloatLE(cmd.position_norm, 4)
   return encodeFrame(MsgId.CMD_ARM_GRIPPER, nextSeq(), payload)
+}
+
+function encodeCmdArmJoint(cmd, nextSeq) {
+  const velocities = Array.isArray(cmd.velocities_rad_s) ? cmd.velocities_rad_s : []
+  const payload = Buffer.alloc(28)
+  payload.writeUInt32LE(cmd.timestamp_ms >>> 0, 0)
+  for (let i = 0; i < 6; i += 1) {
+    const value = Number(velocities[i])
+    payload.writeFloatLE(Number.isFinite(value) ? value : 0, 4 + i * 4)
+  }
+  return encodeFrame(MsgId.CMD_ARM_JOINT, nextSeq(), payload)
 }
 
 function encodeBaseSvin(msg, nextSeq) {
@@ -217,6 +229,7 @@ module.exports = {
   encodeBaseRtcm,
   encodeBaseSvin,
   encodeCmdArmGripper,
+  encodeCmdArmJoint,
   encodeCmdArmTwist,
   encodeCmdDrive,
   encodeFrame,

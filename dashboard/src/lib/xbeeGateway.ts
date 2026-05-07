@@ -17,6 +17,10 @@ export type CmdArmGripper = {
   position_norm: number
 }
 
+export type CmdArmJoint = {
+  velocities_rad_s: number[]
+}
+
 export type MissionControl = {
   command: number
   clear_costmap: boolean
@@ -306,6 +310,13 @@ class XbeeGatewayClient {
     this.send({
       type: 'cmd_arm_gripper',
       position_norm: cmd.position_norm,
+    })
+  }
+
+  sendCmdArmJoint(cmd: CmdArmJoint) {
+    this.send({
+      type: 'cmd_arm_joint',
+      velocities_rad_s: cmd.velocities_rad_s,
     })
   }
 

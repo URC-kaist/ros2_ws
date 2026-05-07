@@ -10,6 +10,52 @@
   align-items: center;
 }
 
+.arm-card__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arm-card__mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 180px;
+}
+
+.arm-card__mode button,
+.arm-card__stop,
+.arm-card__joint-row button {
+  background: rgba(11, 18, 32, 0.72);
+  color: #dfe6fb;
+  border: 0;
+  min-height: 34px;
+  font: inherit;
+}
+
+.arm-card__mode button {
+  padding: 6px 10px;
+}
+
+.arm-card__mode button + button {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.arm-card__mode button.active {
+  background: rgba(53, 211, 195, 0.22);
+  color: #f6fffd;
+}
+
+.arm-card__stop {
+  border: 1px solid rgba(255, 94, 94, 0.42);
+  border-radius: 8px;
+  color: #ffdada;
+  padding: 6px 12px;
+}
+
 .gamepad-picker {
   display: flex;
   justify-content: space-between;
@@ -56,6 +102,76 @@
   border: 1px solid rgba(53, 211, 195, 0.18);
   border-radius: 8px;
   padding: 6px 8px;
+}
+
+.arm-card__joint-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.arm-card__speed {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.arm-card__speed input {
+  accent-color: #35d3c3;
+  width: 100%;
+}
+
+.arm-card__speed strong {
+  color: #dfe6fb;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+.arm-card__joint-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.arm-card__joint-row {
+  display: grid;
+  grid-template-columns: 30px 38px minmax(54px, 1fr) 38px;
+  align-items: center;
+  gap: 6px;
+  background: rgba(53, 211, 195, 0.08);
+  border: 1px solid rgba(53, 211, 195, 0.18);
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.arm-card__joint-row span,
+.arm-card__joint-row output {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.arm-card__joint-row span {
+  color: #dfe6fb;
+}
+
+.arm-card__joint-row output {
+  text-align: center;
+  color: var(--muted);
+}
+
+.arm-card__joint-row button {
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 1rem;
+  line-height: 1;
+  touch-action: none;
+}
+
+.arm-card__joint-row button:active {
+  background: rgba(53, 211, 195, 0.28);
 }
 
 .arm-card__hint {

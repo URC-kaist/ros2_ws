@@ -29,11 +29,35 @@ Notes:
 - `0x03` HEARTBEAT
 - `0x04` MISSION_CONTROL
 - `0x05` CMD_ARM_GRIPPER
+- `0x06` CMD_ARM_JOINT
 - `0x10` TELEM_BATTERY_1
 - `0x11` TELEM_BATTERY_2
 - `0x20` TELEM_NAV
 - `0x30` BASE_SVIN (survey-in ECEF + validity)
 - `0x31` BASE_RTCM (raw RTCM byte payload)
+
+## Command smoothing
+
+The bridge applies a slew-rate limiter before publishing incoming drive and arm
+commands. This prevents abrupt command jumps from the XBEE stream from reaching
+the ROS controllers directly. Set the relevant `smooth_*_commands` parameter to
+`false` to bypass smoothing for that command family.
+
+Parameters:
+- `smoothing_initial_dt_s` (default `0.05`): assumed timestep for the first
+  command after startup or after a long gap.
+- `smooth_drive_commands` (default `true`)
+- `drive_linear_accel_limit_m_s2` (default `0.5`)
+- `drive_angular_accel_limit_rad_s2` (default `1.0`)
+- `smooth_arm_twist_commands` (default `true`)
+- `arm_twist_linear_accel_limit_m_s2` (default `0.3`)
+- `arm_twist_angular_accel_limit_rad_s2` (default `1.0`)
+- `smooth_arm_joint_commands` (default `true`)
+- `arm_joint_accel_limit_rad_s2` (default `0.8`)
+
+Heartbeat-timeout zero commands pass through the same smoothing path, so the
+bridge ramps commanded velocities down at the configured limits instead of
+publishing a step change.
 
 ## Payloads (ROS-aligned units)
 
@@ -103,6 +127,26 @@ ROS mapping: `std_msgs/Float64MultiArray` (single element)
 - Converted to radians with bridge params:
   - `gripper_min_position_rad` (default `0.0`)
   - `gripper_max_position_rad` (default `1.0`)
+
+### CMD_ARM_JOINT (msg_id 0x06)
+Payload size: 28 bytes
+
+- `uint32 timestamp_ms`
+- `float32 arm_j1_velocity_rad_s`
+- `float32 arm_j2_velocity_rad_s`
+- `float32 arm_j3_velocity_rad_s`
+- `float32 arm_j4_velocity_rad_s`
+- `float32 arm_j5_velocity_rad_s`
+- `float32 arm_j6_velocity_rad_s`
+
+ROS mapping: `control_msgs/JointJog`
+- Published on `arm_joint_topic` (default `/moveit_servo/delta_joint_cmds`)
+- `joint_names` comes from `arm_joint_names` (default `arm_j1..arm_j6`)
+- `velocities` uses the six payload values in order.
+- `duration` comes from `arm_joint_duration_s` (default `0.1`)
+
+Suggested rate: 20-50 Hz
+Soft stop: send all zeros.
 
 ### TELEM_BATTERY_1 / TELEM_BATTERY_2 (msg_id 0x10 / 0x11)
 Payload size: 16 bytes

@@ -15,6 +15,7 @@ enum class MsgId : uint8_t {
   kHeartbeat = 0x03,
   kMissionControl = 0x04,
   kCmdArmGripper = 0x05,
+  kCmdArmJoint = 0x06,
   kTelemBattery1 = 0x10,
   kTelemBattery2 = 0x11,
   kTelemNav = 0x20,
@@ -61,6 +62,11 @@ struct MissionControl {
 struct CmdArmGripper {
   uint32_t timestamp_ms{0};
   float position_norm{0.0f};
+};
+
+struct CmdArmJoint {
+  uint32_t timestamp_ms{0};
+  std::array<float, 6> velocities_rad_s{};
 };
 
 struct TelemBattery {
@@ -119,6 +125,8 @@ std::vector<uint8_t> encode_mission_control(uint8_t seq,
                                             const MissionControl &ctrl);
 std::vector<uint8_t> encode_cmd_arm_gripper(uint8_t seq,
                                             const CmdArmGripper &cmd);
+std::vector<uint8_t> encode_cmd_arm_joint(uint8_t seq,
+                                          const CmdArmJoint &cmd);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem);
 std::vector<uint8_t> encode_telem_battery(uint8_t seq, const TelemBattery &telem,
                                           uint8_t battery_id);
@@ -133,6 +141,7 @@ std::optional<CmdArmTwist> decode_cmd_arm_twist(const Frame &frame);
 std::optional<Heartbeat> decode_heartbeat(const Frame &frame);
 std::optional<MissionControl> decode_mission_control(const Frame &frame);
 std::optional<CmdArmGripper> decode_cmd_arm_gripper(const Frame &frame);
+std::optional<CmdArmJoint> decode_cmd_arm_joint(const Frame &frame);
 std::optional<TelemBattery> decode_telem_battery(const Frame &frame);
 std::optional<TelemNav> decode_telem_nav(const Frame &frame);
 std::optional<BaseSvin> decode_base_svin(const Frame &frame);

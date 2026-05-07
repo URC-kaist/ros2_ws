@@ -18,6 +18,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "control_msgs/msg/joint_jog.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
@@ -41,6 +42,7 @@ using mr2_xbee_bridge::MissionControl;
 using mr2_xbee_bridge::TelemBattery;
 using mr2_xbee_bridge::TelemNav;
 using mr2_xbee_bridge::CmdArmGripper;
+using mr2_xbee_bridge::CmdArmJoint;
 
 class XbeeBridgeNode : public rclcpp::Node {
  public:
@@ -56,12 +58,37 @@ class XbeeBridgeNode : public rclcpp::Node {
         heartbeat_tx_rate_hz_(
             declare_parameter<double>("heartbeat_tx_rate_hz", 2.0)),
         nav_tx_rate_hz_(declare_parameter<double>("nav_tx_rate_hz", 2.0)),
+        smoothing_initial_dt_s_(
+            declare_parameter<double>("smoothing_initial_dt_s", 0.05)),
+        smooth_drive_commands_(
+            declare_parameter<bool>("smooth_drive_commands", true)),
+        drive_linear_accel_limit_m_s2_(declare_parameter<double>(
+            "drive_linear_accel_limit_m_s2", 0.5)),
+        drive_angular_accel_limit_rad_s2_(declare_parameter<double>(
+            "drive_angular_accel_limit_rad_s2", 1.0)),
+        smooth_arm_twist_commands_(
+            declare_parameter<bool>("smooth_arm_twist_commands", true)),
+        arm_twist_linear_accel_limit_m_s2_(declare_parameter<double>(
+            "arm_twist_linear_accel_limit_m_s2", 0.3)),
+        arm_twist_angular_accel_limit_rad_s2_(declare_parameter<double>(
+            "arm_twist_angular_accel_limit_rad_s2", 1.0)),
+        smooth_arm_joint_commands_(
+            declare_parameter<bool>("smooth_arm_joint_commands", true)),
+        arm_joint_accel_limit_rad_s2_(declare_parameter<double>(
+            "arm_joint_accel_limit_rad_s2", 0.8)),
         cmd_vel_topic_(
             declare_parameter<std::string>("cmd_vel_topic", "/base/cmd_vel")),
         mission_control_topic_(declare_parameter<std::string>(
             "mission_control_topic", "/mission_control")),
         arm_twist_topic_(declare_parameter<std::string>(
             "arm_twist_topic", "/moveit_servo/delta_twist_cmds")),
+        arm_joint_topic_(declare_parameter<std::string>(
+            "arm_joint_topic", "/moveit_servo/delta_joint_cmds")),
+        arm_joint_names_(declare_parameter<std::vector<std::string>>(
+            "arm_joint_names",
+            {"arm_j1", "arm_j2", "arm_j3", "arm_j4", "arm_j5", "arm_j6"})),
+        arm_joint_duration_s_(
+            declare_parameter<double>("arm_joint_duration_s", 0.1)),
         gripper_cmd_topic_(declare_parameter<std::string>(
             "gripper_cmd_topic", "/gripper_controller/commands")),
         gripper_min_position_rad_(
@@ -88,6 +115,8 @@ class XbeeBridgeNode : public rclcpp::Node {
             mission_control_topic_, 10);
     arm_twist_pub_ =
         create_publisher<geometry_msgs::msg::TwistStamped>(arm_twist_topic_, 10);
+    arm_joint_pub_ =
+        create_publisher<control_msgs::msg::JointJog>(arm_joint_topic_, 10);
     gripper_cmd_pub_ =
         create_publisher<std_msgs::msg::Float64MultiArray>(gripper_cmd_topic_, 10);
     base_svin_pub_ = create_publisher<ublox_ubx_msgs::msg::UBXNavSvin>(
@@ -324,6 +353,13 @@ class XbeeBridgeNode : public rclcpp::Node {
         }
         break;
       }
+      case mr2_xbee_bridge::MsgId::kCmdArmJoint: {
+        auto cmd = mr2_xbee_bridge::decode_cmd_arm_joint(frame);
+        if (cmd) {
+          handle_cmd_arm_joint_(*cmd);
+        }
+        break;
+      }
       case mr2_xbee_bridge::MsgId::kBaseSvin: {
         auto svin = mr2_xbee_bridge::decode_base_svin(frame);
         if (svin && base_svin_pub_) {
@@ -381,35 +417,78 @@ class XbeeBridgeNode : public rclcpp::Node {
   }
 
   void handle_cmd_drive_(const CmdDrive &cmd) {
+    std::lock_guard<std::mutex> lock(command_smoothing_mutex_);
+    const auto now_time = now();
+    std::array<double, 3> target{
+        static_cast<double>(cmd.linear_x_m_s),
+        static_cast<double>(cmd.linear_y_m_s),
+        static_cast<double>(cmd.angular_z_rad_s)};
+    std::array<double, 3> output = target;
+    if (smooth_drive_commands_) {
+      const double dt = smoothing_dt_(last_drive_command_time_, now_time);
+      output[0] = slew_(last_drive_command_[0], target[0],
+                        drive_linear_accel_limit_m_s2_, dt);
+      output[1] = slew_(last_drive_command_[1], target[1],
+                        drive_linear_accel_limit_m_s2_, dt);
+      output[2] = slew_(last_drive_command_[2], target[2],
+                        drive_angular_accel_limit_rad_s2_, dt);
+    }
+    last_drive_command_ = output;
+    last_drive_command_time_ = now_time;
+
     geometry_msgs::msg::Twist msg;
-    msg.linear.x = cmd.linear_x_m_s;
-    msg.linear.y = cmd.linear_y_m_s;
-    msg.angular.z = cmd.angular_z_rad_s;
+    msg.linear.x = output[0];
+    msg.linear.y = output[1];
+    msg.angular.z = output[2];
     cmd_vel_pub_->publish(msg);
     if (log_frames_) {
       RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-                           "CMD_DRIVE x=%.3f y=%.3f yaw=%.3f",
+                           "CMD_DRIVE target=(%.3f, %.3f, %.3f) out=(%.3f, %.3f, %.3f)",
                            cmd.linear_x_m_s, cmd.linear_y_m_s,
-                           cmd.angular_z_rad_s);
+                           cmd.angular_z_rad_s, output[0], output[1],
+                           output[2]);
     }
   }
 
   void handle_cmd_arm_(const CmdArmTwist &cmd) {
+    std::lock_guard<std::mutex> lock(command_smoothing_mutex_);
+    const auto now_time = now();
+    std::array<double, 6> target{
+        static_cast<double>(cmd.lin_x_m_s), static_cast<double>(cmd.lin_y_m_s),
+        static_cast<double>(cmd.lin_z_m_s), static_cast<double>(cmd.ang_x_rad_s),
+        static_cast<double>(cmd.ang_y_rad_s), static_cast<double>(cmd.ang_z_rad_s)};
+    std::array<double, 6> output = target;
+    if (smooth_arm_twist_commands_) {
+      const double dt = smoothing_dt_(last_arm_twist_command_time_, now_time);
+      for (size_t i = 0; i < 3; ++i) {
+        output[i] = slew_(last_arm_twist_command_[i], target[i],
+                          arm_twist_linear_accel_limit_m_s2_, dt);
+      }
+      for (size_t i = 3; i < output.size(); ++i) {
+        output[i] = slew_(last_arm_twist_command_[i], target[i],
+                          arm_twist_angular_accel_limit_rad_s2_, dt);
+      }
+    }
+    last_arm_twist_command_ = output;
+    last_arm_twist_command_time_ = now_time;
+
     geometry_msgs::msg::TwistStamped msg;
-    msg.header.stamp = now();
+    msg.header.stamp = now_time;
     msg.header.frame_id = arm_frame_id_;
-    msg.twist.linear.x = cmd.lin_x_m_s;
-    msg.twist.linear.y = cmd.lin_y_m_s;
-    msg.twist.linear.z = cmd.lin_z_m_s;
-    msg.twist.angular.x = cmd.ang_x_rad_s;
-    msg.twist.angular.y = cmd.ang_y_rad_s;
-    msg.twist.angular.z = cmd.ang_z_rad_s;
+    msg.twist.linear.x = output[0];
+    msg.twist.linear.y = output[1];
+    msg.twist.linear.z = output[2];
+    msg.twist.angular.x = output[3];
+    msg.twist.angular.y = output[4];
+    msg.twist.angular.z = output[5];
     arm_twist_pub_->publish(msg);
     if (log_frames_) {
       RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
-                           "CMD_ARM_TWIST lin=(%.3f, %.3f, %.3f) ang=(%.3f, %.3f, %.3f)",
+                           "CMD_ARM_TWIST target lin=(%.3f, %.3f, %.3f) ang=(%.3f, %.3f, %.3f) out lin=(%.3f, %.3f, %.3f) ang=(%.3f, %.3f, %.3f)",
                            cmd.lin_x_m_s, cmd.lin_y_m_s, cmd.lin_z_m_s,
-                           cmd.ang_x_rad_s, cmd.ang_y_rad_s, cmd.ang_z_rad_s);
+                           cmd.ang_x_rad_s, cmd.ang_y_rad_s, cmd.ang_z_rad_s,
+                           output[0], output[1], output[2], output[3],
+                           output[4], output[5]);
     }
   }
 
@@ -430,6 +509,54 @@ class XbeeBridgeNode : public rclcpp::Node {
       RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
                            "CMD_ARM_GRIPPER norm=%.3f target=%.3f",
                            clipped_norm, target);
+    }
+  }
+
+  void handle_cmd_arm_joint_(const CmdArmJoint &cmd) {
+    if (!arm_joint_pub_) {
+      return;
+    }
+
+    std::lock_guard<std::mutex> lock(command_smoothing_mutex_);
+    const auto now_time = now();
+    std::array<double, 6> target{};
+    std::array<double, 6> output{};
+    for (size_t i = 0; i < cmd.velocities_rad_s.size(); ++i) {
+      target[i] = cmd.velocities_rad_s[i];
+      output[i] = target[i];
+    }
+    if (smooth_arm_joint_commands_) {
+      const double dt = smoothing_dt_(last_arm_joint_command_time_, now_time);
+      for (size_t i = 0; i < output.size(); ++i) {
+        output[i] = slew_(last_arm_joint_command_[i], target[i],
+                          arm_joint_accel_limit_rad_s2_, dt);
+      }
+    }
+    last_arm_joint_command_ = output;
+    last_arm_joint_command_time_ = now_time;
+
+    control_msgs::msg::JointJog msg;
+    msg.header.stamp = now_time;
+    msg.header.frame_id = arm_frame_id_;
+    const size_t count =
+        std::min(arm_joint_names_.size(), cmd.velocities_rad_s.size());
+    msg.joint_names.reserve(count);
+    msg.velocities.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+      msg.joint_names.push_back(arm_joint_names_[i]);
+      msg.velocities.push_back(output[i]);
+    }
+    msg.duration = arm_joint_duration_s_;
+    arm_joint_pub_->publish(msg);
+
+    if (log_frames_) {
+      RCLCPP_INFO_THROTTLE(
+          get_logger(), *get_clock(), 1000,
+          "CMD_ARM_JOINT target=(%.3f, %.3f, %.3f, %.3f, %.3f, %.3f) out=(%.3f, %.3f, %.3f, %.3f, %.3f, %.3f)",
+          cmd.velocities_rad_s[0], cmd.velocities_rad_s[1],
+          cmd.velocities_rad_s[2], cmd.velocities_rad_s[3],
+          cmd.velocities_rad_s[4], cmd.velocities_rad_s[5], output[0],
+          output[1], output[2], output[3], output[4], output[5]);
     }
   }
 
@@ -503,13 +630,14 @@ class XbeeBridgeNode : public rclcpp::Node {
       return;
     }
 
-    geometry_msgs::msg::Twist zero_drive;
-    cmd_vel_pub_->publish(zero_drive);
+    CmdDrive zero_drive;
+    handle_cmd_drive_(zero_drive);
 
-    geometry_msgs::msg::TwistStamped zero_arm;
-    zero_arm.header.stamp = now_time;
-    zero_arm.header.frame_id = arm_frame_id_;
-    arm_twist_pub_->publish(zero_arm);
+    CmdArmTwist zero_arm;
+    handle_cmd_arm_(zero_arm);
+
+    CmdArmJoint zero_joint;
+    handle_cmd_arm_joint_(zero_joint);
   }
 
   void send_heartbeat_() {
@@ -622,6 +750,33 @@ class XbeeBridgeNode : public rclcpp::Node {
     write_frame_(frame);
   }
 
+  double smoothing_dt_(const rclcpp::Time &last_time,
+                       const rclcpp::Time &now_time) const {
+    if (last_time.nanoseconds() <= 0) {
+      return std::max(0.0, smoothing_initial_dt_s_);
+    }
+    const double dt = (now_time - last_time).seconds();
+    if (!std::isfinite(dt) || dt <= 0.0) {
+      return std::max(0.0, smoothing_initial_dt_s_);
+    }
+    return std::min(dt, 0.25);
+  }
+
+  static double slew_(double current, double target, double rate_limit,
+                      double dt) {
+    if (!std::isfinite(target)) {
+      target = 0.0;
+    }
+    if (!std::isfinite(current)) {
+      current = 0.0;
+    }
+    if (!std::isfinite(rate_limit) || rate_limit <= 0.0 || dt <= 0.0) {
+      return target;
+    }
+    const double max_step = rate_limit * dt;
+    return current + std::clamp(target - current, -max_step, max_step);
+  }
+
   void write_frame_(const std::vector<uint8_t> &frame) {
     std::lock_guard<std::mutex> lock(write_mutex_);
     if (fd_ < 0 || shutting_down_.load()) {
@@ -651,9 +806,21 @@ class XbeeBridgeNode : public rclcpp::Node {
   double battery_tx_rate_hz_;
   double heartbeat_tx_rate_hz_;
   double nav_tx_rate_hz_;
+  double smoothing_initial_dt_s_;
+  bool smooth_drive_commands_;
+  double drive_linear_accel_limit_m_s2_;
+  double drive_angular_accel_limit_rad_s2_;
+  bool smooth_arm_twist_commands_;
+  double arm_twist_linear_accel_limit_m_s2_;
+  double arm_twist_angular_accel_limit_rad_s2_;
+  bool smooth_arm_joint_commands_;
+  double arm_joint_accel_limit_rad_s2_;
   std::string cmd_vel_topic_;
   std::string mission_control_topic_;
   std::string arm_twist_topic_;
+  std::string arm_joint_topic_;
+  std::vector<std::string> arm_joint_names_;
+  double arm_joint_duration_s_;
   std::string gripper_cmd_topic_;
   double gripper_min_position_rad_;
   double gripper_max_position_rad_;
@@ -671,6 +838,7 @@ class XbeeBridgeNode : public rclcpp::Node {
   rclcpp::Publisher<mr2_action_interface::msg::MissionControl>::SharedPtr
       mission_control_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr arm_twist_pub_;
+  rclcpp::Publisher<control_msgs::msg::JointJog>::SharedPtr arm_joint_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_cmd_pub_;
   rclcpp::Publisher<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr base_svin_pub_;
   rclcpp::Publisher<rtcm_msgs::msg::Message>::SharedPtr base_rtcm_pub_;
@@ -693,6 +861,13 @@ class XbeeBridgeNode : public rclcpp::Node {
 
   // State
   rclcpp::Time last_heartbeat_{};
+  std::array<double, 3> last_drive_command_{};
+  std::mutex command_smoothing_mutex_;
+  rclcpp::Time last_drive_command_time_{0, 0, RCL_ROS_TIME};
+  std::array<double, 6> last_arm_twist_command_{};
+  rclcpp::Time last_arm_twist_command_time_{0, 0, RCL_ROS_TIME};
+  std::array<double, 6> last_arm_joint_command_{};
+  rclcpp::Time last_arm_joint_command_time_{0, 0, RCL_ROS_TIME};
   std::array<rclcpp::Time, 2> last_battery_tx_{
       {rclcpp::Time(0, 0, RCL_SYSTEM_TIME), rclcpp::Time(0, 0, RCL_SYSTEM_TIME)}};
 

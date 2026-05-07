@@ -233,6 +233,25 @@ std::vector<uint8_t> encode_cmd_arm_gripper(uint8_t seq,
   return finalize_frame(header, payload);
 }
 
+std::vector<uint8_t> encode_cmd_arm_joint(uint8_t seq,
+                                          const CmdArmJoint &cmd) {
+  std::vector<uint8_t> payload;
+  payload.reserve(28);
+  ByteWriter writer(&payload);
+  writer.write_u32(cmd.timestamp_ms);
+  for (const float velocity : cmd.velocities_rad_s) {
+    writer.write_f32(velocity);
+  }
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kCmdArmJoint;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
 std::vector<uint8_t> encode_telem_battery(uint8_t seq,
                                           const TelemBattery &telem) {
   return encode_telem_battery(seq, telem, 1);
@@ -450,6 +469,25 @@ std::optional<CmdArmGripper> decode_cmd_arm_gripper(const Frame &frame) {
   if (!reader.read_u32(&cmd.timestamp_ms) ||
       !reader.read_f32(&cmd.position_norm)) {
     return std::nullopt;
+  }
+  return cmd;
+}
+
+std::optional<CmdArmJoint> decode_cmd_arm_joint(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kCmdArmJoint ||
+      frame.payload.size() != 28) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  CmdArmJoint cmd;
+  if (!reader.read_u32(&cmd.timestamp_ms)) {
+    return std::nullopt;
+  }
+  for (float &velocity : cmd.velocities_rad_s) {
+    if (!reader.read_f32(&velocity)) {
+      return std::nullopt;
+    }
   }
   return cmd;
 }
