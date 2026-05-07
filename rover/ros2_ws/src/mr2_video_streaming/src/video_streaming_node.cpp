@@ -32,6 +32,8 @@ namespace mr2_video_streaming {
 
 using json = nlohmann::json;
 
+constexpr int kUdpSendBufferBytes = 65536;
+
 enum class StreamSourceType { RosTopic, V4L2 };
 
 struct EncoderConfig {
@@ -219,6 +221,19 @@ class StreamPipeline {
   }
 
  private:
+  static void append_live_leaky_queue(std::vector<std::string> & args) {
+    args.insert(
+        args.end(),
+        {
+            "!",
+            "queue",
+            "leaky=downstream",
+            "max-size-buffers=1",
+            "max-size-bytes=0",
+            "max-size-time=0",
+        });
+  }
+
   bool validate_encoding(const std::string & encoding) {
     if (!is_supported_ros_encoding(encoding)) {
       RCLCPP_WARN(
@@ -251,6 +266,7 @@ class StreamPipeline {
            << "! rtph264pay pt=96 mtu=1200 config-interval=1 "
            << "! udpsink host=" << quote_gstreamer_string(base_host_)
            << " port=" << config_.udp_port
+           << " buffer-size=" << kUdpSendBufferBytes
            << " sync=false async=false";
     return branch.str();
   }
@@ -362,12 +378,14 @@ class StreamPipeline {
         "-q",
         "v4l2src",
         "device=" + config_.v4l2_device,
+        "do-timestamp=true",
     };
     const std::string source_caps = build_v4l2_source_caps();
     if (!source_caps.empty()) {
       args.push_back("!");
       args.push_back(source_caps);
     }
+    append_live_leaky_queue(args);
     if (is_jetson_hardware_encoder(config_.encoder.type)) {
       if (is_jpeg) {
         args.insert(args.end(), {"!", "nvv4l2decoder", "mjpeg=true"});
@@ -422,6 +440,7 @@ class StreamPipeline {
             "udpsink",
             "host=" + base_host_,
             "port=" + std::to_string(config_.udp_port),
+            "buffer-size=" + std::to_string(kUdpSendBufferBytes),
             "sync=false",
             "async=false",
         });
