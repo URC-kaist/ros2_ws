@@ -32,7 +32,7 @@ class CameraTurretCanNode : public rclcpp::Node {
 public:
   CameraTurretCanNode() : rclcpp::Node("camera_turret_can") {
     can_iface_ = declare_parameter<std::string>("can_iface", "can0");
-    const int can_id_param = declare_parameter<int>("can_id", 0x123);
+    const int can_id_param = declare_parameter<int>("can_id", 0x124);
     command_topic_ =
         declare_parameter<std::string>("command_topic", "/camera_turret/command");
     const double publish_rate_hz =

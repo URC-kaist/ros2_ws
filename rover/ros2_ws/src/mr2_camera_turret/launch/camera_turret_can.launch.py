@@ -32,7 +32,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("can_iface", default_value="can0"),
-            DeclareLaunchArgument("can_id", default_value="0x123"),
+            DeclareLaunchArgument("can_id", default_value="0x124"),
             DeclareLaunchArgument(
                 "command_topic", default_value="/camera_turret/command"
             ),

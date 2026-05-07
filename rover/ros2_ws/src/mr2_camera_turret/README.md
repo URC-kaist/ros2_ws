@@ -38,7 +38,7 @@ joystick ADC values:
 
 ## CAN-FD protocol
 
-- CAN ID: `0x123` standard 11-bit
+- CAN ID: `0x124` standard 11-bit
 - Frame type: CAN-FD
 - Length: 4 bytes
 
@@ -52,7 +52,7 @@ joystick ADC values:
 ## Parameters
 
 - `can_iface` (string, default: `can0`)
-- `can_id` (int, default: `0x123`)
+- `can_id` (int, default: `0x124`)
 - `command_topic` (string, default: `/camera_turret/command`)
 - `publish_rate_hz` (double, default: `50.0`)
 - `command_timeout_sec` (double, default: `0.5`)
