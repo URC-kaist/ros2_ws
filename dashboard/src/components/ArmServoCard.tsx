@@ -122,9 +122,7 @@ const ArmServoCard = () => {
           setConnected(false)
         }
         cmdRef.current = ZERO_TWIST
-        jointCmdRef.current = ZERO_JOINTS
         setLastCmdDisplay(ZERO_TWIST)
-        setJointDisplay(ZERO_JOINTS)
         lastTickMsRef.current = null
       }
       frame = requestAnimationFrame(tick)
