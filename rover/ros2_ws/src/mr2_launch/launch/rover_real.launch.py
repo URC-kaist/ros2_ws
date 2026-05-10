@@ -79,20 +79,10 @@ def generate_launch_description():
         default_value="true",
         description="Enable manipulator URDF, ros2_control, and MoveIt2 components",
     )
-    use_servo_arg = DeclareLaunchArgument(
-        "use_servo",
-        default_value="false",
-        description="If true, launch MoveIt Servo instead of move_group",
-    )
     enable_autonomous_module_arg = DeclareLaunchArgument(
         "enable_autonomous_module",
         default_value="true",
         description="Enable autonomous module: launch the UVC front_camera (/dev/videoFRONT) and use it for ArUco detection",
-    )
-    enable_yolo_arg = DeclareLaunchArgument(
-        "enable_yolo",
-        default_value="true",
-        description="Start YOLO RGBD detector node",
     )
     enable_video_streaming_arg = DeclareLaunchArgument(
         "enable_video_streaming",
@@ -115,6 +105,21 @@ def generate_launch_description():
         "yolo_cam_topic",
         default_value="/rgbd_camera",
         description="RealSense camera base topic for YOLO (e.g., /rgbd_camera)",
+    )
+    yolo_device_arg = DeclareLaunchArgument(
+        "yolo_device",
+        default_value="cuda:0",
+        description="Ultralytics device for YOLO inference on the real rover",
+    )
+    yolo_publish_annotated_arg = DeclareLaunchArgument(
+        "yolo_publish_annotated",
+        default_value="true",
+        description="Publish annotated YOLO debug images on the real rover",
+    )
+    yolo_annotated_fps_arg = DeclareLaunchArgument(
+        "yolo_annotated_fps",
+        default_value="0.5",
+        description="Maximum annotated YOLO debug image publish rate in Hz on the real rover",
     )
     enable_xbee_sim_arg = DeclareLaunchArgument(
         "enable_xbee_sim",
@@ -224,6 +229,26 @@ def generate_launch_description():
         default_value="0x123",
         description="Standard CAN ID for the LED controller",
     )
+    enable_camera_turret_arg = DeclareLaunchArgument(
+        "enable_camera_turret",
+        default_value="true",
+        description="Start mr2_camera_turret classic CAN command node",
+    )
+    camera_turret_can_id_arg = DeclareLaunchArgument(
+        "camera_turret_can_id",
+        default_value="0x124",
+        description="Standard CAN ID for the camera turret controller",
+    )
+    camera_turret_invert_x_arg = DeclareLaunchArgument(
+        "camera_turret_invert_x",
+        default_value="false",
+        description="Invert camera turret X command direction",
+    )
+    camera_turret_invert_y_arg = DeclareLaunchArgument(
+        "camera_turret_invert_y",
+        default_value="false",
+        description="Invert camera turret Y command direction",
+    )
 
     xbee_sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -312,17 +337,18 @@ def generate_launch_description():
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
             "enable_manipulator_module": LaunchConfiguration("enable_manipulator_module"),
             "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
-            "use_servo": LaunchConfiguration("use_servo"),
             "xbee_device": LaunchConfiguration("xbee_device"),
             "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
             "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
             "enable_aruco": LaunchConfiguration("enable_autonomous_module"),
             "aruco_cam_topic": "/front_camera/image_raw",
-            "enable_yolo": LaunchConfiguration("enable_yolo"),
             "enable_video_streaming": LaunchConfiguration("enable_video_streaming"),
             "video_base_host": LaunchConfiguration("video_base_host"),
             "video_config": LaunchConfiguration("video_config"),
             "yolo_cam_topic": LaunchConfiguration("yolo_cam_topic"),
+            "yolo_device": LaunchConfiguration("yolo_device"),
+            "yolo_publish_annotated": LaunchConfiguration("yolo_publish_annotated"),
+            "yolo_annotated_fps": LaunchConfiguration("yolo_annotated_fps"),
         }.items(),
     )
 
@@ -394,6 +420,25 @@ def generate_launch_description():
             {"can_id": LaunchConfiguration("led_can_id")},
         ],
         condition=IfCondition(LaunchConfiguration("enable_led")),
+    )
+
+    camera_turret_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("mr2_camera_turret"),
+                    "launch",
+                    "camera_turret_can.launch.py",
+                ]
+            )
+        ),
+        launch_arguments={
+            "can_iface": LaunchConfiguration("can_iface"),
+            "can_id": LaunchConfiguration("camera_turret_can_id"),
+            "invert_x": LaunchConfiguration("camera_turret_invert_x"),
+            "invert_y": LaunchConfiguration("camera_turret_invert_y"),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration("enable_camera_turret")),
     )
 
     mission_status_led_node = Node(
@@ -495,17 +540,18 @@ def generate_launch_description():
             can_iface_arg,
             use_mock_servos_arg,
             enable_manipulator_module_arg,
-            use_servo_arg,
             enable_xbee_sim_arg,
             xbee_sim_device_arg,
             xbee_sim_peer_arg,
             xbee_device_arg,
             enable_autonomous_module_arg,
-            enable_yolo_arg,
             enable_video_streaming_arg,
             video_base_host_arg,
             video_config_arg,
             yolo_cam_topic_arg,
+            yolo_device_arg,
+            yolo_publish_annotated_arg,
+            yolo_annotated_fps_arg,
             left_gnss_serial_arg,
             right_gnss_serial_arg,
             left_gnss_frame_arg,
@@ -522,6 +568,10 @@ def generate_launch_description():
             ntrip_maxage_conn_arg,
             enable_led_arg,
             led_can_id_arg,
+            enable_camera_turret_arg,
+            camera_turret_can_id_arg,
+            camera_turret_invert_x_arg,
+            camera_turret_invert_y_arg,
             xbee_sim_launch,
             realsense_launch,
             front_uvc_launch,
@@ -533,6 +583,7 @@ def generate_launch_description():
             left_navsat_relay,
             right_navsat_relay,
             led_node,
+            camera_turret_launch,
             mission_status_led_node,
             left_rocker_static_tf,
             right_rocker_static_tf,

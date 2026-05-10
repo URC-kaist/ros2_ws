@@ -33,6 +33,9 @@ namespace mr2_video_streaming {
 using json = nlohmann::json;
 
 constexpr int kUdpSendBufferBytes = 65536;
+constexpr int kMinV4L2RestartDelaySeconds = 1;
+constexpr int kMaxV4L2RestartDelaySeconds = 30;
+constexpr int kV4L2StableRuntimeSeconds = 5;
 
 enum class StreamSourceType { RosTopic, V4L2 };
 
@@ -115,6 +118,10 @@ class StreamPipeline {
     if (config_.source_type != StreamSourceType::V4L2 || pipeline_ != nullptr || gst_child_pid_ > 0) {
       return;
     }
+    if (next_v4l2_restart_at_ != std::chrono::steady_clock::time_point::max() &&
+        std::chrono::steady_clock::now() < next_v4l2_restart_at_) {
+      return;
+    }
     start_v4l2_pipeline();
   }
 
@@ -127,30 +134,26 @@ class StreamPipeline {
       int status = 0;
       const pid_t result = waitpid(gst_child_pid_, &status, WNOHANG);
       if (result == 0) {
+        const auto now = std::chrono::steady_clock::now();
+        if (!v4l2_child_reported_stable_ &&
+            now - gst_child_started_at_ >= std::chrono::seconds(kV4L2StableRuntimeSeconds)) {
+          v4l2_restart_failures_ = 0;
+          v4l2_child_reported_stable_ = true;
+        }
         return;
       }
 
       if (result == gst_child_pid_) {
+        std::string reason;
         if (WIFEXITED(status)) {
-          RCLCPP_WARN(
-              logger_,
-              "V4L2 sender child for stream %s exited with code %d; scheduling restart",
-              config_.stream_id.c_str(),
-              WEXITSTATUS(status));
+          reason = "exited with code " + std::to_string(WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
-          RCLCPP_WARN(
-              logger_,
-              "V4L2 sender child for stream %s exited on signal %d; scheduling restart",
-              config_.stream_id.c_str(),
-              WTERMSIG(status));
+          reason = "exited on signal " + std::to_string(WTERMSIG(status));
         } else {
-          RCLCPP_WARN(
-              logger_,
-              "V4L2 sender child for stream %s exited unexpectedly; scheduling restart",
-              config_.stream_id.c_str());
+          reason = "exited unexpectedly";
         }
         gst_child_pid_ = -1;
-        next_v4l2_restart_at_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+        schedule_v4l2_restart("V4L2 sender child for stream " + config_.stream_id + " " + reason);
       } else if (result < 0) {
         if (errno != ECHILD) {
           RCLCPP_ERROR(
@@ -162,7 +165,7 @@ class StreamPipeline {
         }
 
         gst_child_pid_ = -1;
-        next_v4l2_restart_at_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+        schedule_v4l2_restart("V4L2 sender child for stream " + config_.stream_id + " disappeared");
       }
     }
 
@@ -170,12 +173,8 @@ class StreamPipeline {
       try {
         start_v4l2_pipeline();
       } catch (const std::exception & error) {
-        next_v4l2_restart_at_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
-        RCLCPP_ERROR(
-            logger_,
-            "Failed to restart V4L2 sender for stream %s: %s",
-            config_.stream_id.c_str(),
-            error.what());
+        schedule_v4l2_restart(
+            "failed to restart V4L2 sender for stream " + config_.stream_id + ": " + error.what());
       }
     }
   }
@@ -366,6 +365,11 @@ class StreamPipeline {
     if (gst_child_pid_ > 0) {
       return;
     }
+    if (!std::filesystem::exists(config_.v4l2_device)) {
+      schedule_v4l2_restart(
+          "V4L2 device " + config_.v4l2_device + " for stream " + config_.stream_id + " is not present");
+      return;
+    }
 
     output_width_ = config_.width;
     output_height_ = config_.height;
@@ -446,6 +450,8 @@ class StreamPipeline {
         });
 
     start_gst_launch_child(args);
+    gst_child_started_at_ = std::chrono::steady_clock::now();
+    v4l2_child_reported_stable_ = false;
     next_v4l2_restart_at_ = std::chrono::steady_clock::time_point::max();
 
     std::ostringstream details;
@@ -595,6 +601,19 @@ class StreamPipeline {
     }
   }
 
+  void schedule_v4l2_restart(const std::string & reason) {
+    v4l2_restart_failures_ = std::min(v4l2_restart_failures_ + 1, 6);
+    const int exponential_delay = kMinV4L2RestartDelaySeconds << (v4l2_restart_failures_ - 1);
+    const int delay_seconds = std::min(exponential_delay, kMaxV4L2RestartDelaySeconds);
+    next_v4l2_restart_at_ =
+        std::chrono::steady_clock::now() + std::chrono::seconds(delay_seconds);
+    RCLCPP_WARN(
+        logger_,
+        "%s; retrying in %d s",
+        reason.c_str(),
+        delay_seconds);
+  }
+
   StreamConfig config_;
   std::string base_host_;
   rclcpp::Logger logger_;
@@ -610,6 +629,9 @@ class StreamPipeline {
   GstClockTime frame_duration_ns_{0};
   GstClockTime frame_index_{0};
   bool stopping_{false};
+  int v4l2_restart_failures_{0};
+  bool v4l2_child_reported_stable_{false};
+  std::chrono::steady_clock::time_point gst_child_started_at_{};
   std::chrono::steady_clock::time_point next_v4l2_restart_at_{
       std::chrono::steady_clock::time_point::max()};
 

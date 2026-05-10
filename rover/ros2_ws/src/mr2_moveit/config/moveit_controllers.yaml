@@ -1,19 +1,3 @@
-# MoveIt controller plugin + controller list
-
-moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
-
-moveit_simple_controller_manager:
-  controller_names:
-    - manipulator_controller
-
-  manipulator_controller:
-    type: FollowJointTrajectory
-    action_ns: follow_joint_trajectory
-    default: true
-    joints:
-      - arm_j1
-      - arm_j2
-      - arm_j3
-      - arm_j4
-      - arm_j5
-      - arm_j6
+# Servo publishes directly to /manipulator_controller/commands, so there is no
+# FollowJointTrajectory controller for MoveIt to manage here.
+moveit_manage_controllers: false

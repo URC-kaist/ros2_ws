@@ -130,7 +130,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j1_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j1_upper_limit}</param>
-        <param name="origin_offset">-4.70</param>
+        <param name="origin_offset">0.0</param>
       </joint>
 
       <joint name="arm_j2">
@@ -144,7 +144,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j2_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j2_upper_limit}</param>
-        <param name="origin_offset">-0.69</param>
+        <param name="origin_offset">0.0</param>
       </joint>
 
       <joint name="arm_j3">
@@ -158,7 +158,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j3_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j3_upper_limit}</param>
-        <param name="origin_offset">3.61</param>
+        <param name="origin_offset">-0.7853981634</param>
       </joint>
 
       <joint name="arm_j4">
@@ -172,7 +172,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j4_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j4_upper_limit}</param>
-        <param name="origin_offset">-2.55</param>
+        <param name="origin_offset">0.0</param>
       </joint>
 
       <joint name="arm_j5">
@@ -186,7 +186,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j5_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j5_upper_limit}</param>
-        <param name="origin_offset">-2.46</param>
+        <param name="origin_offset">2.3561944902</param>
       </joint>
 
       <joint name="arm_j6">
@@ -200,7 +200,7 @@
         <param name="can_iface">${can_iface}</param>
         <param name="joint_lower_limit">${arm_j6_lower_limit}</param>
         <param name="joint_upper_limit">${arm_j6_upper_limit}</param>
-        <param name="origin_offset">-3.03</param>
+        <param name="origin_offset">0.0</param>
       </joint>
 
       <joint name="arm_gripper">
@@ -211,7 +211,10 @@
         <param name="node_id">9</param>
         <param name="can_iface">${can_iface}</param>
         <param name="command_channel">angle</param>
-        <param name="desired_profile">As5600</param>
+        <param name="desired_profile">DirectInput</param>
+        <param name="require_limits_status">false</param>
+        <param name="joint_lower_limit">0.0</param>
+        <param name="joint_upper_limit">1.3089969390</param>
         <param name="auto_arm">true</param>
       </joint>
       </xacro:if>

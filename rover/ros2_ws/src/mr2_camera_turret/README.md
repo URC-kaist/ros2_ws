@@ -1,9 +1,9 @@
 # mr2_camera_turret
 
-CAN-FD driver for the STM32 camera turret receiver.
+Classic CAN driver for the STM32 camera turret receiver.
 
 The node subscribes to normalized X/Y turret commands and sends the receiver's
-4-byte joystick payload on a standard 11-bit CAN-FD frame.
+4-byte joystick payload on a standard 11-bit classic CAN frame.
 
 ## Quick start
 
@@ -36,10 +36,10 @@ joystick ADC values:
 | 0.0        | 2048 |
 | 1.0        | 4095 |
 
-## CAN-FD protocol
+## CAN protocol
 
 - CAN ID: `0x124` standard 11-bit
-- Frame type: CAN-FD
+- Frame type: classic CAN 2.0, 500 kbps
 - Length: 4 bytes
 
 | Byte | Field |

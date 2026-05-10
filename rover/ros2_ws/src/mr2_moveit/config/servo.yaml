@@ -11,8 +11,8 @@ scale:
   rotational: 0.8   # rad/s (only used if command_in_type=="unitless")
   joint: 0.6        # rad/s (only used if command_in_type=="unitless")
 
-command_out_type: trajectory_msgs/JointTrajectory
-command_out_topic: /manipulator_controller/joint_trajectory
+command_out_type: std_msgs/Float64MultiArray
+command_out_topic: /manipulator_controller/commands
 publish_joint_positions: true
 publish_joint_velocities: false
 publish_joint_accelerations: false

@@ -36,7 +36,7 @@ fi
 
 iface="${1:-can0}"
 per_node_wait_sec="${2:-20}"
-nodes=(1 2 3 4 5 6 7 8)
+nodes=(1 2 3 4 5 6 7 8 9)
 
 if ! ip link show "${iface}" >/dev/null 2>&1; then
   echo "CAN interface '${iface}' not found or not accessible." >&2

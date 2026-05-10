@@ -26,6 +26,14 @@ def generate_launch_description():
     ]
 
     moveit_config = MoveItConfigsBuilder("rover", package_name="mr2_moveit").to_moveit_configs()
+    moveit_params = moveit_config.to_dict()
+    for key in (
+        "moveit_controller_manager",
+        "moveit_manage_controllers",
+        "moveit_simple_controller_manager",
+    ):
+        moveit_params.pop(key, None)
+
     servo_dict = _load_yaml("mr2_moveit", "config/servo.yaml")
     servo_params = {"moveit_servo": servo_dict}
 
@@ -36,7 +44,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             servo_params,
-            moveit_config.to_dict(),
+            moveit_params,
             {"use_sim_time": use_sim_time},
         ],
     )

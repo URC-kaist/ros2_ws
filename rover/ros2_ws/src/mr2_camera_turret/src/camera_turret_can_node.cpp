@@ -76,7 +76,8 @@ public:
         [this]() { publish_can_command(); });
 
     RCLCPP_INFO(get_logger(),
-                "camera_turret_can ready on %s, StdID 0x%03X, topic %s",
+                "camera_turret_can ready on %s, classic CAN StdID 0x%03X, "
+                "topic %s",
                 can_iface_.c_str(), can_id_, command_topic_.c_str());
   }
 
@@ -103,10 +104,9 @@ private:
     const uint16_t vrx = normalized_to_adc(x);
     const uint16_t vry = normalized_to_adc(y);
 
-    struct canfd_frame frame {};
+    struct can_frame frame {};
     frame.can_id = can_id_ & kStdIdMask;
-    frame.len = 4;
-    frame.flags = 0;
+    frame.can_dlc = 4;
     frame.data[0] = static_cast<uint8_t>(vrx & 0xFF);
     frame.data[1] = static_cast<uint8_t>((vrx >> 8) & 0xFF);
     frame.data[2] = static_cast<uint8_t>(vry & 0xFF);

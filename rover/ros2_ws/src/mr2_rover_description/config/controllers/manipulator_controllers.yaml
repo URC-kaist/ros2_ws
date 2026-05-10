@@ -8,7 +8,7 @@ controller_manager:
       publish_rate: 50
 
     manipulator_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+      type: position_controllers/JointGroupPositionController
 
     gripper_position_controller:
       type: position_controllers/JointGroupPositionController
@@ -22,11 +22,7 @@ manipulator_controller:
       - arm_j4
       - arm_j5
       - arm_j6
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
+    interface_name: position
 
 gripper_position_controller:
   ros__parameters:

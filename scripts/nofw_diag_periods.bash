@@ -13,7 +13,7 @@ Options:
   -i, --iface IFACE      CAN interface (default: can0)
   -d, --duration SEC     Capture duration in seconds (default: 10)
   -n, --node NODE        Expected node ID, 1..15. May be repeated.
-                         Default: nodes 1..8.
+                         Default: nodes 1..9.
   --raw                  Print raw captured diagnostic/telemetry frames after
                          the summary.
   -h, --help             Show this help.
@@ -76,7 +76,7 @@ if [[ ! "$duration" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
 fi
 
 if [[ ${#nodes[@]} -eq 0 ]]; then
-  nodes=(1 2 3 4 5 6 7 8)
+  nodes=(1 2 3 4 5 6 7 8 9)
 fi
 
 for node in "${nodes[@]}"; do

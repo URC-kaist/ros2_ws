@@ -18,6 +18,13 @@ def _launch_setup(context, *args, **kwargs):
         "on",
     )
     torch_device = LaunchConfiguration("torch_device").perform(context)
+    publish_annotated = LaunchConfiguration("publish_annotated").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    annotated_fps = float(LaunchConfiguration("annotated_fps").perform(context))
     default_model_path = LaunchConfiguration("model_path").perform(context)
     tensorrt_engine_path = LaunchConfiguration("tensorrt_engine_path").perform(context)
     selected_model_path = tensorrt_engine_path if use_tensorrt else default_model_path
@@ -35,6 +42,8 @@ def _launch_setup(context, *args, **kwargs):
                     "depth_topic": "/rgbd_camera/aligned_depth_to_color/image_raw",
                     "camera_info_topic": "/rgbd_camera/color/camera_info",
                     "annotated_topic": "yolo/annotated_image",
+                    "publish_annotated": publish_annotated,
+                    "annotated_fps": annotated_fps,
                     "pose_topic": "yolo/object_pose",
                     "target_frame": "",
                     "model_path": selected_model_path,
@@ -79,6 +88,16 @@ def generate_launch_description():
                 "torch_device",
                 default_value="cuda:0",
                 description="Torch device string (e.g. cuda:0, cuda:1, cpu) used when use_cuda is true.",
+            ),
+            DeclareLaunchArgument(
+                "publish_annotated",
+                default_value="true",
+                description="Publish annotated YOLO debug images.",
+            ),
+            DeclareLaunchArgument(
+                "annotated_fps",
+                default_value="0.0",
+                description="Maximum annotated YOLO debug image publish rate in Hz; 0 publishes every frame.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]

@@ -143,7 +143,11 @@ double mdeg_s_to_rad_s(int32_t mdeg_s) {
 }
 
 bool profile_requires_output_feedback(Profile profile) {
-  return profile != Profile::VelocityOnly;
+  return profile == Profile::As5600 || profile == Profile::TmagLut;
+}
+
+bool profile_requires_selection(Profile profile) {
+  return profile != Profile::DirectInput;
 }
 
 } // namespace
@@ -294,8 +298,9 @@ public:
       }
     }
 
-    if (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
-        active_profile_.load() != static_cast<uint8_t>(desired_profile_)) {
+    if (profile_requires_selection(desired_profile_) &&
+        (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
+         active_profile_.load() != static_cast<uint8_t>(desired_profile_))) {
       config_status_seen_ = false;
       send_profile_command(desired_profile_);
       if (!wait_for([this] {
@@ -431,7 +436,8 @@ private:
       return true;
     }
 
-    if (stored_output_encoder_type_.load() !=
+    if (profile_requires_selection(desired_profile_) &&
+        stored_output_encoder_type_.load() !=
         static_cast<uint8_t>(desired_profile_)) {
       RCLCPP_ERROR(logger_,
                    "Actuator %u config profile mismatch: stored=%u expected=%u",
@@ -503,8 +509,9 @@ private:
                    node_id_, phase, runtime_diag_magic_.load());
       return false;
     }
-    if (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
-        active_profile_.load() != static_cast<uint8_t>(desired_profile_)) {
+    if (profile_requires_selection(desired_profile_) &&
+        (stored_profile_.load() != static_cast<uint8_t>(desired_profile_) ||
+         active_profile_.load() != static_cast<uint8_t>(desired_profile_))) {
       RCLCPP_ERROR(
           logger_,
           "Actuator %u profile mismatch during %s: stored=%u active=%u expected=%u",

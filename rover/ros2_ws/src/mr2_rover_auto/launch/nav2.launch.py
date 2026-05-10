@@ -78,7 +78,7 @@ def generate_launch_description():
     # User defined config file should contain '<robot_namespace>' keyword for the replacements.
     params_file = ReplaceString(
         source_file=params_file,
-        replacements={'<robot_namespace>': ('/', namespace)},
+        replacements={'<robot_namespace>': ['/', namespace]},
         condition=IfCondition(use_namespace))
 
     configured_params = ParameterFile(
@@ -162,7 +162,7 @@ def generate_launch_description():
                               'container_name': 'nav2_container'}.items()),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(launch_dir, 'navigation_launch.py')),
+            PythonLaunchDescriptionSource(os.path.join(pkg_share, 'launch', 'navigation_launch.py')),
             launch_arguments={'namespace': namespace,
                               'use_sim_time': use_sim_time,
                               'autostart': autostart,

@@ -11,7 +11,7 @@ controller_manager:
       type: mr2_rover_control/TwistToCommandsController
 
     manipulator_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+      type: position_controllers/JointGroupPositionController
 
     gripper_controller:
       type: position_controllers/JointGroupPositionController
@@ -31,7 +31,7 @@ rover_controller:
     wheel_base: 0.95386
     track_width: 0.6504
     wheel_radius: 0.17
-    max_wheel_linear_speed: 1.2  # m/s hard limit per wheel; However, hardware is the bottleneck. (#34)
+    max_wheel_linear_speed: 0.8  # m/s hard limit per wheel; However, hardware is the bottleneck. (#34)
     max_steer: 2.35619  # +/- 135 degrees
     steering_error_ratio_deg: 40.0  # v1.0 speed scale vs steering error
     # cmd_vel slew-rate limits (preserved from controller defaults)
@@ -67,11 +67,7 @@ manipulator_controller:
       - arm_j4
       - arm_j5
       - arm_j6
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
+    interface_name: position
 
 gripper_controller:
   ros__parameters:

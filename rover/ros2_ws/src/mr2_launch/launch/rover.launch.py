@@ -91,11 +91,6 @@ def generate_launch_description():
         default_value="true",
         description="Enable autonomous camera module (front_camera) in simulation",
     )
-    use_servo_arg = DeclareLaunchArgument(
-        "use_servo",
-        default_value="false",
-        description="If true, launch MoveIt Servo instead of move_group",
-    )
     xbee_sim_device_arg = DeclareLaunchArgument(
         "xbee_sim_device",
         default_value="/tmp/xbee_sim0",
@@ -121,11 +116,6 @@ def generate_launch_description():
         default_value="/front_camera/image_raw",
         description="Base image topic for aruco_opencv (must have matching /camera_info; default is Gazebo RGBD camera)",
     )
-    enable_yolo_arg = DeclareLaunchArgument(
-        "enable_yolo",
-        default_value="true",
-        description="Start YOLO RGBD detector node",
-    )
     enable_video_streaming_arg = DeclareLaunchArgument(
         "enable_video_streaming",
         default_value="false",
@@ -147,6 +137,21 @@ def generate_launch_description():
         "yolo_cam_topic",
         default_value="/rgbd_camera",
         description="RealSense camera base topic for YOLO (e.g., /rgbd_camera)",
+    )
+    yolo_device_arg = DeclareLaunchArgument(
+        "yolo_device",
+        default_value="",
+        description="Ultralytics device for YOLO inference (e.g., cuda:0 or cpu; empty lets Ultralytics choose)",
+    )
+    yolo_publish_annotated_arg = DeclareLaunchArgument(
+        "yolo_publish_annotated",
+        default_value="true",
+        description="Publish annotated YOLO debug images",
+    )
+    yolo_annotated_fps_arg = DeclareLaunchArgument(
+        "yolo_annotated_fps",
+        default_value="0.0",
+        description="Maximum annotated YOLO debug image publish rate in Hz; 0 publishes every frame",
     )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────
@@ -286,41 +291,22 @@ def generate_launch_description():
         executable="yolo_rgbd_detector",
         name="yolo_detector",
         output="screen",
-        condition=IfCondition(LaunchConfiguration("enable_yolo")),
+        condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
         parameters=[
             {
                 "rgb_topic": yolo_rgb_topic,
                 "depth_topic": yolo_depth_topic,
                 "camera_info_topic": yolo_camera_info_topic,
                 "annotated_topic": "yolo/annotated_image",
+                "publish_annotated": LaunchConfiguration("yolo_publish_annotated"),
+                "annotated_fps": LaunchConfiguration("yolo_annotated_fps"),
                 "pose_topic": "yolo/object_pose",
                 "camera_frame_is_optical": camera_frame_is_optical,
                 "class_id_map": "0:2,1:0,2:1",
+                "device": LaunchConfiguration("yolo_device"),
                 "use_sim_time": LaunchConfiguration("use_sim_time"),
             }
         ],
-    )
-
-    move_group_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare("mr2_moveit"), "launch", "move_group.launch.py"]
-            )
-        ),
-        launch_arguments={
-            "use_sim_time": LaunchConfiguration("use_sim_time"),
-        }.items(),
-        condition=IfCondition(
-            PythonExpression(
-                [
-                    "'",
-                    enable_manipulator_module,
-                    "' == 'true' and '",
-                    LaunchConfiguration("use_servo"),
-                    "' != 'true'",
-                ]
-            )
-        ),
     )
 
     servo_launch = IncludeLaunchDescription(
@@ -333,15 +319,7 @@ def generate_launch_description():
             "use_sim_time": LaunchConfiguration("use_sim_time"),
         }.items(),
         condition=IfCondition(
-            PythonExpression(
-                [
-                    "'",
-                    enable_manipulator_module,
-                    "' == 'true' and '",
-                    LaunchConfiguration("use_servo"),
-                    "' == 'true'",
-                ]
-            )
+            PythonExpression(["'", enable_manipulator_module, "' == 'true'"])
         ),
     )
 
@@ -411,17 +389,18 @@ def generate_launch_description():
         enable_manipulator_module_sim_arg,
         enable_autonomous_module_arg,
         enable_autonomous_module_sim_arg,
-        use_servo_arg,
         xbee_sim_device_arg,
         xbee_sim_peer_arg,
         xbee_device_arg,
         enable_aruco_arg,
         aruco_cam_topic_arg,
-        enable_yolo_arg,
         enable_video_streaming_arg,
         video_base_host_arg,
         video_config_arg,
         yolo_cam_topic_arg,
+        yolo_device_arg,
+        yolo_publish_annotated_arg,
+        yolo_annotated_fps_arg,
         use_sim_time_param,
         rover_launch,
         rover_real_launch,
@@ -429,7 +408,6 @@ def generate_launch_description():
         system_status,
         aruco_tracker,
         yolo_detector,
-        move_group_launch,
         servo_launch,
         xbee_sim_launch,
         xbee_bridge,

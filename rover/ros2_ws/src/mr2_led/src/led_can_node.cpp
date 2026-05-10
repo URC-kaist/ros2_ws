@@ -1,8 +1,10 @@
 #include <cstdint>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include <linux/can.h>
 
@@ -12,6 +14,7 @@
 
 namespace {
 constexpr uint32_t kStdIdMask = 0x7FF;
+constexpr auto kShutdownLedFlushDelay = std::chrono::milliseconds(50);
 }
 
 class LedCanNode : public rclcpp::Node {
@@ -38,7 +41,32 @@ public:
                 can_iface_.c_str(), can_id_);
   }
 
+  ~LedCanNode() override { set_shutdown_led_mode_(); }
+
 private:
+  void send_mode_(uint8_t mode) {
+    struct can_frame frame {};
+    frame.can_id = can_id_ & kStdIdMask;
+    frame.can_dlc = 1;
+    frame.data[0] = mode;
+    bus_->enqueue_tx(frame);
+  }
+
+  void set_shutdown_led_mode_() noexcept {
+    try {
+      if (!bus_) {
+        return;
+      }
+      send_mode_(mr2_led::srv::SetLedMode::Request::MODE_SUCCESS);
+      std::this_thread::sleep_for(kShutdownLedFlushDelay);
+    } catch (const std::exception &ex) {
+      RCLCPP_WARN(get_logger(), "Failed to set shutdown LED mode: %s",
+                  ex.what());
+    } catch (...) {
+      RCLCPP_WARN(get_logger(), "Failed to set shutdown LED mode");
+    }
+  }
+
   void handle_request_(
       const std::shared_ptr<rmw_request_id_t> /*request_header*/,
       const std::shared_ptr<mr2_led::srv::SetLedMode::Request> request,
@@ -51,11 +79,7 @@ private:
       return;
     }
 
-    struct can_frame frame {};
-    frame.can_id = can_id_ & kStdIdMask;
-    frame.can_dlc = 1;
-    frame.data[0] = mode;
-    bus_->enqueue_tx(frame);
+    send_mode_(mode);
 
     response->success = true;
     response->message = "Sent";

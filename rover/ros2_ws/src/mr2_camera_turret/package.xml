@@ -3,7 +3,7 @@
 <package format="3">
   <name>mr2_camera_turret</name>
   <version>0.1.0</version>
-  <description>CAN-FD camera turret command driver for MR2.</description>
+  <description>Classic CAN camera turret command driver for MR2.</description>
   <maintainer email="gmmyung@kaist.ac.kr">mr2</maintainer>
   <license>MIT</license>
 
