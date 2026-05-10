@@ -43,6 +43,7 @@ const DEFAULTS = {
   mavproxyMasterDevice: '/dev/ttySIK',
   mavproxyMasterBaud: 57600,
   mavproxyOut: 'udp:192.168.1.108:14550',
+  mavproxyDefaultModules: '',
 }
 
 function loadGatewayEnv(baseDir) {
@@ -254,6 +255,10 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
     ),
     mavproxyOut:
       getArg(args, '--mavproxy-out') || env.MAVPROXY_OUT || DEFAULTS.mavproxyOut,
+    mavproxyDefaultModules:
+      getArg(args, '--mavproxy-default-modules') ||
+      env.MAVPROXY_DEFAULT_MODULES ||
+      DEFAULTS.mavproxyDefaultModules,
   }
 }
 

@@ -54,7 +54,7 @@ CRC storage:
     - Example) +1.0 rad → 65536 → `0x00010000`
     - Example) -0.5 rad → -32768 → `0xFFFF8000`
 - LEN = 6 (SEQ + CMD + 4)
-  - Note: Target is clamped to ±90° in firmware.
+  - Note: Target is clamped to ±180° in firmware.
 
 ---
 
@@ -140,6 +140,6 @@ NOTE: Below examples show the “format” only; actual CRC must be computed usi
 - `BACKOFF_COUNTS` = `80`, `HOME_RELEASE_COUNTS` = `120`: encoder counts for backoff and release distances.
 - `HOME_OFFSET_COUNTS` = `(0.15 rad)` converted to counts: position assigned when the switch first triggers.
 - `HOME_SEARCH_MAX_COUNTS` = one output shaft revolution with gear ratio applied: max travel allowed during search before `ERR_HOME_NOT_FOUND`.
-- `MAX_ABS_TARGET_RAD` = `±90 deg` (π/2): command clamp.
+- `MAX_ABS_TARGET_RAD` = `±180 deg` (π): command clamp.
 - `AUTO_RETURN_IDLE_MS` = `1000`: idle time before auto-return.
 - `AUTO_RETURN_RAD` = `0.0`: auto-return target position.

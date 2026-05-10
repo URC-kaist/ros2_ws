@@ -42,7 +42,7 @@ constexpr float GEAR_DEN = 20.0f;
 constexpr float TWO_PI_F = 6.2831853071795864769f;
 
 // Clamp commanded angle range.
-constexpr float MAX_ABS_TARGET_RAD = (3.14159265358979323846f / 2.0f);   // +-90 deg
+constexpr float MAX_ABS_TARGET_RAD = 3.14159265358979323846f;   // +-180 deg
 
 // ---------------------- Position PID ----------------------
 constexpr long DEAD_BAND = 8;

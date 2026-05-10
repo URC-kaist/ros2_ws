@@ -13,6 +13,7 @@ function createConfig(overrides = {}) {
     mavproxyMasterDevice: '/dev/ttySIK',
     mavproxyMasterBaud: 57600,
     mavproxyOut: 'udp:192.168.1.108:14550',
+    mavproxyDefaultModules: '',
     ...overrides,
   }
 }
@@ -21,6 +22,7 @@ test('createMavproxyArgs builds the startup command arguments', () => {
   assert.deepEqual(createMavproxyArgs(createConfig()), [
     '--master=/dev/ttySIK,57600',
     '--out=udp:192.168.1.108:14550',
+    '--default-modules=',
     '--non-interactive',
   ])
 })
@@ -50,6 +52,7 @@ test('startMavproxy spawns MAVProxy and stops it with SIGTERM', () => {
   assert.deepEqual(calls[0].args, [
     '--master=/dev/ttySIK,57600',
     '--out=udp:192.168.1.108:14550',
+    '--default-modules=',
     '--non-interactive',
   ])
   assert.equal(calls[0].options.stdio[0], 'ignore')

@@ -187,7 +187,7 @@ The base station needs a GStreamer runtime with `gst-launch-1.0`, `rtph264depay`
 MAVProxy starts with the gateway by default:
 
 ```bash
-mavproxy.py --master=/dev/ttySIK,57600 --out=udp:192.168.1.108:14550 --non-interactive
+mavproxy.py --master=/dev/ttySIK,57600 --out=udp:192.168.1.108:14550 --default-modules= --non-interactive
 ```
 
 ### Config Sources
@@ -226,6 +226,11 @@ values such as `MR2_GATEWAY_HOST`, `MR2_GATEWAY_PORT`, and
 | `--mavproxy-master-device` | `MAVPROXY_MASTER_DEVICE` | `/dev/ttySIK` |
 | `--mavproxy-master-baud` | `MAVPROXY_MASTER_BAUD` | `57600` |
 | `--mavproxy-out` | `MAVPROXY_OUT` | `udp:192.168.1.108:14550` |
+| `--mavproxy-default-modules` | `MAVPROXY_DEFAULT_MODULES` | empty |
+
+The default module list is intentionally empty because the gateway only needs
+MAVLink forwarding. This avoids startup failures from optional MAVProxy modules
+such as `adsb` being absent from the local Python environment.
 
 ### Video Streaming
 

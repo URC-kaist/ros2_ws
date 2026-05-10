@@ -32,6 +32,8 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       '115200',
       '--mavproxy-out',
       'udp:127.0.0.1:14550',
+      '--mavproxy-default-modules',
+      'link,wp',
     ],
     {
       BASE_XBEE_DEVICE: '/tmp/ignored',
@@ -46,6 +48,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
       MAVPROXY_MASTER_DEVICE: '/dev/ignored',
       MAVPROXY_MASTER_BAUD: '57600',
       MAVPROXY_OUT: 'udp:192.168.1.108:14550',
+      MAVPROXY_DEFAULT_MODULES: 'adsb',
     }
   )
 
@@ -62,6 +65,7 @@ test('parseGatewayConfig prefers argv over env and coerces values', () => {
   assert.equal(config.mavproxyMasterDevice, '/tmp/sik0')
   assert.equal(config.mavproxyMasterBaud, 115200)
   assert.equal(config.mavproxyOut, 'udp:127.0.0.1:14550')
+  assert.equal(config.mavproxyDefaultModules, 'link,wp')
   assert.equal('cmdHz' in config, false)
   assert.equal('cmdTimeoutMs' in config, false)
 })
@@ -84,6 +88,7 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   assert.equal(config.mavproxyMasterDevice, '/dev/ttySIK')
   assert.equal(config.mavproxyMasterBaud, 57600)
   assert.equal(config.mavproxyOut, 'udp:192.168.1.108:14550')
+  assert.equal(config.mavproxyDefaultModules, '')
 })
 
 test('parseGatewayConfig accepts top-level MR2 network env fallbacks', () => {

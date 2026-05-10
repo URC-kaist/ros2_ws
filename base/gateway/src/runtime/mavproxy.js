@@ -6,6 +6,7 @@ function createMavproxyArgs(config) {
   return [
     `--master=${config.mavproxyMasterDevice},${config.mavproxyMasterBaud}`,
     `--out=${config.mavproxyOut}`,
+    `--default-modules=${config.mavproxyDefaultModules || ''}`,
     '--non-interactive',
   ]
 }
