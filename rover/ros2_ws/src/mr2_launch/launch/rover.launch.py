@@ -363,6 +363,8 @@ def generate_launch_description():
             {"device": LaunchConfiguration("xbee_device")},
             {"heartbeat_timeout_ms": 500},
             {"cmd_vel_topic": "/base/cmd_vel"},
+            {"smooth_arm_joint_commands": True},
+            {"arm_joint_accel_limit_rad_s2": 3.0},
         ],
         condition=real_condition,
     )
@@ -376,6 +378,8 @@ def generate_launch_description():
             {"heartbeat_timeout_ms": 500},
             {"log_frames": False},
             {"cmd_vel_topic": "/base/cmd_vel"},
+            {"smooth_arm_joint_commands": True},
+            {"arm_joint_accel_limit_rad_s2": 3.0},
         ],
         condition=xbee_sim_condition,
     )

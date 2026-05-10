@@ -7,7 +7,7 @@ type ArmServoMode = 'cartesian' | 'joint'
 
 const LIN_SCALE = 0.6 // m/s equivalent for servo twist
 const ANG_SCALE = 1.2 // rad/s equivalent for servo twist
-const JOINT_SCALE = 0.8 // rad/s at full joint command scale
+const JOINT_SCALE = 1.5 // rad/s at full joint command scale
 const DEADZONE = 0.08
 const CMD_PERIOD_MS = 50
 const GRIPPER_RATE_PER_SEC = 0.08
