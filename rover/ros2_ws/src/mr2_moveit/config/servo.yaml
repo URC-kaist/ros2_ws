@@ -2,7 +2,7 @@
 # MoveIt Servo parameters for the MR2 manipulator
 ###############################################
 
-publish_period: 0.05            # seconds between command publications (20 Hz, larger position steps for position-only control)
+publish_period: 0.02            # seconds between command publications (50 Hz)
 max_expected_latency: 0.1       # delay between sending a command and the robot executing it [s]
 
 command_in_type: "speed_units"  # "unitless" or "speed_units"
