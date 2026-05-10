@@ -449,52 +449,15 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("enable_led")),
     )
 
-    # Static TF for rocker joints (hardware has no joint states for these)
-    left_rocker_static_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="left_rocker_static_tf",
-        arguments=[
-            "--x",
-            "0",
-            "--y",
-            "0.2455",
-            "--z",
-            "0.06",
-            "--roll",
-            "0",
-            "--pitch",
-            "0",
-            "--yaw",
-            "0",
-            "--frame-id",
-            "base_chassis",
-            "--child-frame-id",
-            "left_rocker",
-        ],
-    )
-
-    right_rocker_static_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="right_rocker_static_tf",
-        arguments=[
-            "--x",
-            "0",
-            "--y",
-            "-0.2455",
-            "--z",
-            "0.06",
-            "--roll",
-            "0",
-            "--pitch",
-            "0",
-            "--yaw",
-            "0",
-            "--frame-id",
-            "base_chassis",
-            "--child-frame-id",
-            "right_rocker",
+    passive_rocker_joint_state = Node(
+        package="mr2_rover_description",
+        executable="static_joint_state_publisher",
+        name="passive_rocker_joint_state",
+        output="screen",
+        parameters=[
+            {"joint_names": ["left_rocker_joint"]},
+            {"positions": [0.0]},
+            {"publish_rate": 10.0},
         ],
     )
 
@@ -585,8 +548,7 @@ def generate_launch_description():
             led_node,
             camera_turret_launch,
             mission_status_led_node,
-            left_rocker_static_tf,
-            right_rocker_static_tf,
+            passive_rocker_joint_state,
             manual_set_datum,
         ]
     )

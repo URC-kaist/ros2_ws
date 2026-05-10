@@ -25,6 +25,8 @@
   <xacro:property name="arm_j6_upper_limit" value="3.1415926536"/>
   <!-- <xacro:property name="arm_j6_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j6_upper_limit" value="100"/> -->
+  <xacro:property name="arm_gripper_lower_limit" value="0.0"/>
+  <xacro:property name="arm_gripper_upper_limit" value="1.3089969390"/>
   <!-- Shared shaded material for STL visuals (prevents unlit white appearance) -->
   <material name="ArmGrey">
     <color rgba="0.6 0.6 0.6 1.0"/>
@@ -200,6 +202,28 @@
       <parent link="arm_l6"/>
       <child link="eef_link"/>
       <origin xyz="0.215 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="gripper_link">
+      <visual>
+        <geometry>
+          <box size="0.08 0.04 0.04"/>
+        </geometry>
+        <origin xyz="0.04 0 0" rpy="0 0 0"/>
+        <material name="ArmGrey"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="0.08 0.04 0.04"/>
+        </geometry>
+        <origin xyz="0.04 0 0" rpy="0 0 0"/>
+      </collision>
+    </link>
+    <joint name="arm_gripper" type="revolute">
+      <parent link="eef_link"/>
+      <child link="gripper_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="${arm_gripper_lower_limit}" upper="${arm_gripper_upper_limit}" effort="20" velocity="2.0"/>
     </joint>
   </xacro:macro>
 </robot>
