@@ -25,13 +25,13 @@ check_octomap_collisions: false
 
 move_group_name: manipulator
 planning_frame: base_link
-ee_frame_name: arm_l6
+ee_frame_name: eef_link
 robot_link_command_frame: base_link
 
 lower_singularity_threshold: 60.0
 hard_stop_singularity_threshold: 120.0
 leaving_singularity_threshold_multiplier: 2.5
-joint_limit_margins: [0.12]
+joint_limit_margin: 0.06
 
 cartesian_command_in_topic: ~/delta_twist_cmds
 joint_command_in_topic: ~/delta_joint_cmds

@@ -1,28 +1,28 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <!-- Joint limits (shared with ros2_control config) -->
-  <xacro:property name="arm_j1_lower_limit" value="-4"/>
-  <xacro:property name="arm_j1_upper_limit" value="4"/>
+  <xacro:property name="arm_j1_lower_limit" value="-3.1415926536"/>
+  <xacro:property name="arm_j1_upper_limit" value="3.1415926536"/>
   <!-- <xacro:property name="arm_j1_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j1_upper_limit" value="100"/> -->
-  <xacro:property name="arm_j2_lower_limit" value="-0.645"/>
-  <xacro:property name="arm_j2_upper_limit" value="1.7"/>
+  <xacro:property name="arm_j2_lower_limit" value="-0.7853981634"/>
+  <xacro:property name="arm_j2_upper_limit" value="1.5707963268"/>
   <!-- <xacro:property name="arm_j2_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j2_upper_limit" value="100"/> -->
-  <xacro:property name="arm_j3_lower_limit" value="-2"/>
-  <xacro:property name="arm_j3_upper_limit" value="-0.1"/>
+  <xacro:property name="arm_j3_lower_limit" value="-1.7453292520"/>
+  <xacro:property name="arm_j3_upper_limit" value="0.0"/>
   <!-- <xacro:property name="arm_j3_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j3_upper_limit" value="100"/> -->
-  <xacro:property name="arm_j4_lower_limit" value="-3.5"/>
-  <xacro:property name="arm_j4_upper_limit" value="3.5"/>
+  <xacro:property name="arm_j4_lower_limit" value="-3.4906585040"/>
+  <xacro:property name="arm_j4_upper_limit" value="3.4906585040"/>
   <!-- <xacro:property name="arm_j4_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j4_upper_limit" value="100"/> -->
-  <xacro:property name="arm_j5_lower_limit" value="-0.12"/>
-  <xacro:property name="arm_j5_upper_limit" value="3.65"/>
+  <xacro:property name="arm_j5_lower_limit" value="0.0"/>
+  <xacro:property name="arm_j5_upper_limit" value="3.4906585040"/>
   <!-- <xacro:property name="arm_j5_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j5_upper_limit" value="100"/> -->
-  <xacro:property name="arm_j6_lower_limit" value="-4"/>
-  <xacro:property name="arm_j6_upper_limit" value="4"/>
+  <xacro:property name="arm_j6_lower_limit" value="-3.1415926536"/>
+  <xacro:property name="arm_j6_upper_limit" value="3.1415926536"/>
   <!-- <xacro:property name="arm_j6_lower_limit" value="-100"/> -->
   <!-- <xacro:property name="arm_j6_upper_limit" value="100"/> -->
   <!-- Shared shaded material for STL visuals (prevents unlit white appearance) -->
@@ -194,6 +194,12 @@
       <origin xyz="0.116 0 0" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="${arm_j6_lower_limit}" upper="${arm_j6_upper_limit}" effort="50" velocity="1.0"/>
+    </joint>
+    <link name="eef_link"/>
+    <joint name="arm_l6_to_eef" type="fixed">
+      <parent link="arm_l6"/>
+      <child link="eef_link"/>
+      <origin xyz="0.215 0 0" rpy="0 0 0"/>
     </joint>
   </xacro:macro>
 </robot>

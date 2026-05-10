@@ -9,31 +9,49 @@ default_acceleration_scaling_factor: 0.1
 # Joint limits can be turned off with [has_velocity_limits, has_acceleration_limits]
 joint_limits:
   arm_j1:
+    has_position_limits: true
+    min_position: -3.1415926536
+    max_position: 3.1415926536
     has_velocity_limits: true
     max_velocity: 1.0
     has_acceleration_limits: false
     max_acceleration: 0.0
   arm_j2:
+    has_position_limits: true
+    min_position: -0.7853981634
+    max_position: 1.5707963268
     has_velocity_limits: true
     max_velocity: 1.0
     has_acceleration_limits: false
     max_acceleration: 0.0
   arm_j3:
+    has_position_limits: true
+    min_position: -1.7453292520
+    max_position: 0.0
     has_velocity_limits: true
     max_velocity: 1.0
     has_acceleration_limits: false
     max_acceleration: 0.0
   arm_j4:
+    has_position_limits: true
+    min_position: -3.4906585040
+    max_position: 3.4906585040
     has_velocity_limits: true
     max_velocity: 1.0
     has_acceleration_limits: false
     max_acceleration: 0.0
   arm_j5:
+    has_position_limits: true
+    min_position: 0.0
+    max_position: 3.4906585040
     has_velocity_limits: true
     max_velocity: 1.0
     has_acceleration_limits: false
     max_acceleration: 0.0
   arm_j6:
+    has_position_limits: true
+    min_position: -3.1415926536
+    max_position: 3.1415926536
     has_velocity_limits: true
     max_velocity: 1.0
     has_acceleration_limits: false

@@ -120,6 +120,54 @@
         "panel": "delivery",
         "order": 7
       }
+    },
+    {
+      "stream_id": "arm_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoARM",
+        "pixel_format": "MJPG"
+      },
+      "udp_port": 5018,
+      "width": 640,
+      "height": 360,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Arm",
+        "panel": "delivery",
+        "order": 8
+      }
+    },
+    {
+      "stream_id": "gripper_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoGRIPPER",
+        "pixel_format": "MJPG"
+      },
+      "udp_port": 5020,
+      "width": 640,
+      "height": 360,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Gripper",
+        "panel": "delivery",
+        "order": 9
+      }
     }
   ]
 }
