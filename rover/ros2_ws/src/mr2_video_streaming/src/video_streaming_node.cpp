@@ -54,6 +54,8 @@ struct StreamConfig {
   std::string ros_encoding;
   std::string v4l2_device;
   std::string v4l2_pixel_format;
+  int v4l2_capture_width{0};
+  int v4l2_capture_height{0};
   int udp_port{0};
   int width{0};
   int height{0};
@@ -285,20 +287,39 @@ class StreamPipeline {
     return caps.str();
   }
 
+  std::string build_nvmm_output_caps() const {
+    std::ostringstream caps;
+    caps << "video/x-raw(memory:NVMM),format=NV12";
+    if (output_width_ > 0) {
+      caps << ",width=" << output_width_;
+    }
+    if (output_height_ > 0) {
+      caps << ",height=" << output_height_;
+    }
+    if (config_.framerate > 0) {
+      caps << ",framerate=" << std::max(1, config_.framerate) << "/1";
+    }
+    return caps.str();
+  }
+
   std::string build_v4l2_source_caps() const {
     std::ostringstream caps;
     const std::string pixel_format = uppercase(config_.v4l2_pixel_format);
     const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
+    const int capture_width =
+        config_.v4l2_capture_width > 0 ? config_.v4l2_capture_width : config_.width;
+    const int capture_height =
+        config_.v4l2_capture_height > 0 ? config_.v4l2_capture_height : config_.height;
 
     caps << (is_jpeg ? "image/jpeg" : "video/x-raw");
     if (!is_jpeg && !pixel_format.empty()) {
       caps << ",format=" << pixel_format;
     }
-    if (config_.width > 0) {
-      caps << ",width=" << config_.width;
+    if (capture_width > 0) {
+      caps << ",width=" << capture_width;
     }
-    if (config_.height > 0) {
-      caps << ",height=" << config_.height;
+    if (capture_height > 0) {
+      caps << ",height=" << capture_height;
     }
     if (config_.framerate > 0) {
       caps << ",framerate=" << std::max(1, config_.framerate) << "/1";
@@ -371,8 +392,12 @@ class StreamPipeline {
       return;
     }
 
-    output_width_ = config_.width;
-    output_height_ = config_.height;
+    const int capture_width =
+        config_.v4l2_capture_width > 0 ? config_.v4l2_capture_width : config_.width;
+    const int capture_height =
+        config_.v4l2_capture_height > 0 ? config_.v4l2_capture_height : config_.height;
+    output_width_ = config_.width > 0 ? config_.width : capture_width;
+    output_height_ = config_.height > 0 ? config_.height : capture_height;
 
     const std::string pixel_format = uppercase(config_.v4l2_pixel_format);
     const bool is_jpeg = pixel_format == "MJPG" || pixel_format == "JPEG";
@@ -400,7 +425,7 @@ class StreamPipeline {
               "!",
               "nvvidconv",
               "!",
-              "video/x-raw(memory:NVMM),format=NV12",
+              build_nvmm_output_caps(),
               "!",
               "nvv4l2h264enc",
               "bitrate=" + std::to_string(config_.encoder.bitrate_kbps * 1000),
@@ -414,7 +439,9 @@ class StreamPipeline {
         args.push_back("!");
         args.push_back("jpegdec");
       }
-      args.insert(args.end(), {"!", "videoconvert", "!", "video/x-raw,format=I420"});
+      args.insert(
+          args.end(),
+          {"!", "videoconvert", "!", "videoscale", "!", build_raw_output_caps()});
       args.insert(
           args.end(),
           {
@@ -458,8 +485,11 @@ class StreamPipeline {
     details << "Started V4L2 video stream " << config_.stream_id
             << " device=" << config_.v4l2_device
             << " port=" << config_.udp_port;
-    if (config_.width > 0 && config_.height > 0) {
-      details << " size=" << config_.width << "x" << config_.height;
+    if (capture_width > 0 && capture_height > 0) {
+      details << " capture=" << capture_width << "x" << capture_height;
+    }
+    if (output_width_ > 0 && output_height_ > 0) {
+      details << " output=" << output_width_ << "x" << output_height_;
     }
     if (config_.framerate > 0) {
       details << " fps=" << config_.framerate;
@@ -765,6 +795,10 @@ StreamConfig parse_stream_config(const json & item) {
     config.source_type = StreamSourceType::V4L2;
     config.v4l2_device = source.at("device").get<std::string>();
     config.v4l2_pixel_format = source.value("pixel_format", std::string());
+    config.v4l2_capture_width =
+        source.value("capture_width", item.value("capture_width", config.width));
+    config.v4l2_capture_height =
+        source.value("capture_height", item.value("capture_height", config.height));
   } else {
     throw std::runtime_error(
         "stream " + config.stream_id + " has unsupported source.type " + source_type);
@@ -867,6 +901,13 @@ class VideoStreamingNode : public rclcpp::Node {
         if (!stream.v4l2_pixel_format.empty()) {
           details << " pixel_format=" << stream.v4l2_pixel_format;
         }
+        if (stream.v4l2_capture_width > 0 && stream.v4l2_capture_height > 0) {
+          details << " capture=" << stream.v4l2_capture_width << "x"
+                  << stream.v4l2_capture_height;
+        }
+      }
+      if (stream.width > 0 && stream.height > 0) {
+        details << " output=" << stream.width << "x" << stream.height;
       }
       RCLCPP_INFO(get_logger(), "%s", details.str().c_str());
     }

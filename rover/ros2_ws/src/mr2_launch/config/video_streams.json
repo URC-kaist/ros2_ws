@@ -6,7 +6,9 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoTOP",
-        "pixel_format": "MJPG"
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
       },
       "udp_port": 5008,
       "width": 320,
@@ -30,7 +32,9 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoFL",
-        "pixel_format": "MJPG"
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
       },
       "udp_port": 5010,
       "width": 320,
@@ -54,7 +58,9 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoFR",
-        "pixel_format": "MJPG"
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
       },
       "udp_port": 5012,
       "width": 320,
@@ -78,7 +84,9 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoLEFT",
-        "pixel_format": "MJPG"
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
       },
       "udp_port": 5014,
       "width": 320,
@@ -102,7 +110,9 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoRIGHT",
-        "pixel_format": "MJPG"
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
       },
       "udp_port": 5016,
       "width": 320,
@@ -126,7 +136,9 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoARM",
-        "pixel_format": "MJPG"
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
       },
       "udp_port": 5018,
       "width": 320,
@@ -150,7 +162,9 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoGRIPPER",
-        "pixel_format": "MJPG"
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
       },
       "udp_port": 5020,
       "width": 320,
