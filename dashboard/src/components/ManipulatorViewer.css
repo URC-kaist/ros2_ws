@@ -1,0 +1,40 @@
+.manipulator-viewer {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.manipulator-viewer--embedded {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.manipulator-viewer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.manipulator-viewer__canvas {
+  width: 100%;
+  min-height: 320px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0b1220;
+}
+
+.manipulator-viewer__canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.manipulator-viewer__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

@@ -7,6 +7,41 @@ export type RosStamp = {
   nsecs?: number
 }
 
+export type RosHeader = {
+  stamp?: RosStamp
+  frame_id?: string
+}
+
+export type JointStateMsg = {
+  header?: RosHeader
+  name?: string[]
+  position?: number[]
+  velocity?: number[]
+  effort?: number[]
+}
+
+export type TransformStampedMsg = {
+  header?: RosHeader
+  child_frame_id?: string
+  transform?: {
+    translation?: {
+      x?: number
+      y?: number
+      z?: number
+    }
+    rotation?: {
+      x?: number
+      y?: number
+      z?: number
+      w?: number
+    }
+  }
+}
+
+export type TFMessageMsg = {
+  transforms?: TransformStampedMsg[]
+}
+
 export type PoseStamped = {
   header?: {
     stamp?: RosStamp

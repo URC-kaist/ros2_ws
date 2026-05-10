@@ -13,20 +13,10 @@
 .arm-card__toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
 }
 
-.arm-card__mode {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  overflow: hidden;
-  min-width: 180px;
-}
-
-.arm-card__mode button,
 .arm-card__stop,
 .arm-card__joint-row button {
   background: rgba(11, 18, 32, 0.72);
@@ -34,19 +24,6 @@
   border: 0;
   min-height: 34px;
   font: inherit;
-}
-
-.arm-card__mode button {
-  padding: 6px 10px;
-}
-
-.arm-card__mode button + button {
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.arm-card__mode button.active {
-  background: rgba(53, 211, 195, 0.22);
-  color: #f6fffd;
 }
 
 .arm-card__stop {
@@ -145,6 +122,20 @@
   border: 1px solid rgba(53, 211, 195, 0.18);
   border-radius: 8px;
   padding: 6px;
+}
+
+.arm-card__joint-row--active {
+  border-color: rgba(53, 211, 195, 0.58);
+  background: rgba(53, 211, 195, 0.16);
+}
+
+.arm-card__joint-row--limit {
+  border-color: rgba(255, 77, 77, 0.62);
+  background: rgba(255, 77, 77, 0.16);
+}
+
+.arm-card__joint-row--limit output {
+  color: #ffd8d8;
 }
 
 .arm-card__joint-row span,
