@@ -182,35 +182,70 @@
   color: var(--muted);
 }
 
-.camera-turret__sliders {
+.camera-turret__control {
   display: grid;
   gap: 10px;
 }
 
-.camera-turret__slider {
-  display: grid;
-  gap: 6px;
-}
-
-.camera-turret__slider-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.camera-turret__slider-label output {
-  color: #dfe6fb;
-  font-family: var(--font-mono);
-  min-width: 4.5ch;
-  text-align: right;
-}
-
-.camera-turret__slider input[type='range'] {
+.camera-turret__pad {
+  position: relative;
   width: 100%;
-  accent-color: var(--accent);
+  aspect-ratio: 1;
+  min-height: 160px;
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+  background:
+    radial-gradient(circle at center, rgba(53, 211, 195, 0.13), transparent 34%),
+    rgba(11, 18, 32, 0.72);
+  border: 1px solid rgba(53, 211, 195, 0.18);
+  border-radius: 8px;
+}
+
+.camera-turret__pad:focus-visible {
+  outline: 2px solid rgba(53, 211, 195, 0.72);
+  outline-offset: 2px;
+}
+
+.camera-turret__axis {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.camera-turret__axis--x {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+
+.camera-turret__axis--y {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+.camera-turret__thumb {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: var(--accent);
+  border: 2px solid rgba(232, 238, 245, 0.9);
+  box-shadow: 0 0 0 4px rgba(53, 211, 195, 0.16);
+}
+
+.camera-turret__readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
 }
 
 .camera-turret__center {
