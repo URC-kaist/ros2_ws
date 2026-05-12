@@ -539,10 +539,49 @@
   min-width: 0;
 }
 
+.video-feed-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
 .video-feed-label {
   color: var(--muted);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-feed-stream-toggle {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(15, 23, 36, 0.8);
+  color: #cdd6f4;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.video-feed-stream-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.video-feed-toggle-error {
+  border: 1px solid rgba(242, 95, 92, 0.35);
+  border-radius: 8px;
+  background: rgba(242, 95, 92, 0.12);
+  color: #ffdada;
+  padding: 6px 8px;
+  font-size: 0.8rem;
 }
 
 .video-feed-placeholder {

@@ -48,7 +48,7 @@ const CameraTurretCard = () => {
 
   const updateFromPointer = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
-    const nextX = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    const nextX = 1 - ((event.clientX - rect.left) / rect.width) * 2
     const nextY = 1 - ((event.clientY - rect.top) / rect.height) * 2
     publishCommand({
       x: quantizeUnit(nextX),
@@ -98,7 +98,7 @@ const CameraTurretCard = () => {
           <span
             className="camera-turret__thumb"
             style={{
-              left: `${((command.x + 1) / 2) * 100}%`,
+              left: `${((1 - command.x) / 2) * 100}%`,
               top: `${((1 - command.y) / 2) * 100}%`,
             }}
           />
