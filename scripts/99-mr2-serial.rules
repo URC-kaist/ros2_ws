@@ -12,8 +12,8 @@ SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{idVendor}=="0403", ATTRS{idProduct}==
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoFRONT"
 # Gripper camera via hub on front-camera USB port (Suyin rev 0x5805, USB path 2.3.2) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.2", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoGRIPPER"
-# Arm camera via hub on front-camera USB port (Suyin rev 0x5805, USB path 2.3.3) — map only the capture node (index 0)
-SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoARM"
+# Arm camera via hub on front-camera USB port (Suyin rev 0x5805, USB path 2.3.4) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.4", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoARM"
 # Front-left camera (Suyin rev 0x5805, USB path 2.4.1) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.1", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoFL"
 # Left camera (Suyin rev 0x5805, USB path 2.4.2) — map only the capture node (index 0)
