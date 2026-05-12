@@ -84,6 +84,16 @@ def generate_launch_description():
         default_value="true",
         description="Enable autonomous module: launch the UVC front_camera (/dev/videoFRONT) and use it for ArUco detection",
     )
+    enable_science_module_arg = DeclareLaunchArgument(
+        "enable_science_module",
+        default_value="false",
+        description="Enable science module: start the direct V4L2 panorama capture action server for /dev/videoFRONT",
+    )
+    panorama_stale_goal_timeout_arg = DeclareLaunchArgument(
+        "panorama_stale_goal_timeout_sec",
+        default_value="60.0",
+        description="Seconds before a new panorama goal may replace a stale active goal after client disconnect",
+    )
     enable_video_streaming_arg = DeclareLaunchArgument(
         "enable_video_streaming",
         default_value="false",
@@ -302,6 +312,21 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
     )
 
+    panorama_server = Node(
+        package="mr2_panorama",
+        executable="panorama_server",
+        name="panorama_server",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": False,
+                "video_device": "/dev/videoFRONT",
+                "stale_goal_timeout_sec": LaunchConfiguration("panorama_stale_goal_timeout_sec"),
+            }
+        ],
+        condition=IfCondition(LaunchConfiguration("enable_science_module")),
+    )
+
     ntrip_client_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -508,6 +533,8 @@ def generate_launch_description():
             xbee_sim_peer_arg,
             xbee_device_arg,
             enable_autonomous_module_arg,
+            enable_science_module_arg,
+            panorama_stale_goal_timeout_arg,
             enable_video_streaming_arg,
             video_base_host_arg,
             video_config_arg,
@@ -539,6 +566,7 @@ def generate_launch_description():
             realsense_launch,
             front_uvc_launch,
             navigation_launch,
+            panorama_server,
             ntrip_client_launch,
             rover_launch,
             ublox_left_launch_delayed,

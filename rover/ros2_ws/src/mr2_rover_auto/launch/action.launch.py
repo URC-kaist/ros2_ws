@@ -15,19 +15,12 @@ def generate_launch_description():
     """
 
     pkg_share = get_package_share_directory('mr2_rover_auto')
-    mr2_panorama_share = get_package_share_directory('mr2_panorama')
     cover_vision_params = os.path.join(pkg_share, 'config', 'cover_vision_params.yaml')
-    front_camera_calibration = os.path.join(
-        mr2_panorama_share, 'config', 'front_camera_calibration.yaml')
 
     return LaunchDescription([
         # For Gazebo, set to true. For field test, set to false.
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('cover_vision_params', default_value=cover_vision_params),
-        DeclareLaunchArgument('panorama_video_device', default_value='/dev/videoFRONT'),
-        DeclareLaunchArgument('panorama_calibration_yaml', default_value=front_camera_calibration),
-        DeclareLaunchArgument('panorama_fixed_frame', default_value='map'),
-        DeclareLaunchArgument('panorama_base_frame', default_value='base_link'),
 
         Node(
             package='mr2_rover_auto',
@@ -47,22 +40,6 @@ def generate_launch_description():
             parameters=[
                 LaunchConfiguration("cover_vision_params"),
                 {"use_sim_time": LaunchConfiguration("use_sim_time")}
-            ],
-        ),
-
-        Node(
-            package='mr2_panorama',
-            executable='panorama_server',
-            name='panorama_server',
-            output='screen',
-            parameters=[
-                {
-                    "use_sim_time": LaunchConfiguration("use_sim_time"),
-                    "video_device": LaunchConfiguration("panorama_video_device"),
-                    "calibration_yaml": LaunchConfiguration("panorama_calibration_yaml"),
-                    "fixed_frame": LaunchConfiguration("panorama_fixed_frame"),
-                    "base_frame": LaunchConfiguration("panorama_base_frame"),
-                }
             ],
         ),
 
