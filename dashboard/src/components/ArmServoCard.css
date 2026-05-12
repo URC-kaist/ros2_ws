@@ -109,15 +109,17 @@
 
 .arm-card__joint-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
   gap: 8px;
 }
 
 .arm-card__joint-row {
   display: grid;
-  grid-template-columns: 30px 38px minmax(54px, 1fr) 38px;
+  grid-template-columns: minmax(28px, 0.8fr) 34px minmax(44px, 1fr) 34px;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  overflow: hidden;
   background: rgba(53, 211, 195, 0.08);
   border: 1px solid rgba(53, 211, 195, 0.18);
   border-radius: 8px;
@@ -142,6 +144,7 @@
 .arm-card__joint-row output {
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
   font-size: 0.85rem;
+  min-width: 0;
 }
 
 .arm-card__joint-row span {
@@ -154,10 +157,17 @@
 }
 
 .arm-card__joint-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 1rem;
   line-height: 1;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
   touch-action: none;
 }
 

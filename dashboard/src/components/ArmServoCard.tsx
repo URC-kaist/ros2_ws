@@ -259,14 +259,15 @@ const ArmServoCard = () => {
             const velocity = jointDisplay[index] ?? 0
             const position = manipulatorState.joints[name]
             const nearLimit = isNearLimit(position, JOINT_LIMITS[name])
+            const label = name.replace('arm_', '').toUpperCase()
             return (
               <div
                 className={`arm-card__joint-row ${velocity !== 0 ? 'arm-card__joint-row--active' : ''} ${nearLimit ? 'arm-card__joint-row--limit' : ''}`}
                 key={name}
               >
-                <span>{name.replace('arm_', '').toUpperCase()}</span>
+                <span>{label}</span>
                 <button
-                  aria-label={`Jog ${name} negative`}
+                  aria-label={`${label} negative`}
                   type="button"
                   onPointerDown={(event) => {
                     event.currentTarget.setPointerCapture(event.pointerId)
@@ -280,7 +281,7 @@ const ArmServoCard = () => {
                 </button>
                 <output>{position.toFixed(2)}</output>
                 <button
-                  aria-label={`Jog ${name} positive`}
+                  aria-label={`${label} positive`}
                   type="button"
                   onPointerDown={(event) => {
                     event.currentTarget.setPointerCapture(event.pointerId)

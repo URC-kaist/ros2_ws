@@ -1,4 +1,3 @@
-import CameraTurretCard from './CameraTurretCard'
 import CentrifugeCard from './CentrifugeCard'
 import MicroscopeViewCard from './MicroscopeViewCard'
 import SpectrophotometerCard from './SpectrophotometerCard'
@@ -32,7 +31,6 @@ const ScienceTabPanel = () => {
             </div>
           </div>
         </article>
-        <CameraTurretCard />
         <div className="science-metrics">
           <article className="card metric-card">
             <h3>Temperature</h3>

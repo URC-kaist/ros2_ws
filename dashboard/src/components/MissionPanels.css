@@ -202,7 +202,7 @@
 }
 
 .camera-turret__slider-label output {
-  color: #eaf1ff;
+  color: #dfe6fb;
   font-family: var(--font-mono);
   min-width: 4.5ch;
   text-align: right;
@@ -210,14 +210,14 @@
 
 .camera-turret__slider input[type='range'] {
   width: 100%;
-  accent-color: #7dd3fc;
+  accent-color: var(--accent);
 }
 
 .camera-turret__center {
   justify-self: end;
-  background: rgba(125, 211, 252, 0.12);
-  color: #eaf1ff;
-  border: 1px solid rgba(125, 211, 252, 0.35);
+  background: rgba(15, 23, 36, 0.8);
+  color: #cdd6f4;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   padding: 7px 12px;
   font-weight: 600;
