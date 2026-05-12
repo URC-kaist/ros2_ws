@@ -51,6 +51,7 @@ public:
   void register_fd_listener(uint32_t id, uint32_t mask, FdRxCallback cb);
   void enqueue_tx(const struct can_frame &fr);
   void enqueue_tx(const struct canfd_frame &fr);
+  bool transmit_last(const struct can_frame &fr);
 
   uint64_t dropped_tx() const noexcept { return dropped_tx_; }
 
@@ -87,6 +88,8 @@ private:
 
   std::queue<TxFrame> tx_q_;
   std::mutex tx_mtx_;
+  std::mutex write_mtx_;
+  std::atomic_bool final_tx_requested_{false};
   std::atomic_uint64_t dropped_tx_{0};
 };
 
@@ -197,6 +200,25 @@ inline void CanBusManager::enqueue_tx(const struct canfd_frame &fr) {
   write(wake_pipe_[1], &one, 1);
 }
 
+inline bool CanBusManager::transmit_last(const struct can_frame &fr) {
+  final_tx_requested_ = true;
+
+  TxFrame tx {};
+  tx.frame.can_id = fr.can_id;
+  tx.frame.len = fr.can_dlc;
+  std::memcpy(tx.frame.data, fr.data, CAN_MAX_DLEN);
+  tx.mtu = CAN_MTU;
+
+  {
+    std::lock_guard<std::mutex> lk(tx_mtx_);
+    std::queue<TxFrame> empty;
+    tx_q_.swap(empty);
+  }
+
+  std::lock_guard<std::mutex> lk(write_mtx_);
+  return ::write(fd_, &tx.frame, tx.mtu) == static_cast<ssize_t>(tx.mtu);
+}
+
 inline void CanBusManager::io_loop_() {
   struct pollfd pfds[2]{{fd_, POLLIN, 0}, {wake_pipe_[0], POLLIN, 0}};
   while (running_) {
@@ -246,6 +268,10 @@ inline void CanBusManager::flush_tx_() {
         break;
       tx = tx_q_.front();
       tx_q_.pop();
+    }
+    std::lock_guard<std::mutex> write_lk(write_mtx_);
+    if (final_tx_requested_) {
+      continue;
     }
     if (::write(fd_, &tx.frame, tx.mtu) != static_cast<ssize_t>(tx.mtu))
       dropped_tx_++;

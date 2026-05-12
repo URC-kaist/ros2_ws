@@ -10,6 +10,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET
   gstreamer-1.0
@@ -28,6 +29,7 @@ target_link_libraries(video_streaming_node
 ament_target_dependencies(video_streaming_node
   rclcpp
   sensor_msgs
+  std_srvs
 )
 
 install(TARGETS video_streaming_node

@@ -44,10 +44,10 @@ joystick ADC values:
 
 | Byte | Field |
 |------|-------|
-| 0    | `vrx` LSB |
-| 1    | `vrx` MSB |
-| 2    | `vry` LSB |
-| 3    | `vry` MSB |
+| 0    | `vrx` LSB (`y` / tilt command) |
+| 1    | `vrx` MSB (`y` / tilt command) |
+| 2    | `vry` LSB (`x` / pan command) |
+| 3    | `vry` MSB (`x` / pan command) |
 
 ## Parameters
 
@@ -55,8 +55,8 @@ joystick ADC values:
 - `can_id` (int, default: `0x124`)
 - `command_topic` (string, default: `/camera_turret/command`)
 - `publish_rate_hz` (double, default: `50.0`)
-- `command_timeout_sec` (double, default: `0.5`)
 - `invert_x` (bool, default: `false`)
 - `invert_y` (bool, default: `false`)
 
-When commands time out, the node sends centered X/Y values.
+The node keeps sending the latest command while running. On shutdown, it sends
+centered X/Y values.

@@ -17,9 +17,6 @@ def _launch_node(context):
                     "can_id": can_id,
                     "command_topic": LaunchConfiguration("command_topic"),
                     "publish_rate_hz": LaunchConfiguration("publish_rate_hz"),
-                    "command_timeout_sec": LaunchConfiguration(
-                        "command_timeout_sec"
-                    ),
                     "invert_x": LaunchConfiguration("invert_x"),
                     "invert_y": LaunchConfiguration("invert_y"),
                 }
@@ -37,7 +34,6 @@ def generate_launch_description():
                 "command_topic", default_value="/camera_turret/command"
             ),
             DeclareLaunchArgument("publish_rate_hz", default_value="50.0"),
-            DeclareLaunchArgument("command_timeout_sec", default_value="0.5"),
             DeclareLaunchArgument("invert_x", default_value="false"),
             DeclareLaunchArgument("invert_y", default_value="false"),
             OpaqueFunction(function=_launch_node),

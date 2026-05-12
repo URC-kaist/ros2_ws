@@ -37,8 +37,6 @@ public:
         declare_parameter<std::string>("command_topic", "/camera_turret/command");
     const double publish_rate_hz =
         declare_parameter<double>("publish_rate_hz", 50.0);
-    command_timeout_ = std::chrono::duration<double>(
-        declare_parameter<double>("command_timeout_sec", 0.5));
     invert_x_ = declare_parameter<bool>("invert_x", false);
     invert_y_ = declare_parameter<bool>("invert_y", false);
 
@@ -49,11 +47,6 @@ public:
     if (publish_rate_hz <= 0.0 || !std::isfinite(publish_rate_hz)) {
       throw std::runtime_error("publish_rate_hz must be finite and positive");
     }
-    if (command_timeout_.count() < 0.0 ||
-        !std::isfinite(command_timeout_.count())) {
-      throw std::runtime_error("command_timeout_sec must be finite and >= 0");
-    }
-
     can_id_ = static_cast<uint32_t>(can_id_param);
     bus_ = CanBusRegistry::get(can_iface_);
     if (!bus_) {
@@ -65,7 +58,6 @@ public:
         [this](const geometry_msgs::msg::Vector3::SharedPtr msg) {
           latest_x_ = msg->x;
           latest_y_ = msg->y;
-          last_command_time_ = std::chrono::steady_clock::now();
           have_command_ = true;
         });
 
@@ -81,19 +73,17 @@ public:
                 can_iface_.c_str(), can_id_, command_topic_.c_str());
   }
 
+  ~CameraTurretCanNode() override {
+    send_can_command(0.0, 0.0, true);
+  }
+
 private:
   void publish_can_command() {
-    double x = 0.0;
-    double y = 0.0;
+    send_can_command(have_command_ ? latest_x_ : 0.0,
+                     have_command_ ? latest_y_ : 0.0, false);
+  }
 
-    if (have_command_) {
-      const auto now = std::chrono::steady_clock::now();
-      if (now - last_command_time_ <= command_timeout_) {
-        x = latest_x_;
-        y = latest_y_;
-      }
-    }
-
+  void send_can_command(double x, double y, bool final_command) {
     if (invert_x_) {
       x = -x;
     }
@@ -101,8 +91,8 @@ private:
       y = -y;
     }
 
-    const uint16_t vrx = normalized_to_adc(x);
-    const uint16_t vry = normalized_to_adc(y);
+    const uint16_t vrx = normalized_to_adc(y);
+    const uint16_t vry = normalized_to_adc(x);
 
     struct can_frame frame {};
     frame.can_id = can_id_ & kStdIdMask;
@@ -111,7 +101,11 @@ private:
     frame.data[1] = static_cast<uint8_t>((vrx >> 8) & 0xFF);
     frame.data[2] = static_cast<uint8_t>(vry & 0xFF);
     frame.data[3] = static_cast<uint8_t>((vry >> 8) & 0xFF);
-    bus_->enqueue_tx(frame);
+    if (final_command) {
+      bus_->transmit_last(frame);
+    } else {
+      bus_->enqueue_tx(frame);
+    }
   }
 
   std::string can_iface_;
@@ -121,8 +115,6 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr command_sub_;
   rclcpp::TimerBase::SharedPtr publish_timer_;
 
-  std::chrono::duration<double> command_timeout_{0.5};
-  std::chrono::steady_clock::time_point last_command_time_{};
   double latest_x_{0.0};
   double latest_y_{0.0};
   bool have_command_{false};

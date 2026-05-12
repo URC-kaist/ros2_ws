@@ -27,6 +27,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 
 namespace mr2_video_streaming {
 
@@ -116,8 +117,33 @@ class StreamPipeline {
 
   ~StreamPipeline() { shutdown(); }
 
+  const std::string & stream_id() const { return config_.stream_id; }
+
+  bool is_enabled() const { return enabled_; }
+
+  bool set_enabled(bool enabled) {
+    if (enabled_ == enabled) {
+      return false;
+    }
+
+    enabled_ = enabled;
+    if (!enabled_) {
+      shutdown();
+      RCLCPP_INFO(logger_, "Disabled video stream %s", config_.stream_id.c_str());
+      return true;
+    }
+
+    stopping_ = false;
+    v4l2_restart_failures_ = 0;
+    next_v4l2_restart_at_ = std::chrono::steady_clock::time_point::min();
+    start_if_needed();
+    RCLCPP_INFO(logger_, "Enabled video stream %s", config_.stream_id.c_str());
+    return true;
+  }
+
   void start_if_needed() {
-    if (config_.source_type != StreamSourceType::V4L2 || pipeline_ != nullptr || gst_child_pid_ > 0) {
+    if (!enabled_ || config_.source_type != StreamSourceType::V4L2 || pipeline_ != nullptr ||
+        gst_child_pid_ > 0) {
       return;
     }
     if (next_v4l2_restart_at_ != std::chrono::steady_clock::time_point::max() &&
@@ -128,7 +154,7 @@ class StreamPipeline {
   }
 
   void poll_runtime() {
-    if (config_.source_type != StreamSourceType::V4L2 || stopping_) {
+    if (!enabled_ || config_.source_type != StreamSourceType::V4L2 || stopping_) {
       return;
     }
 
@@ -182,7 +208,7 @@ class StreamPipeline {
   }
 
   void push_frame(const sensor_msgs::msg::Image & msg) {
-    if (config_.source_type != StreamSourceType::RosTopic) {
+    if (!enabled_ || config_.source_type != StreamSourceType::RosTopic) {
       return;
     }
 
@@ -659,6 +685,7 @@ class StreamPipeline {
   GstClockTime frame_duration_ns_{0};
   GstClockTime frame_index_{0};
   bool stopping_{false};
+  bool enabled_{true};
   int v4l2_restart_failures_{0};
   bool v4l2_child_reported_stable_{false};
   std::chrono::steady_clock::time_point gst_child_started_at_{};
@@ -888,11 +915,28 @@ class VideoStreamingNode : public rclcpp::Node {
       }
 
       pipelines_.push_back(pipeline);
+      const std::string service_name =
+          std::string(get_fully_qualified_name()) + "/streams/" + stream.stream_id + "/set_enabled";
+      auto service = create_service<std_srvs::srv::SetBool>(
+          service_name,
+          [pipeline, stream_id = stream.stream_id](
+              const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+              std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+            const bool changed = pipeline->set_enabled(request->data);
+            response->success = true;
+            response->message =
+                "stream " + stream_id + (pipeline->is_enabled() ? " enabled" : " disabled");
+            if (!changed) {
+              response->message += " (already in requested state)";
+            }
+          });
+      stream_enable_services_.push_back(service);
 
       std::ostringstream details;
       details << "Configured video stream " << stream.stream_id
               << " source=" << source_type_to_string(stream.source_type)
-              << " port=" << stream.udp_port;
+              << " port=" << stream.udp_port
+              << " service=" << service_name;
       if (stream.source_type == StreamSourceType::RosTopic) {
         details << " topic=" << stream.ros_topic
                 << " encoding=" << stream.ros_encoding;
@@ -1008,6 +1052,7 @@ class VideoStreamingNode : public rclcpp::Node {
   rclcpp::TimerBase::SharedPtr monitor_timer_;
   std::vector<std::shared_ptr<StreamPipeline>> pipelines_;
   std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subscriptions_;
+  std::vector<rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr> stream_enable_services_;
 };
 
 }  // namespace mr2_video_streaming
