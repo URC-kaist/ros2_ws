@@ -21,6 +21,12 @@ export type CmdArmJoint = {
   velocities_rad_s: number[]
 }
 
+export type CmdCameraTurret = {
+  x: number
+  y: number
+  z: number
+}
+
 export type MissionControl = {
   command: number
   clear_costmap: boolean
@@ -317,6 +323,15 @@ class XbeeGatewayClient {
     this.send({
       type: 'cmd_arm_joint',
       velocities_rad_s: cmd.velocities_rad_s,
+    })
+  }
+
+  sendCmdCameraTurret(cmd: CmdCameraTurret) {
+    this.send({
+      type: 'cmd_camera_turret',
+      x: cmd.x,
+      y: cmd.y,
+      z: cmd.z,
     })
   }
 

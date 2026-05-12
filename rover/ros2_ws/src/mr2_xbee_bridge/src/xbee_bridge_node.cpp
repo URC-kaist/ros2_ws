@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "control_msgs/msg/joint_jog.hpp"
+#include "geometry_msgs/msg/vector3.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
@@ -43,6 +44,7 @@ using mr2_xbee_bridge::TelemBattery;
 using mr2_xbee_bridge::TelemNav;
 using mr2_xbee_bridge::CmdArmGripper;
 using mr2_xbee_bridge::CmdArmJoint;
+using mr2_xbee_bridge::CmdCameraTurret;
 
 class XbeeBridgeNode : public rclcpp::Node {
  public:
@@ -91,6 +93,8 @@ class XbeeBridgeNode : public rclcpp::Node {
             declare_parameter<double>("arm_joint_duration_s", 0.1)),
         gripper_cmd_topic_(declare_parameter<std::string>(
             "gripper_cmd_topic", "/gripper_controller/commands")),
+        camera_turret_cmd_topic_(declare_parameter<std::string>(
+            "camera_turret_cmd_topic", "/camera_turret/command")),
         gripper_min_position_rad_(
             declare_parameter<double>("gripper_min_position_rad", 0.0)),
         gripper_max_position_rad_(
@@ -119,6 +123,8 @@ class XbeeBridgeNode : public rclcpp::Node {
         create_publisher<control_msgs::msg::JointJog>(arm_joint_topic_, 10);
     gripper_cmd_pub_ =
         create_publisher<std_msgs::msg::Float64MultiArray>(gripper_cmd_topic_, 10);
+    camera_turret_cmd_pub_ =
+        create_publisher<geometry_msgs::msg::Vector3>(camera_turret_cmd_topic_, 10);
     base_svin_pub_ = create_publisher<ublox_ubx_msgs::msg::UBXNavSvin>(
         base_svin_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
     base_rtcm_pub_ = create_publisher<rtcm_msgs::msg::Message>(
@@ -360,6 +366,13 @@ class XbeeBridgeNode : public rclcpp::Node {
         }
         break;
       }
+      case mr2_xbee_bridge::MsgId::kCmdCameraTurret: {
+        auto cmd = mr2_xbee_bridge::decode_cmd_camera_turret(frame);
+        if (cmd) {
+          handle_cmd_camera_turret_(*cmd);
+        }
+        break;
+      }
       case mr2_xbee_bridge::MsgId::kBaseSvin: {
         auto svin = mr2_xbee_bridge::decode_base_svin(frame);
         if (svin && base_svin_pub_) {
@@ -560,6 +573,24 @@ class XbeeBridgeNode : public rclcpp::Node {
     }
   }
 
+  void handle_cmd_camera_turret_(const CmdCameraTurret &cmd) {
+    if (!camera_turret_cmd_pub_) {
+      return;
+    }
+
+    geometry_msgs::msg::Vector3 msg;
+    msg.x = std::clamp(static_cast<double>(cmd.x), -1.0, 1.0);
+    msg.y = std::clamp(static_cast<double>(cmd.y), -1.0, 1.0);
+    msg.z = std::clamp(static_cast<double>(cmd.z), -1.0, 1.0);
+    camera_turret_cmd_pub_->publish(msg);
+
+    if (log_frames_) {
+      RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
+                           "CMD_CAMERA_TURRET x=%.3f y=%.3f z=%.3f",
+                           msg.x, msg.y, msg.z);
+    }
+  }
+
   void handle_base_rtcm_frag_(uint8_t seq, const BaseRtcmFrag &frag) {
     const auto now_time = now();
     prune_rtcm_frags_(now_time);
@@ -638,6 +669,9 @@ class XbeeBridgeNode : public rclcpp::Node {
 
     CmdArmJoint zero_joint;
     handle_cmd_arm_joint_(zero_joint);
+
+    CmdCameraTurret zero_turret;
+    handle_cmd_camera_turret_(zero_turret);
   }
 
   void send_heartbeat_() {
@@ -822,6 +856,7 @@ class XbeeBridgeNode : public rclcpp::Node {
   std::vector<std::string> arm_joint_names_;
   double arm_joint_duration_s_;
   std::string gripper_cmd_topic_;
+  std::string camera_turret_cmd_topic_;
   double gripper_min_position_rad_;
   double gripper_max_position_rad_;
   std::string arm_frame_id_;
@@ -840,6 +875,7 @@ class XbeeBridgeNode : public rclcpp::Node {
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr arm_twist_pub_;
   rclcpp::Publisher<control_msgs::msg::JointJog>::SharedPtr arm_joint_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_cmd_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr camera_turret_cmd_pub_;
   rclcpp::Publisher<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr base_svin_pub_;
   rclcpp::Publisher<rtcm_msgs::msg::Message>::SharedPtr base_rtcm_pub_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr

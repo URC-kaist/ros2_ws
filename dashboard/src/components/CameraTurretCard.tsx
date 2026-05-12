@@ -1,97 +1,103 @@
 import { useEffect, useRef, useState } from 'react'
+import { useXbeeGateway } from '../hooks/useXbeeGateway'
 
-const POLL_INTERVAL_MS = 1000
+const CMD_INTERVAL_MS = 50
+const SLIDER_STEP = 0.01
 
-type GamepadInfo = { index: number; id: string }
+type TurretCommand = { x: number; y: number; z: number }
+
+const ZERO_COMMAND: TurretCommand = { x: 0, y: 0, z: 0 }
+
+const clampUnit = (value: number) => Math.max(-1, Math.min(1, value))
 
 const CameraTurretCard = () => {
-  const [gamepads, setGamepads] = useState<GamepadInfo[]>([])
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
-  const [connected, setConnected] = useState(false)
-  const selectedRef = useRef<number | null>(null)
+  const { gateway } = useXbeeGateway()
+  const [command, setCommand] = useState<TurretCommand>(ZERO_COMMAND)
+  const commandRef = useRef<TurretCommand>(ZERO_COMMAND)
 
   useEffect(() => {
-    selectedRef.current = selectedIndex
-  }, [selectedIndex])
+    commandRef.current = command
+  }, [command])
 
   useEffect(() => {
-    const updatePads = () => {
-      const pads = navigator.getGamepads?.() ?? []
-      const list = pads.reduce<GamepadInfo[]>((acc, pad, index) => {
-        if (pad) acc.push({ index, id: pad.id || `Gamepad ${index + 1}` })
-        return acc
-      }, [])
-
-      setGamepads(list)
-
-      if (list.length === 0) {
-        setSelectedIndex(null)
-        setConnected(false)
-        return
-      }
-
-      const current = selectedRef.current
-      const currentPad = current != null ? pads[current] : null
-      const nextIndex = currentPad && current != null ? current : list[0].index
-
-      if (current !== nextIndex) {
-        setSelectedIndex(nextIndex)
-      }
-
-      setConnected(Boolean(pads[nextIndex]))
-    }
-
-    updatePads()
-    window.addEventListener('gamepadconnected', updatePads)
-    window.addEventListener('gamepaddisconnected', updatePads)
-    const interval = window.setInterval(updatePads, POLL_INTERVAL_MS)
+    const commandTimer = window.setInterval(() => {
+      gateway.sendCmdCameraTurret(commandRef.current)
+    }, CMD_INTERVAL_MS)
 
     return () => {
-      window.removeEventListener('gamepadconnected', updatePads)
-      window.removeEventListener('gamepaddisconnected', updatePads)
-      window.clearInterval(interval)
+      window.clearInterval(commandTimer)
+      gateway.sendCmdCameraTurret(ZERO_COMMAND)
     }
-  }, [])
+  }, [gateway])
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        return
+      }
+      commandRef.current = ZERO_COMMAND
+      setCommand(ZERO_COMMAND)
+      gateway.sendCmdCameraTurret(ZERO_COMMAND)
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [gateway])
+
+  const updateAxis = (axis: keyof TurretCommand, value: number) => {
+    setCommand((current) => ({
+      ...current,
+      [axis]: clampUnit(value),
+    }))
+  }
+
+  const center = () => {
+    commandRef.current = ZERO_COMMAND
+    setCommand(ZERO_COMMAND)
+    gateway.sendCmdCameraTurret(ZERO_COMMAND)
+  }
 
   return (
     <article className="card camera-turret-card">
       <header className="camera-turret__header">
         <h3>Camera Turret</h3>
-        <span className={`pill ${connected ? 'pill--on' : 'pill--off'}`}>
-          {connected ? 'gamepad connected' : 'no gamepad'}
-        </span>
+        <span className="pill pill--on">slider control</span>
       </header>
 
-      <label className="camera-turret__picker">
-        <span className="camera-turret__label">Joystick</span>
-        <select
-          value={selectedIndex ?? ''}
-          onChange={(event) => {
-            const next = event.target.value === '' ? null : Number(event.target.value)
-            setSelectedIndex(next)
-            const pads = navigator.getGamepads?.() ?? []
-            setConnected(next != null && next >= 0 && Boolean(pads[next]))
-          }}
-        >
-          <option value="">No control</option>
-          {gamepads.length === 0 ? (
-            <option value="" disabled>
-              No gamepad detected
-            </option>
-          ) : (
-            gamepads.map((pad) => (
-              <option key={pad.index} value={pad.index}>
-                {pad.id}
-              </option>
-            ))
-          )}
-        </select>
-      </label>
+      <div className="camera-turret__sliders">
+        <label className="camera-turret__slider">
+          <span className="camera-turret__slider-label">
+            <span>Pan</span>
+            <output>{command.x.toFixed(2)}</output>
+          </span>
+          <input
+            type="range"
+            min="-1"
+            max="1"
+            step={SLIDER_STEP}
+            value={command.x}
+            onChange={(event) => updateAxis('x', Number(event.target.value))}
+          />
+        </label>
 
-      <div className="camera-turret__feed">
-        <div className="video-feed-placeholder camera-turret__placeholder">Awaiting stream...</div>
+        <label className="camera-turret__slider">
+          <span className="camera-turret__slider-label">
+            <span>Tilt</span>
+            <output>{command.y.toFixed(2)}</output>
+          </span>
+          <input
+            type="range"
+            min="-1"
+            max="1"
+            step={SLIDER_STEP}
+            value={command.y}
+            onChange={(event) => updateAxis('y', Number(event.target.value))}
+          />
+        </label>
+
+        <button type="button" className="camera-turret__center" onClick={center}>
+          Center
+        </button>
       </div>
-      <p className="camera-turret__hint">RS: pan/tilt · LT/RT: zoom</p>
     </article>
   )
 }

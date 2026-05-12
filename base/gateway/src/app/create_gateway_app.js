@@ -13,6 +13,7 @@ const {
   encodeCmdArmGripper,
   encodeCmdArmJoint,
   encodeCmdArmTwist,
+  encodeCmdCameraTurret,
   encodeCmdDrive,
   encodeHeartbeat,
   encodeMissionControl,
@@ -274,6 +275,25 @@ function createGatewayApp(options = {}) {
           {
             timestamp_ms: Date.now() >>> 0,
             position_norm: positionNorm,
+          },
+          nextSeq
+        )
+      )
+      return
+    }
+
+    if (type === 'cmd_camera_turret') {
+      const x = coerceNumber(msg.x)
+      const y = coerceNumber(msg.y)
+      const z = coerceNumber(msg.z)
+      log(`cmd_camera_turret rx x=${x} y=${y} z=${z}`)
+      writeFrame(
+        encodeCmdCameraTurret(
+          {
+            timestamp_ms: Date.now() >>> 0,
+            x,
+            y,
+            z,
           },
           nextSeq
         )

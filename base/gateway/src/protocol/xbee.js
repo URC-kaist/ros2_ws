@@ -7,6 +7,7 @@ const MsgId = {
   MISSION_CONTROL: 0x04,
   CMD_ARM_GRIPPER: 0x05,
   CMD_ARM_JOINT: 0x06,
+  CMD_CAMERA_TURRET: 0x07,
   TELEM_BATTERY_1: 0x10,
   TELEM_BATTERY_2: 0x11,
   TELEM_NAV: 0x20,
@@ -108,6 +109,15 @@ function encodeCmdArmJoint(cmd, nextSeq) {
     payload.writeFloatLE(Number.isFinite(value) ? value : 0, 4 + i * 4)
   }
   return encodeFrame(MsgId.CMD_ARM_JOINT, nextSeq(), payload)
+}
+
+function encodeCmdCameraTurret(cmd, nextSeq) {
+  const payload = Buffer.alloc(16)
+  payload.writeUInt32LE(cmd.timestamp_ms >>> 0, 0)
+  payload.writeFloatLE(cmd.x, 4)
+  payload.writeFloatLE(cmd.y, 8)
+  payload.writeFloatLE(cmd.z, 12)
+  return encodeFrame(MsgId.CMD_CAMERA_TURRET, nextSeq(), payload)
 }
 
 function encodeBaseSvin(msg, nextSeq) {
@@ -230,6 +240,7 @@ module.exports = {
   encodeBaseSvin,
   encodeCmdArmGripper,
   encodeCmdArmJoint,
+  encodeCmdCameraTurret,
   encodeCmdArmTwist,
   encodeCmdDrive,
   encodeFrame,

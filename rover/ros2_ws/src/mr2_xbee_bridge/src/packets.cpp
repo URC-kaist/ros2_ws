@@ -252,6 +252,25 @@ std::vector<uint8_t> encode_cmd_arm_joint(uint8_t seq,
   return finalize_frame(header, payload);
 }
 
+std::vector<uint8_t> encode_cmd_camera_turret(uint8_t seq,
+                                              const CmdCameraTurret &cmd) {
+  std::vector<uint8_t> payload;
+  payload.reserve(16);
+  ByteWriter writer(&payload);
+  writer.write_u32(cmd.timestamp_ms);
+  writer.write_f32(cmd.x);
+  writer.write_f32(cmd.y);
+  writer.write_f32(cmd.z);
+
+  Header header;
+  header.magic = kMagic;
+  header.msg_id = MsgId::kCmdCameraTurret;
+  header.length = static_cast<uint8_t>(payload.size());
+  header.seq = seq;
+
+  return finalize_frame(header, payload);
+}
+
 std::vector<uint8_t> encode_telem_battery(uint8_t seq,
                                           const TelemBattery &telem) {
   return encode_telem_battery(seq, telem, 1);
@@ -488,6 +507,21 @@ std::optional<CmdArmJoint> decode_cmd_arm_joint(const Frame &frame) {
     if (!reader.read_f32(&velocity)) {
       return std::nullopt;
     }
+  }
+  return cmd;
+}
+
+std::optional<CmdCameraTurret> decode_cmd_camera_turret(const Frame &frame) {
+  if (frame.header.msg_id != MsgId::kCmdCameraTurret ||
+      frame.payload.size() != 16) {
+    return std::nullopt;
+  }
+
+  ByteReader reader(frame.payload.data(), frame.payload.size());
+  CmdCameraTurret cmd;
+  if (!reader.read_u32(&cmd.timestamp_ms) || !reader.read_f32(&cmd.x) ||
+      !reader.read_f32(&cmd.y) || !reader.read_f32(&cmd.z)) {
+    return std::nullopt;
   }
   return cmd;
 }
