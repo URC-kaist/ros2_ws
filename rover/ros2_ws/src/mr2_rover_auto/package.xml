@@ -35,6 +35,7 @@
   <exec_depend>geographiclib</exec_depend>
   <exec_depend>eigen</exec_depend>
   <exec_depend>mr2_action_interface</exec_depend>
+  <exec_depend>mr2_panorama</exec_depend>
   <build_depend>geographiclib</build_depend>
   <build_depend>robot_localization</build_depend>
   <exec_depend>aruco_opencv</exec_depend>

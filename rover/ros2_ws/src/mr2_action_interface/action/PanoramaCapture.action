@@ -1,0 +1,18 @@
+# Goal - manually rotate the rover while this action captures and stitches a panorama.
+float64 angle_step_deg
+float64 yaw_tolerance_deg
+float64 timeout_sec
+uint8 jpeg_quality
+---
+# Result - final panorama as a JPEG-compressed image.
+bool success
+string message
+uint32 captures_taken
+uint32 expected_captures
+sensor_msgs/CompressedImage panorama
+---
+# Feedback - capture progress and next yaw target in the fixed frame.
+uint32 captures_taken
+uint32 expected_captures
+float64 current_yaw_deg
+float64 next_target_yaw_deg

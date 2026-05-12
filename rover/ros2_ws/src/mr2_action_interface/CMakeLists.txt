@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 
@@ -17,11 +18,12 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/GnssOnly.action"
   "action/CoverVision.action"
+  "action/PanoramaCapture.action"
   "msg/MissionSpec.msg"
   "msg/MissionList.msg"
   "msg/MissionControl.msg"
   "msg/MissionStatus.msg"
-  DEPENDENCIES builtin_interfaces geometry_msgs action_msgs
+  DEPENDENCIES builtin_interfaces geometry_msgs sensor_msgs action_msgs
 )
 
 
