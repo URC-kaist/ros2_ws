@@ -42,7 +42,7 @@ depth_module.gain.1: 16
 depth_module.exposure.2: 1
 depth_module.gain.2: 16
 
-depth_module.emitter_enabled: 0  # default: 1 # NOTE: sunlight issue ("hidden" in ros2 param list)
+depth_module.emitter_enabled: 1  # default: 1 # IR projector on for low-light depth
 
 enable_sync: false
 depth_module.inter_cam_sync_mode: 0

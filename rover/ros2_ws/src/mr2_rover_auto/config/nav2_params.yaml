@@ -112,8 +112,8 @@ controller_server:
       batch_size: 500 # 2000 # Hopefully use less CPU
       vx_std: 0.2
       vy_std: 0.2
-      wz_std: 0.4
-      vx_max: 0.6
+      wz_std: 0.25
+      vx_max: 0.8
       vx_min: -0.35
       vy_max: 0.6
       wz_max: 0.9 # NOTE: RADIUS = 0.57725 (#34)
@@ -383,8 +383,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP" # XXX: Setting "CLOSED_LOOP" gives 0.125 max vel (???)
-    max_velocity: [0.6, 0.6, 0.9] # NOTE: RADIUS = 0.57725 (#34)
-    min_velocity: [-0.6, -0.6, -0.9]
+    max_velocity: [0.8, 0.6, 0.9] # NOTE: RADIUS = 0.57725 (#34)
+    min_velocity: [-0.35, -0.6, -0.9]
     max_accel: [2.5, 2.5, 0.8] # Conservative ang. acc; high steering response delay
     max_decel: [-2.5, -2.5, -0.8]
     odom_topic: "odom"

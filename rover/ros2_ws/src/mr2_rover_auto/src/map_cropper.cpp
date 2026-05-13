@@ -147,6 +147,7 @@ public:
     from_ll_response_timeout_s_ = this->declare_parameter<double>("from_ll_response_timeout_s", 5.0);
 
     roi_padding_m_ = this->declare_parameter<double>("roi_padding_m", 100.0);
+    blank_map_max_side_m_ = this->declare_parameter<double>("blank_map_max_side_m", 4000.0);
     load_map_wait_timeout_s_ = this->declare_parameter<double>("load_map_wait_timeout_s", 3.0);
     load_map_response_timeout_s_ = this->declare_parameter<double>("load_map_response_timeout_s", 10.0);
 
@@ -333,6 +334,12 @@ private:
     return max_index + 1;
   }
 
+  bool source_map_contains(double x, double y) const
+  {
+    return x >= metadata_.min_x && x <= metadata_.max_x &&
+           y >= metadata_.min_y && y <= metadata_.max_y;
+  }
+
   bool compute_crop_bounds(
     double current_x,
     double current_y,
@@ -400,6 +407,49 @@ private:
     out_bounds->row_end = row_end;
     out_bounds->origin_x = origin_x;
     out_bounds->origin_y = origin_y;
+    out_bounds->side_length_m = std::min(realized_side_x, realized_side_y);
+    return true;
+  }
+
+  bool compute_blank_bounds(
+    double current_x,
+    double current_y,
+    double goal_x,
+    double goal_y,
+    CropBounds * out_bounds,
+    std::string * error_msg) const
+  {
+    if (blank_map_max_side_m_ <= kEpsilon) {
+      *error_msg = "blank_map_max_side_m must be positive";
+      return false;
+    }
+
+    const double distance_m = std::hypot(goal_x - current_x, goal_y - current_y);
+    double side_m = distance_m + roi_padding_m_;
+    side_m = std::max(side_m, std::max(metadata_.resolution_x, metadata_.resolution_y));
+
+    if (side_m > blank_map_max_side_m_) {
+      std::ostringstream oss;
+      oss << "Requested blank map side " << side_m
+          << " m exceeds blank_map_max_side_m " << blank_map_max_side_m_ << " m";
+      *error_msg = oss.str();
+      return false;
+    }
+
+    const int side_cols = std::max(1, static_cast<int>(std::ceil(side_m / metadata_.resolution_x)));
+    const int side_rows = std::max(1, static_cast<int>(std::ceil(side_m / metadata_.resolution_y)));
+    const double realized_side_x = static_cast<double>(side_cols) * metadata_.resolution_x;
+    const double realized_side_y = static_cast<double>(side_rows) * metadata_.resolution_y;
+
+    const double center_x = 0.5 * (current_x + goal_x);
+    const double center_y = 0.5 * (current_y + goal_y);
+
+    out_bounds->col_start = 0;
+    out_bounds->col_end = side_cols;
+    out_bounds->row_start = 0;
+    out_bounds->row_end = side_rows;
+    out_bounds->origin_x = center_x - 0.5 * realized_side_x;
+    out_bounds->origin_y = center_y - 0.5 * realized_side_y;
     out_bounds->side_length_m = std::min(realized_side_x, realized_side_y);
     return true;
   }
@@ -596,25 +646,60 @@ private:
     const double current_image_y = current_y - image_center_map_y;
     const double goal_image_x = goal_x - image_center_map_x;
     const double goal_image_y = goal_y - image_center_map_y;
+    const bool source_covers_request =
+      source_map_contains(current_image_x, current_image_y) &&
+      source_map_contains(goal_image_x, goal_image_y);
 
     CropBounds bounds;
-    if (!compute_crop_bounds(
-        current_image_x, current_image_y, goal_image_x, goal_image_y, &bounds, &error_msg))
-    {
-      response->message = error_msg;
-      return;
+    cv::Mat map_image;
+    double origin_map_x = 0.0;
+    double origin_map_y = 0.0;
+    const char * map_kind = "crop";
+    bool generated_blank = false;
+
+    if (source_covers_request) {
+      if (!compute_crop_bounds(
+          current_image_x, current_image_y, goal_image_x, goal_image_y, &bounds, &error_msg))
+      {
+        response->message = error_msg;
+        return;
+      }
+
+      origin_map_x = bounds.origin_x + image_center_map_x;
+      origin_map_y = bounds.origin_y + image_center_map_y;
+
+      const int crop_width = bounds.col_end - bounds.col_start;
+      const int crop_height = bounds.row_end - bounds.row_start;
+
+      const auto crop_rect = cv::Rect(bounds.col_start, bounds.row_start, crop_width, crop_height);
+      map_image = source_map_(crop_rect).clone();
+      if (map_image.empty()) {
+        response->message = "Failed to extract crop image";
+        return;
+      }
+    } else {
+      if (!compute_blank_bounds(current_x, current_y, goal_x, goal_y, &bounds, &error_msg)) {
+        response->message = error_msg;
+        return;
+      }
+
+      origin_map_x = bounds.origin_x;
+      origin_map_y = bounds.origin_y;
+      const int blank_width = bounds.col_end - bounds.col_start;
+      const int blank_height = bounds.row_end - bounds.row_start;
+      map_image = cv::Mat(blank_height, blank_width, CV_8UC1, cv::Scalar(0));
+      map_kind = "blank";
+      generated_blank = true;
+
+      RCLCPP_WARN(
+        get_logger(),
+        "Source map does not cover request; generating blank map (current_image=[%.3f, %.3f], goal_image=[%.3f, %.3f], source_extent=[%.3f, %.3f]..[%.3f, %.3f])",
+        current_image_x, current_image_y, goal_image_x, goal_image_y,
+        metadata_.min_x, metadata_.min_y, metadata_.max_x, metadata_.max_y);
     }
 
-    const double origin_map_x = bounds.origin_x + image_center_map_x;
-    const double origin_map_y = bounds.origin_y + image_center_map_y;
-
-    const int crop_width = bounds.col_end - bounds.col_start;
-    const int crop_height = bounds.row_end - bounds.row_start;
-
-    const auto crop_rect = cv::Rect(bounds.col_start, bounds.row_start, crop_width, crop_height);
-    const cv::Mat crop = source_map_(crop_rect).clone();
-    if (crop.empty()) {
-      response->message = "Failed to extract crop image";
+    if (map_image.empty()) {
+      response->message = "Generated map image is empty";
       return;
     }
 
@@ -624,8 +709,8 @@ private:
     const auto output_png = std::filesystem::path(output_dir_) / (stem + ".png");
     const auto output_yaml = std::filesystem::path(output_dir_) / (stem + ".yaml");
 
-    if (!cv::imwrite(output_png.string(), crop)) {
-      response->message = "Failed to write crop image: " + output_png.string();
+    if (!cv::imwrite(output_png.string(), map_image)) {
+      response->message = "Failed to write map image: " + output_png.string();
       return;
     }
 
@@ -657,12 +742,12 @@ private:
     response->roi_side_length_m = bounds.side_length_m;
     response->map_origin_x = origin_map_x;
     response->map_origin_y = origin_map_y;
-    response->message = "Crop generated and loaded";
+    response->message = generated_blank ? "Blank map generated and loaded" : "Crop generated and loaded";
 
     RCLCPP_INFO(
       get_logger(),
-      "Generated %s and loaded %s (current_map=[%.3f, %.3f], goal_map=[%.3f, %.3f], image_center_map=[%.3f, %.3f], origin_map=[%.3f, %.3f], side=%.3f m)",
-      output_png.c_str(), output_yaml.c_str(), current_x, current_y, goal_x, goal_y,
+      "Generated %s %s and loaded %s (current_map=[%.3f, %.3f], goal_map=[%.3f, %.3f], image_center_map=[%.3f, %.3f], origin_map=[%.3f, %.3f], side=%.3f m)",
+      map_kind, output_png.c_str(), output_yaml.c_str(), current_x, current_y, goal_x, goal_y,
       image_center_map_x, image_center_map_y, origin_map_x, origin_map_y, bounds.side_length_m);
   }
 
@@ -684,6 +769,7 @@ private:
   double image_center_map_y_{0.0};
 
   double roi_padding_m_{100.0};
+  double blank_map_max_side_m_{4000.0};
   double tf_timeout_s_{0.2};
   double from_ll_wait_timeout_s_{2.0};
   double from_ll_response_timeout_s_{5.0};

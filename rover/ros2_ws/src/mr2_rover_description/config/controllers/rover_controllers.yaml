@@ -45,7 +45,7 @@ rover_controller:
     solver_cmd_deadzone_lin: 0.001  # m/s
     solver_cmd_deadzone_ang: 0.001  # rad/s
     solver_vel_eps: 0.0001          # m/s
-    mission_smooth: true            # true: Use solver smoothing when mission state == RUNNING
+    mission_smooth: false           # Use the same steering conversion in mission and nominal driving
     # Wheel odometry masks (order: FL, FR, RL, RR). Use to ignore dead/dummy wheels.
     odom_wheel_drive_enabled: [true, false, true, true] # XXX: FR false for 2026. 02. 21 incident
     odom_wheel_steer_enabled: [true, true, true, true]
