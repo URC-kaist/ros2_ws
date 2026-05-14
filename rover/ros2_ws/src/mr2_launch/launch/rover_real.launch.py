@@ -82,7 +82,7 @@ def generate_launch_description():
     enable_autonomous_module_arg = DeclareLaunchArgument(
         "enable_autonomous_module",
         default_value="true",
-        description="Enable autonomous module: launch the UVC front_camera (/dev/videoFRONT) and use it for ArUco detection",
+        description="Enable autonomous module: launch RealSense RGB-D, the UVC front_camera, and autonomous perception/navigation",
     )
     enable_science_module_arg = DeclareLaunchArgument(
         "enable_science_module",
@@ -286,6 +286,7 @@ def generate_launch_description():
             "base_frame_id": "rgbd_camera",
             "urdf_mount_frame": "rgbd_camera",
         }.items(),
+        condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
     )
 
     front_uvc_launch = IncludeLaunchDescription(
