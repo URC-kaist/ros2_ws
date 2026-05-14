@@ -6,7 +6,7 @@
       "source": {
         "type": "v4l2",
         "device": "/dev/videoRGBD",
-        "pixel_format": "MJPG",
+        "pixel_format": "YUY2",
         "capture_width": 640,
         "capture_height": 480
       },
