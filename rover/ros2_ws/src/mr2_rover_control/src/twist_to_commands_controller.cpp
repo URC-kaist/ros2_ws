@@ -21,16 +21,8 @@ controller_interface::CallbackReturn TwistToCommandsController::on_init() {
   auto_declare<double>("rate_limit_linear_y", 1.5); // m/s^2
   auto_declare<double>("rate_limit_angular_z",
                        1.0); // rad/s^2 (tighter yaw slew)
-  auto_declare<double>("solver_error_alpha", 0.1); // EMA factor for steering cmd
-  auto_declare<double>("solver_gain_k", 4.0);      // EMA weight sharpness
-  auto_declare<double>("solver_max_steer_deg", 90.0); // solver steering clamp
-  auto_declare<double>("solver_speed_no_atten_deg", 15.0); // speed=1 below this
-  auto_declare<double>("solver_cmd_deadzone_lin", 1e-3); // m/s
-  auto_declare<double>("solver_cmd_deadzone_ang", 1e-3); // rad/s
-  auto_declare<double>("solver_vel_eps", 1e-4);          // m/s
   auto_declare<double>("steering_error_ratio_deg",
                        40.0); // drive scale->0 around 30 deg
-  auto_declare<bool>("mission_smooth", true);
   auto_declare<std::vector<bool>>("odom_wheel_drive_enabled", {});
   auto_declare<std::vector<bool>>("odom_wheel_steer_enabled", {});
   auto_declare<std::string>("wheel_odom_topic", "/wheel_encoder/odometry");
@@ -105,40 +97,6 @@ TwistToCommandsController::on_configure(const rclcpp_lifecycle::State &) {
   steering_error_ratio_rad_ = (steer_err_ratio_deg > 0.0)
                                   ? steer_err_ratio_deg * M_PI / 180.0
                                   : max_steer_;
-  mission_smooth_ = get_node()->get_parameter("mission_smooth").as_bool();
-  solver_error_alpha_ =
-      get_node()->get_parameter("solver_error_alpha").as_double();
-  solver_error_alpha_ = std::clamp(solver_error_alpha_, 0.0, 1.0);
-  solver_gain_k_ = get_node()->get_parameter("solver_gain_k").as_double();
-  solver_gain_k_ = std::max(0.0, solver_gain_k_);
-  const double solver_max_steer_deg =
-      get_node()->get_parameter("solver_max_steer_deg").as_double();
-  const double solver_speed_no_atten_deg =
-      get_node()->get_parameter("solver_speed_no_atten_deg").as_double();
-  const double solver_cmd_deadzone_lin =
-      get_node()->get_parameter("solver_cmd_deadzone_lin").as_double();
-  const double solver_cmd_deadzone_ang =
-      get_node()->get_parameter("solver_cmd_deadzone_ang").as_double();
-  const double solver_vel_eps =
-      get_node()->get_parameter("solver_vel_eps").as_double();
-
-  solver_cfg_.track_width = track_width_;
-  solver_cfg_.wheel_base = wheel_base_;
-  solver_cfg_.error_alpha = solver_error_alpha_;
-  solver_cfg_.gain_k = solver_gain_k_;
-  const double solver_max_steer_rad =
-      std::abs(solver_max_steer_deg) * M_PI / 180.0;
-  solver_cfg_.max_steer_angle =
-      (max_steer_ > 0.0) ? std::min(max_steer_, solver_max_steer_rad)
-                         : solver_max_steer_rad;
-  solver_cfg_.steer_speed_no_atten =
-      std::max(0.0, solver_speed_no_atten_deg) * M_PI / 180.0;
-  solver_cfg_.steer_speed_full_atten =
-      std::max(0.0, steering_error_ratio_rad_);
-  solver_cfg_.cmd_deadzone_lin = std::max(0.0, solver_cmd_deadzone_lin);
-  solver_cfg_.cmd_deadzone_ang = std::max(0.0, solver_cmd_deadzone_ang);
-  solver_cfg_.vel_eps = std::max(0.0, solver_vel_eps);
-  solver_.emplace(solver_cfg_);
 
   const auto odom_wheel_drive_enabled =
       get_node()->get_parameter("odom_wheel_drive_enabled").as_bool_array();
@@ -393,9 +351,7 @@ TwistToCommandsController::update(const rclcpp::Time &,
                                   const rclcpp::Duration &period) {
   const auto now = get_node()->now();
   const bool timed_out = (now - last_twist_time_).seconds() > timeout_;
-
   const double dt = std::max(0.0, period.seconds());
-
   const double target_vx = timed_out ? 0.0 : last_twist_.linear.x;
   const double target_vy = timed_out ? 0.0 : last_twist_.linear.y;
   const double target_wz = timed_out ? 0.0 : last_twist_.angular.z;
@@ -411,232 +367,139 @@ TwistToCommandsController::update(const rclcpp::Time &,
   const double vy = limited_twist_.linear.y;
   const double wz = limited_twist_.angular.z;
 
-  const bool running =
-      (mission_state_.has_value() && mission_state_.value() == kMissionStateRunning);
-  const bool use_solver = running && mission_smooth_;
-
-  if (!use_solver) {
-    if (wheel_radius_ <= 0.0) {
-      RCLCPP_ERROR_THROTTLE(
-          get_node()->get_logger(), *get_node()->get_clock(), 2000,
-          "wheel_radius must be > 0 (got %.3f); zeroing commands", wheel_radius_);
-      publishZeros();
-    } else if (state_interfaces_.size() < 8) {
-      RCLCPP_WARN_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(),
-                           2000,
-                           "State interfaces not available yet; zeroing outputs");
-      publishZeros();
-    } else {
-      std::array<double, 4> current_steer{};
-      bool steer_feedback_valid = true;
-      for (size_t i = 0; i < 4; ++i) {
-        const double val = state_interfaces_[i + 4].get_value();
-        if (std::isfinite(val)) {
-          current_steer[i] = val;
-        } else {
-          steer_feedback_valid = false;
-          RCLCPP_WARN_THROTTLE(
-              get_node()->get_logger(), *get_node()->get_clock(), 2000,
-              "Steering joint %s position missing/invalid; zeroing wheel commands",
-              steering_joints_[i].c_str());
-        }
-      }
-
-      if (!steer_feedback_valid) {
-        publishZeros();
-      } else {
-        const auto wheels = wheelPositions();
-        std::array<double, 4> speed{};
-        std::array<double, 4> steer{};
-
-        auto ang_distance = [](double a, double b) {
-          // Smallest absolute difference between two angles (wrap at 2*pi)
-          const double diff = std::remainder(a - b, 2.0 * M_PI);
-          return std::abs(diff);
-        };
-
-        for (size_t i = 0; i < wheels.size(); ++i) {
-          const auto &w = wheels[i];
-          const double vx_i = vx - wz * w[1];
-          const double vy_i = vy + wz * w[0];
-          const double v_lin = std::hypot(vx_i, vy_i);
-
-          constexpr double kVelStop = 1e-4;
-          if (v_lin < kVelStop) { // Preserve steer even if the rover is stop.
-            speed[i] = 0.0;
-            continue;
-          }
-
-          const double v_lin_limited = (max_wheel_linear_speed_ > 0.0)
-                                           ? std::min(v_lin, max_wheel_linear_speed_)
-                                           : v_lin;
-
-          double ang = std::atan2(vy_i, vx_i);
-          double w_ang = v_lin_limited / wheel_radius_;
-
-          // Two equivalent steering solutions: (ang, w_ang) or (ang +/- pi, -w_ang).
-          double ang_alt = ang;
-          double w_ang_alt = w_ang;
-          if (ang > 0) {
-            ang_alt = ang - M_PI;
-          } else {
-            ang_alt = ang + M_PI;
-          }
-          w_ang_alt *= -1.0;
-
-          const bool reachable1 = std::abs(ang) <= max_steer_;
-          const bool reachable2 = std::abs(ang_alt) <= max_steer_;
-
-          // Choose the solution closest to current steering angle for that wheel.
-          if (reachable1 && !reachable2) {
-            ang = std::clamp(ang, -max_steer_, max_steer_);
-          } else if (!reachable1 && reachable2) {
-            ang = std::clamp(ang_alt, -max_steer_, max_steer_);
-            w_ang = w_ang_alt;
-          } else if (!reachable1 && !reachable2) {
-            const double unclamped = ang;
-            ang = std::clamp(unclamped, -max_steer_, max_steer_);
-            w_ang = 0.0; // cannot realize kinematics at this angle
-            RCLCPP_WARN_THROTTLE(
-                get_node()->get_logger(), *get_node()->get_clock(), 2000,
-                "Steering solution %.2f rad exceeds limit (±%.2f); "
-                "zeroing wheel speed for wheel %zu",
-                unclamped, max_steer_, i);
-          } else { // both reachable
-            const double cand1 = std::clamp(ang, -max_steer_, max_steer_);
-            const double cand2 = std::clamp(ang_alt, -max_steer_, max_steer_);
-            if (ang_distance(cand2, current_steer[i]) <
-                ang_distance(cand1, current_steer[i])) {
-              ang = cand2;
-              w_ang = w_ang_alt;
-            } else {
-              ang = cand1;
-            }
-          }
-
-          steer[i] = std::clamp(ang, -max_steer_, max_steer_);
-          speed[i] = w_ang;
-        }
-
-        // Apply a global speed scale based on the worst steering error.
-        double max_steer_err = 0.0;
-        for (size_t i = 0; i < wheels.size(); ++i) {
-          const double steer_err = ang_distance(steer[i], current_steer[i]);
-          if (steer_err > max_steer_err) {
-            max_steer_err = steer_err;
-          }
-        }
-        if (max_steer_ > 0.0) {
-          const double denom = steering_error_ratio_rad_ > 0.0
-                                   ? steering_error_ratio_rad_
-                                   : max_steer_;
-          const double norm = denom > 0.0 ? (max_steer_err / denom) : 0.0;
-          constexpr double power = 2.0; // square the normalized error
-          double scale = 1.0 - std::pow(norm, power);
-          scale = std::clamp(scale, 0.0, 1.0);
-          for (double &v : speed) {
-            v *= scale;
-          }
-        }
-
-        for (size_t i = 0; i < 4; ++i) {
-          command_interfaces_[i].set_value(speed[i]);
-          command_interfaces_[i + 4].set_value(steer[i]);
-        }
-      }
-    }
-
-    // Publish odom at configured rate using available state interfaces
-    if (odom_pub_ && odom_publish_rate_ > 0.0) {
-      const double dt = (now - last_odom_pub_time_).seconds();
-      if (dt >= (1.0 / odom_publish_rate_)) {
-        std::array<double, 4> wheel_ang_vel{};
-        std::array<double, 4> steer_angle{};
-        if (fillWheelStates(wheel_ang_vel, steer_angle)) {
-          publishOdom(wheel_ang_vel, steer_angle, now);
-          last_odom_pub_time_ = now;
-        }
-      }
-    }
-
-    if (timed_out) {
-      // Ensure outputs stay zeroed when commands stale
-      publishZeros();
-    }
-
-    return controller_interface::return_type::OK;
-  }
-
-  if (!solver_) {
-    RCLCPP_ERROR_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(),
-                          2000,
-                          "FourWheelSteeringSolver is not configured; zeroing");
-    publishZeros();
-    return controller_interface::return_type::OK;
-  }
-
-  const double effective_error_alpha = solver_error_alpha_;
-  solver_->setErrorAlpha(effective_error_alpha);
-
-  if (state_interfaces_.size() < 8) {
-    RCLCPP_WARN_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(),
-                         2000,
-                         "State interfaces not available yet; zeroing outputs");
-    publishZeros();
-    return controller_interface::return_type::OK;
-  }
-
-  // Current steering joint positions (state_interfaces_: wheel vels first,
-  // then steering positions)
-  std::array<double, 4> current_steer{};
-  bool steer_feedback_valid = true;
-  for (size_t i = 0; i < 4; ++i) {
-    const double val = state_interfaces_[i + 4].get_value();
-    if (std::isfinite(val)) {
-      current_steer[i] = val;
-    } else {
-      steer_feedback_valid = false;
-      RCLCPP_WARN_THROTTLE(
-          get_node()->get_logger(), *get_node()->get_clock(), 2000,
-          "Steering joint %s position missing/invalid; zeroing commands",
-          steering_joints_[i].c_str());
-    }
-  }
-
-  if (!steer_feedback_valid) {
-    publishZeros();
-    return controller_interface::return_type::OK;
-  }
-
-  FourWheelSteeringSolver::Cmd cmd{vx, vy, wz};
-  const auto targets = solver_->solve(cmd, current_steer);
-
   if (wheel_radius_ <= 0.0) {
     RCLCPP_ERROR_THROTTLE(
         get_node()->get_logger(), *get_node()->get_clock(), 2000,
         "wheel_radius must be > 0 (got %.3f); zeroing commands", wheel_radius_);
     publishZeros();
+  } else if (state_interfaces_.size() < 8) {
+    RCLCPP_WARN_THROTTLE(get_node()->get_logger(), *get_node()->get_clock(),
+                         2000,
+                         "State interfaces not available yet; zeroing outputs");
+    publishZeros();
   } else {
+    std::array<double, 4> current_steer{};
+    bool steer_feedback_valid = true;
     for (size_t i = 0; i < 4; ++i) {
-      double wheel_linear = targets[i].speed;
-      if (max_wheel_linear_speed_ > 0.0) {
-        wheel_linear = std::clamp(
-            wheel_linear, -max_wheel_linear_speed_, max_wheel_linear_speed_);
+      const double val = state_interfaces_[i + 4].get_value();
+      if (std::isfinite(val)) {
+        current_steer[i] = val;
+      } else {
+        steer_feedback_valid = false;
+        RCLCPP_WARN_THROTTLE(
+            get_node()->get_logger(), *get_node()->get_clock(), 2000,
+            "Steering joint %s position missing/invalid; zeroing wheel commands",
+            steering_joints_[i].c_str());
       }
-      const double wheel_speed = wheel_linear / wheel_radius_;
-      double steer_cmd = targets[i].angle;
+    }
+
+    if (!steer_feedback_valid) {
+      publishZeros();
+    } else {
+      const auto wheels = wheelPositions();
+      std::array<double, 4> speed{};
+      std::array<double, 4> steer{};
+
+      auto ang_distance = [](double a, double b) {
+        // Smallest absolute difference between two angles (wrap at 2*pi)
+        const double diff = std::remainder(a - b, 2.0 * M_PI);
+        return std::abs(diff);
+      };
+
+      for (size_t i = 0; i < wheels.size(); ++i) {
+        const auto &w = wheels[i];
+        const double vx_i = vx - wz * w[1];
+        const double vy_i = vy + wz * w[0];
+        const double v_lin = std::hypot(vx_i, vy_i);
+
+        constexpr double kVelStop = 1e-4;
+        if (v_lin < kVelStop) { // Preserve steer even if the rover is stop.
+          speed[i] = 0.0;
+          continue;
+        }
+
+        const double v_lin_limited = (max_wheel_linear_speed_ > 0.0)
+                                         ? std::min(v_lin, max_wheel_linear_speed_)
+                                         : v_lin;
+
+        double ang = std::atan2(vy_i, vx_i);
+        double w_ang = v_lin_limited / wheel_radius_;
+
+        // Two equivalent steering solutions: (ang, w_ang) or (ang +/- pi, -w_ang).
+        double ang_alt = ang;
+        double w_ang_alt = w_ang;
+        if (ang > 0) {
+          ang_alt = ang - M_PI;
+        } else {
+          ang_alt = ang + M_PI;
+        }
+        w_ang_alt *= -1.0;
+
+        const bool reachable1 = std::abs(ang) <= max_steer_;
+        const bool reachable2 = std::abs(ang_alt) <= max_steer_;
+
+        // Choose the solution closest to current steering angle for that wheel.
+        if (reachable1 && !reachable2) {
+          ang = std::clamp(ang, -max_steer_, max_steer_);
+        } else if (!reachable1 && reachable2) {
+          ang = std::clamp(ang_alt, -max_steer_, max_steer_);
+          w_ang = w_ang_alt;
+        } else if (!reachable1 && !reachable2) {
+          const double unclamped = ang;
+          ang = std::clamp(unclamped, -max_steer_, max_steer_);
+          w_ang = 0.0; // cannot realize kinematics at this angle
+          RCLCPP_WARN_THROTTLE(
+              get_node()->get_logger(), *get_node()->get_clock(), 2000,
+              "Steering solution %.2f rad exceeds limit (±%.2f); "
+              "zeroing wheel speed for wheel %zu",
+              unclamped, max_steer_, i);
+        } else { // both reachable
+          const double cand1 = std::clamp(ang, -max_steer_, max_steer_);
+          const double cand2 = std::clamp(ang_alt, -max_steer_, max_steer_);
+          if (ang_distance(cand2, current_steer[i]) <
+              ang_distance(cand1, current_steer[i])) {
+            ang = cand2;
+            w_ang = w_ang_alt;
+          } else {
+            ang = cand1;
+          }
+        }
+
+        steer[i] = std::clamp(ang, -max_steer_, max_steer_);
+        speed[i] = w_ang;
+      }
+
+      // Apply a global speed scale based on the worst steering error.
+      double max_steer_err = 0.0;
+      for (size_t i = 0; i < wheels.size(); ++i) {
+        const double steer_err = ang_distance(steer[i], current_steer[i]);
+        if (steer_err > max_steer_err) {
+          max_steer_err = steer_err;
+        }
+      }
       if (max_steer_ > 0.0) {
-        steer_cmd = std::clamp(steer_cmd, -max_steer_, max_steer_);
+        const double denom =
+            steering_error_ratio_rad_ > 0.0 ? steering_error_ratio_rad_ : max_steer_;
+        const double norm = denom > 0.0 ? (max_steer_err / denom) : 0.0;
+        constexpr double power = 2.0; // square the normalized error
+        double scale = 1.0 - std::pow(norm, power);
+        scale = std::clamp(scale, 0.0, 1.0);
+        for (double &v : speed) {
+          v *= scale;
+        }
       }
-      command_interfaces_[i].set_value(wheel_speed);
-      command_interfaces_[i + 4].set_value(steer_cmd);
+
+      for (size_t i = 0; i < 4; ++i) {
+        command_interfaces_[i].set_value(speed[i]);
+        command_interfaces_[i + 4].set_value(steer[i]);
+      }
     }
   }
 
   // Publish odom at configured rate using available state interfaces
   if (odom_pub_ && odom_publish_rate_ > 0.0) {
-    const double dt = (now - last_odom_pub_time_).seconds();
-    if (dt >= (1.0 / odom_publish_rate_)) {
+    const double odom_dt = (now - last_odom_pub_time_).seconds();
+    if (odom_dt >= (1.0 / odom_publish_rate_)) {
       std::array<double, 4> wheel_ang_vel{};
       std::array<double, 4> steer_angle{};
       if (fillWheelStates(wheel_ang_vel, steer_angle)) {

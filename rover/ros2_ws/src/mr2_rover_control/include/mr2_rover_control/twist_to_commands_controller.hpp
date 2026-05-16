@@ -9,7 +9,6 @@
 #include "controller_interface/controller_interface.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "mr2_action_interface/msg/mission_status.hpp"
-#include "mr2_rover_control/four_wheel_steering_solver.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/state.hpp"
@@ -63,20 +62,14 @@ private:
   double max_steer_;
   double timeout_;
   double odom_publish_rate_;
-  double solver_error_alpha_;
-  double solver_gain_k_;
   double rate_limit_vx_;
   double rate_limit_vy_;
   double rate_limit_wz_;
   double steering_error_ratio_rad_;
-  bool mission_smooth_;
   std::string odom_frame_id_;
   std::string base_frame_id_;
   std::array<bool, 4> odom_wheel_drive_enabled_;
   std::array<bool, 4> odom_wheel_steer_enabled_;
-
-  FourWheelSteeringSolver::Config solver_cfg_;
-  std::optional<FourWheelSteeringSolver> solver_;
 
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_twist_nominal_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_twist_running_;
