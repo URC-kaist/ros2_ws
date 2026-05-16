@@ -27,26 +27,22 @@ const AutonomousTabPanel = ({
 
   return (
     <div className="autonomy-layout" role="tabpanel">
-      <div className="autonomy-left">
-        <article className="card card--map">
+      <MissionMasterPanel
+        missionList={missionList}
+        grabFromMap={grabFromMap}
+        healthSlot={<AutonomyHealthCard />}
+        mapSlot={
           <MapPreview
             missionList={missionsForMap}
             grabFromMap={grabFromMap}
             onGrabCoordinate={onGrabCoordinate}
           />
-        </article>
-      </div>
-      <div className="autonomy-right">
-        <AutonomyHealthCard />
-        <RecentObjectsCard />
-        <MissionMasterPanel
-          missionList={missionList}
-          grabFromMap={grabFromMap}
-          onGrabFromMapChange={onGrabFromMapChange}
-          onMissionListChange={onMissionListChange}
-          onMissionPreview={onMissionPreview}
-        />
-      </div>
+        }
+        onGrabFromMapChange={onGrabFromMapChange}
+        onMissionListChange={onMissionListChange}
+        onMissionPreview={onMissionPreview}
+      />
+      <RecentObjectsCard />
     </div>
   )
 }

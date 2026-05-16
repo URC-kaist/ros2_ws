@@ -25,6 +25,13 @@ const labelForTone = (tone: HealthTone) => {
   return 'Missing'
 }
 
+const SHORT_LABELS: Record<string, string> = {
+  Localization: 'Loc',
+  Traversability: 'Trav',
+  Controller: 'Ctrl',
+  'Master Status': 'Master',
+}
+
 const AutonomyHealthCard = () => {
   const { ros } = useRosBridge()
   const [lastSeen, setLastSeen] = useState<Record<LastSeenKey, number | null>>({
@@ -116,27 +123,23 @@ const AutonomyHealthCard = () => {
   }, [lastSeen, nowMs])
 
   return (
-    <article className="card">
+    <section className="autonomy-health-card" aria-label="Autonomy Health">
       <h3>Autonomy Health</h3>
-      <p>Pipeline freshness against 1s / 4s thresholds.</p>
       <div className="autonomy-health-table">
-        <div className="autonomy-health-row autonomy-health-header">
-          {statuses.map((item) => (
-            <span key={`${item.label}-header`}>{item.label}</span>
-          ))}
-        </div>
-        <div className="autonomy-health-row">
-          {statuses.map((item) => (
+        {statuses.map((item) => (
+          <div className="autonomy-health-row" key={item.label}>
+            <span className="autonomy-health-label">{item.label}</span>
             <span
-              key={item.label}
               className={`autonomy-health-cell autonomy-health-${item.tone}`}
+              title={`${item.label}: ${item.value}`}
             >
-              {item.value}
+              <span>{SHORT_LABELS[item.label] ?? item.label}</span>
+              <strong>{item.value}</strong>
             </span>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-    </article>
+    </section>
   )
 }
 

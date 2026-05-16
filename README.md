@@ -159,8 +159,9 @@ ros2 topic hz /mission_status
 
 Notes:
 - Missions execute in the order listed in `missions: [...]` (Mission Master does not loop the list).
-- `mission_id` is currently used for status/debug correlation only (not ordering).
-- `target_radius` / `waypoint_count` are only used by `COVER_VISION` missions; set them to `0` for `GNSS_ONLY`.
+- `mission_id` identifies missions in status/debug output. `MissionControl.mission_id` is reserved for compatibility and is currently ignored by Mission Master.
+- `target_radius` is only used by `COVER_VISION` missions; set it to `0` for `GNSS_ONLY`.
+- `waypoint_count: 1` marks a mission as a via point and skips the arrival delay after success; use `0` otherwise.
 - `object_type` is used by `COVER_VISION` + `YOLO` (class id). For `GNSS_ONLY` or `ARUCO`, set to `0`.
 - GNSS missions rely on `robot_localization/srv/FromLL` (WGS84 -> map) from `navsat_transform_node`. Debug:
 ```bash

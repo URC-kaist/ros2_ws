@@ -1,14 +1,30 @@
-import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type FocusEvent,
+  type ReactNode,
+} from 'react'
 import { useRosBridge } from '../hooks/useRosBridge'
 import { useXbeeGateway } from '../hooks/useXbeeGateway'
 import {
+  COORDINATE_FORMATS,
   createMissionSpec,
   csvToMissionList,
-  DETECTION_METHODS,
+  DETECTION_YOLO,
+  formatCoordinateValue,
+  getDetectionMethodsForMissionType,
   getInvalidMissionFields,
   missionListToCsv,
   MISSION_TYPES,
+  MISSION_TYPE_COVER_VISION,
+  MISSION_TYPE_GNSS_ONLY,
+  normalizeMissionSpec,
   OBJECT_TYPES,
+  parseCoordinateInput,
+  type CoordinateAxis,
+  type CoordinateFormat,
   type MissionSpec,
 } from '../lib/missions'
 import type { MissionControlMsg, MissionListMsg, MissionStatusMsg } from '../lib/rosMessages'
@@ -36,6 +52,8 @@ const STORAGE_PREFIX = 'missionListSlot'
 type MissionMasterPanelProps = {
   missionList: MissionSpec[]
   grabFromMap: boolean
+  healthSlot?: ReactNode
+  mapSlot?: ReactNode
   onGrabFromMapChange: (enabled: boolean) => void
   onMissionListChange: (missions: MissionSpec[]) => void
   onMissionPreview: (missions: MissionSpec[]) => void
@@ -44,6 +62,8 @@ type MissionMasterPanelProps = {
 const MissionMasterPanel = ({
   missionList,
   grabFromMap,
+  healthSlot,
+  mapSlot,
   onGrabFromMapChange,
   onMissionListChange,
   onMissionPreview,
@@ -51,7 +71,6 @@ const MissionMasterPanel = ({
   const { ros, connected: rosConnected } = useRosBridge()
   const { gateway } = useXbeeGateway()
   const [clearCostmap, setClearCostmap] = useState(false)
-  const [missionId, setMissionId] = useState('0')
   const [status, setStatus] = useState<MissionStatusMsg | null>(null)
   const [statusAt, setStatusAt] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -59,6 +78,7 @@ const MissionMasterPanel = ({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const [storageSlot, setStorageSlot] = useState(1)
+  const [coordinateFormat, setCoordinateFormat] = useState<CoordinateFormat>('dd')
   const [storageNote, setStorageNote] = useState<{ message: string; isError: boolean } | null>(
     null
   )
@@ -85,14 +105,14 @@ const MissionMasterPanel = ({
     }
   }, [])
 
-  const validateMissionList = () => {
+  const validateMissionList = (missions = missionList) => {
     const nextInvalid: InvalidFieldMap = {}
     const clampIssues = (index: number, field: string) => {
       if (!nextInvalid[index]) nextInvalid[index] = {}
       nextInvalid[index][field] = true
     }
 
-    missionList.forEach((mission, index) => {
+    missions.forEach((mission, index) => {
       getInvalidMissionFields(mission).forEach((field) => clampIssues(index, field))
     })
 
@@ -101,7 +121,9 @@ const MissionMasterPanel = ({
   }
 
   const handleSendMissionList = () => {
-    if (!validateMissionList()) return
+    const normalizedMissions = missionList.map(normalizeMissionSpec)
+    if (!validateMissionList(normalizedMissions)) return
+    onMissionListChange(normalizedMissions)
 
     const now = Date.now()
     const msg: MissionListMsg = {
@@ -109,22 +131,23 @@ const MissionMasterPanel = ({
         sec: Math.floor(now / 1000),
         nanosec: (now % 1000) * 1e6,
       },
-      missions: missionList,
+      missions: normalizedMissions,
     }
     ros.publish('/mission_list', 'mr2_action_interface/msg/MissionList', msg)
   }
 
   const handlePreviewMissionList = () => {
-    if (!validateMissionList()) return
-    onMissionPreview(missionList)
+    const normalizedMissions = missionList.map(normalizeMissionSpec)
+    if (!validateMissionList(normalizedMissions)) return
+    onMissionListChange(normalizedMissions)
+    onMissionPreview(normalizedMissions)
   }
 
   const handleSendControl = (command: number) => {
-    const id = Number.parseInt(missionId, 10)
     const msg: MissionControlMsg = {
       command,
       clear_costmap: clearCostmap,
-      mission_id: Number.isFinite(id) ? id : 0,
+      mission_id: 0,
     }
     gateway.sendMissionControl(msg)
   }
@@ -167,6 +190,16 @@ const MissionMasterPanel = ({
       }
       return next
     })
+  }
+
+  const markInvalid = (index: number, field: string) => {
+    setInvalidFields((prev) => ({
+      ...prev,
+      [index]: {
+        ...prev[index],
+        [field]: true,
+      },
+    }))
   }
 
   const updateMission = (index: number, patch: Partial<MissionSpec>) => {
@@ -237,9 +270,23 @@ const MissionMasterPanel = ({
   }
 
   const updateField = (index: number, field: keyof MissionSpec, value: number) => {
-    updateMission(index, { [field]: value } as Partial<MissionSpec>)
+    const nextMission = { ...missionList[index], [field]: value } as MissionSpec
+    const shouldNormalize = field === 'mission_type' || field === 'detection_method'
+    updateMission(index, shouldNormalize ? normalizeMissionSpec(nextMission) : nextMission)
     clearInvalid(index, String(field))
   }
+
+  const handleCoordinateBlur =
+    (index: number, field: 'target_latitude' | 'target_longitude', axis: CoordinateAxis) =>
+    (event: FocusEvent<HTMLInputElement>) => {
+      const value = parseCoordinateInput(event.target.value, coordinateFormat, axis)
+      if (value == null) {
+        if (event.target.value.trim()) markInvalid(index, field)
+        return
+      }
+      updateField(index, field, value)
+      event.target.value = formatCoordinateValue(value, coordinateFormat, axis)
+    }
 
   const addMission = () => {
     const nextId =
@@ -279,7 +326,7 @@ const MissionMasterPanel = ({
       setStorageNote({ message: `Slot ${storageSlot} is empty.`, isError: true })
       return
     }
-    const missions = csvToMissionList(stored)
+    const missions = csvToMissionList(stored).map(normalizeMissionSpec)
     if (missions.length === 0) {
       setStorageNote({
         message: `Slot ${storageSlot} has no readable missions.`,
@@ -300,14 +347,22 @@ const MissionMasterPanel = ({
       <article className="card card--span-2 mission-master">
         <header className="mission-master__header">
           <h3>Mission Master</h3>
-          <span className={`pill ${rosConnected ? 'pill--on' : 'pill--off'}`}>
-            {rosConnected ? 'rosbridge connected' : 'rosbridge offline'}
-          </span>
+          <div className="mission-master__header-right">
+            {healthSlot}
+            <span className={`pill ${rosConnected ? 'pill--on' : 'pill--off'}`}>
+              {rosConnected ? 'rosbridge connected' : 'rosbridge offline'}
+            </span>
+          </div>
         </header>
 
-        <div className="mission-master__grid">
+        <div className={mapSlot ? 'mission-master__planner' : undefined}>
+          {mapSlot ? (
+            <section className="mission-master__map-panel">
+              <div className="mission-master__map-shell">{mapSlot}</div>
+            </section>
+          ) : null}
+          <div className="mission-master__grid">
           <section className="mission-master__status">
-            <label className="mission-master__label">MissionStatus</label>
             <div
               className={`mission-master__status-shell mission-master__status-${ledMode} ${
                 statusFlash ? 'mission-master__status-flash' : ''
@@ -355,7 +410,6 @@ const MissionMasterPanel = ({
           </section>
 
           <section className="mission-master__controls">
-            <label className="mission-master__label">MissionControl</label>
             <div className="mission-master__control-row">
               <label className="mission-master__checkbox">
                 <input
@@ -365,14 +419,6 @@ const MissionMasterPanel = ({
                 />
                 Clear costmap
               </label>
-              <input
-                type="number"
-                className="mission-master__input"
-                value={missionId}
-                onChange={(event) => setMissionId(event.target.value)}
-                placeholder="mission_id"
-                min={0}
-              />
               <div className="mission-master__control-buttons">
                 {COMMANDS.map((cmd) => (
                   <button
@@ -391,16 +437,26 @@ const MissionMasterPanel = ({
                   </button>
                 ))}
               </div>
-              <span className="mission-master__note">Send via XBEE</span>
             </div>
           </section>
 
           <section>
             <label className="mission-master__label">MissionList</label>
             <div className="mission-master__actions mission-master__actions--top">
-              <button type="button" className="mission-master__button" onClick={addMission}>
-                Add mission
-              </button>
+              <label className="mission-master__coordinate-format">
+                <span>Coords</span>
+                <select
+                  value={coordinateFormat}
+                  onChange={(event) => setCoordinateFormat(event.target.value as CoordinateFormat)}
+                  title="Coordinate input format"
+                >
+                  {COORDINATE_FORMATS.map((format) => (
+                    <option key={format.value} value={format.value}>
+                      {format.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 className={`mission-master__button mission-master__button--toggle ${
@@ -484,20 +540,34 @@ const MissionMasterPanel = ({
                 <span>Lon</span>
                 <span>Radius</span>
                 <span title="Via point skips the arrival hold between missions.">Via</span>
-                <span />
+                <button
+                  type="button"
+                  className="mission-master__table-add-button"
+                  onClick={addMission}
+                  aria-label="Add mission"
+                  title="Add mission"
+                >
+                  +
+                </button>
               </div>
               {missionList.length === 0 ? (
                 <div className="mission-master__empty">No missions yet.</div>
               ) : (
-                missionList.map((mission, index) => (
-                  <div
-                    className={`mission-master__table-row ${
-                      invalidFields[index] ? 'mission-master__table-row--invalid' : ''
-                    } ${dropIndex === index ? 'mission-master__table-row--drop' : ''}`}
-                    key={`${mission.mission_id}-${index}`}
-                    onDragOver={handleDragOver(index)}
-                    onDrop={handleDrop(index)}
-                  >
+                missionList.map((mission, index) => {
+                  const isGnssOnly = mission.mission_type === MISSION_TYPE_GNSS_ONLY
+                  const isCoverVision = mission.mission_type === MISSION_TYPE_COVER_VISION
+                  const exposesObject = isCoverVision && mission.detection_method === DETECTION_YOLO
+                  const detectionMethods = getDetectionMethodsForMissionType(mission.mission_type)
+
+                  return (
+                    <div
+                      className={`mission-master__table-row ${
+                        invalidFields[index] ? 'mission-master__table-row--invalid' : ''
+                      } ${dropIndex === index ? 'mission-master__table-row--drop' : ''}`}
+                      key={`${mission.mission_id}-${index}`}
+                      onDragOver={handleDragOver(index)}
+                      onDrop={handleDrop(index)}
+                    >
                     <button
                       type="button"
                       className="mission-master__drag-handle"
@@ -534,94 +604,118 @@ const MissionMasterPanel = ({
                         </option>
                       ))}
                     </select>
-                    <select
-                      value={mission.detection_method}
-                      onChange={(event) =>
-                        updateField(index, 'detection_method', Number(event.target.value))
-                      }
-                      className={
-                        invalidFields[index]?.detection_method ? 'mission-master__input--invalid' : ''
-                      }
-                    >
-                      {DETECTION_METHODS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={mission.object_type}
-                      onChange={(event) =>
-                        updateField(index, 'object_type', Number(event.target.value))
-                      }
-                      className={
-                        invalidFields[index]?.object_type ? 'mission-master__input--invalid' : ''
-                      }
-                    >
-                      {OBJECT_TYPES.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    {isGnssOnly ? (
+                      <span className="mission-master__locked-cell">—</span>
+                    ) : (
+                      <select
+                        value={mission.detection_method}
+                        onChange={(event) =>
+                          updateField(index, 'detection_method', Number(event.target.value))
+                        }
+                        className={
+                          invalidFields[index]?.detection_method
+                            ? 'mission-master__input--invalid'
+                            : ''
+                        }
+                      >
+                        {detectionMethods.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {exposesObject ? (
+                      <select
+                        value={mission.object_type}
+                        onChange={(event) =>
+                          updateField(index, 'object_type', Number(event.target.value))
+                        }
+                        className={
+                          invalidFields[index]?.object_type ? 'mission-master__input--invalid' : ''
+                        }
+                      >
+                        {OBJECT_TYPES.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="mission-master__locked-cell">—</span>
+                    )}
                     <input
-                      key={`lat-${mission.mission_id}-${mission.target_latitude}`}
+                      key={`lat-${mission.mission_id}-${mission.target_latitude}-${coordinateFormat}`}
                       type="text"
                       inputMode="decimal"
-                      defaultValue={
-                        mission.target_latitude === 0 ? '' : String(mission.target_latitude)
+                      defaultValue={formatCoordinateValue(
+                        mission.target_latitude,
+                        coordinateFormat,
+                        'lat'
+                      )}
+                      onBlur={handleCoordinateBlur(index, 'target_latitude', 'lat')}
+                      placeholder={
+                        COORDINATE_FORMATS.find((format) => format.value === coordinateFormat)
+                          ?.placeholder
                       }
-                      onBlur={(event) => {
-                        const value = Number.parseFloat(event.target.value)
-                        if (Number.isFinite(value)) {
-                          updateField(index, 'target_latitude', value)
-                        }
-                      }}
                       className={
                         invalidFields[index]?.target_latitude ? 'mission-master__input--invalid' : ''
                       }
                     />
                     <input
-                      key={`lon-${mission.mission_id}-${mission.target_longitude}`}
+                      key={`lon-${mission.mission_id}-${mission.target_longitude}-${coordinateFormat}`}
                       type="text"
                       inputMode="decimal"
-                      defaultValue={
-                        mission.target_longitude === 0 ? '' : String(mission.target_longitude)
+                      defaultValue={formatCoordinateValue(
+                        mission.target_longitude,
+                        coordinateFormat,
+                        'lon'
+                      )}
+                      onBlur={handleCoordinateBlur(index, 'target_longitude', 'lon')}
+                      placeholder={
+                        coordinateFormat === 'dd'
+                          ? '-110.791397'
+                          : COORDINATE_FORMATS.find((format) => format.value === coordinateFormat)
+                              ?.placeholder.replace('N', 'W')
                       }
-                      onBlur={(event) => {
-                        const value = Number.parseFloat(event.target.value)
-                        if (Number.isFinite(value)) {
-                          updateField(index, 'target_longitude', value)
-                        }
-                      }}
                       className={
                         invalidFields[index]?.target_longitude ? 'mission-master__input--invalid' : ''
                       }
                     />
-                    <input
-                      type="number"
-                      value={mission.target_radius === 0 ? '' : mission.target_radius}
-                      onChange={(event) =>
-                        updateField(index, 'target_radius', Number(event.target.value) || 0)
-                      }
-                      className={
-                        invalidFields[index]?.target_radius ? 'mission-master__input--invalid' : ''
-                      }
-                    />
-                    <div className="mission-master__via-cell">
+                    {isCoverVision ? (
                       <input
-                        type="checkbox"
-                        className={`mission-master__via-checkbox ${
-                          invalidFields[index]?.waypoint_count ? 'mission-master__input--invalid' : ''
-                        }`}
-                        checked={mission.waypoint_count === 1}
+                        type="number"
+                        value={mission.target_radius === 0 ? '' : mission.target_radius}
                         onChange={(event) =>
-                          updateField(index, 'waypoint_count', event.target.checked ? 1 : 0)
+                          updateField(index, 'target_radius', Number(event.target.value) || 0)
                         }
-                        aria-label="Via point (skip arrival delay)"
-                        title="Via point skips the arrival hold between missions."
+                        className={
+                          invalidFields[index]?.target_radius ? 'mission-master__input--invalid' : ''
+                        }
                       />
-                    </div>
+                    ) : (
+                      <span className="mission-master__locked-cell">—</span>
+                    )}
+                    {isGnssOnly ? (
+                      <div className="mission-master__via-cell">
+                        <input
+                          type="checkbox"
+                          className={`mission-master__via-checkbox ${
+                            invalidFields[index]?.waypoint_count
+                              ? 'mission-master__input--invalid'
+                              : ''
+                          }`}
+                          checked={mission.waypoint_count === 1}
+                          onChange={(event) =>
+                            updateField(index, 'waypoint_count', event.target.checked ? 1 : 0)
+                          }
+                          aria-label="Via point (skip arrival delay)"
+                          title="Via point skips the arrival hold between GNSS waypoints."
+                        />
+                      </div>
+                    ) : (
+                      <span className="mission-master__locked-cell">—</span>
+                    )}
                     <button
                       type="button"
                       className="mission-master__icon-button"
@@ -631,11 +725,13 @@ const MissionMasterPanel = ({
                       ✕
                     </button>
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
             <p className="mission-master__meta">{missionSummary}</p>
           </section>
+          </div>
         </div>
       </article>
     </>

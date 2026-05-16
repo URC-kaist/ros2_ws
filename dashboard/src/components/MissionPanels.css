@@ -20,22 +20,9 @@
 
 .autonomy-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
+  grid-template-columns: 1fr;
   gap: 12px;
   align-items: start;
-}
-
-.autonomy-left {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.autonomy-right {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
 }
 
 .live-feed-panel {
@@ -648,7 +635,7 @@
   }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1500px) {
   .science-layout {
     grid-template-columns: repeat(2, minmax(240px, 1fr));
   }
@@ -769,17 +756,40 @@
 
 .autonomy-health-table {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(40px, 1fr));
+  gap: 4px;
   font-size: 0.85rem;
 }
 
-.autonomy-health-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(90px, 1fr));
+.autonomy-health-card {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  min-height: 0;
+  padding: 5px 7px;
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.36);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.autonomy-health-card h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.autonomy-health-card p {
+  display: none;
+}
+
+.autonomy-health-row {
+  display: block;
+  min-width: 0;
 }
 
 .autonomy-health-header {
+  display: none;
   color: var(--muted);
   text-transform: uppercase;
   font-size: 0.75rem;
@@ -787,11 +797,25 @@
 }
 
 .autonomy-health-cell {
+  display: grid;
+  gap: 2px;
   background: rgba(9, 14, 24, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 6px 8px;
+  border-radius: 5px;
+  padding: 3px 5px 4px;
   text-align: center;
+  font-size: 0.62rem;
+  line-height: 1;
+  min-width: 0;
+}
+
+.autonomy-health-cell strong {
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.autonomy-health-label {
+  display: none;
 }
 
 .autonomy-health-good {
@@ -854,6 +878,15 @@
   color: var(--muted);
   font-size: 0.85rem;
   text-align: center;
+}
+
+.autonomy-layout .recent-objects-image {
+  min-height: 320px;
+  max-height: 560px;
+}
+
+.autonomy-layout .recent-objects-image img {
+  max-height: 560px;
 }
 
 .recent-objects-image img {
