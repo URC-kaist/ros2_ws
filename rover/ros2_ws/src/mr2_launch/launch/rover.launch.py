@@ -221,6 +221,29 @@ def generate_launch_description():
         }.items(),
         condition=real_condition,
     )
+    disabled_video_stream_ids = PythonExpression(
+        [
+            "','.join(filter(None, ["
+            "'rgbd_camera' if (('",
+            LaunchConfiguration("mode"),
+            "' == 'real' and '",
+            LaunchConfiguration("enable_autonomous_module"),
+            "' == 'true') or ('",
+            LaunchConfiguration("mode"),
+            "' == 'sim' and '",
+            LaunchConfiguration("enable_autonomous_module_sim"),
+            "' == 'true')) else '', "
+            "'arm_cam,gripper_cam' if (('",
+            LaunchConfiguration("mode"),
+            "' == 'real' and '",
+            LaunchConfiguration("enable_manipulator_module"),
+            "' != 'true') or ('",
+            LaunchConfiguration("mode"),
+            "' == 'sim' and '",
+            LaunchConfiguration("enable_manipulator_module_sim"),
+            "' != 'true')) else '']))",
+        ]
+    )
     video_streaming_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -230,6 +253,7 @@ def generate_launch_description():
         launch_arguments={
             "video_config": LaunchConfiguration("video_config"),
             "video_base_host": LaunchConfiguration("video_base_host"),
+            "disabled_stream_ids": disabled_video_stream_ids,
         }.items(),
         condition=IfCondition(LaunchConfiguration("enable_video_streaming")),
     )

@@ -21,6 +21,11 @@ def generate_launch_description():
         default_value=EnvironmentVariable("MR2_BASE_IP"),
         description="Base-station host/IP that will receive the rover RTP/UDP video streams",
     )
+    disabled_stream_ids_arg = DeclareLaunchArgument(
+        "disabled_stream_ids",
+        default_value="",
+        description="Comma-separated stream IDs to skip from the central video config",
+    )
 
     video_streaming_node = Node(
         package="mr2_video_streaming",
@@ -31,6 +36,7 @@ def generate_launch_description():
             {
                 "video_config_path": LaunchConfiguration("video_config"),
                 "base_host": LaunchConfiguration("video_base_host"),
+                "disabled_stream_ids": LaunchConfiguration("disabled_stream_ids"),
             }
         ],
     )
@@ -39,6 +45,7 @@ def generate_launch_description():
         [
             video_config_arg,
             video_base_host_arg,
+            disabled_stream_ids_arg,
             video_streaming_node,
         ]
     )

@@ -85,6 +85,28 @@ bool is_supported_encoder_type(const std::string & encoder_type) {
          is_jetson_hardware_encoder(encoder_type);
 }
 
+std::string trim_copy(const std::string & value) {
+  const auto first = value.find_first_not_of(" \t\r\n");
+  if (first == std::string::npos) {
+    return "";
+  }
+  const auto last = value.find_last_not_of(" \t\r\n");
+  return value.substr(first, last - first + 1);
+}
+
+std::set<std::string> parse_disabled_stream_ids(const std::string & value) {
+  std::set<std::string> stream_ids;
+  std::stringstream input(value);
+  std::string item;
+  while (std::getline(input, item, ',')) {
+    item = trim_copy(item);
+    if (!item.empty()) {
+      stream_ids.insert(item);
+    }
+  }
+  return stream_ids;
+}
+
 std::string source_type_to_string(StreamSourceType source_type) {
   switch (source_type) {
     case StreamSourceType::RosTopic:
@@ -887,7 +909,9 @@ class VideoStreamingNode : public rclcpp::Node {
   VideoStreamingNode()
       : rclcpp::Node("video_streaming"),
         video_config_path_(declare_parameter<std::string>("video_config_path", "")),
-        base_host_(declare_parameter<std::string>("base_host", default_base_host())) {
+        base_host_(declare_parameter<std::string>("base_host", default_base_host())),
+        disabled_stream_ids_(parse_disabled_stream_ids(
+            declare_parameter<std::string>("disabled_stream_ids", ""))) {
     if (video_config_path_.empty()) {
       throw std::runtime_error("video_config_path parameter is required");
     }
@@ -900,6 +924,12 @@ class VideoStreamingNode : public rclcpp::Node {
 
     const auto streams = load_streams_from_file(video_config_path_);
     for (const auto & stream : streams) {
+      if (disabled_stream_ids_.count(stream.stream_id) > 0) {
+        RCLCPP_INFO(
+            get_logger(), "Skipping disabled video stream %s", stream.stream_id.c_str());
+        continue;
+      }
+
       auto pipeline = std::make_shared<StreamPipeline>(stream, base_host_, get_logger());
 
       if (stream.source_type == StreamSourceType::RosTopic) {
@@ -1047,6 +1077,7 @@ class VideoStreamingNode : public rclcpp::Node {
 
   std::string video_config_path_;
   std::string base_host_;
+  std::set<std::string> disabled_stream_ids_;
   GMainLoop * gst_main_loop_{nullptr};
   std::thread gst_main_loop_thread_;
   rclcpp::TimerBase::SharedPtr monitor_timer_;
