@@ -1,6 +1,6 @@
 cover_vision_server:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     map_frame: map
     base_frame: base_link
     tf_timeout_sec: 0.2
@@ -18,13 +18,14 @@ cover_vision_server:
 
     # Detection handling
     detection_stale_sec: 0.75
+    detection_acceptance_margin_m: 3.0
     detection_pose_topic: cover_vision/object_pose # deprecated legacy topic
     detection_pose_topic_aruco: cover_vision/object_pose/aruco
     detection_pose_topic_yolo: cover_vision/object_pose/yolo
 
 cover_vision_yolo_adapter:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     map_frame: map
     base_frame: base_link
     mission_status_topic: mission_status
@@ -36,11 +37,11 @@ cover_vision_yolo_adapter:
     min_publish_interval_sec: 0.1
     filter_window: 5
     max_jump_m: 2.0
-    max_detection_distance_m: 5.0 # D435i range is 3.0 so this is generous enough
+    max_detection_distance_m: 3.5
 
 cover_vision_aruco_adapter:
   ros__parameters:
-    use_sim_time: true
+    use_sim_time: false
     map_frame: map
     base_frame: base_link
     mission_status_topic: mission_status
@@ -53,5 +54,5 @@ cover_vision_aruco_adapter:
     min_publish_interval_sec: 0.1
     filter_window: 5
     max_jump_m: 2.0
-    max_detection_distance_m: 5.0 # D435i range is 3.0 so this is generous enough
+    max_detection_distance_m: 3.5
     force_enable: true # easier debugging

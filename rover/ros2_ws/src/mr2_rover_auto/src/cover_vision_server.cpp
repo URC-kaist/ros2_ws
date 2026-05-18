@@ -142,6 +142,8 @@ public:
       this->declare_parameter<std::string>("detection_pose_topic_aruco", detection_pose_topic_);
     detection_pose_topic_yolo_ =
       this->declare_parameter<std::string>("detection_pose_topic_yolo", detection_pose_topic_);
+    detection_acceptance_margin_m_ =
+      this->declare_parameter<double>("detection_acceptance_margin_m", 3.0);
 
     nav_client_ = rclcpp_action::create_client<NavToPose>(this, nav_action_name_);
     nav_through_client_ = rclcpp_action::create_client<NavThroughPoses>(this, nav_through_action_name_);
@@ -197,6 +199,7 @@ private:
   double spiral_point_spacing_m_{2.4};
   size_t spiral_max_points_{5000};
   double detection_stale_sec_{0.75};
+  double detection_acceptance_margin_m_{3.0};
   std::string detection_pose_topic_;
   std::string detection_pose_topic_aruco_;
   std::string detection_pose_topic_yolo_;
@@ -257,14 +260,17 @@ private:
     return false;
   }
 
-  static bool detection_within_radius(
+  bool detection_within_acceptance_radius(
     const geometry_msgs::msg::PoseStamped & pose_map,
     const geometry_msgs::msg::PoseStamped & center,
     double radius_m)
   {
     const double dx = pose_map.pose.position.x - center.pose.position.x;
     const double dy = pose_map.pose.position.y - center.pose.position.y;
-    return (dx * dx + dy * dy) <= (radius_m * radius_m);
+    const double margin_m =
+      std::isfinite(detection_acceptance_margin_m_) ? std::max(0.0, detection_acceptance_margin_m_) : 0.0;
+    const double acceptance_radius_m = std::max(0.0, radius_m) + margin_m;
+    return (dx * dx + dy * dy) <= (acceptance_radius_m * acceptance_radius_m);
   }
 
   bool try_get_detection_map_pose(
@@ -335,10 +341,6 @@ private:
       RCLCPP_ERROR(get_logger(), "navigate_through_poses action server unavailable");
       return false;
     }
-    if (!follow_path_client_->wait_for_action_server(5s)) {
-      RCLCPP_ERROR(get_logger(), "follow_path action server unavailable");
-      return false;
-    }
     return true;
   }
 
@@ -355,7 +357,7 @@ private:
     nav_goal.pose = pose_map;
 
     auto gh_future = nav_client_->async_send_goal(nav_goal);
-    if (gh_future.wait_for(5s) != std::future_status::ready) {
+    if (gh_future.wait_for(15s) != std::future_status::ready) {
       RCLCPP_ERROR(get_logger(), "NavigateToPose goal handle timeout");
       return NavOutcome::ABORTED;
     }
@@ -373,18 +375,19 @@ private:
         return NavOutcome::CANCELED;
       }
 
-      if (det && search_radius_reached && search_center) {
-        update_search_radius_reached(*search_center, search_radius_m, search_radius_reached);
-        if (search_radius_reached->load(std::memory_order_relaxed)) {
-          geometry_msgs::msg::PoseStamped detected_pose;
-          if (try_get_detection_map_pose(det, this->now(), detected_pose)) {
-            nav_client_->async_cancel_goal(nav_gh);
-            if (detected_pose_map) {
-              *detected_pose_map = detected_pose;
-            }
-            return NavOutcome::DETECTED;
+      if (det) {
+        geometry_msgs::msg::PoseStamped detected_pose;
+        if (try_get_detection_map_pose(det, this->now(), detected_pose)) {
+          nav_client_->async_cancel_goal(nav_gh);
+          if (detected_pose_map) {
+            *detected_pose_map = detected_pose;
           }
+          return NavOutcome::DETECTED;
         }
+      }
+
+      if (search_radius_reached && search_center) {
+        update_search_radius_reached(*search_center, search_radius_m, search_radius_reached);
       }
 
       if (res_future.wait_for(50ms) == std::future_status::ready) {
@@ -414,7 +417,7 @@ private:
     goal.goal_checker_id = goal_checker_id;
 
     auto gh_future = follow_path_client_->async_send_goal(goal);
-    if (gh_future.wait_for(5s) != std::future_status::ready) {
+    if (gh_future.wait_for(15s) != std::future_status::ready) {
       RCLCPP_ERROR(get_logger(), "FollowPath goal handle timeout");
       return NavOutcome::ABORTED;
     }
@@ -483,21 +486,16 @@ private:
     auto search_radius_reached =
       detection_enabled ? std::make_shared<std::atomic<bool>>(false) : nullptr;
     if (search_radius_reached) {
-      if (search_radius_reached) {
-        update_search_radius_reached(center, search_radius_m, search_radius_reached);
-      }
+      update_search_radius_reached(center, search_radius_m, search_radius_reached);
     }
 
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr detection_sub;
     if (detection_enabled) {
       detection_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         detection_topic, 10,
-        [this, det, center, search_radius_m, search_radius_reached](const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+        [this, det, center, search_radius_m](const geometry_msgs::msg::PoseStamped::SharedPtr msg)
         {
           if (!msg) {
-            return;
-          }
-          if (!search_radius_reached->load(std::memory_order_relaxed)) {
             return;
           }
           if (msg->header.frame_id != map_frame_) {
@@ -512,7 +510,17 @@ private:
           pose_map.pose.position.z = 0.0;
           pose_map.pose.orientation.w = 1.0;
 
-          if (!detection_within_radius(pose_map, center, search_radius_m)) {
+          if (!detection_within_acceptance_radius(pose_map, center, search_radius_m)) {
+            const double dx = pose_map.pose.position.x - center.pose.position.x;
+            const double dy = pose_map.pose.position.y - center.pose.position.y;
+            const double dist = std::hypot(dx, dy);
+            const double margin_m =
+              std::isfinite(detection_acceptance_margin_m_) ?
+              std::max(0.0, detection_acceptance_margin_m_) : 0.0;
+            RCLCPP_WARN_THROTTLE(
+              this->get_logger(), *this->get_clock(), 2000,
+              "Ignoring detection %.2f m from search center; acceptance radius is %.2f m",
+              dist, search_radius_m + margin_m);
             return;
           }
 
@@ -600,7 +608,7 @@ private:
         };
 
       auto gh_future = nav_through_client_->async_send_goal(nav_through_goal, goal_options);
-      if (gh_future.wait_for(5s) != std::future_status::ready) {
+      if (gh_future.wait_for(15s) != std::future_status::ready) {
         RCLCPP_ERROR(get_logger(), "NavigateThroughPoses goal handle timeout");
         result->mission_result = 0;
         result->waypoints_completed = 0;
@@ -676,7 +684,7 @@ private:
             return;
           }
 
-          // Detected object: regardless of NavigateThroughPoses result, attempt approach.
+          // Detected object: the coverage goal is canceled; finish without a post-detection rotate.
           break;
         }
 
@@ -691,48 +699,9 @@ private:
       }
     }
 
-    // 4) Rotate-in-place toward detected pose using FollowPath with a single pose.
-    double robot_x = 0.0;
-    double robot_y = 0.0;
-    if (!get_robot_xy(robot_x, robot_y)) {
-      result->mission_result = 0;
-      result->waypoints_completed = 0;
-      goal_handle->abort(result);
-      return;
-    }
-
-    const double dx_obj = detected_pose_map.pose.position.x - robot_x;
-    const double dy_obj = detected_pose_map.pose.position.y - robot_y;
-    const double target_yaw = std::atan2(dy_obj, dx_obj);
-
-    nav_msgs::msg::Path look_path;
-    look_path.header.stamp = this->now();
-    look_path.header.frame_id = map_frame_;
-    geometry_msgs::msg::PoseStamped look_pose;
-    look_pose.header = look_path.header;
-    look_pose.pose.position.x = robot_x;
-    look_pose.pose.position.y = robot_y;
-    look_pose.pose.position.z = 0.0;
-    look_pose.pose.orientation = yaw_to_quat(target_yaw);
-    look_path.poses.push_back(look_pose);
-
-    const auto nav_obj_outcome =
-      run_follow_path(goal_handle, look_path, follow_path_controller_id_, follow_path_goal_checker_id_);
-    if (nav_obj_outcome == NavOutcome::CANCELED) {
-      result->mission_result = 0;
-      result->waypoints_completed = 0;
-      goal_handle->canceled(result);
-      return;
-    }
-    if (nav_obj_outcome != NavOutcome::SUCCEEDED) {
-      result->mission_result = 0;
-      result->waypoints_completed = 0;
-      goal_handle->abort(result);
-      return;
-    }
-
+    RCLCPP_INFO(get_logger(), "CoverVision: object detected, completing without post-detection rotation");
     result->mission_result = 1;
-    result->waypoints_completed = static_cast<int32_t>(poses.size());
+    result->waypoints_completed = std::max<int32_t>(0, fb.current_waypoint_index);
     goal_handle->succeed(result);
   }
 };
