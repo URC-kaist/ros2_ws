@@ -1,4 +1,4 @@
-import { type PointerEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type PointerEvent, useCallback, useRef, useState } from 'react'
 import { useXbeeGateway } from '../hooks/useXbeeGateway'
 
 const COMMAND_STEP = 0.01
@@ -6,6 +6,7 @@ const COMMAND_STEP = 0.01
 type TurretCommand = { x: number; y: number; z: number }
 
 const ZERO_COMMAND: TurretCommand = { x: 0, y: 0, z: 0 }
+let lastTurretCommand: TurretCommand = ZERO_COMMAND
 
 const clampUnit = (value: number) => Math.max(-1, Math.min(1, value))
 const quantizeUnit = (value: number) =>
@@ -15,35 +16,17 @@ const commandsEqual = (a: TurretCommand, b: TurretCommand) =>
 
 const CameraTurretCard = () => {
   const { gateway } = useXbeeGateway()
-  const [command, setCommand] = useState<TurretCommand>(ZERO_COMMAND)
-  const commandRef = useRef<TurretCommand>(ZERO_COMMAND)
+  const [command, setCommand] = useState<TurretCommand>(lastTurretCommand)
+  const commandRef = useRef<TurretCommand>(lastTurretCommand)
 
   const publishCommand = useCallback((next: TurretCommand) => {
     if (commandsEqual(commandRef.current, next)) {
       return
     }
     commandRef.current = next
+    lastTurretCommand = next
     setCommand(next)
     gateway.sendCmdCameraTurret(next)
-  }, [gateway])
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (!document.hidden) {
-        return
-      }
-      publishCommand(ZERO_COMMAND)
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [publishCommand])
-
-  useEffect(() => {
-    return () => {
-      if (!commandsEqual(commandRef.current, ZERO_COMMAND)) {
-        gateway.sendCmdCameraTurret(ZERO_COMMAND)
-      }
-    }
   }, [gateway])
 
   const updateFromPointer = (event: PointerEvent<HTMLDivElement>) => {
