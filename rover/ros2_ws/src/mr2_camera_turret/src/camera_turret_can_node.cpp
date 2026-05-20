@@ -39,6 +39,8 @@ public:
         declare_parameter<double>("publish_rate_hz", 50.0);
     invert_x_ = declare_parameter<bool>("invert_x", false);
     invert_y_ = declare_parameter<bool>("invert_y", false);
+    tilt_min_rad_ = declare_parameter<double>("tilt_min_rad", -0.3);
+    tilt_max_rad_ = declare_parameter<double>("tilt_max_rad", 0.8);
 
     if (can_id_param < 0 || can_id_param > static_cast<int>(kStdIdMask)) {
       throw std::runtime_error("Invalid CAN ID: " +
@@ -46,6 +48,11 @@ public:
     }
     if (publish_rate_hz <= 0.0 || !std::isfinite(publish_rate_hz)) {
       throw std::runtime_error("publish_rate_hz must be finite and positive");
+    }
+    if (!std::isfinite(tilt_min_rad_) || !std::isfinite(tilt_max_rad_) ||
+        tilt_min_rad_ > tilt_max_rad_) {
+      throw std::runtime_error(
+          "tilt_min_rad and tilt_max_rad must be finite with min <= max");
     }
     can_id_ = static_cast<uint32_t>(can_id_param);
     bus_ = CanBusRegistry::get(can_iface_);
@@ -84,6 +91,8 @@ private:
   }
 
   void send_can_command(double x, double y, bool final_command) {
+    y = std::clamp(y, tilt_min_rad_, tilt_max_rad_);
+
     if (invert_x_) {
       x = -x;
     }
@@ -120,6 +129,8 @@ private:
   bool have_command_{false};
   bool invert_x_{false};
   bool invert_y_{false};
+  double tilt_min_rad_{-0.3};
+  double tilt_max_rad_{0.8};
 };
 
 int main(int argc, char **argv) {

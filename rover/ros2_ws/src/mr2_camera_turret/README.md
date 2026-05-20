@@ -24,11 +24,11 @@ ros2 topic pub --once /camera_turret/command geometry_msgs/msg/Vector3 "{x: 0.0,
 - Topic: `/camera_turret/command`
 - Type: `geometry_msgs/msg/Vector3`
 - `x`: X-axis command, normalized to `[-1.0, 1.0]`
-- `y`: Y-axis command, normalized to `[-1.0, 1.0]`
+- `y`: Y-axis tilt command in radians, clamped to `[-0.3, 0.8]` by default
 - `z`: ignored
 
-The node clamps out-of-range inputs and maps normalized values to 12-bit
-joystick ADC values:
+The node clamps out-of-range inputs and maps command values to 12-bit joystick
+ADC values:
 
 | Normalized | ADC |
 |------------|-----|
@@ -57,6 +57,8 @@ joystick ADC values:
 - `publish_rate_hz` (double, default: `50.0`)
 - `invert_x` (bool, default: `false`)
 - `invert_y` (bool, default: `false`)
+- `tilt_min_rad` (double, default: `-0.3`)
+- `tilt_max_rad` (double, default: `0.8`)
 
 The node keeps sending the latest command while running. On shutdown, it sends
 centered X/Y values.

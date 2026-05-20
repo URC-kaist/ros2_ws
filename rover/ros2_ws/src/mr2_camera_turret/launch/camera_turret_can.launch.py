@@ -19,6 +19,8 @@ def _launch_node(context):
                     "publish_rate_hz": LaunchConfiguration("publish_rate_hz"),
                     "invert_x": LaunchConfiguration("invert_x"),
                     "invert_y": LaunchConfiguration("invert_y"),
+                    "tilt_min_rad": LaunchConfiguration("tilt_min_rad"),
+                    "tilt_max_rad": LaunchConfiguration("tilt_max_rad"),
                 }
             ],
         )
@@ -36,6 +38,8 @@ def generate_launch_description():
             DeclareLaunchArgument("publish_rate_hz", default_value="50.0"),
             DeclareLaunchArgument("invert_x", default_value="false"),
             DeclareLaunchArgument("invert_y", default_value="false"),
+            DeclareLaunchArgument("tilt_min_rad", default_value="-0.3"),
+            DeclareLaunchArgument("tilt_max_rad", default_value="0.8"),
             OpaqueFunction(function=_launch_node),
         ]
     )
