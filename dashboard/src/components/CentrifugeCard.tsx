@@ -1,109 +1,210 @@
+import { useCallback, useState } from 'react'
+import { useRosBridge } from '../hooks/useRosBridge'
+import type {
+  MotorPositionRequest,
+  MotorVelocityRequest,
+  ScienceServiceResponse,
+  SelectCentrifugePositionRequest,
+  TriggerCentrifugeRampRequest,
+} from '../lib/rosMessages'
+
+const POSITION_SERVICE = '/science/centrifuge_position'
+const POSITION_TYPE = 'mr2_science_module/srv/SelectCentrifugePosition'
+const RAMP_SERVICE = '/science/centrifuge_ramp'
+const RAMP_TYPE = 'mr2_science_module/srv/TriggerCentrifugeRamp'
+const DEBUG_VELOCITY_SERVICE = '/science/debug_centrifuge_motor_velocity'
+const MOTOR_VELOCITY_TYPE = 'mr2_science_module/srv/MotorVelocity'
+const DEBUG_POSITION_SERVICE = '/science/debug_centrifuge_motor_position'
+const MOTOR_POSITION_TYPE = 'mr2_science_module/srv/MotorPosition'
+
+type PendingCommand = 'position' | 'ramp' | 'velocity' | 'motor-position' | null
+type StatusState = { ok: boolean; text: string } | null
+
+const numberFromInput = (value: string, fallback: number) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
 const CentrifugeCard = () => {
+  const { ros, connected: rosConnected } = useRosBridge()
+  const [positionIndex, setPositionIndex] = useState(0)
+  const [velocityRadS, setVelocityRadS] = useState(0)
+  const [positionRad, setPositionRad] = useState(0)
+  const [pending, setPending] = useState<PendingCommand>(null)
+  const [status, setStatus] = useState<StatusState>(null)
+
+  const callService = useCallback(
+    async <TRequest,>(
+      command: Exclude<PendingCommand, null>,
+      service: string,
+      serviceType: string,
+      request: TRequest
+    ) => {
+      if (!ros.isConnected()) {
+        setStatus({ ok: false, text: 'ROS bridge is offline' })
+        return
+      }
+      setPending(command)
+      setStatus(null)
+      try {
+        const response = await ros.callService<TRequest, ScienceServiceResponse>(
+          service,
+          serviceType,
+          request
+        )
+        setStatus({
+          ok: response.success,
+          text: response.message || (response.success ? 'Sent' : 'Command failed'),
+        })
+      } catch (error) {
+        setStatus({
+          ok: false,
+          text: error instanceof Error ? error.message : 'Service call failed',
+        })
+      } finally {
+        setPending(null)
+      }
+    },
+    [ros]
+  )
+
+  const selectPosition = () => {
+    void callService<SelectCentrifugePositionRequest>(
+      'position',
+      POSITION_SERVICE,
+      POSITION_TYPE,
+      { index: positionIndex }
+    )
+  }
+
+  const startRamp = () => {
+    void callService<TriggerCentrifugeRampRequest>('ramp', RAMP_SERVICE, RAMP_TYPE, {
+      start: true,
+    })
+  }
+
+  const setVelocity = (value = velocityRadS) => {
+    void callService<MotorVelocityRequest>(
+      'velocity',
+      DEBUG_VELOCITY_SERVICE,
+      MOTOR_VELOCITY_TYPE,
+      { rad_s: value }
+    )
+  }
+
+  const setPosition = () => {
+    void callService<MotorPositionRequest>(
+      'motor-position',
+      DEBUG_POSITION_SERVICE,
+      MOTOR_POSITION_TYPE,
+      { rad: positionRad }
+    )
+  }
+
   return (
     <article className="card centrifuge-card">
       <header className="centrifuge-card__header">
         <div>
           <h3>Centrifuge</h3>
-          <p>Rotor positioning, spin profiles, and run telemetry.</p>
+          <p>Position selection, ramp trigger, and debug motor targets.</p>
         </div>
-        <span className="pill">standby</span>
+        <span className={`pill ${rosConnected ? 'pill--on' : 'pill--off'}`}>
+          {rosConnected ? 'ROS online' : 'ROS offline'}
+        </span>
       </header>
 
-      <div className="centrifuge-tabs" role="tablist" aria-label="Centrifuge interface tabs">
-        <button
-          className="centrifuge-tab centrifuge-tab--active"
-          type="button"
-          role="tab"
-          aria-selected="true"
-        >
-          Controls
-        </button>
-        <button className="centrifuge-tab" type="button" role="tab" aria-selected="false">
-          Get/Set
-        </button>
-        <button className="centrifuge-tab" type="button" role="tab" aria-selected="false">
-          Stats
-        </button>
-      </div>
-
       <section className="centrifuge-section">
-        <h4>Controls</h4>
-        <div className="centrifuge-controls">
-          <button className="centrifuge-button" type="button">
-            Home
-          </button>
-          <button className="centrifuge-button" type="button">
-            Start
-          </button>
-          <button className="centrifuge-button centrifuge-button--ghost" type="button">
-            Stop
-          </button>
-          <button className="centrifuge-button centrifuge-button--ghost" type="button">
-            Eject
-          </button>
-        </div>
-      </section>
-
-      <section className="centrifuge-section">
-        <h4>Get / Set</h4>
+        <h4>Module Commands</h4>
         <div className="centrifuge-form">
           <label className="centrifuge-field">
-            <span>Position</span>
-            <select defaultValue="3">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
+            <span>Position index</span>
+            <select
+              value={positionIndex}
+              onChange={(event) => setPositionIndex(Number(event.target.value))}
+            >
+              {Array.from({ length: 8 }, (_, index) => (
+                <option key={index} value={index}>
+                  {index} ({index * 45} deg)
+                </option>
+              ))}
             </select>
           </label>
-          <label className="centrifuge-field">
-            <span>RPM</span>
-            <input type="number" defaultValue={1200} min={0} step={50} />
-          </label>
-          <label className="centrifuge-field">
-            <span>Duration (min)</span>
-            <input type="number" defaultValue={10} min={1} step={1} />
-          </label>
           <div className="centrifuge-actions">
-            <button className="centrifuge-button centrifuge-button--ghost" type="button">
-              Get
+            <button
+              className="centrifuge-button centrifuge-button--ghost"
+              type="button"
+              disabled={!rosConnected || pending === 'position'}
+              onClick={selectPosition}
+            >
+              {pending === 'position' ? 'Sending...' : 'Select'}
             </button>
-            <button className="centrifuge-button" type="button">
-              Set
+            <button
+              className="centrifuge-button"
+              type="button"
+              disabled={!rosConnected || pending === 'ramp'}
+              onClick={startRamp}
+            >
+              {pending === 'ramp' ? 'Sending...' : 'Start ramp'}
             </button>
           </div>
         </div>
       </section>
 
       <section className="centrifuge-section">
-        <h4>Statistics</h4>
-        <div className="centrifuge-stats">
-          <div className="centrifuge-stat">
-            <span className="centrifuge-stat__label">Current Position</span>
-            <span className="centrifuge-stat__value">3 / 8</span>
-          </div>
-          <div className="centrifuge-stat">
-            <span className="centrifuge-stat__label">RPM</span>
-            <span className="centrifuge-stat__value">1200</span>
-          </div>
-          <div className="centrifuge-progress">
-            <div className="centrifuge-progress__meta">
-              <span>Time</span>
-              <span>3 min 50 sec / 10 min</span>
-            </div>
-            <progress
-              className="centrifuge-progress__bar"
-              value={230}
-              max={600}
-              aria-label="Run time progress"
+        <h4>Debug Motor</h4>
+        <div className="centrifuge-form">
+          <label className="centrifuge-field">
+            <span>Velocity (rad/s)</span>
+            <input
+              type="number"
+              step={0.1}
+              value={velocityRadS}
+              onChange={(event) => setVelocityRadS(numberFromInput(event.target.value, velocityRadS))}
             />
+          </label>
+          <div className="centrifuge-actions">
+            <button
+              className="centrifuge-button centrifuge-button--ghost"
+              type="button"
+              disabled={!rosConnected || pending === 'velocity'}
+              onClick={() => setVelocity(0)}
+            >
+              Stop
+            </button>
+            <button
+              className="centrifuge-button"
+              type="button"
+              disabled={!rosConnected || pending === 'velocity'}
+              onClick={() => setVelocity()}
+            >
+              Set velocity
+            </button>
           </div>
+          <label className="centrifuge-field">
+            <span>Position (rad)</span>
+            <input
+              type="number"
+              step={0.1}
+              value={positionRad}
+              onChange={(event) => setPositionRad(numberFromInput(event.target.value, positionRad))}
+            />
+          </label>
+          <button
+            className="centrifuge-button"
+            type="button"
+            disabled={!rosConnected || pending === 'motor-position'}
+            onClick={setPosition}
+          >
+            Set position
+          </button>
         </div>
       </section>
+
+      {status && (
+        <div className={`science-module__status ${status.ok ? '' : 'science-module__status--error'}`}>
+          {status.text}
+        </div>
+      )}
     </article>
   )
 }

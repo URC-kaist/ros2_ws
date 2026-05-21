@@ -136,6 +136,153 @@
   color: #eaf1ff;
 }
 
+.science-module-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.science-module__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.science-module__header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.science-module__section {
+  display: grid;
+  gap: 8px;
+}
+
+.science-module__section h4 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.science-module__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.science-module__field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.science-module__field input,
+.science-module__field select {
+  width: 100%;
+  min-width: 0;
+  background: rgba(9, 14, 24, 0.7);
+  color: #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.science-module__field input[type='range'].science-module__range {
+  padding: 0;
+  border: 0;
+  accent-color: var(--accent);
+  background: transparent;
+}
+
+.science-module__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.science-module__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.science-module__button {
+  min-height: 34px;
+  border-radius: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(53, 211, 195, 0.35);
+  background: rgba(53, 211, 195, 0.9);
+  color: #0b1220;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.science-module__button--secondary {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 36, 0.8);
+  color: #cdd6f4;
+}
+
+.science-module__button:disabled,
+.centrifuge-button:disabled,
+.spectro-card__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.science-module__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.science-module__stats div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px;
+}
+
+.science-module__stats span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.science-module__stats strong {
+  min-width: 0;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.science-module__status {
+  border-radius: 8px;
+  border: 1px solid rgba(53, 211, 195, 0.28);
+  background: rgba(53, 211, 195, 0.1);
+  color: #b7fff8;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.science-module__status--error {
+  border-color: rgba(255, 103, 103, 0.35);
+  background: rgba(255, 103, 103, 0.12);
+  color: #ffc7c7;
+}
+
 .panorama-card {
   display: grid;
   gap: 10px;
