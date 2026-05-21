@@ -1,0 +1,5 @@
+bool enabled
+uint8 brightness
+---
+bool success
+string message

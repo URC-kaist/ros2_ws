@@ -1,0 +1,16 @@
+uint8 COMMAND_STARTUP=0
+uint8 COMMAND_POSITION_1=1
+uint8 COMMAND_POSITION_2=2
+uint8 COMMAND_POSITION_3=3
+uint8 COMMAND_POSITION_4=4
+uint8 COMMAND_POSITION_5=5
+uint8 COMMAND_POSITION_6=6
+
+uint8 command
+
+# Startup ignores this. Position commands always send an explicit duration,
+# where 0 means no vibration.
+uint16 vibration_duration_ms
+---
+bool success
+string message

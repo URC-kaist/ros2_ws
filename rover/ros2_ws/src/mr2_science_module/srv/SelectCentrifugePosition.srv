@@ -1,0 +1,5 @@
+# Valid indices: 0=0, 1=pi/4, 2=pi/2, ..., 7=7pi/4.
+uint8 index
+---
+bool success
+string message

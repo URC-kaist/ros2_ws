@@ -1,0 +1,10 @@
+uint8 GROUP_PUMPS_2_4=0
+uint8 GROUP_PUMPS_1_3=1
+
+uint8 group
+
+# 0 uses the firmware default duration. Nonzero values are uint16 milliseconds.
+uint16 duration_ms
+---
+bool success
+string message

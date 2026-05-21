@@ -12,6 +12,7 @@
   <exec_depend>aruco_opencv</exec_depend>
   <exec_depend>mr2_video_streaming</exec_depend>
   <exec_depend>mr2_panorama</exec_depend>
+  <exec_depend>mr2_science_module</exec_depend>
   <exec_depend>rclcpp_components</exec_depend>
   <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>rosbridge_server</exec_depend>

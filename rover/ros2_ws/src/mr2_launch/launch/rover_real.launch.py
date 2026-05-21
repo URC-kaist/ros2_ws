@@ -87,7 +87,7 @@ def generate_launch_description():
     enable_science_module_arg = DeclareLaunchArgument(
         "enable_science_module",
         default_value="false",
-        description="Enable science module: start the direct V4L2 panorama capture action server for /dev/videoFRONT",
+        description="Enable science module: start science CAN controls and the direct V4L2 panorama capture action server for /dev/videoFRONT",
     )
     panorama_stale_goal_timeout_arg = DeclareLaunchArgument(
         "panorama_stale_goal_timeout_sec",
@@ -334,6 +334,22 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("enable_science_module")),
     )
 
+    science_module_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("mr2_science_module"),
+                    "launch",
+                    "science_module_can.launch.py",
+                ]
+            )
+        ),
+        launch_arguments={
+            "can_iface": LaunchConfiguration("can_iface"),
+        }.items(),
+        condition=IfCondition(LaunchConfiguration("enable_science_module")),
+    )
+
     ntrip_client_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -574,6 +590,7 @@ def generate_launch_description():
             front_uvc_launch,
             navigation_launch,
             panorama_server,
+            science_module_launch,
             ntrip_client_launch,
             rover_launch,
             ublox_left_launch_delayed,

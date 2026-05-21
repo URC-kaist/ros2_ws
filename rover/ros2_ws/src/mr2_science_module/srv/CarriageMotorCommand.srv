@@ -1,0 +1,12 @@
+uint8 MODE_VELOCITY=1
+uint8 MODE_POSITION=2
+uint8 MODE_HOME=3
+uint8 MODE_FOC_CALIBRATION=4
+
+uint8 mode
+
+# Velocity mode: um/s. Position mode: um. Ignored for home and FOC calibration.
+int32 value
+---
+bool success
+string message
