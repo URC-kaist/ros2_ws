@@ -10,8 +10,8 @@ default_acceleration_scaling_factor: 0.1
 joint_limits:
   arm_j1:
     has_position_limits: true
-    min_position: -3.1415926536
-    max_position: 3.1415926536
+    min_position: -3.4906585040
+    max_position: 3.4906585040
     has_velocity_limits: true
     max_velocity: 1.0
     has_acceleration_limits: false

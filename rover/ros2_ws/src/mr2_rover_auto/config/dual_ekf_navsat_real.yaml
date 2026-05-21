@@ -9,9 +9,9 @@ d435i_filter:
 
 ekf_local: # for short range (wheel odom + imu)
   ros__parameters:
-    frequency: 30.0
-    sensor_timeout: 0.1
-    two_d_mode: false # Consider in 3D; testing
+    frequency: 15.0
+    sensor_timeout: 0.2
+    two_d_mode: true
     publish_tf: true
     map_frame: map
     odom_frame: odom
@@ -23,7 +23,7 @@ ekf_local: # for short range (wheel odom + imu)
     imu0_config: [false, false, false, true, true, false, # orientation
                   true, true, true, true, true, true, # vel and gyro
                   false, false, false] # acceleration (turned off to ignore gravity)
-    imu0_queue_size: 32 # <= 960 Hz
+    imu0_queue_size: 10
     imu0_differential: false # using navsat
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
@@ -34,7 +34,7 @@ ekf_local: # for short range (wheel odom + imu)
     odom0_config: [false, false, false, false, false, false,
                    true,  true, false, false, false, true, # vX, vY, and w_yaw
                    false, false, false]
-    odom0_queue_size: 30 # <= 900 Hz
+    odom0_queue_size: 10
     odom0_differential: false # using navsat
     odom0_relative: false
 
@@ -73,8 +73,8 @@ ekf_local: # for short range (wheel odom + imu)
 
 ekf_global: # with navsat gps
   ros__parameters:
-    frequency: 30.0
-    sensor_timeout: 0.1
+    frequency: 15.0
+    sensor_timeout: 0.2
     two_d_mode: true
     publish_tf: true
     map_frame: map
@@ -87,7 +87,7 @@ ekf_global: # with navsat gps
     imu0_config: [false, false, false, true, true, false, # tilt
                   true, true, true, true, true, true, # local vel and gyro
                   false, false, false] # acceleration (turned off to ignore gravity)
-    imu0_queue_size: 32 # <= 960 Hz
+    imu0_queue_size: 10
     imu0_differential: false # using navsat
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
@@ -98,7 +98,7 @@ ekf_global: # with navsat gps
     odom0_config: [false, false, false, false, false, false,
                    true,  true, false, false, false, true, # vX, vY, and w_yaw
                    false, false, false]
-    odom0_queue_size: 32 # <= 960 Hz
+    odom0_queue_size: 10
     odom0_differential: false # using navsat
     odom0_relative: false
 
@@ -107,7 +107,7 @@ ekf_global: # with navsat gps
     odom1_config: [true, true, true, false, false, true, # X, Y, yaw (north-south)
                    false, false, false, false, false, false,
                    false, false, false]
-    odom1_queue_size: 32 # <= 960 Hz
+    odom1_queue_size: 10
     odom1_differential: false
     odom1_relative: false
 
@@ -150,7 +150,7 @@ navsat_transform: # gps.fix, /rgbd_camera/imu, odometry/filtered
     odom_frame: odom
     base_link_frame: base_link
     world_frame: map
-    frequency: 30.0 # how frequent to check /fix and publish /gps/filtered
+    frequency: 15.0 # how frequent to check /fix and publish /gps/filtered
     # Prevent early conversions while datum is still being set at startup.
     delay: 3.0 # seconds to wait before anything for ekf or GPS to settle
     magnetic_declination_radians: 0.0 # we use absolute heading from dual GPS

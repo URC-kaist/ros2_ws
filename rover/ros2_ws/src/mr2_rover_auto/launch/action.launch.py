@@ -19,7 +19,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         # For Gazebo, set to true. For field test, set to false.
-        DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('cover_vision_params', default_value=cover_vision_params),
 
         Node(

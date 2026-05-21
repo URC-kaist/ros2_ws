@@ -285,8 +285,14 @@ def generate_launch_description():
             "camera_namespace": "",
             "base_frame_id": "rgbd_camera",
             "urdf_mount_frame": "rgbd_camera",
+            "imu_only": PythonExpression(
+                [
+                    "'false' if '",
+                    LaunchConfiguration("enable_autonomous_module"),
+                    "' == 'true' else 'true'",
+                ]
+            ),
         }.items(),
-        condition=IfCondition(LaunchConfiguration("enable_autonomous_module")),
     )
 
     front_uvc_launch = IncludeLaunchDescription(
