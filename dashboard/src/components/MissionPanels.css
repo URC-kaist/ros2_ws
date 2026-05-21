@@ -136,6 +136,124 @@
   color: #eaf1ff;
 }
 
+.panorama-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.panorama-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panorama-card__header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.panorama-card__settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.panorama-card__field {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  min-width: 0;
+}
+
+.panorama-card__field input {
+  width: 100%;
+  min-width: 0;
+  background: rgba(9, 14, 24, 0.7);
+  color: #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+
+.panorama-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.panorama-card__preview {
+  position: relative;
+  min-height: 190px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 13, 22, 0.72);
+}
+
+.panorama-card__preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 190px;
+  object-fit: contain;
+}
+
+.panorama-card__placeholder {
+  min-height: 190px;
+}
+
+.panorama-card__progress {
+  display: grid;
+  gap: 6px;
+}
+
+.panorama-card__progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.panorama-card__progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--accent);
+}
+
+.panorama-card__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.panorama-card__stats div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px;
+}
+
+.panorama-card__stats span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.panorama-card__stats strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
 .camera-turret-card {
   display: grid;
   gap: 10px;

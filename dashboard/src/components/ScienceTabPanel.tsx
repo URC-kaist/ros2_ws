@@ -1,5 +1,6 @@
 import CentrifugeCard from './CentrifugeCard'
 import MicroscopeViewCard from './MicroscopeViewCard'
+import PanoramaCaptureCard from './PanoramaCaptureCard'
 import SpectrophotometerCard from './SpectrophotometerCard'
 
 const ScienceTabPanel = () => {
@@ -45,6 +46,7 @@ const ScienceTabPanel = () => {
       </div>
       <div className="science-column">
         <CentrifugeCard />
+        <PanoramaCaptureCard />
         <SpectrophotometerCard />
       </div>
     </div>

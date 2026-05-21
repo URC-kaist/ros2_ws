@@ -176,3 +176,31 @@ export type GetSpectrumResponse = {
   message: string
   spectrum: SpectrumMsg
 }
+
+export type CompressedImageMsg = {
+  header?: RosHeader
+  format?: string
+  data?: string | number[]
+}
+
+export type PanoramaCaptureGoal = {
+  angle_step_deg: number
+  yaw_tolerance_deg: number
+  timeout_sec: number
+  jpeg_quality: number
+}
+
+export type PanoramaCaptureFeedback = {
+  captures_taken?: number
+  expected_captures?: number
+  current_yaw_deg?: number
+  next_target_yaw_deg?: number
+}
+
+export type PanoramaCaptureResult = {
+  success?: boolean
+  message?: string
+  captures_taken?: number
+  expected_captures?: number
+  panorama?: CompressedImageMsg
+}

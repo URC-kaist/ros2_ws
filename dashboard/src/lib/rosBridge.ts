@@ -15,7 +15,7 @@ const DEFAULT_PATH = '/rosbridge-ws'
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 5000
 
-const resolveRosBridgeUrl = () => {
+export const resolveRosBridgeUrl = () => {
   const explicit = import.meta.env.VITE_ROSBRIDGE_URL as string | undefined
   if (explicit) return explicit
   if (typeof window === 'undefined') {
