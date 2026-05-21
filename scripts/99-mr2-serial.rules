@@ -16,6 +16,20 @@ SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idPro
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.2", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoGRIPPER"
 # Arm camera via hub on front-camera USB port (Suyin rev 0x5805, USB path 2.3.4) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.4", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoARM"
+# Spectrometer camera (Suyin rev 0x5805, USB path 2.3.3) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSPECTROMETER"
+# Science-left camera (Suyin rev 0x5801, USB path 2.3.1.2) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.1.2", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSCIENCELEFT"
+# Science-front camera (Suyin rev 0x5805, USB path 2.3.1.4) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.1.4", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSCIENCEFRONT"
+# Left beaker camera (Suyin rev 0x5801, USB path 2.3.2.1) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.2.1", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoLEFTBEAKER"
+# Microscope camera (AVEO USB2.0, USB path 2.3.2.2) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1871", ATTRS{idProduct}=="7670", ATTRS{bcdDevice}=="1111", ATTRS{devpath}=="2.3.2.2", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoMICROSCOPE"
+# Science-right camera (Suyin rev 0x5805, USB path 2.3.2.3) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.2.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSCIENCERIGHT"
+# Right beaker camera (Suyin rev 0x5801, USB path 2.3.2.4) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.2.4", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoRIGHTBEAKER"
 # Front-left camera (Suyin rev 0x5805, USB path 2.4.1) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.1", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoFL"
 # Left camera (Suyin rev 0x5805, USB path 2.4.2) — map only the capture node (index 0)
@@ -24,8 +38,8 @@ SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idPro
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoRIGHT"
 # Front-right camera (Suyin rev 0x5805, USB path 2.4.4) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.4.4", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoFR"
-# Top mast camera (Suyin rev 0x5801) — map only the capture node (index 0)
-SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoTOP"
+# Top mast camera (Suyin rev 0x5801, USB path 2.2.2) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.2.2", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoTOP"
 
 # UBLOX ZED-F9P/F9R (CDC-ACM). The u-blox launch selects receivers by
 # DEVICE_SERIAL_STRING, so this rule only sets permissions and disables

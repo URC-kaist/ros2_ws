@@ -208,6 +208,162 @@
         "panel": "delivery",
         "order": 9
       }
+    },
+    {
+      "stream_id": "science_left_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoSCIENCELEFT",
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
+      },
+      "udp_port": 5026,
+      "width": 320,
+      "height": 180,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Science Left",
+        "panel": "science",
+        "order": 11
+      }
+    },
+    {
+      "stream_id": "science_front_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoSCIENCEFRONT",
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
+      },
+      "udp_port": 5028,
+      "width": 320,
+      "height": 180,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Science Front",
+        "panel": "science",
+        "order": 12
+      }
+    },
+    {
+      "stream_id": "left_beaker_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoLEFTBEAKER",
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
+      },
+      "udp_port": 5030,
+      "width": 320,
+      "height": 180,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Left Beaker",
+        "panel": "science",
+        "order": 13
+      }
+    },
+    {
+      "stream_id": "microscope_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoMICROSCOPE",
+        "pixel_format": "YUY2",
+        "capture_width": 640,
+        "capture_height": 480
+      },
+      "udp_port": 5032,
+      "width": 320,
+      "height": 240,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Microscope",
+        "panel": "science",
+        "order": 14
+      }
+    },
+    {
+      "stream_id": "science_right_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoSCIENCERIGHT",
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
+      },
+      "udp_port": 5034,
+      "width": 320,
+      "height": 180,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Science Right",
+        "panel": "science",
+        "order": 15
+      }
+    },
+    {
+      "stream_id": "right_beaker_cam",
+      "source": {
+        "type": "v4l2",
+        "device": "/dev/videoRIGHTBEAKER",
+        "pixel_format": "MJPG",
+        "capture_width": 640,
+        "capture_height": 360
+      },
+      "udp_port": 5036,
+      "width": 320,
+      "height": 180,
+      "framerate": 30,
+      "encoder": {
+        "type": "nvv4l2h264enc",
+        "bitrate_kbps": 1800,
+        "keyframe_interval": 30,
+        "speed_preset": "ultrafast",
+        "tune": "zerolatency"
+      },
+      "display": {
+        "label": "Right Beaker",
+        "panel": "science",
+        "order": 16
+      }
     }
   ]
 }
