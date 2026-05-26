@@ -86,6 +86,11 @@ def generate_launch_description():
         default_value="true",
         description="Enable autonomous camera module (front_camera)",
     )
+    enable_science_module_arg = DeclareLaunchArgument(
+        "enable_science_module",
+        default_value="false",
+        description="Enable science-module video gating",
+    )
     enable_autonomous_module_sim_arg = DeclareLaunchArgument(
         "enable_autonomous_module_sim",
         default_value="true",
@@ -241,7 +246,12 @@ def generate_launch_description():
             LaunchConfiguration("mode"),
             "' == 'sim' and '",
             LaunchConfiguration("enable_manipulator_module_sim"),
-            "' != 'true')) else '']))",
+            "' != 'true')) else '', "
+            "'left_cam,right_cam' if ('",
+            LaunchConfiguration("mode"),
+            "' == 'real' and '",
+            LaunchConfiguration("enable_science_module"),
+            "' == 'true') else '']))",
         ]
     )
     video_streaming_launch = IncludeLaunchDescription(
@@ -412,6 +422,7 @@ def generate_launch_description():
         enable_manipulator_module_arg,
         enable_manipulator_module_sim_arg,
         enable_autonomous_module_arg,
+        enable_science_module_arg,
         enable_autonomous_module_sim_arg,
         xbee_sim_device_arg,
         xbee_sim_peer_arg,

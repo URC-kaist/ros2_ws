@@ -20,8 +20,8 @@ SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idPro
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.3", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSPECTROMETER"
 # Science-left camera (Suyin rev 0x5801, USB path 2.3.1.2) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.1.2", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSCIENCELEFT"
-# Science-front camera (Suyin rev 0x5805, USB path 2.3.1.4) — map only the capture node (index 0)
-SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.1.4", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSCIENCEFRONT"
+# Science-front camera (Suyin rev 0x5805, USB path 2.3.1.1) — map only the capture node (index 0)
+SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5805", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.1.1", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoSCIENCEFRONT"
 # Left beaker camera (Suyin rev 0x5801, USB path 2.3.2.1) — map only the capture node (index 0)
 SUBSYSTEM=="video4linux", KERNEL=="video*", ATTRS{idVendor}=="1e45", ATTRS{idProduct}=="8022", ATTRS{bcdDevice}=="5801", ATTRS{serial}=="200910120001", ATTRS{devpath}=="2.3.2.1", ATTR{index}=="0", MODE:="0666", GROUP:="video", SYMLINK+="videoLEFTBEAKER"
 # Microscope camera (AVEO USB2.0, USB path 2.3.2.2) — map only the capture node (index 0)

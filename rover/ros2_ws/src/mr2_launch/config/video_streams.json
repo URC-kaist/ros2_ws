@@ -236,32 +236,6 @@
       }
     },
     {
-      "stream_id": "science_front_cam",
-      "source": {
-        "type": "v4l2",
-        "device": "/dev/videoSCIENCEFRONT",
-        "pixel_format": "MJPG",
-        "capture_width": 640,
-        "capture_height": 360
-      },
-      "udp_port": 5028,
-      "width": 320,
-      "height": 180,
-      "framerate": 30,
-      "encoder": {
-        "type": "nvv4l2h264enc",
-        "bitrate_kbps": 1800,
-        "keyframe_interval": 30,
-        "speed_preset": "ultrafast",
-        "tune": "zerolatency"
-      },
-      "display": {
-        "label": "Science Front",
-        "panel": "science",
-        "order": 12
-      }
-    },
-    {
       "stream_id": "left_beaker_cam",
       "source": {
         "type": "v4l2",

@@ -87,7 +87,7 @@ def generate_launch_description():
     enable_science_module_arg = DeclareLaunchArgument(
         "enable_science_module",
         default_value="false",
-        description="Enable science module: start science CAN controls and the direct V4L2 panorama capture action server for /dev/videoFRONT",
+        description="Enable science module: start science CAN controls and the direct V4L2 panorama capture action server for /dev/videoSCIENCEFRONT",
     )
     panorama_stale_goal_timeout_arg = DeclareLaunchArgument(
         "panorama_stale_goal_timeout_sec",
@@ -327,7 +327,7 @@ def generate_launch_description():
         parameters=[
             {
                 "use_sim_time": False,
-                "video_device": "/dev/videoFRONT",
+                "video_device": "/dev/videoSCIENCEFRONT",
                 "stale_goal_timeout_sec": LaunchConfiguration("panorama_stale_goal_timeout_sec"),
             }
         ],
@@ -385,6 +385,7 @@ def generate_launch_description():
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
             "enable_manipulator_module": LaunchConfiguration("enable_manipulator_module"),
             "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
+            "enable_science_module": LaunchConfiguration("enable_science_module"),
             "xbee_device": LaunchConfiguration("xbee_device"),
             "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
             "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
