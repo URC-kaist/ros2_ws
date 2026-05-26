@@ -76,7 +76,7 @@ public:
   ScienceModuleCanNode() : rclcpp::Node("science_module_can") {
     can_iface_ = declare_parameter<std::string>("can_iface", "can0");
     centrifuge_module_rx_id_ =
-        read_can_id_parameter("centrifuge_module_rx_id", 0x400);
+        read_can_id_parameter("centrifuge_module_rx_id", 0x450);
     carriage_module_rx_id_ =
         read_can_id_parameter("carriage_module_rx_id", 0x500);
     carriage_motor_rx_id_ =
@@ -221,13 +221,16 @@ private:
       const std::shared_ptr<mr2_science_module::srv::Pump::Request> req,
       std::shared_ptr<mr2_science_module::srv::Pump::Response> res) {
     uint8_t command = 0;
-    if (req->group == mr2_science_module::srv::Pump::Request::GROUP_PUMPS_2_4) {
+    if (req->pump == mr2_science_module::srv::Pump::Request::PUMP_1) {
       command = 0x07;
-    } else if (req->group ==
-               mr2_science_module::srv::Pump::Request::GROUP_PUMPS_1_3) {
+    } else if (req->pump == mr2_science_module::srv::Pump::Request::PUMP_2) {
       command = 0x08;
+    } else if (req->pump == mr2_science_module::srv::Pump::Request::PUMP_3) {
+      command = 0x0D;
+    } else if (req->pump == mr2_science_module::srv::Pump::Request::PUMP_4) {
+      command = 0x0E;
     } else {
-      fail(res, "Invalid pump group");
+      fail(res, "Pump must be 1..4");
       return;
     }
 

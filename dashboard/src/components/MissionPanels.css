@@ -538,6 +538,17 @@
   font-size: 0.85rem;
 }
 
+.centrifuge-status {
+  min-height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(9, 14, 24, 0.62);
+  color: #cdd6f4;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 6px 8px;
+}
+
 .centrifuge-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -577,6 +588,10 @@
 }
 
 .centrifuge-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border-radius: 10px;
   padding: 6px 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -584,6 +599,15 @@
   color: #0b1220;
   font-size: 0.8rem;
   cursor: pointer;
+}
+
+.centrifuge-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.centrifuge-button svg {
+  flex: 0 0 auto;
 }
 
 .centrifuge-button--ghost {
@@ -614,6 +638,18 @@
   padding: 6px 8px;
   font-size: 0.85rem;
   width: 100%;
+}
+
+.centrifuge-field input:disabled,
+.centrifuge-field select:disabled {
+  color: rgba(229, 231, 235, 0.52);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.centrifuge-field input[type="range"] {
+  padding: 0;
+  accent-color: #35d3c3;
 }
 
 .centrifuge-actions {

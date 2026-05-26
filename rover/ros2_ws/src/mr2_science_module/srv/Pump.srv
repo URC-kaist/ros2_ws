@@ -1,7 +1,9 @@
-uint8 GROUP_PUMPS_2_4=0
-uint8 GROUP_PUMPS_1_3=1
+uint8 PUMP_1=1
+uint8 PUMP_2=2
+uint8 PUMP_3=3
+uint8 PUMP_4=4
 
-uint8 group
+uint8 pump
 
 # 0 uses the firmware default duration. Nonzero values are uint16 milliseconds.
 uint16 duration_ms

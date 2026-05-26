@@ -47,7 +47,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("can_iface", default_value="can0"),
-            DeclareLaunchArgument("centrifuge_module_rx_id", default_value="0x400"),
+            DeclareLaunchArgument("centrifuge_module_rx_id", default_value="0x450"),
             DeclareLaunchArgument("carriage_module_rx_id", default_value="0x500"),
             DeclareLaunchArgument("carriage_motor_rx_id", default_value="0x650"),
             DeclareLaunchArgument(
