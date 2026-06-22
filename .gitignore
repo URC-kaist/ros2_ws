@@ -15,3 +15,5 @@ base/gateway/*.tlog*
 scripts/dashboard_err.log
 
 scripts/nginx/mr2-dashboard.conf
+/.DS_Store
+/slides/.DS_Store

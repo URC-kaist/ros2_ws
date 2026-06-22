@@ -1,0 +1,11 @@
+flowchart LR
+  source["rover camera<br/>ROS image / V4L2"]
+  gst["GStreamer / H.264"]
+  receiver["gateway<br/>video receiver"]
+  meta["/video/streams"]
+  ws["/video-ws"]
+  dashboard["dashboard<br/>VideoStreamCard"]
+
+  source --> gst --> receiver
+  receiver --> meta --> dashboard
+  receiver --> ws --> dashboard

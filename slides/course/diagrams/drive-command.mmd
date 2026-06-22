@@ -1,0 +1,14 @@
+flowchart LR
+  control["ControlPanel.tsx"]
+  client["xbeeGateway.ts"]
+  nginx["nginx<br/>/xbee-ws"]
+  ws["gateway<br/>ws_hub"]
+  frame["xbee.js<br/>CMD_DRIVE"]
+  serial["/dev/ttyXBEE"]
+  radio["XBee"]
+  bridge["mr2_xbee_bridge"]
+  cmd["/base/cmd_vel"]
+  control2["ros2_control"]
+  can["CAN hardware"]
+
+  control --> client --> nginx --> ws --> frame --> serial --> radio --> bridge --> cmd --> control2 --> can

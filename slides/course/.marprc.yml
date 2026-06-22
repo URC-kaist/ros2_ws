@@ -1,0 +1,4 @@
+themeSet:
+  - ./theme.css
+allowLocalFiles: true
+html: true

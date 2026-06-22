@@ -1,0 +1,30 @@
+flowchart LR
+  subgraph client["client"]
+    browser["Browser Dashboard"]
+  end
+
+  subgraph base["base station"]
+    nginx["nginx"]
+    app["React static app"]
+    gateway["Base gateway<br/>Node.js"]
+    xbeeBase["XBee<br/>base radio"]
+  end
+
+  subgraph rover["rover"]
+    rosbridge["rosbridge_server<br/>:9090"]
+    xbeeRover["XBee<br/>rover radio"]
+    roverBridge["mr2_xbee_bridge"]
+    ros["Rover ROS 2 graph"]
+    hw["CAN / sensors / payload"]
+  end
+
+  browser -->|"HTTPS / WSS"| nginx
+  nginx -->|"static files"| app
+  nginx -->|"/xbee-ws<br/>/video-ws<br/>/video/streams"| gateway
+  nginx -->|"/rosbridge-ws"| rosbridge
+  gateway <-->|"serial bytes"| xbeeBase
+  xbeeBase <-->|"radio"| xbeeRover
+  xbeeRover <-->|"serial bytes"| roverBridge
+  roverBridge --> ros
+  rosbridge --> ros
+  ros <-->|"ros2_control / drivers"| hw

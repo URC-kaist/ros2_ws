@@ -1,0 +1,10 @@
+flowchart LR
+  ui["ScienceModuleControls.tsx"]
+  roslib["rosBridge.ts / roslib"]
+  nginx["nginx<br/>/rosbridge-ws"]
+  rosbridge["rosbridge_server"]
+  service["ROS service"]
+  node["mr2_science_module"]
+  device["CAN / device"]
+
+  ui --> roslib --> nginx --> rosbridge --> service --> node --> device
