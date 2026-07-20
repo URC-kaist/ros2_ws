@@ -89,7 +89,13 @@ def generate_launch_description():
         motor_ids=range(1, 7),
         condition=IfCondition(
             PythonExpression(
-                ["'", enable_manipulator_module, "' == 'true' and '", use_mock_servos, "' == 'true'"]
+                [
+                    "'",
+                    enable_manipulator_module,
+                    "' == 'true' and '",
+                    use_mock_servos,
+                    "' == 'true'",
+                ]
             )
         ),
     )

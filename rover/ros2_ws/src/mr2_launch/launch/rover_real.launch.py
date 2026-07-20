@@ -1,7 +1,11 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    IncludeLaunchDescription,
+    TimerAction,
+)
 from launch.conditions import IfCondition
-from launch.actions import ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     EnvironmentVariable,
@@ -55,7 +59,12 @@ def generate_launch_description():
     controller_config_arg = DeclareLaunchArgument(
         "controller_config",
         default_value=PathJoinSubstitution(
-            [FindPackageShare("mr2_rover_description"), "config", "controllers", "rover_controllers.yaml"]
+            [
+                FindPackageShare("mr2_rover_description"),
+                "config",
+                "controllers",
+                "rover_controllers.yaml",
+            ]
         ),
         description="Controller manager YAML shared by sim and hardware",
     )
@@ -82,17 +91,26 @@ def generate_launch_description():
     enable_autonomous_module_arg = DeclareLaunchArgument(
         "enable_autonomous_module",
         default_value="true",
-        description="Enable autonomous module: launch RealSense RGB-D, the UVC front_camera, and autonomous perception/navigation",
+        description=(
+            "Enable autonomous module: launch RealSense RGB-D, the UVC "
+            "front_camera, and autonomous perception/navigation"
+        ),
     )
     enable_science_module_arg = DeclareLaunchArgument(
         "enable_science_module",
         default_value="false",
-        description="Enable science module: start science CAN controls and the direct V4L2 panorama capture action server for /dev/videoSCIENCEFRONT",
+        description=(
+            "Enable science module: start science CAN controls and the direct "
+            "V4L2 panorama capture action server for /dev/videoSCIENCEFRONT"
+        ),
     )
     panorama_stale_goal_timeout_arg = DeclareLaunchArgument(
         "panorama_stale_goal_timeout_sec",
         default_value="60.0",
-        description="Seconds before a new panorama goal may replace a stale active goal after client disconnect",
+        description=(
+            "Seconds before a new panorama goal may replace a stale active goal "
+            "after client disconnect"
+        ),
     )
     enable_video_streaming_arg = DeclareLaunchArgument(
         "enable_video_streaming",
@@ -182,7 +200,10 @@ def generate_launch_description():
     rtcm_input_topic_arg = DeclareLaunchArgument(
         "rtcm_input_topic",
         default_value="/base/rtcm",
-        description="Topic providing RTCM corrections for rover F9Ps (set to /ntrip_client/rtcm to use NTRIP)",
+        description=(
+            "Topic providing RTCM corrections for rover F9Ps (set to "
+            "/ntrip_client/rtcm to use NTRIP)"
+        ),
     )
     enable_ntrip_arg = DeclareLaunchArgument(
         "enable_ntrip",

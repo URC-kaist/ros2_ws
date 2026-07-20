@@ -1,4 +1,5 @@
-"""Run the manually operated rover stack entirely on the Jetson.
+"""
+Run the manually operated rover stack entirely on the Jetson.
 
 This wrapper deliberately bypasses rover_real.launch.py because that wrapper
 owns the GNSS, NTRIP, localization, autonomous-navigation, and science modules.

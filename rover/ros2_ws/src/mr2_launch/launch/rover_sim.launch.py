@@ -21,7 +21,12 @@ def generate_launch_description():
     controller_config_arg = DeclareLaunchArgument(
         "controller_config",
         default_value=PathJoinSubstitution(
-            [FindPackageShare("mr2_rover_description"), "config", "controllers", "rover_controllers.yaml"]
+            [
+                FindPackageShare("mr2_rover_description"),
+                "config",
+                "controllers",
+                "rover_controllers.yaml",
+            ]
         ),
         description="Controller manager YAML shared by sim and hardware",
     )

@@ -5,7 +5,7 @@ from launch.actions import (
     TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
-from launch.launch_description_sources import AnyLaunchDescriptionSource, PythonLaunchDescriptionSource
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     EnvironmentVariable,
     LaunchConfiguration,
@@ -13,7 +13,6 @@ from launch.substitutions import (
     PythonExpression,
 )
 from launch_ros.actions import Node, SetParameter
-from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from mr2_launch.env import load_mr2_env
 
@@ -57,7 +56,12 @@ def generate_launch_description():
     controller_config_arg = DeclareLaunchArgument(
         "controller_config",
         default_value=PathJoinSubstitution(
-            [FindPackageShare("mr2_rover_description"), "config", "controllers", "rover_controllers.yaml"]
+            [
+                FindPackageShare("mr2_rover_description"),
+                "config",
+                "controllers",
+                "rover_controllers.yaml",
+            ]
         ),
         description="Controller manager YAML shared by sim and hardware",
     )
@@ -104,7 +108,10 @@ def generate_launch_description():
     start_manipulator_controllers_active_arg = DeclareLaunchArgument(
         "start_manipulator_controllers_active",
         default_value="false",
-        description="Start real manipulator and gripper controllers active instead of configured/inactive",
+        description=(
+            "Start real manipulator and gripper controllers active instead of "
+            "configured/inactive"
+        ),
     )
     xbee_sim_device_arg = DeclareLaunchArgument(
         "xbee_sim_device",
@@ -129,7 +136,10 @@ def generate_launch_description():
     aruco_cam_topic_arg = DeclareLaunchArgument(
         "aruco_cam_topic",
         default_value="/front_camera/image_raw",
-        description="Base image topic for aruco_opencv (must have matching /camera_info; default is Gazebo RGBD camera)",
+        description=(
+            "Base image topic for aruco_opencv (must have matching /camera_info; "
+            "default is Gazebo RGBD camera)"
+        ),
     )
     enable_video_streaming_arg = DeclareLaunchArgument(
         "enable_video_streaming",
@@ -156,7 +166,10 @@ def generate_launch_description():
     yolo_device_arg = DeclareLaunchArgument(
         "yolo_device",
         default_value="",
-        description="Ultralytics device for YOLO inference (e.g., cuda:0 or cpu; empty lets Ultralytics choose)",
+        description=(
+            "Ultralytics device for YOLO inference (e.g., cuda:0 or cpu; empty "
+            "lets Ultralytics choose)"
+        ),
     )
     yolo_publish_annotated_arg = DeclareLaunchArgument(
         "yolo_publish_annotated",
@@ -166,7 +179,10 @@ def generate_launch_description():
     yolo_annotated_fps_arg = DeclareLaunchArgument(
         "yolo_annotated_fps",
         default_value="0.0",
-        description="Maximum annotated YOLO debug image publish rate in Hz; 0 publishes every frame",
+        description=(
+            "Maximum annotated YOLO debug image publish rate in Hz; 0 publishes "
+            "every frame"
+        ),
     )
 
     # ─── Nodes / Includes ────────────────────────────────────────────────────────

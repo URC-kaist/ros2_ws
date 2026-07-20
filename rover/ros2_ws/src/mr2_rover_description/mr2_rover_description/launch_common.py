@@ -49,7 +49,7 @@ def robot_description_from_xacro(xacro_file, mappings: Mapping[str, LaunchConfig
 
 
 def robot_state_publisher_node(robot_description, use_sim_time):
-    """Standard robot_state_publisher node with shared sim time handling."""
+    """Create a robot_state_publisher node with shared sim time handling."""
     return Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
