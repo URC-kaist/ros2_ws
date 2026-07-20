@@ -1,0 +1,21 @@
+[Unit]
+Description=MR2 manual rover ROS 2 stack
+Requires=mr2-xbee-sim.service
+After=network-online.target mr2-xbee-sim.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__MR2_USER__
+Group=__MR2_GROUP__
+WorkingDirectory=__REPO_ROOT__/rover/ros2_ws
+EnvironmentFile=-__REPO_ROOT__/.env
+Environment=ROS_LOCALHOST_ONLY=1
+ExecStart=__REPO_ROOT__/scripts/run_rover_direct.bash
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

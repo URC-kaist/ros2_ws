@@ -38,6 +38,17 @@ npm run dev
 The Vite dev server binds to `0.0.0.0`. In this repo it is configured to allow
 access from `mr2-ubuntu` as well as the default local hostnames.
 
+For the Jetson-hosted manual interface:
+
+```bash
+VITE_OPERATING_PROFILE=rover-direct npm run dev
+```
+
+This profile exposes Status, Live Feed, and Arm tabs, keeps the persistent
+drive/steering panel, and omits GPS/map, autonomy/science, Rocket M2, and base
+antenna UI. Leave endpoint variables blank when nginx serves the dashboard and
+proxies all services on the same Jetson.
+
 ## Local Setup
 
 For a simple same-host setup:
@@ -75,6 +86,7 @@ template includes every environment variable currently read by the dashboard.
 
 | Variable | Purpose | Default if unset |
 | --- | --- | --- |
+| `VITE_OPERATING_PROFILE` | UI feature set (`base` or `rover-direct`) | `base` |
 | `VITE_ROSBRIDGE_URL` | Full rosbridge WebSocket URL | `ws(s)://<current-host>/rosbridge-ws` |
 | `VITE_XBEE_WS_URL` | Full base gateway WebSocket URL | `ws(s)://<current-host>/xbee-ws` |
 | `VITE_VIDEO_WS_URL` | Full video WebSocket URL | `ws(s)://<current-host>/video-ws` |

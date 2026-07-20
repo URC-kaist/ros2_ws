@@ -74,6 +74,7 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   const config = parseGatewayConfig([], {})
 
   assert.equal(config.device, '/dev/ttyXBEE')
+  assert.equal(config.profile, 'base')
   assert.equal('baud' in config, false)
   assert.equal(config.host, '0.0.0.0')
   assert.equal(config.port, 8081)
@@ -89,6 +90,50 @@ test('parseGatewayConfig falls back to defaults when values are absent', () => {
   assert.equal(config.mavproxyMasterBaud, 57600)
   assert.equal(config.mavproxyOut, 'udp:192.168.1.108:14550')
   assert.equal(config.mavproxyDefaultModules, '')
+  assert.equal(config.rosTopicRelayEnable, true)
+})
+
+test('parseGatewayConfig applies rover-direct native defaults', () => {
+  const config = parseGatewayConfig([], {
+    MR2_GATEWAY_PROFILE: 'rover-direct',
+    MR2_BASE_ROCKET_IP: '192.168.1.20',
+    ROCKET_M2_USER: 'leftover-user',
+    ROCKET_M2_PASS: 'leftover-password',
+  })
+
+  assert.equal(config.profile, 'rover-direct')
+  assert.equal(config.device, '/run/mr2/xbee_gateway')
+  assert.equal(config.host, '127.0.0.1')
+  assert.equal(config.port, 8081)
+  assert.equal(config.antennaEnable, false)
+  assert.equal(config.rocketM2Enable, false)
+  assert.equal(config.rocketM2AutoEnable, false)
+  assert.equal(config.mavproxyEnable, false)
+  assert.equal(config.rosTopicRelayEnable, false)
+  assert.match(config.videoConfigPath, /video_streams\.json$/)
+})
+
+test('parseGatewayConfig lets explicit runtime settings override rover-direct defaults', () => {
+  const config = parseGatewayConfig(
+    [
+      '--gateway-profile',
+      'rover-direct',
+      '--base-xbee-device',
+      '/tmp/direct-peer',
+      '--gateway-host',
+      '127.0.0.2',
+      '--mavproxy-enable',
+      'true',
+      '--ros-topic-relay-enable',
+      'true',
+    ],
+    {}
+  )
+
+  assert.equal(config.device, '/tmp/direct-peer')
+  assert.equal(config.host, '127.0.0.2')
+  assert.equal(config.mavproxyEnable, true)
+  assert.equal(config.rosTopicRelayEnable, true)
 })
 
 test('parseGatewayConfig accepts top-level MR2 network env fallbacks', () => {

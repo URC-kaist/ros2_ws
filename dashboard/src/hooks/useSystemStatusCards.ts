@@ -14,7 +14,12 @@ import {
   type StatusSnapshot,
 } from '../lib/systemStatus'
 
-export const useSystemStatusCards = () => {
+type SystemStatusCardOptions = {
+  includeBaseStation?: boolean
+}
+
+export const useSystemStatusCards = (options: SystemStatusCardOptions = {}) => {
+  const includeBaseStation = options.includeBaseStation !== false
   const { ros } = useRosBridge()
   const { gateway } = useXbeeGateway()
   const [snapshots, setSnapshots] = useState<Record<string, StatusSnapshot | null>>({})
@@ -79,14 +84,16 @@ export const useSystemStatusCards = () => {
   }, [ros])
 
   useEffect(() => {
+    if (!includeBaseStation) return
     const unsubscribe = gateway.onBaseStatus((status) => {
       setBaseStatus(status)
       setBaseStatusUpdatedAt(Date.now())
     })
     return () => unsubscribe()
-  }, [gateway])
+  }, [gateway, includeBaseStation])
 
   useEffect(() => {
+    if (!includeBaseStation) return
     if (typeof window === 'undefined') return
     const stored = window.localStorage.getItem('baseHeadingDeg')
     if (!stored) return
@@ -94,9 +101,10 @@ export const useSystemStatusCards = () => {
     if (!Number.isFinite(parsed)) return
     const normalized = ((parsed % 360) + 360) % 360
     gateway.sendBaseHeading(normalized)
-  }, [gateway])
+  }, [gateway, includeBaseStation])
 
   const applyBaseHeading = () => {
+    if (!includeBaseStation) return
     const parsed = Number(baseHeadingInput)
     if (!Number.isFinite(parsed)) return
     const normalized = ((parsed % 360) + 360) % 360
@@ -141,8 +149,18 @@ export const useSystemStatusCards = () => {
       }
     })
 
-    return [baseCard, ...batteryCards, ...systemCards]
-  }, [baseStatus, baseStatusUpdatedAt, batterySnapshots, snapshots])
+    return [
+      ...(includeBaseStation ? [baseCard] : []),
+      ...batteryCards,
+      ...systemCards,
+    ]
+  }, [
+    baseStatus,
+    baseStatusUpdatedAt,
+    batterySnapshots,
+    includeBaseStation,
+    snapshots,
+  ])
 
   return {
     cards,

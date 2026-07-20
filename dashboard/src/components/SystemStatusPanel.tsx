@@ -3,6 +3,7 @@ import CameraTurretCard from './CameraTurretCard'
 import GnssStatusCard from './GnssStatusCard'
 import RocketM2Card from './RocketM2Card'
 import SystemStatusCards from './SystemStatusCards'
+import { isRoverDirectProfile } from '../lib/operatingProfile'
 import './SystemStatusPanel.css'
 
 const SystemStatusPanel = () => {
@@ -12,13 +13,13 @@ const SystemStatusPanel = () => {
     baseHeadingInput,
     setBaseHeadingInput,
     applyBaseHeading,
-  } = useSystemStatusCards()
+  } = useSystemStatusCards({ includeBaseStation: !isRoverDirectProfile })
 
   return (
     <div className="panel-grid" role="tabpanel">
-      <GnssStatusCard />
-      <RocketM2Card />
-      <CameraTurretCard />
+      {!isRoverDirectProfile && <GnssStatusCard />}
+      {!isRoverDirectProfile && <RocketM2Card />}
+      {!isRoverDirectProfile && <CameraTurretCard />}
       <SystemStatusCards
         cards={cards}
         baseStatus={baseStatus}

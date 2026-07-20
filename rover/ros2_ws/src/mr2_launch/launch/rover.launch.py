@@ -19,7 +19,7 @@ from mr2_launch.env import load_mr2_env
 
 
 def generate_launch_description():
-    load_mr2_env(required=["MR2_BASE_IP"])
+    load_mr2_env()
 
     # ─── Arguments ───────────────────────────────────────────────────────────────
     default_rviz = PathJoinSubstitution([
@@ -96,6 +96,16 @@ def generate_launch_description():
         default_value="true",
         description="Enable autonomous camera module (front_camera) in simulation",
     )
+    enable_localization_arg = DeclareLaunchArgument(
+        "enable_localization",
+        default_value="true",
+        description="Start the delayed robot_localization stack",
+    )
+    start_manipulator_controllers_active_arg = DeclareLaunchArgument(
+        "start_manipulator_controllers_active",
+        default_value="false",
+        description="Start real manipulator and gripper controllers active instead of configured/inactive",
+    )
     xbee_sim_device_arg = DeclareLaunchArgument(
         "xbee_sim_device",
         default_value="/tmp/xbee_sim0",
@@ -128,7 +138,7 @@ def generate_launch_description():
     )
     video_base_host_arg = DeclareLaunchArgument(
         "video_base_host",
-        default_value=EnvironmentVariable("MR2_BASE_IP"),
+        default_value=EnvironmentVariable("MR2_BASE_IP", default_value="127.0.0.1"),
         description="Base-station host/IP for rover RTP/UDP video streams",
     )
     video_config_arg = DeclareLaunchArgument(
@@ -223,6 +233,9 @@ def generate_launch_description():
             "use_mock_servos": LaunchConfiguration("use_mock_servos"),
             "enable_manipulator_module": enable_manipulator_module,
             "enable_autonomous_module": LaunchConfiguration("enable_autonomous_module"),
+            "start_manipulator_controllers_active": LaunchConfiguration(
+                "start_manipulator_controllers_active"
+            ),
         }.items(),
         condition=real_condition,
     )
@@ -273,6 +286,7 @@ def generate_launch_description():
     )
     localization_launch = TimerAction(
         period=localization_delay,
+        condition=IfCondition(LaunchConfiguration("enable_localization")),
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -424,6 +438,8 @@ def generate_launch_description():
         enable_autonomous_module_arg,
         enable_science_module_arg,
         enable_autonomous_module_sim_arg,
+        enable_localization_arg,
+        start_manipulator_controllers_active_arg,
         xbee_sim_device_arg,
         xbee_sim_peer_arg,
         xbee_device_arg,

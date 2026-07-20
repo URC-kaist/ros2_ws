@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRosBridge } from '../../hooks/useRosBridge'
 import { useXbeeGateway } from '../../hooks/useXbeeGateway'
 import type { MissionStatusMsg, UBXNavStatus } from '../../lib/rosMessages'
+import { isRoverDirectProfile } from '../../lib/operatingProfile'
 import { type LinkStatus, type TelemBattery } from '../../lib/xbeeGateway'
 import './ControlStatusList.css'
 
@@ -92,6 +93,7 @@ const ControlStatusList = () => {
   }, [])
 
   useEffect(() => {
+    if (isRoverDirectProfile) return
     const offMission = rosBridge.subscribe<MissionStatusMsg>(
       '/mission_status',
       'mr2_action_interface/msg/MissionStatus',
@@ -107,6 +109,7 @@ const ControlStatusList = () => {
   }, [rosBridge])
 
   useEffect(() => {
+    if (isRoverDirectProfile) return
     const unsubscribers: Array<() => void> = []
 
     for (const side of GNSS_SIDES) {
@@ -217,7 +220,11 @@ const ControlStatusList = () => {
   return (
     <>
       <section className="panel-section">
-        <div className="status-grid-compact">
+        <div
+          className={`status-grid-compact${
+            isRoverDirectProfile ? ' status-grid-compact--direct' : ''
+          }`}
+        >
           <div className="status-grid-label">
             <span className={`status-dot ${linkDotClass}`} aria-hidden="true" />
             XBEE
@@ -226,34 +233,40 @@ const ControlStatusList = () => {
             <span className={`status-dot ${rosDotClass}`} aria-hidden="true" />
             ROS
           </div>
-          <div className="status-grid-label">
-            <span className={`status-dot ${missionDotClass}`} aria-hidden="true" />
-            AUTO
-          </div>
+          {!isRoverDirectProfile && (
+            <div className="status-grid-label">
+              <span className={`status-dot ${missionDotClass}`} aria-hidden="true" />
+              AUTO
+            </div>
+          )}
           <div className="status-grid-value">
             <strong>{linkState}</strong>
           </div>
           <div className="status-grid-value">
             <strong>{rosState}</strong>
           </div>
-          <div className="status-grid-value">
-            <strong>{missionLabel}</strong>
-          </div>
-        </div>
-      </section>
-      <section className="panel-section">
-        <div className="gnss-flat-grid">
-          {gnssSummary.map((side) => (
-            <div className="gnss-flat-row" key={side.id}>
-              <strong className="gnss-flat-title">{side.label}</strong>
-              <span>Fix {side.fixType}</span>
-              <span>
-                Fix OK <strong className={side.fixOkTone}>{side.fixOk}</strong>
-              </span>
+          {!isRoverDirectProfile && (
+            <div className="status-grid-value">
+              <strong>{missionLabel}</strong>
             </div>
-          ))}
+          )}
         </div>
       </section>
+      {!isRoverDirectProfile && (
+        <section className="panel-section">
+          <div className="gnss-flat-grid">
+            {gnssSummary.map((side) => (
+              <div className="gnss-flat-row" key={side.id}>
+                <strong className="gnss-flat-title">{side.label}</strong>
+                <span>Fix {side.fixType}</span>
+                <span>
+                  Fix OK <strong className={side.fixOkTone}>{side.fixOk}</strong>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="panel-section">
         <div className="status-list status-list--batteries">
           <div className={`status-item battery${battery1Stale ? ' battery-stale' : ''}`}>

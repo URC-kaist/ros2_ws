@@ -5,6 +5,8 @@
 - [docs/README.md](docs/README.md): top-level documentation index
 - [docs/video-pipeline.md](docs/video-pipeline.md): rover-to-base-to-browser
   video transport, framing, and bootstrap behavior
+- [docs/rover-direct-operation.md](docs/rover-direct-operation.md): native
+  Jetson direct-control deployment at `192.168.2.102`
 
 ```bash
 ros2 run tf2_tools view_frames
@@ -38,6 +40,45 @@ ros2 launch mr2_rover_auto navigation.launch.py mode:=sim \
   2>&1 | tee navigation.log
 
 ```
+
+### Rover-direct operation (no base-station computer)
+
+The Jetson can host the manual rover stack, gateway/video relay, dashboard,
+nginx, and Wi-Fi AP natively. The direct mode keeps drive/steering, arm control,
+video, batteries, and system status, while omitting GPS, autonomy, science,
+Rocket M2, MAVProxy, and base antenna services.
+
+```bash
+# Build/install native files without starting hardware-facing services.
+./scripts/install_rover_direct.bash
+
+# Configure the Jetson AP separately (password is never checked in).
+sudo --preserve-env=MR2_AP_PASSWORD ./scripts/configure_rover_ap.bash
+
+# After checking CAN and camera readiness:
+./scripts/install_rover_direct.bash --skip-build --start
+```
+
+Join the `MR2-Rover` AP and browse to `https://192.168.2.102`. See the
+[rover-direct runbook](docs/rover-direct-operation.md) for prerequisites,
+service inspection, manual startup, and hardware validation.
+
+### Ubuntu 24.04 laptop development
+
+Use the ROS 2 Humble/Jammy development container instead of installing Humble
+directly on an Ubuntu 24.04 laptop:
+
+```bash
+./scripts/dev_container.bash build
+./scripts/dev_container.bash up
+./scripts/dev_container.bash setup
+./scripts/dev_container.bash check
+```
+
+See [`docker/dev/README.md`](docker/dev/README.md) for interactive shells,
+XBEE simulation, dashboard startup, and video-test limitations. This container
+is only for laptop development and validation; Jetson rover services run
+natively.
 
 Scripts to host and receive web:
 Please install Node.js and npm!

@@ -7,7 +7,7 @@ from mr2_launch.env import load_mr2_env
 
 
 def generate_launch_description():
-    load_mr2_env(required=["MR2_BASE_IP"])
+    load_mr2_env()
 
     video_config_arg = DeclareLaunchArgument(
         "video_config",
@@ -18,7 +18,7 @@ def generate_launch_description():
     )
     video_base_host_arg = DeclareLaunchArgument(
         "video_base_host",
-        default_value=EnvironmentVariable("MR2_BASE_IP"),
+        default_value=EnvironmentVariable("MR2_BASE_IP", default_value="127.0.0.1"),
         description="Base-station host/IP that will receive the rover RTP/UDP video streams",
     )
     disabled_stream_ids_arg = DeclareLaunchArgument(

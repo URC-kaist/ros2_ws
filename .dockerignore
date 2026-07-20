@@ -1,0 +1,5 @@
+**
+!docker/
+!docker/dev/
+!docker/dev/entrypoint.bash
+

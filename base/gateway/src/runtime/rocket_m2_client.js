@@ -31,10 +31,11 @@ class RocketM2Client {
   getState() {
     const configured =
       this.config.rocketM2Ip && this.config.rocketM2User && this.config.rocketM2Pass
+    const autoEnable = this.config.rocketM2AutoEnable !== false
     return {
       target: this.target,
       label: this.label,
-      enabled: Boolean(this.config.rocketM2Enable || configured),
+      enabled: Boolean(this.config.rocketM2Enable || (autoEnable && configured)),
       configured: Boolean(configured),
       status: this.status,
     }

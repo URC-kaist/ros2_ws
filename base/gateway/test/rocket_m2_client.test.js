@@ -32,6 +32,24 @@ test('RocketM2Client getState reflects configuration', () => {
   })
 })
 
+test('RocketM2Client does not auto-enable configured radios when profile disables it', () => {
+  const client = new RocketM2Client({
+    config: createConfig({
+      rocketM2Enable: false,
+      rocketM2AutoEnable: false,
+    }),
+    execFileAsync: async () => ({ stdout: '' }),
+  })
+
+  assert.deepEqual(client.getState(), {
+    target: 'base',
+    label: 'Base',
+    enabled: false,
+    configured: true,
+    status: null,
+  })
+})
+
 test('RocketM2Client poll publishes successful status', async () => {
   const statuses = []
   const execCalls = []

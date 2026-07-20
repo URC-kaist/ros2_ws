@@ -30,8 +30,7 @@ from geometry_msgs.msg import TwistStamped
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64, Int8
-from trajectory_msgs.msg import JointTrajectory
+from std_msgs.msg import Float64, Float64MultiArray, Int8
 
 
 JOINTS = ["arm_j1", "arm_j2", "arm_j3", "arm_j4", "arm_j5", "arm_j6"]
@@ -105,9 +104,9 @@ class ServoJogTrace(Node):
         self.latest_joint_cmd_time = None
         self.latest_twist_cmd = None
         self.latest_twist_cmd_time = None
-        self.latest_traj = None
-        self.latest_traj_time = None
-        self.traj_baseline = None
+        self.latest_output = None
+        self.latest_output_time = None
+        self.output_baseline = None
         self.latest_state = None
         self.latest_state_time = None
         self.state_baseline = None
@@ -125,7 +124,7 @@ class ServoJogTrace(Node):
                 ["elapsed_s", "status", "collision_scale", "joint_cmd_age_s", "twist_cmd_age_s"]
                 + [f"joint_cmd_{joint}_deg_s" for joint in JOINTS]
                 + ["twist_lin_x", "twist_lin_y", "twist_lin_z", "twist_ang_x", "twist_ang_y", "twist_ang_z"]
-                + [f"traj_{joint}_deg" for joint in JOINTS]
+                + [f"output_{joint}_deg" for joint in JOINTS]
                 + [f"state_{joint}_deg" for joint in JOINTS]
             )
             self.csv_writer = csv.DictWriter(self.csv_file, fieldnames=fields)
@@ -133,7 +132,12 @@ class ServoJogTrace(Node):
 
         self.create_subscription(JointJog, "/moveit_servo/delta_joint_cmds", self.joint_cmd_cb, 20)
         self.create_subscription(TwistStamped, "/moveit_servo/delta_twist_cmds", self.twist_cmd_cb, 20)
-        self.create_subscription(JointTrajectory, "/manipulator_controller/joint_trajectory", self.traj_cb, 20)
+        self.create_subscription(
+            Float64MultiArray,
+            "/manipulator_controller/commands",
+            self.output_cb,
+            20,
+        )
         self.create_subscription(JointState, "/joint_states", self.joint_state_cb, qos_profile_sensor_data)
         self.create_subscription(Int8, "/moveit_servo/status", self.status_cb, 20)
         self.create_subscription(Float64, "/moveit_servo/collision_velocity_scale", self.collision_scale_cb, 20)
@@ -155,16 +159,15 @@ class ServoJogTrace(Node):
         self.latest_twist_cmd = twist_values(msg)
         self.latest_twist_cmd_time = now_s()
 
-    def traj_cb(self, msg):
-        if not msg.points:
+    def output_cb(self, msg):
+        if len(msg.data) < len(JOINTS):
             return
-        point = msg.points[-1]
-        if len(point.positions) < len(msg.joint_names):
-            return
-        self.latest_traj = values_by_joint(msg.joint_names, point.positions)
-        self.latest_traj_time = now_s()
-        if self.traj_baseline is None:
-            self.traj_baseline = dict(self.latest_traj)
+        self.latest_output = {
+            joint: float(value) for joint, value in zip(JOINTS, msg.data)
+        }
+        self.latest_output_time = now_s()
+        if self.output_baseline is None:
+            self.output_baseline = dict(self.latest_output)
 
     def joint_state_cb(self, msg):
         self.latest_state = values_by_joint(msg.name, msg.position)
@@ -191,7 +194,7 @@ class ServoJogTrace(Node):
         joint_cmd = self.latest_joint_cmd or {name: 0.0 for name in JOINTS}
         joint_cmd_deg_s = ordered_deg(joint_cmd)
         twist = self.latest_twist_cmd or [0.0] * 6
-        traj_delta = deltas_deg(self.latest_traj, self.traj_baseline)
+        output_delta = deltas_deg(self.latest_output, self.output_baseline)
         state_delta = deltas_deg(self.latest_state, self.state_baseline)
         status = "n/a" if self.latest_status is None else str(self.latest_status)
         scale = float("nan") if self.latest_collision_scale is None else self.latest_collision_scale
@@ -201,7 +204,7 @@ class ServoJogTrace(Node):
         twist_norm = math.sqrt(sum(v * v for v in twist))
         non_j2_cmd = any(abs(joint_cmd[name]) > self.args.epsilon for name in ["arm_j1", "arm_j3", "arm_j4", "arm_j5", "arm_j6"])
         j2_only_cmd = joint_recent and abs(joint_cmd["arm_j2"]) > self.args.epsilon and not non_j2_cmd
-        extra_traj = any(abs(value) > self.args.epsilon_deg for value in [traj_delta[2], traj_delta[3], traj_delta[4]])
+        extra_output = any(abs(value) > self.args.epsilon_deg for value in [output_delta[2], output_delta[3], output_delta[4]])
         extra_state = any(abs(value) > self.args.epsilon_deg for value in [state_delta[2], state_delta[3], state_delta[4]])
 
         if twist_recent and twist_norm > self.args.epsilon:
@@ -214,26 +217,26 @@ class ServoJogTrace(Node):
                 "joint_input_not_j2_only",
                 "Incoming JointJog contains non-j2 velocities, so coupled output may originate before Servo.",
             )
-        if j2_only_cmd and not twist_recent and extra_traj:
+        if j2_only_cmd and not twist_recent and extra_output:
             self.note_once(
-                "extra_traj",
-                "Servo output trajectory changed j3/j4/j5 while input looked j2-only. Focus on Servo smoothing/limits/state.",
+                "extra_output",
+                "Servo position output changed j3/j4/j5 while input looked j2-only. Focus on Servo smoothing/limits/state.",
             )
-        if j2_only_cmd and not twist_recent and extra_state and not extra_traj:
+        if j2_only_cmd and not twist_recent and extra_state and not extra_output:
             self.note_once(
                 "extra_state",
-                "Joint states changed j3/j4/j5 without matching Servo trajectory deltas. Focus on controller/hardware/transmission.",
+                "Joint states changed j3/j4/j5 without matching Servo output deltas. Focus on controller/hardware/transmission.",
             )
 
         print(
             f"t={elapsed:7.2f}s status={status:>3} coll_scale="
             f"{'n/a' if not math.isfinite(scale) else f'{scale:.3f}'} "
             f"joint_age={fmt_age(self.latest_joint_cmd_time)} twist_age={fmt_age(self.latest_twist_cmd_time)} "
-            f"traj_age={fmt_age(self.latest_traj_time)} state_age={fmt_age(self.latest_state_time)}"
+            f"output_age={fmt_age(self.latest_output_time)} state_age={fmt_age(self.latest_state_time)}"
         )
         print(f"  in_joint:  {fmt_vec(joint_cmd_deg_s)}   [j1 j2 j3 j4 j5 j6]")
         print(f"  in_twist:  {fmt_vec(twist, width=7, precision=3)}   [vx vy vz wx wy wz]")
-        print(f"  out_dpos:  {fmt_vec(traj_delta)}   trajectory delta from trace start")
+        print(f"  out_dpos:  {fmt_vec(output_delta)}   controller command delta from trace start")
         print(f"  js_dpos:   {fmt_vec(state_delta)}   joint_states delta from trace start")
 
         if self.csv_writer is not None:
@@ -252,10 +255,10 @@ class ServoJogTrace(Node):
             }
             for joint, value in zip(JOINTS, joint_cmd_deg_s):
                 row[f"joint_cmd_{joint}_deg_s"] = value
-            traj_abs = ordered_deg(self.latest_traj or {})
+            output_abs = ordered_deg(self.latest_output or {})
             state_abs = ordered_deg(self.latest_state or {})
-            for joint, value in zip(JOINTS, traj_abs):
-                row[f"traj_{joint}_deg"] = value
+            for joint, value in zip(JOINTS, output_abs):
+                row[f"output_{joint}_deg"] = value
             for joint, value in zip(JOINTS, state_abs):
                 row[f"state_{joint}_deg"] = value
             self.csv_writer.writerow(row)

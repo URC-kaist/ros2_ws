@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, TimerAction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -28,6 +28,9 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_manipulator_module = LaunchConfiguration("enable_manipulator_module")
     enable_autonomous_module = LaunchConfiguration("enable_autonomous_module")
+    start_manipulator_controllers_active = LaunchConfiguration(
+        "start_manipulator_controllers_active"
+    )
     controller_spawn_delay = LaunchConfiguration("controller_spawn_delay")
     use_sim_time_arg = DeclareLaunchArgument(
         "use_sim_time",
@@ -48,6 +51,11 @@ def generate_launch_description():
         "controller_spawn_delay",
         default_value="2.0",
         description="Delay (seconds) before spawning ros2_control controllers",
+    )
+    start_manipulator_controllers_active_arg = DeclareLaunchArgument(
+        "start_manipulator_controllers_active",
+        default_value="false",
+        description="Activate manipulator and gripper controllers immediately after spawning",
     )
 
     can_iface, can_iface_arg = declare_can_iface(
@@ -92,7 +100,29 @@ def generate_launch_description():
         start_after=controller_spawn_delay,
         interval=2.0,
     )
-    manipulator_spawner = TimerAction(
+    manipulator_active_spawner = TimerAction(
+        period=PythonExpression([controller_spawn_delay, " + 4.0"]),
+        actions=[
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=["manipulator_controller", "gripper_controller"],
+                output="screen",
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            "'",
+                            enable_manipulator_module,
+                            "' == 'true' and '",
+                            start_manipulator_controllers_active,
+                            "' == 'true'",
+                        ]
+                    )
+                ),
+            )
+        ],
+    )
+    manipulator_inactive_spawner = TimerAction(
         period=PythonExpression([controller_spawn_delay, " + 4.0"]),
         actions=[
             Node(
@@ -103,6 +133,7 @@ def generate_launch_description():
                 condition=IfCondition(enable_manipulator_module),
             )
         ],
+        condition=UnlessCondition(start_manipulator_controllers_active),
     )
 
     battery_monitor = Node(
@@ -142,6 +173,7 @@ def generate_launch_description():
             enable_manipulator_module_arg,
             enable_autonomous_module_arg,
             controller_spawn_delay_arg,
+            start_manipulator_controllers_active_arg,
             can_iface_arg,
             controller_config_arg,
             use_mock_servos_arg,
@@ -149,7 +181,8 @@ def generate_launch_description():
             *mock_servos,
             ros2_control,
             *spawners,
-            manipulator_spawner,
+            manipulator_active_spawner,
+            manipulator_inactive_spawner,
             battery_monitor,
             battery_monitor_secondary,
         ]
