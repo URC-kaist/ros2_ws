@@ -112,7 +112,7 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
   const roverDirect = profile === 'rover-direct'
   const profileDefaults = roverDirect
     ? {
-        device: '/run/mr2/xbee_gateway',
+        device: '/tmp/mr2_xbee_gateway',
         host: '127.0.0.1',
         antennaEnable: false,
         rocketM2Enable: false,

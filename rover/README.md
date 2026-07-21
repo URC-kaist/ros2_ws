@@ -4,23 +4,40 @@
 
 `mr2_launch/rover_direct.launch.py` is the real-hardware entry point for
 Jetson-hosted operation without a base-station computer. It starts
-drive/steering, the manipulator with active controllers, battery/system status,
-MoveIt Servo, the rover XBEE bridge, rosbridge, and video streaming to
-`127.0.0.1`.
+the local XBEE PTY pair, Node.js gateway, drive/steering, battery/system status,
+the rover XBEE bridge, rosbridge, and video streaming to `127.0.0.1`. The
+manipulator and its active controllers are enabled by default.
 
 It bypasses the GNSS/NTRIP/autonomy/science composition in
-`rover_real.launch.py`. In production, systemd provides
-`/run/mr2/xbee_rover`; for a manual test the launch can create the PTY pair:
+`rover_real.launch.py`. Direct `ros2 launch` is the primary operating mode:
 
 ```bash
 cd ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 launch mr2_launch rover_direct.launch.py \
-  start_xbee_sim:=true \
-  xbee_device:=/tmp/xbee_direct_rover \
-  xbee_gateway_device:=/tmp/xbee_direct_gateway
+ros2 launch mr2_launch rover_direct.launch.py
 ```
+
+For drive-only operation when the manipulator hardware is not installed or
+powered:
+
+```bash
+ros2 launch mr2_launch rover_direct.launch.py \
+  enable_manipulator_module:=false
+```
+
+Optional direct-mode features can be enabled independently:
+
+```bash
+ros2 launch mr2_launch rover_direct.launch.py \
+  enable_manipulator_module:=false \
+  enable_video_streaming:=false \
+  enable_led:=true \
+  enable_camera_turret:=true
+```
+
+Use `ros2 launch mr2_launch rover_direct.launch.py --show-args` for the complete
+parameter list.
 
 For the complete Jetson AP, gateway/video relay, nginx, and systemd procedure,
 see [`docs/rover-direct-operation.md`](../docs/rover-direct-operation.md).

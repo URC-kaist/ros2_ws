@@ -2,10 +2,8 @@
 
 This mode removes the separate base-station computer. The Jetson Orin Nano
 runs the rover ROS 2 stack, gateway, video relay, dashboard, nginx, and Wi-Fi
-access point as native host processes.
-
-Docker is only a laptop development environment. It is not part of the Jetson
-runtime.
+access point as native host processes. Development, builds, tests, and runtime
+all run natively on the Jetson over SSH.
 
 ## Topology
 
@@ -19,17 +17,18 @@ Jetson nginx :443
   |-- /video/streams,/video-ws -> gateway 127.0.0.1:8081
   `-- /rosbridge-ws -----------> rosbridge 127.0.0.1:9090
 
-gateway /run/mr2/xbee_gateway
+gateway /tmp/mr2_xbee_gateway
   <---- socat PTY pair ---->
-rover bridge /run/mr2/xbee_rover
+rover bridge /tmp/mr2_xbee_rover
 
 rover cameras -- RTP/H.264 --> 127.0.0.1 UDP ports --> gateway --> browser
 ```
 
-The direct ROS launch starts real ros2_control, drive/steering, battery
-monitoring, MoveIt Servo, the XBEE bridge, rosbridge, and rover video encoding.
-It does not start dual GNSS, NTRIP, localization, Nav2/autonomy, science,
-panorama, or autonomous perception.
+The direct ROS launch owns the local XBEE PTY pair and Node.js gateway, then
+starts real ros2_control, drive/steering, battery monitoring, MoveIt Servo, the
+XBEE bridge, rosbridge, and rover video encoding. It does not start dual GNSS,
+NTRIP, localization, Nav2/autonomy, science, panorama, or autonomous
+perception.
 
 The gateway `rover-direct` profile retains XBEE control/telemetry and video
 relay. It disables MAVProxy, base antenna tracking, Rocket M2 polling, and the
@@ -43,11 +42,20 @@ lease.
 ## Jetson prerequisites
 
 - ROS 2 Humble and the repository's normal rover hardware dependencies
-- Node.js `20.19+` or `22.12+`
+- Node.js 24 (the repository pins `24.15.0` in `.nvmrc`)
 - nginx, OpenSSL, rsync, socat, and NetworkManager (`nmcli`)
 - GStreamer plus Jetson `nvv4l2h264enc`/`nvvidconv`
 - a built rover workspace at `rover/ros2_ws/install/setup.bash`
 - configured `can0` and camera udev aliases from the existing rover setup
+
+With NVM installed, select the repository version once and make it the shell
+default:
+
+```bash
+nvm install
+nvm alias default 24.15.0
+nvm use
+```
 
 Build the ROS workspace natively on the Jetson:
 
@@ -58,7 +66,12 @@ rosdep install --from-paths src -y --ignore-src --rosdistro humble
 colcon build --symlink-install
 ```
 
-Do not use the laptop development container for this build or runtime.
+Run the complete native gateway, dashboard, ROS build, and test sequence from
+the repository root when needed:
+
+```bash
+./scripts/check_rover_direct.bash
+```
 
 ## Configure the Jetson AP
 
@@ -77,19 +90,27 @@ If `MR2_AP_PASSWORD` is omitted in an interactive terminal, the script prompts
 without echoing it. NetworkManager stores the resulting connection as
 `MR2-Rover-AP` and brings it up with IPv4 shared mode.
 
-## Install the native services
+## Install the native dashboard for manual launch
 
 From the repository root on the Jetson:
 
 ```bash
-./scripts/install_rover_direct.bash
+MR2_DIRECT_AP_IP=10.42.0.1 \
+  ./scripts/install_rover_direct.bash --manual
 ```
 
-This installs the direct dashboard build, nginx configuration/certificate, and
-three systemd units, but does not start or enable the hardware-facing services.
-Review CAN and camera readiness first.
+This installs the direct dashboard build and nginx configuration/certificate.
+Manual mode also stops and disables `mr2-rover-direct.service`, preventing it
+from racing a directly executed `rover_direct.launch.py`. Review CAN and camera
+readiness before launching.
 
-Enable at boot without starting now:
+The generated self-signed certificate includes both rover addresses
+`192.168.0.62` and `10.42.0.1` (plus `rover` and `rover.local`). Re-running the
+installer replaces an older rover-direct certificate when either IP SAN is
+missing.
+
+Systemd-managed operation remains available as an alternative. Enable at boot
+without starting now:
 
 ```bash
 ./scripts/install_rover_direct.bash --skip-build --enable
@@ -101,56 +122,93 @@ Enable and start:
 ./scripts/install_rover_direct.bash --skip-build --start
 ```
 
-The units are:
-
-- `mr2-xbee-sim.service`: owns the local PTY pair
-- `mr2-rover-direct.service`: runs `rover_direct.launch.py`
-- `mr2-gateway-direct.service`: runs the co-located gateway/video relay
+The unit is `mr2-rover-direct.service`. Its launch owns the PTY pair, gateway,
+video relay, and rover ROS processes as one lifecycle.
 
 Inspect them with:
 
 ```bash
-systemctl status mr2-xbee-sim mr2-rover-direct mr2-gateway-direct
-journalctl -u mr2-rover-direct -u mr2-gateway-direct -f
+systemctl status mr2-rover-direct
+journalctl -u mr2-rover-direct -f
 ```
 
 After joining the `MR2-Rover` Wi-Fi network, open:
 
 ```text
-https://192.168.2.102
+https://10.42.0.1
 ```
 
 The certificate is self-signed. Install/trust it on the operator laptop if
 browser warnings are unacceptable.
 
-## Manual native start
+## Direct native start (primary mode)
 
-For maintenance without systemd, create the PTYs first:
-
-```bash
-sudo install -d -o "$USER" -g "$(id -gn)" /run/mr2
-socat -d -d \
-  pty,raw,echo=0,link=/run/mr2/xbee_rover \
-  pty,raw,echo=0,link=/run/mr2/xbee_gateway
-```
-
-Then use separate terminals:
+Start nginx, confirm the systemd rover service is not running, then source the
+built workspace and run the unified launch with the desired arguments:
 
 ```bash
-./scripts/run_rover_direct.bash
+sudo systemctl start nginx
+sudo systemctl stop mr2-rover-direct
+cd /home/mr2/mr2-stack/rover/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mr2_launch rover_direct.launch.py \
+  enable_manipulator_module:=true \
+  enable_video_streaming:=true \
+  enable_autonomous_module:=false \
+  enable_led:=false \
+  enable_camera_turret:=false
 ```
+
+The launch resolves Node.js directly from the repository `.nvmrc`, so no
+separate `nvm use` step is required. nginx remains a privileged host service
+installed separately by `install_rover_direct.bash`.
+
+### Optional launch features
+
+The manipulator is enabled by default. If its AK motors or gripper node 9 are
+not installed or powered, start a drive-only stack so their missing CAN
+feedback does not prevent `controller_manager` from starting:
 
 ```bash
-cd base/gateway
-npm start -- \
-  --gateway-profile rover-direct \
-  --base-xbee-device /run/mr2/xbee_gateway \
-  --gateway-host 127.0.0.1
+ros2 launch mr2_launch rover_direct.launch.py \
+  enable_manipulator_module:=false
 ```
 
-The rover launch can create its own PTY pair for a short manual test with
-`start_xbee_sim:=true`, but production systemd keeps PTY ownership separate so
-the rover and gateway can restart independently.
+Common feature arguments are:
+
+| Argument | Default | Purpose |
+| --- | --- | --- |
+| `enable_manipulator_module` | `true` | Include arm/gripper hardware, controllers, and MoveIt Servo |
+| `start_manipulator_controllers_active` | `true` | Start arm/gripper controllers active instead of inactive |
+| `enable_video_streaming` | `true` | Stream configured cameras to the local gateway |
+| `enable_autonomous_module` | `false` | Start RGB-D/front cameras and YOLO perception; not GNSS/localization/Nav2 |
+| `enable_aruco` | `false` | Start ArUco tracking on `aruco_cam_topic` |
+| `enable_led` | `false` | Start status and mission LED CAN nodes |
+| `enable_camera_turret` | `false` | Start the camera-turret CAN node |
+| `headless` | `true` | Disable RViz |
+| `start_xbee_sim` | `true` | Own the local rover/gateway PTY pair |
+| `start_gateway` | `true` | Start the local Node.js dashboard gateway |
+| `ensure_nginx` | `true` | Require/start the nginx system service for HTTPS |
+| `start_rover` | `true` | Start the hardware-facing ROS rover stack |
+
+Run the following for every available argument and its description:
+
+```bash
+ros2 launch mr2_launch rover_direct.launch.py --show-args
+```
+
+The systemd wrapper accepts matching `.env` settings such as
+`MR2_ENABLE_MANIPULATOR_MODULE=false`, `MR2_ENABLE_VIDEO_STREAMING=false`,
+`MR2_ENABLE_LED=true`, and `MR2_ENABLE_CAMERA_TURRET=true`.
+
+nginx configuration is installed and reloaded by `install_rover_direct.bash`;
+it does not need to be regenerated for each launch. The unified
+`mr2-rover-direct.service` requires `nginx.service`, so starting the rover unit
+starts nginx first. A manual `ros2 launch` checks nginx and makes a
+non-interactive start attempt. If local policy does not permit that operation,
+run `sudo systemctl start nginx` once or set `ensure_nginx:=false` when the
+dashboard is intentionally unused.
 
 ## Scope and hardware validation
 
@@ -166,4 +224,4 @@ Before field operation, validate on the actual Jetson and rover:
 - every configured camera stream and browser H.264 decode
 - controller states with `ros2 control list_controllers`
 - zero-command CAN startup, then deliberate drive/steering and arm tests
-- reconnect behavior after restarting each native service
+- reconnect behavior after restarting the unified rover-direct service

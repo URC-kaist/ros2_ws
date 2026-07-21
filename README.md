@@ -49,36 +49,41 @@ video, batteries, and system status, while omitting GPS, autonomy, science,
 Rocket M2, MAVProxy, and base antenna services.
 
 ```bash
-# Build/install native files without starting hardware-facing services.
-./scripts/install_rover_direct.bash
+# Build/install native files and keep systemd rover startup disabled.
+MR2_DIRECT_AP_IP=10.42.0.1 \
+  ./scripts/install_rover_direct.bash --manual
 
 # Configure the Jetson AP separately (password is never checked in).
 sudo --preserve-env=MR2_AP_PASSWORD ./scripts/configure_rover_ap.bash
 
-# After checking CAN and camera readiness:
-./scripts/install_rover_direct.bash --skip-build --start
+# After checking CAN and camera readiness, start directly with launch arguments.
+sudo systemctl start nginx
+cd rover/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mr2_launch rover_direct.launch.py
 ```
 
-Join the `MR2-Rover` AP and browse to `https://192.168.2.102`. See the
+Join the `MR2-Rover` AP and browse to `https://10.42.0.1`. See the
 [rover-direct runbook](docs/rover-direct-operation.md) for prerequisites,
 service inspection, manual startup, and hardware validation.
 
-### Ubuntu 24.04 laptop development
+### Jetson native development
 
-Use the ROS 2 Humble/Jammy development container instead of installing Humble
-directly on an Ubuntu 24.04 laptop:
+Development, builds, and tests run directly on the Jetson over SSH. Install
+dependencies and build the workspace natively:
 
 ```bash
-./scripts/dev_container.bash build
-./scripts/dev_container.bash up
-./scripts/dev_container.bash setup
-./scripts/dev_container.bash check
+source /opt/ros/humble/setup.bash
+rosdep install --from-paths rover/ros2_ws/src -y --ignore-src --rosdistro humble
+npm --prefix base/gateway ci
+npm --prefix dashboard ci --include=dev
+cd rover/ros2_ws
+colcon build --symlink-install
 ```
 
-See [`docker/dev/README.md`](docker/dev/README.md) for interactive shells,
-XBEE simulation, dashboard startup, and video-test limitations. This container
-is only for laptop development and validation; Jetson rover services run
-natively.
+Run the native rover-direct gateway, dashboard, ROS build, and package tests
+from the repository root with `./scripts/check_rover_direct.bash`.
 
 Scripts to host and receive web:
 Please install Node.js and npm!

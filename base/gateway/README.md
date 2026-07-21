@@ -164,7 +164,7 @@ Rover-local direct operation:
 cd base/gateway
 npm start -- \
   --gateway-profile rover-direct \
-  --base-xbee-device /run/mr2/xbee_gateway \
+  --base-xbee-device /tmp/mr2_xbee_gateway \
   --gateway-host 127.0.0.1
 ```
 
@@ -235,7 +235,7 @@ values such as `MR2_GATEWAY_HOST`, `MR2_GATEWAY_PORT`, and
 | `--ros-topic-relay-enable` | `BASE_ROS_TOPIC_RELAY_ENABLE` | `true` |
 
 For `rover-direct`, the profile defaults change the XBEE device to
-`/run/mr2/xbee_gateway`, the bind host to `127.0.0.1`, and the topic relay to
+`/tmp/mr2_xbee_gateway`, the bind host to `127.0.0.1`, and the topic relay to
 `false`.
 
 ### MAVProxy

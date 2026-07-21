@@ -1,7 +1,7 @@
 [Unit]
-Description=MR2 manual rover ROS 2 stack
-Requires=mr2-xbee-sim.service
-After=network-online.target mr2-xbee-sim.service
+Description=MR2 rover-direct PTY, gateway, and manual ROS 2 stack
+Requires=nginx.service
+After=network-online.target nginx.service
 Wants=network-online.target
 
 [Service]
@@ -11,6 +11,7 @@ Group=__MR2_GROUP__
 WorkingDirectory=__REPO_ROOT__/rover/ros2_ws
 EnvironmentFile=-__REPO_ROOT__/.env
 Environment=ROS_LOCALHOST_ONLY=1
+Environment=MR2_NODE_BIN=__NODE_BIN__
 ExecStart=__REPO_ROOT__/scripts/run_rover_direct.bash
 Restart=on-failure
 RestartSec=3

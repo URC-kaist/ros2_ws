@@ -102,7 +102,7 @@ test('parseGatewayConfig applies rover-direct native defaults', () => {
   })
 
   assert.equal(config.profile, 'rover-direct')
-  assert.equal(config.device, '/run/mr2/xbee_gateway')
+  assert.equal(config.device, '/tmp/mr2_xbee_gateway')
   assert.equal(config.host, '127.0.0.1')
   assert.equal(config.port, 8081)
   assert.equal(config.antennaEnable, false)
