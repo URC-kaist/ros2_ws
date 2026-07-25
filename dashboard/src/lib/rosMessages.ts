@@ -187,83 +187,14 @@ export type SciencePumpRequest = {
   duration_ms: number
 }
 
-export type SetScienceLedRequest = {
-  enabled: boolean
-  brightness: number
-}
-
-export type SelectCentrifugePositionRequest = {
-  index: number
-}
-
-export type TriggerCentrifugeRampRequest = {
-  start: boolean
-}
-
-export type MoveCarriageRequest = {
-  command: number
-  vibration_duration_ms: number
-}
-
-export type CarriageMotorCommandRequest = {
-  mode: number
-  value: number
-}
-
-export type MotorVelocityRequest = {
-  rad_s: number
-}
-
-export type MotorPositionRequest = {
-  rad: number
-}
-
-export type CarriageMotorTelemetryMsg = {
-  position_um?: number
-  velocity_um_s?: number
-}
-
-export type CompressedImageMsg = {
-  header?: RosHeader
-  format?: string
-  data?: string | number[]
-}
-
-export type PanoramaCaptureGoal = {
-  angle_step_deg: number
-  yaw_tolerance_deg: number
-  timeout_sec: number
-  jpeg_quality: number
-}
-
-export type PanoramaCaptureFeedback = {
-  captures_taken?: number
-  expected_captures?: number
-  current_yaw_deg?: number
-  next_target_yaw_deg?: number
-}
-
-export type PanoramaCaptureResult = {
-  success?: boolean
-  message?: string
-  captures_taken?: number
-  expected_captures?: number
-  panorama?: CompressedImageMsg
-}
-
-export type ScienceServiceResponse = {
-  success: boolean
-  message: string
-}
-
-export type SetScienceLedRequest = {
-  enabled: boolean
-  brightness: number
-}
-
 export type PumpRequest = {
   group: number
   duration_ms: number
+}
+
+export type SetScienceLedRequest = {
+  enabled: boolean
+  brightness: number
 }
 
 export type SelectCentrifugePositionRequest = {
@@ -296,4 +227,32 @@ export type CarriageMotorTelemetryMsg = {
   stamp?: RosStamp
   position_um?: number
   velocity_um_s?: number
+}
+
+export type CompressedImageMsg = {
+  header?: RosHeader
+  format?: string
+  data?: string | number[]
+}
+
+export type PanoramaCaptureGoal = {
+  angle_step_deg: number
+  yaw_tolerance_deg: number
+  timeout_sec: number
+  jpeg_quality: number
+}
+
+export type PanoramaCaptureFeedback = {
+  captures_taken?: number
+  expected_captures?: number
+  current_yaw_deg?: number
+  next_target_yaw_deg?: number
+}
+
+export type PanoramaCaptureResult = {
+  success?: boolean
+  message?: string
+  captures_taken?: number
+  expected_captures?: number
+  panorama?: CompressedImageMsg
 }

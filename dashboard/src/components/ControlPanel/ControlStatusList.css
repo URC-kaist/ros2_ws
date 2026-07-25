@@ -74,6 +74,10 @@
   gap: 8px 10px;
 }
 
+.status-grid-compact--direct {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .status-grid-label,
 .status-grid-value {
   display: inline-flex;

@@ -366,18 +366,22 @@ function createGatewayApp(options = {}) {
       }
     }
 
-    // Start the ROS topic relay before opening the server so base-side data can
-    // flow immediately once dashboard clients connect.
-    rosTopicRelay = await startRosTopicRelay({
-      nextSeq,
-      writeFrame,
-      log,
-      onBaseSurveyIn: (msg) => {
-        if (antennaTracker) {
-          antennaTracker.updateBaseSurveyIn(msg)
-        }
-      },
-    })
+    if (config.rosTopicRelayEnable !== false) {
+      // Start the ROS topic relay before opening the server so base-side data
+      // can flow immediately once dashboard clients connect.
+      rosTopicRelay = await startRosTopicRelay({
+        nextSeq,
+        writeFrame,
+        log,
+        onBaseSurveyIn: (msg) => {
+          if (antennaTracker) {
+            antennaTracker.updateBaseSurveyIn(msg)
+          }
+        },
+      })
+    } else {
+      log('Base ROS GNSS/RTCM topic relay disabled')
+    }
     videoGateway.start()
 
     await new Promise((resolve) => {

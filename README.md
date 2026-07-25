@@ -5,6 +5,8 @@
 - [docs/README.md](docs/README.md): top-level documentation index
 - [docs/video-pipeline.md](docs/video-pipeline.md): rover-to-base-to-browser
   video transport, framing, and bootstrap behavior
+- [docs/rover-direct-operation.md](docs/rover-direct-operation.md): native
+  Jetson direct-control deployment at `192.168.2.102`
 
 ```bash
 ros2 run tf2_tools view_frames
@@ -38,6 +40,50 @@ ros2 launch mr2_rover_auto navigation.launch.py mode:=sim \
   2>&1 | tee navigation.log
 
 ```
+
+### Rover-direct operation (no base-station computer)
+
+The Jetson can host the manual rover stack, gateway/video relay, dashboard,
+nginx, and Wi-Fi AP natively. The direct mode keeps drive/steering, arm control,
+video, batteries, and system status, while omitting GPS, autonomy, science,
+Rocket M2, MAVProxy, and base antenna services.
+
+```bash
+# Build/install native files and keep systemd rover startup disabled.
+MR2_DIRECT_AP_IP=10.42.0.1 \
+  ./scripts/install_rover_direct.bash --manual
+
+# Configure the Jetson AP separately (password is never checked in).
+sudo --preserve-env=MR2_AP_PASSWORD ./scripts/configure_rover_ap.bash
+
+# After checking CAN and camera readiness, start directly with launch arguments.
+sudo systemctl start nginx
+cd rover/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mr2_launch rover_direct.launch.py
+```
+
+Join the `MR2-Rover` AP and browse to `https://10.42.0.1`. See the
+[rover-direct runbook](docs/rover-direct-operation.md) for prerequisites,
+service inspection, manual startup, and hardware validation.
+
+### Jetson native development
+
+Development, builds, and tests run directly on the Jetson over SSH. Install
+dependencies and build the workspace natively:
+
+```bash
+source /opt/ros/humble/setup.bash
+rosdep install --from-paths rover/ros2_ws/src -y --ignore-src --rosdistro humble
+npm --prefix base/gateway ci
+npm --prefix dashboard ci --include=dev
+cd rover/ros2_ws
+colcon build --symlink-install
+```
+
+Run the native rover-direct gateway, dashboard, ROS build, and package tests
+from the repository root with `./scripts/check_rover_direct.bash`.
 
 Scripts to host and receive web:
 Please install Node.js and npm!

@@ -158,6 +158,21 @@ cd base/gateway
 npm start -- --base-xbee-device /dev/ttyXBEE --gateway-port 8081
 ```
 
+Rover-local direct operation:
+
+```bash
+cd base/gateway
+npm start -- \
+  --gateway-profile rover-direct \
+  --base-xbee-device /tmp/mr2_xbee_gateway \
+  --gateway-host 127.0.0.1
+```
+
+The `rover-direct` profile keeps the XBEE and video WebSocket services. Its
+defaults bind to loopback, use the local xbeesim PTY, and disable MAVProxy,
+antenna tracking, Rocket M2 auto-enable, and the base GNSS/RTCM topic relay.
+Explicit CLI settings still override profile defaults.
+
 Example with antenna tracking enabled:
 
 ```bash
@@ -211,11 +226,17 @@ values such as `MR2_GATEWAY_HOST`, `MR2_GATEWAY_PORT`, and
 
 | CLI flag | Environment variable | Default |
 | --- | --- | --- |
+| `--gateway-profile` | `MR2_GATEWAY_PROFILE` | `base` |
 | `--base-xbee-device` | `BASE_XBEE_DEVICE` | `/dev/ttyXBEE` |
 | `--gateway-host` | `MR2_GATEWAY_HOST` | `0.0.0.0` |
 | `--gateway-port` | `MR2_GATEWAY_PORT` | `8081` |
 | `--base-xbee-heartbeat-hz` | `BASE_XBEE_HEARTBEAT_HZ` | `2` |
 | `--base-xbee-link-timeout-ms` | `BASE_XBEE_LINK_TIMEOUT_MS` | `2000` |
+| `--ros-topic-relay-enable` | `BASE_ROS_TOPIC_RELAY_ENABLE` | `true` |
+
+For `rover-direct`, the profile defaults change the XBEE device to
+`/tmp/mr2_xbee_gateway`, the bind host to `127.0.0.1`, and the topic relay to
+`false`.
 
 ### MAVProxy
 
@@ -273,7 +294,9 @@ such as `adsb` being absent from the local Python environment.
 | `--rocket-m2-poll-ms` | `ROCKET_M2_POLL_MS` | `5000` |
 | `--rocket-m2-timeout-ms` | `ROCKET_M2_TIMEOUT_MS` | `4000` |
 
-Rocket M2 polling auto-enables if IP, user, and password are configured.
+Rocket M2 polling auto-enables if IP, user, and password are configured in the
+base profile. The `rover-direct` profile disables this credential-based
+auto-enable.
 
 ## Socket Interface
 

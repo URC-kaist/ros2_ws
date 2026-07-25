@@ -43,7 +43,8 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "static_joint_state_publisher = mr2_rover_description.static_joint_state_publisher:main",
+            "static_joint_state_publisher = "
+            "mr2_rover_description.static_joint_state_publisher:main",
         ],
     },
 )

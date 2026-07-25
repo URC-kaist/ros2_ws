@@ -8,6 +8,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class CanBusRegistry {
 public:
@@ -25,6 +26,24 @@ public:
       weak = sp;
     }
     return sp;
+  }
+
+  /** Stop every live manager before owners of registered callbacks vanish. */
+  static void stop_all() {
+    std::vector<std::shared_ptr<CanBusManager>> managers;
+    {
+      std::lock_guard<std::mutex> lk(map_mtx());
+      managers.reserve(map().size());
+      for (auto &[iface, weak] : map()) {
+        (void)iface;
+        if (auto manager = weak.lock()) {
+          managers.push_back(std::move(manager));
+        }
+      }
+    }
+    for (auto &manager : managers) {
+      manager->stop();
+    }
   }
 
 private:

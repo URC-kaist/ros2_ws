@@ -4,6 +4,7 @@ const fs = require('fs')
 const path = require('path')
 
 const DEFAULTS = {
+  profile: 'base',
   device: '/dev/ttyXBEE',
   host: '0.0.0.0',
   port: 8081,
@@ -32,6 +33,7 @@ const DEFAULTS = {
   antennaAllowProvisional: true,
   baseHeadingOffsetDeg: 0,
   rocketM2Enable: false,
+  rocketM2AutoEnable: true,
   rocketM2Ip: '',
   rocketM2Targets: [],
   rocketM2User: '',
@@ -44,6 +46,7 @@ const DEFAULTS = {
   mavproxyMasterBaud: 57600,
   mavproxyOut: 'udp:192.168.1.108:14550',
   mavproxyDefaultModules: '',
+  rosTopicRelayEnable: true,
 }
 
 function loadGatewayEnv(baseDir) {
@@ -102,6 +105,23 @@ function toBool(value) {
 // Resolve runtime config with the standard precedence for this package:
 // CLI flags override environment variables, which override hard-coded defaults.
 function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
+  const profile =
+    getArg(args, '--gateway-profile') ||
+    env.MR2_GATEWAY_PROFILE ||
+    DEFAULTS.profile
+  const roverDirect = profile === 'rover-direct'
+  const profileDefaults = roverDirect
+    ? {
+        device: '/tmp/mr2_xbee_gateway',
+        host: '127.0.0.1',
+        antennaEnable: false,
+        rocketM2Enable: false,
+        rocketM2AutoEnable: false,
+        mavproxyEnable: false,
+        rosTopicRelayEnable: false,
+      }
+    : DEFAULTS
+
   const rocketM2Targets = [
     {
       target: 'base',
@@ -121,10 +141,15 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
   ]
 
   return {
+    profile,
     device:
-      getArg(args, '--base-xbee-device') || env.BASE_XBEE_DEVICE || DEFAULTS.device,
+      getArg(args, '--base-xbee-device') ||
+      env.BASE_XBEE_DEVICE ||
+      profileDefaults.device,
     host:
-      getArg(args, '--gateway-host') || env.MR2_GATEWAY_HOST || DEFAULTS.host,
+      getArg(args, '--gateway-host') ||
+      env.MR2_GATEWAY_HOST ||
+      profileDefaults.host,
     port: toInt(
       getArg(args, '--gateway-port') || env.MR2_GATEWAY_PORT || DEFAULTS.port
     ),
@@ -167,7 +192,7 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
     antennaEnable: toBool(
       getArg(args, '--antenna-enable') ||
         env.BASE_ANTENNA_ENABLE ||
-        DEFAULTS.antennaEnable
+        profileDefaults.antennaEnable
     ),
     antennaDevice:
       getArg(args, '--antenna-device') || env.BASE_ANTENNA_DEVICE || DEFAULTS.antennaDevice,
@@ -217,8 +242,11 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
         DEFAULTS.baseHeadingOffsetDeg
     ),
     rocketM2Enable: toBool(
-      getArg(args, '--rocket-m2-enable') || env.ROCKET_M2_ENABLE || DEFAULTS.rocketM2Enable
+      getArg(args, '--rocket-m2-enable') ||
+        env.ROCKET_M2_ENABLE ||
+        profileDefaults.rocketM2Enable
     ),
+    rocketM2AutoEnable: profileDefaults.rocketM2AutoEnable,
     rocketM2Targets,
     rocketM2Ip:
       rocketM2Targets.find((target) => target.target === 'base')?.ip ||
@@ -238,7 +266,9 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
         DEFAULTS.rocketM2TimeoutMs
     ),
     mavproxyEnable: toBool(
-      getArg(args, '--mavproxy-enable') || env.MAVPROXY_ENABLE || DEFAULTS.mavproxyEnable
+      getArg(args, '--mavproxy-enable') ||
+        env.MAVPROXY_ENABLE ||
+        profileDefaults.mavproxyEnable
     ),
     mavproxyBinary:
       getArg(args, '--mavproxy-binary') ||
@@ -259,6 +289,11 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
       getArg(args, '--mavproxy-default-modules') ||
       env.MAVPROXY_DEFAULT_MODULES ||
       DEFAULTS.mavproxyDefaultModules,
+    rosTopicRelayEnable: toBool(
+      getArg(args, '--ros-topic-relay-enable') ||
+        env.BASE_ROS_TOPIC_RELAY_ENABLE ||
+        profileDefaults.rosTopicRelayEnable
+    ),
   }
 }
 

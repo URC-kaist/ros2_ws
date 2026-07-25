@@ -1,6 +1,4 @@
-"""
-Wrapper launch for ublox fixed-base + rover setup with unique container names.
-"""
+"""Wrapper launch for ublox fixed-base + rover setup with unique container names."""
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument

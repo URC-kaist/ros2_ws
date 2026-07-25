@@ -3,10 +3,13 @@ import { FiMaximize2, FiMinimize2 } from 'react-icons/fi'
 import ControlPanel from './components/ControlPanel'
 import MissionPanels from './components/MissionPanels'
 import MissionTabs, { type MissionTabId } from './components/MissionTabs'
+import { isRoverDirectProfile } from './lib/operatingProfile'
 import './components/layout.css'
 
 const App = () => {
-  const [activeTab, setActiveTab] = useState<MissionTabId>('science')
+  const [activeTab, setActiveTab] = useState<MissionTabId>(
+    isRoverDirectProfile ? 'live-feed' : 'science'
+  )
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   useEffect(() => {

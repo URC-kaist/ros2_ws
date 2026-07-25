@@ -1,0 +1,26 @@
+upstream mr2_direct_gateway {
+  server 127.0.0.1:8081;
+}
+
+upstream mr2_direct_rosbridge {
+  server 127.0.0.1:9090;
+}
+
+server {
+  listen 80;
+  listen [::]:80;
+  server_name rover rover.local 192.168.0.62 10.42.0.1 __MR2_DIRECT_AP_IP__;
+
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  server_name rover rover.local 192.168.0.62 10.42.0.1 __MR2_DIRECT_AP_IP__;
+
+  ssl_certificate /etc/nginx/ssl/mr2-rover-direct.crt;
+  ssl_certificate_key /etc/nginx/ssl/mr2-rover-direct.key;
+
+  include /etc/nginx/snippets/mr2-rover-direct-locations.conf;
+}
