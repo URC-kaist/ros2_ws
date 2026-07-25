@@ -199,6 +199,12 @@ public:
     if (auto_arm_it != info.parameters.end()) {
       auto_arm_ = parse_bool(auto_arm_it->second);
     }
+    const auto required_at_activation_it =
+        info.parameters.find("required_at_activation");
+    if (required_at_activation_it != info.parameters.end()) {
+      required_at_activation_ =
+          parse_bool(required_at_activation_it->second);
+    }
     const auto require_limits_it = info.parameters.find("require_limits_status");
     if (require_limits_it != info.parameters.end()) {
       require_limits_status_ = parse_bool(require_limits_it->second);
@@ -287,14 +293,14 @@ public:
     }
 
     if (!wait_for([this] { return diag_seen_.load(); }, "runtime diagnostic")) {
-      return false;
+      return handle_activation_failure("runtime diagnostic");
     }
 
     if (armed_) {
       send_power_command(false);
       if (!wait_for([this] { return diag_seen_.load() && !armed_.load(); },
                     "disarmed diagnostic")) {
-        return false;
+        return handle_activation_failure("disarmed diagnostic");
       }
     }
 
@@ -313,31 +319,31 @@ public:
                     "desired profile diagnostic")) {
         RCLCPP_ERROR(logger_, "Actuator %u profile select result: %u", node_id_,
                      profile_select_result_.load());
-        return false;
+        return handle_activation_failure("profile selection");
       }
     }
 
     if (require_limits_status_ &&
         !wait_for([this] { return limits_status_seen_.load(); },
                   "limits status")) {
-      return false;
+      return handle_activation_failure("limits status");
     }
     if (require_config_status_ &&
         !wait_for([this] { return config_status_seen_.load(); },
                   "config status")) {
-      return false;
+      return handle_activation_failure("config status");
     }
     if (!validate_config_status()) {
-      return false;
+      return handle_activation_failure("config validation");
     }
     if (!validate_runtime_diag_ready("before arm")) {
-      return false;
+      return handle_activation_failure("pre-arm diagnostic validation");
     }
 
     if (channel_ == CommandChannel::Angle) {
       if (!wait_for([this] { return angle_status_seen_.load(); },
                     "angle status before arm")) {
-        return false;
+        return handle_activation_failure("angle status before arm");
       }
       hold_position_rad_ = position_rad_;
       transmit_angle(hold_position_rad_);
@@ -346,10 +352,10 @@ public:
     }
 
     if (!arm_with_confirmation()) {
-      return false;
+      return handle_activation_failure("arm confirmation");
     }
     if (!validate_runtime_diag_ready("after arm")) {
-      return false;
+      return handle_activation_failure("post-arm diagnostic validation");
     }
 
     active_ = true;
@@ -411,6 +417,22 @@ public:
   void export_command(double *&command) override { command = &desired_command_; }
 
 private:
+  bool handle_activation_failure(const char *phase) {
+    active_ = false;
+    if (required_at_activation_) {
+      return false;
+    }
+    if (auto_arm_ && diag_seen_.load()) {
+      send_power_command(false);
+    }
+    RCLCPP_WARN(
+        logger_,
+        "Optional actuator %u failed activation during %s; leaving it inactive "
+        "so the remaining CAN hardware can start",
+        node_id_, phase);
+    return true;
+  }
+
   bool valid_frame(const can_frame &frame, uint8_t expected_dlc) const {
     return (frame.can_id & CAN_EFF_FLAG) == 0 &&
            (frame.can_id & CAN_RTR_FLAG) == 0 && frame.can_dlc == expected_dlc;
@@ -592,8 +614,13 @@ private:
     if (predicate()) {
       return true;
     }
-    RCLCPP_ERROR(logger_, "Actuator %u timed out waiting for %s",
-                 node_id_, description);
+    if (required_at_activation_) {
+      RCLCPP_ERROR(logger_, "Actuator %u timed out waiting for %s", node_id_,
+                   description);
+    } else {
+      RCLCPP_WARN(logger_, "Optional actuator %u timed out waiting for %s",
+                  node_id_, description);
+    }
     return false;
   }
 
@@ -812,6 +839,7 @@ private:
   std::atomic<uint8_t> active_profile_{
       static_cast<uint8_t>(Profile::VelocityOnly)};
   bool auto_arm_{true};
+  bool required_at_activation_{true};
   bool require_limits_status_{true};
   bool require_config_status_{true};
   int activation_timeout_ms_{1500};

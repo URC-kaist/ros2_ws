@@ -20,6 +20,7 @@
 #include "transmission_interface/transmission_interface_exception.hpp"
 
 #include "mr2_can_bus_core/can_device.hpp"
+#include "mr2_can_bus_core/can_bus_registry.hpp"
 
 using hardware_interface::CallbackReturn;
 using hardware_interface::return_type;
@@ -29,7 +30,12 @@ namespace mr2_can_hardware_interface {
 class CanHW : public hardware_interface::SystemInterface {
 public:
   CanHW() = default;
-  ~CanHW() override = default;
+  ~CanHW() override {
+    // Listener callbacks capture device `this` pointers and use node-owned ROS
+    // publishers. Stop the shared receive thread before member destruction
+    // tears down either the node or the devices.
+    CanBusRegistry::stop_all();
+  }
 
   CallbackReturn
   on_init(const hardware_interface::HardwareInfo &info) override {

@@ -84,6 +84,23 @@ def generate_launch_description():
 
     rsp = robot_state_publisher_node(robot_description, use_sim_time)
 
+    # The real CAN hardware exposes only actuated joints. MoveIt Servo still
+    # needs the passive rocker state before it considers the robot state
+    # complete and starts forwarding arm commands.
+    passive_rocker_joint_state = Node(
+        package="mr2_rover_description",
+        executable="static_joint_state_publisher",
+        name="passive_rocker_joint_state",
+        output="screen",
+        condition=IfCondition(enable_manipulator_module),
+        parameters=[
+            {"joint_names": ["left_rocker_joint"]},
+            {"positions": [0.0]},
+            {"publish_rate": 10.0},
+            {"use_sim_time": use_sim_time},
+        ],
+    )
+
     mock_servos = mock_servo_nodes(
         can_iface,
         motor_ids=range(1, 7),
@@ -184,6 +201,7 @@ def generate_launch_description():
             controller_config_arg,
             use_mock_servos_arg,
             rsp,
+            passive_rocker_joint_state,
             *mock_servos,
             ros2_control,
             *spawners,

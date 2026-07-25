@@ -216,6 +216,9 @@
         <param name="joint_lower_limit">${arm_gripper_lower_limit}</param>
         <param name="joint_upper_limit">${arm_gripper_upper_limit}</param>
         <param name="auto_arm">true</param>
+        <!-- Keep the six-axis arm and base controllers available when the
+             independently powered gripper is absent or offline. -->
+        <param name="required_at_activation">false</param>
       </joint>
       </xacro:if>
 

@@ -117,6 +117,9 @@ my $path = shift @ARGV;
 my %expected = map { $_ => 1 } grep { length } split /\s+/, $ENV{EXPECTED_MOTORS} // "";
 my $print_raw = ($ENV{RAW} // 0) ? 1 : 0;
 my (%count, %first, %last, %intervals, %sum, %min, %max, %status, %raw_lines);
+my $total_frames = 0;
+my $extended_frames = 0;
+my %extended_ids;
 
 sub note {
   my ($key, $t, $raw_line) = @_;
@@ -156,6 +159,11 @@ while (my $line = <$fh>) {
   chomp $line;
   next unless $line =~ /\(([0-9.]+)\).*?\bcan\d+\s+([0-9A-Fa-f]+)\s+\[(\d+)\]\s+(.*)$/;
   my ($t, $id_hex, $dlc, $data_text) = ($1 + 0, uc($2), $3 + 0, uc($4));
+  $total_frames++;
+  if (length($id_hex) > 3) {
+    $extended_frames++;
+    $extended_ids{$id_hex}++;
+  }
   my $id = hex($id_hex);
   next unless ($id & 0x1FFFFF00) == 0x00002900;
   my $motor = $id & 0xFF;
@@ -190,9 +198,11 @@ sub period {
 
 printf "%-7s %-7s %-11s %-11s %-9s %-7s %s\n",
   "Motor", "Frames", "Position", "Velocity", "Current", "Temp", "Error";
+my $missing = 0;
 for my $motor (sort { $a <=> $b } keys %expected) {
   my $key = "ak:$motor";
   if (!exists $status{$motor}) {
+    $missing++;
     printf "%-7s %-7s %-11s %-11s %-9s %-7s %s\n",
       $motor, "0", "-", "-", "-", "-", "NO_FRAMES";
     next;
@@ -202,6 +212,26 @@ for my $motor (sort { $a <=> $b } keys %expected) {
     $motor, $count{$key}, $s->{position_deg}, $s->{velocity_rpm},
     $s->{current_a}, $s->{temp_c}, $s->{error}, error_name($s->{error});
   print "        ", period($key), "\n";
+}
+
+if ($missing) {
+  print "\nCaptured $total_frames total CAN frame(s), including $extended_frames extended frame(s),\n";
+  print "but $missing expected AK motor(s) had no 0x29xx feedback.\n";
+  if (%extended_ids) {
+    print "Other extended CAN IDs (count):\n";
+    my $shown = 0;
+    for my $id (sort { $extended_ids{$b} <=> $extended_ids{$a} || hex($a) <=> hex($b) }
+                  keys %extended_ids) {
+      printf "  0x%s (%d)\n", $id, $extended_ids{$id};
+      last if ++$shown >= 12;
+    }
+  } else {
+    print "No extended CAN frames were seen at all.\n";
+  }
+  print "This is a passive receive-only test. NO_FRAMES can mean:\n";
+  print "  - arm power/CAN wiring/termination, bitrate, or motor ID mismatch; or\n";
+  print "  - the motor is in MIT/query-response mode instead of Servo Mode with periodic feedback.\n";
+  print "The rover AK driver requires Servo Direct Mode and periodic status feedback.\n";
 }
 
 if ($print_raw) {

@@ -166,14 +166,40 @@ installed separately by `install_rover_direct.bash`.
 
 ### Optional launch features
 
-The manipulator is enabled by default. If its AK motors or gripper node 9 are
-not installed or powered, start a drive-only stack so their missing CAN
-feedback does not prevent `controller_manager` from starting:
+The manipulator is enabled by default. Its six AK arm motors must publish CAN
+feedback before the driver will transmit position commands. If the arm is not
+installed or powered, start a drive-only stack to avoid exposing inactive arm
+controllers:
 
 ```bash
 ros2 launch mr2_launch rover_direct.launch.py \
   enable_manipulator_module:=false
 ```
+
+Gripper node 9 is optional at hardware activation. When it is absent or
+offline, the gripper remains inactive and emits no actuator commands, while
+the rover and six-axis manipulator controllers continue to start. A healthy
+gripper still activates normally.
+
+Real-hardware launch also publishes the fixed zero state of the passive left
+rocker joint. MoveIt Servo requires that passive state in addition to the
+actuated CAN joint states before it forwards dashboard arm commands.
+
+If the arm controllers are active but the physical arm does not move, verify
+feedback from motor IDs 101 through 106 without sending a motion command:
+
+```bash
+./scripts/check_ak_actuator_status.bash --iface can0 --duration 3
+```
+
+A zero-frame result means either the arm power/CAN wiring/termination,
+motor-side bitrate/IDs, or the motor communication mode must be corrected. The
+driver uses CubeMars Servo Direct Mode and expects periodic extended `0x29xx`
+status frames. Motors configured for MIT mode or query-response feedback do not
+satisfy that requirement even when they are powered and connected. Configure
+IDs 101 through 106 for Servo Mode, the same bitrate as `can0`, and periodic CAN
+status feedback. The driver intentionally does not send a blind position
+command before it has captured a valid boot position.
 
 Common feature arguments are:
 
