@@ -1,0 +1,123 @@
+.latency-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(95, 196, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(5, 12, 20, 0.72);
+  color: #dcecff;
+  font-size: 0.72rem;
+}
+
+.latency-diagnostics__header,
+.latency-diagnostics__stages > div,
+.latency-diagnostics__summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.latency-diagnostics__header span,
+.latency-diagnostics__clock,
+.latency-diagnostics small,
+.latency-diagnostics__stages span,
+.latency-diagnostics__summary span {
+  color: #8fa5bd;
+}
+
+.latency-diagnostics__field {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.latency-diagnostics select,
+.latency-diagnostics button {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: #172235;
+  color: #e8f2ff;
+  font: inherit;
+}
+
+.latency-diagnostics__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.latency-diagnostics__actions button {
+  padding: 5px;
+  cursor: pointer;
+}
+
+.latency-diagnostics button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.latency-diagnostics__copy {
+  padding: 5px;
+  cursor: pointer;
+}
+
+.latency-diagnostics__readiness {
+  padding: 5px;
+  border-radius: 5px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.latency-diagnostics__readiness--ready {
+  background: rgba(38, 177, 105, 0.18);
+  color: #75e1a8;
+}
+
+.latency-diagnostics__readiness--blocked {
+  background: rgba(255, 143, 143, 0.12);
+  color: #ffadad;
+}
+
+.latency-diagnostics__reasons {
+  display: grid;
+  gap: 2px;
+}
+
+.latency-diagnostics__import {
+  grid-column: 1 / -1;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: #172235;
+  color: #e8f2ff;
+  text-align: center;
+  cursor: pointer;
+}
+
+.latency-diagnostics__import input {
+  display: none;
+}
+
+.latency-diagnostics__section-title {
+  padding-top: 5px;
+  color: #c8ddf4;
+  font-weight: 600;
+}
+
+.latency-diagnostics__stages,
+.latency-diagnostics__summary {
+  display: grid;
+  gap: 3px;
+}
+
+.latency-diagnostics__summary {
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.latency-diagnostics__error {
+  color: #ff8f8f;
+}

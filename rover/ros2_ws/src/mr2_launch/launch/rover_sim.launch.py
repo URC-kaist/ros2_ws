@@ -55,6 +55,11 @@ def generate_launch_description():
         default_value="/tmp/xbee_sim1",
         description="Peer PTY path for external attachment",
     )
+    enable_latency_diagnostics_arg = DeclareLaunchArgument(
+        "enable_latency_diagnostics",
+        default_value="false",
+        description="Publish experimental command and motion latency traces",
+    )
     rover_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -71,6 +76,7 @@ def generate_launch_description():
             "enable_autonomous_module_sim": LaunchConfiguration("enable_autonomous_module"),
             "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
             "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
+            "enable_latency_diagnostics": LaunchConfiguration("enable_latency_diagnostics"),
         }.items(),
     )
 
@@ -84,6 +90,7 @@ def generate_launch_description():
             enable_autonomous_module_arg,
             xbee_sim_device_arg,
             xbee_sim_peer_arg,
+            enable_latency_diagnostics_arg,
             rover_launch,
         ]
     )

@@ -14,7 +14,7 @@ setup(
     zip_safe=True,
     maintainer="mr2",
     maintainer_email="gmmyung@kaist.ac.kr",
-    description="System status publisher using psutil.",
+    description="System and chrony clock status publisher.",
     license="MIT",
     tests_require=["pytest"],
     entry_points={

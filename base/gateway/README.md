@@ -322,6 +322,34 @@ Clients connect to the same HTTP server port configured by `--gateway-port`.
 - Path: `/video/streams`
 - Content: JSON stream definitions derived from the central `video_streams.json` file
 
+### Latency Clock Endpoint
+
+- Path: `/latency/time`
+- Content: no-cache gateway receive/send epoch timestamps used for NTP-style
+  browser-to-base clock-offset sampling
+
+### Chrony Status Endpoint
+
+- Path: `/latency/clock-status`
+- Content: no-cache, read-only base `chronyc -n tracking` status
+- Runtime requirement: the `chronyc` executable and local chronyd command
+  socket; missing/unsynchronized chrony is returned as structured JSON instead
+  of failing the gateway
+
+The endpoint executes only the fixed `chronyc -n tracking` argument list with a
+1.5 second timeout. It cannot start chrony, modify its configuration, or step a
+clock. nginx proxies this endpoint alongside `/latency/time`; chrony's NTP UDP
+port 123 is independent of nginx.
+
+An experimentally tagged `cmd_drive` keeps the normal 16-byte XBEE payload.
+The gateway broadcasts a JSON `latency_trace` mapping the dashboard `trial_id`
+to the encoded `(xbee_seq, wire_timestamp_ms)` key. Untagged commands and the
+XBEE wire protocol are unchanged.
+
+Rocket M2 video-link latency is not derived from the post-GStreamer browser
+timestamp. Use the matched rover/base RTP capture tools documented in
+`scripts/latency/README.md`; they do not change the gateway video wire format.
+
 ### Dashboard -> Gateway
 
 - `cmd_drive`
@@ -351,6 +379,8 @@ Clients connect to the same HTTP server port configured by `--gateway-port`.
   Fields: `enabled`, `antenna_ready`, `auto_home`, `heading_offset_deg`, `base_lat_deg`, `base_lon_deg`, `base_alt_m`, `antenna_heading_deg`, `last_cmd_heading_deg`, `last_cmd_age_ms`, `base_fix_age_ms`, `rover_nav_age_ms`, `base_fix_valid`, `rover_nav_valid`, `idle_reason`
 - `rocket_m2_status`
   Fields: `target` (`base`, `drone`, or `rover`), `label`, `connected`, `updated_at_ms`, `last_success_ms`, `signal`, `rssi`, `noisef`, `chwidth`, `rx_chainmask`, `chainrssi`, `chainrssimgmt`, `chainrssiext`, `error`
+- `latency_trace` (only for a dashboard-tagged experiment command)
+  Fields: `trial_id`, `client_tx_epoch_us`, `gateway_rx_epoch_us`, `xbee_seq`, `wire_timestamp_ms`
 
 Notes:
 

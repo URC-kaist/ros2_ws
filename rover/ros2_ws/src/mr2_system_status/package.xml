@@ -3,13 +3,14 @@
 <package format="3">
   <name>mr2_system_status</name>
   <version>0.0.1</version>
-  <description>System status publisher using psutil.</description>
+  <description>System and chrony clock status publisher.</description>
   <maintainer email="gmmyung@kaist.ac.kr">mr2</maintainer>
   <license>MIT</license>
 
   <depend>rclpy</depend>
   <depend>diagnostic_msgs</depend>
   <exec_depend>python3-psutil</exec_depend>
+  <exec_depend>chrony</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

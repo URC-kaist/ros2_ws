@@ -10,7 +10,8 @@
   left: 0;
   width: 20%;
   height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   z-index: 2;
 }
 

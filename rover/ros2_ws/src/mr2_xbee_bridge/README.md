@@ -59,6 +59,32 @@ Heartbeat-timeout zero commands pass through the same smoothing path, so the
 bridge ramps commanded velocities down at the configured limits instead of
 publishing a step change.
 
+## Experimental latency diagnostics
+
+Latency diagnostics are disabled by default and do not change the XBEE wire
+layout. Enable them through the top-level launch wrapper:
+
+```bash
+ros2 launch mr2_launch rover_real.launch.py enable_latency_diagnostics:=true
+```
+
+The bridge then publishes compact JSON in `std_msgs/msg/String` on
+`/latency/trace`:
+
+- `command` records contain the received frame's `(seq, timestamp_ms)`, rover
+  system-clock receive time (T3), `/base/cmd_vel` publish time (T4), and raw vs
+  smoothed commands.
+
+Parameters:
+
+- `latency_diagnostics_enabled` (default `false`)
+- `latency_trace_topic` (default `/latency/trace`)
+
+The timestamps use `std::chrono::system_clock`, not ROS simulation time. Base
+Physical-motion/T6 detection is intentionally not part of this diagnostic.
+Rover-to-base video-link latency is measured separately by matching RTP packet
+captures as documented in `scripts/latency/README.md`.
+
 ## Payloads (ROS-aligned units)
 
 ### CMD_DRIVE (msg_id 0x01)

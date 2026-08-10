@@ -63,8 +63,49 @@ function createGatewayHttpHandler(options = {}) {
       : () => ({ enabled: false, configured: false, status: null })
   const getVideoStreams =
     typeof options.getVideoStreams === 'function' ? options.getVideoStreams : () => []
+  const getChronyStatus =
+    typeof options.getChronyStatus === 'function'
+      ? options.getChronyStatus
+      : async () => ({
+          schema_version: 1,
+          role: 'base',
+          available: false,
+          synchronized: false,
+          error: 'chrony status provider is not configured',
+        })
 
-  return function gatewayHttpHandler(req, res) {
+  return async function gatewayHttpHandler(req, res) {
+    const requestEpochUs = Date.now() * 1000
+
+    if (req.method === 'GET' && req.url && req.url.startsWith('/latency/time')) {
+      const sendEpochUs = Date.now() * 1000
+      res.writeHead(200, {
+        'Cache-Control': 'no-store',
+        'Content-Type': 'application/json',
+      })
+      res.end(
+        JSON.stringify({
+          server_receive_epoch_us: requestEpochUs,
+          server_send_epoch_us: sendEpochUs,
+        })
+      )
+      return
+    }
+
+    if (
+      req.method === 'GET' &&
+      req.url &&
+      req.url.startsWith('/latency/clock-status')
+    ) {
+      const status = await getChronyStatus()
+      res.writeHead(200, {
+        'Cache-Control': 'no-store',
+        'Content-Type': 'application/json',
+      })
+      res.end(JSON.stringify(status))
+      return
+    }
+
     if (req.method === 'GET' && req.url && req.url.startsWith('/rocket-m2/status')) {
       const rocketM2State = getRocketM2State()
       handleRocketM2Status(req, res, rocketM2State)

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { getVideoGatewayClient, type VideoStreamInfo } from '../lib/videoGateway'
 import type { VideoChunkMessage, VideoConfigMessage } from '../lib/videoProtocol'
+import { browserEpochUs, latencyDiagnostics } from '../lib/latencyDiagnostics'
 import './VideoStreamCard.css'
 
 type VideoStreamCardProps = {
@@ -241,6 +242,11 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
             offsetY,
             drawWidth,
             drawHeight
+          )
+          latencyDiagnostics.observeVideoRender(
+            stream.stream_id,
+            frame.timestamp,
+            browserEpochUs()
           )
           frame.close()
           waitingForKeyframeRef.current = false

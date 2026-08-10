@@ -14,7 +14,12 @@ export type VideoConfigMessage = {
 export type VideoChunkMessage = {
   kind: 'chunk'
   streamId: string
+  /** Base gateway time after RTP jitter/depay/H.264 parsing (T7a). */
+  baseIngestTimestampUs: number
+  /** Compatibility/decode timestamp; identical to baseIngestTimestampUs. */
   timestampUs: number
+  /** Set by videoGateway at WebSocket message callback entry (T7b). */
+  browserReceiveEpochUs: number | null
   key: boolean
   delta: boolean
   payload: Uint8Array
@@ -90,7 +95,9 @@ export function decodeVideoMessage(buffer: ArrayBuffer): VideoGatewayMessage | n
     return {
       kind: 'chunk',
       streamId,
+      baseIngestTimestampUs: timestampUs,
       timestampUs,
+      browserReceiveEpochUs: null,
       key: (flags & CHUNK_FLAG_KEY) !== 0,
       delta: (flags & CHUNK_FLAG_DELTA) !== 0,
       payload,

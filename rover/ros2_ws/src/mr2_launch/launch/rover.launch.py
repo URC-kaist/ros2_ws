@@ -128,6 +128,11 @@ def generate_launch_description():
         default_value="/dev/ttyXBEE",
         description="Serial device for the real XBEE bridge",
     )
+    enable_latency_diagnostics_arg = DeclareLaunchArgument(
+        "enable_latency_diagnostics",
+        default_value="false",
+        description="Publish experimental command and motion latency traces",
+    )
     enable_aruco_arg = DeclareLaunchArgument(
         "enable_aruco",
         default_value="true",
@@ -407,6 +412,7 @@ def generate_launch_description():
             {"cmd_vel_topic": "/base/cmd_vel"},
             {"smooth_arm_joint_commands": True},
             {"arm_joint_accel_limit_rad_s2": 3.0},
+            {"latency_diagnostics_enabled": LaunchConfiguration("enable_latency_diagnostics")},
         ],
         condition=real_condition,
     )
@@ -422,6 +428,7 @@ def generate_launch_description():
             {"cmd_vel_topic": "/base/cmd_vel"},
             {"smooth_arm_joint_commands": True},
             {"arm_joint_accel_limit_rad_s2": 3.0},
+            {"latency_diagnostics_enabled": LaunchConfiguration("enable_latency_diagnostics")},
         ],
         condition=xbee_sim_condition,
     )
@@ -459,6 +466,7 @@ def generate_launch_description():
         xbee_sim_device_arg,
         xbee_sim_peer_arg,
         xbee_device_arg,
+        enable_latency_diagnostics_arg,
         enable_aruco_arg,
         aruco_cam_topic_arg,
         enable_video_streaming_arg,

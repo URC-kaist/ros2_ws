@@ -19,6 +19,7 @@ const {
   encodeMissionControl,
 } = require('../protocol/xbee')
 const { createGatewayHttpHandler } = require('../runtime/http_handlers')
+const { createChronyStatusProvider } = require('../runtime/chrony_status')
 const { startMavproxy } = require('../runtime/mavproxy')
 const { RocketM2Client } = require('../runtime/rocket_m2_client')
 const { startRosTopicRelay } = require('../runtime/ros_topic_relay')
@@ -30,12 +31,46 @@ const { loadVideoConfig } = require('../video/stream_config')
 
 const XBEE_BAUD = 115200
 
+function encodeDashboardDriveMessage(msg, nextSeq, gatewayRxEpochUs = Date.now() * 1000) {
+  const coerceNumber = (value) => {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : 0
+  }
+  const wireTimestampMs = Math.floor(gatewayRxEpochUs / 1000) >>> 0
+  const frame = encodeCmdDrive(
+    {
+      timestamp_ms: wireTimestampMs,
+      linear_x_m_s: coerceNumber(msg.linear_x_m_s),
+      linear_y_m_s: coerceNumber(msg.linear_y_m_s),
+      angular_z_rad_s: coerceNumber(msg.angular_z_rad_s),
+    },
+    nextSeq
+  )
+  const trialId = typeof msg.trial_id === 'string' ? msg.trial_id.slice(0, 128) : ''
+  const clientTxEpochUs = coerceNumber(msg.client_tx_epoch_us)
+  return {
+    frame,
+    trace:
+      trialId && clientTxEpochUs > 0
+        ? {
+            type: 'latency_trace',
+            trial_id: trialId,
+            client_tx_epoch_us: clientTxEpochUs,
+            gateway_rx_epoch_us: gatewayRxEpochUs,
+            xbee_seq: frame[3],
+            wire_timestamp_ms: wireTimestampMs,
+          }
+        : null,
+  }
+}
+
 // Compose the gateway runtime out of small adapters so the entrypoint stays thin
 // and each integration point can be tested independently.
 function createGatewayApp(options = {}) {
   const config = options.config
   const env = options.env || process.env
   const execFileAsync = options.execFileAsync || promisify(execFile)
+  const getChronyStatus = createChronyStatusProvider({ execFileAsync })
   const videoConfig = loadVideoConfig(config.videoConfigPath)
 
   const nextSeq = createSequencer()
@@ -63,6 +98,7 @@ function createGatewayApp(options = {}) {
       log,
       getRocketM2State: () => getRocketM2FleetState(),
       getVideoStreams: () => (videoGateway ? videoGateway.getBrowserStreams() : []),
+      getChronyStatus,
     })
   )
   const routeRegistry = createWsRouteRegistry({ server })
@@ -174,6 +210,7 @@ function createGatewayApp(options = {}) {
   }
 
   function handleDashboardMessage(msg) {
+    const gatewayRxEpochUs = Date.now() * 1000
     if (!msg || typeof msg !== 'object') return
 
     // Older clients sometimes send `event`; current clients send `type`.
@@ -185,17 +222,11 @@ function createGatewayApp(options = {}) {
       const lateral = coerceNumber(msg.linear_y_m_s)
       const angular = coerceNumber(msg.angular_z_rad_s)
       log(`cmd_drive rx x=${linear} y=${lateral} yaw=${angular}`)
-      writeFrame(
-        encodeCmdDrive(
-          {
-            timestamp_ms: Date.now() >>> 0,
-            linear_x_m_s: linear,
-            linear_y_m_s: lateral,
-            angular_z_rad_s: angular,
-          },
-          nextSeq
-        )
-      )
+      const encoded = encodeDashboardDriveMessage(msg, nextSeq, gatewayRxEpochUs)
+      writeFrame(encoded.frame)
+      if (encoded.trace) {
+        wsHub.broadcast(encoded.trace)
+      }
       return
     }
 
@@ -468,4 +499,5 @@ function createGatewayApp(options = {}) {
 
 module.exports = {
   createGatewayApp,
+  encodeDashboardDriveMessage,
 }

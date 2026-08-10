@@ -309,6 +309,18 @@ Fields:
 - `timestamp_us`
 - `payload`
 
+`timestamp_us` is the base gateway's epoch timestamp when the Annex-B access
+unit emerges from the receive child after RTP jitter buffering, depayloading,
+and H.264 parsing. It is not the rover capture timestamp or raw base-NIC packet
+arrival time. Browser diagnostics call this observation T7a and use it only for
+the base-to-browser boundary; they do not use it to estimate Rocket M2 latency.
+
+Rocket M2 link latency is measured without changing this wire field. The tools
+under `scripts/latency/` capture the existing RTP packets on the rover and base
+Rocket-facing interfaces and match `(UDP port, SSRC, sequence, RTP timestamp)`.
+See `scripts/latency/README.md` for the clock-offset contract and field
+procedure.
+
 Current flags:
 
 - bit 0: key

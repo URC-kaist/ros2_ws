@@ -1,4 +1,5 @@
 import { decodeVideoMessage, type VideoGatewayMessage } from './videoProtocol'
+import { browserEpochUs, latencyDiagnostics } from './latencyDiagnostics'
 
 export type VideoStreamInfo = {
   stream_id: string
@@ -114,10 +115,19 @@ class VideoGatewayClient {
       }
     })
     ws.addEventListener('message', (event) => {
+      const browserReceiveEpochUs = browserEpochUs()
       if (this.ws !== ws) return
       if (!(event.data instanceof ArrayBuffer)) return
       const message = decodeVideoMessage(event.data)
       if (!message) return
+      if (message.kind === 'chunk') {
+        message.browserReceiveEpochUs = browserReceiveEpochUs
+        latencyDiagnostics.observeVideoReceive(
+          message.streamId,
+          message.baseIngestTimestampUs,
+          browserReceiveEpochUs
+        )
+      }
       const streamListeners = this.listeners.get(message.streamId)
       if (!streamListeners) return
       for (const listener of streamListeners) {

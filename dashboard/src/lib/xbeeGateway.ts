@@ -4,6 +4,20 @@ export type CmdDrive = {
   angular_z_rad_s: number
 }
 
+export type CmdDriveTrace = {
+  trial_id: string
+  client_tx_epoch_us: number
+}
+
+export type GatewayLatencyTrace = {
+  type: 'latency_trace'
+  trial_id: string
+  client_tx_epoch_us: number
+  gateway_rx_epoch_us: number
+  xbee_seq: number
+  wire_timestamp_ms: number
+}
+
 export type CmdArmTwist = {
   lin_x_m_s: number
   lin_y_m_s: number
@@ -131,6 +145,7 @@ type GatewayMessage =
   | RawTelemNav
   | RawBaseStatus
   | RawRocketM2Status
+  | GatewayLatencyTrace
   | ({ type: 'link_status' } & LinkStatus)
 
 const DEFAULT_PATH = '/xbee-ws'
@@ -167,6 +182,7 @@ class XbeeGatewayClient {
   private navListeners = new Set<MessageHandler<TelemNav>>()
   private baseStatusListeners = new Set<MessageHandler<BaseStatus>>()
   private rocketM2Listeners = new Set<MessageHandler<RocketM2Status>>()
+  private latencyTraceListeners = new Set<MessageHandler<GatewayLatencyTrace>>()
   private pendingBaseHeading: number | null = null
   private url: string
 
@@ -240,6 +256,10 @@ class XbeeGatewayClient {
         for (const listener of this.rocketM2Listeners) {
           listener(message)
         }
+      } else if (message.type === 'latency_trace') {
+        for (const listener of this.latencyTraceListeners) {
+          listener(message)
+        }
       } else if (message.type === 'link_status') {
         this.lastLinkStatus = message
         this.linkConnected = message.connected
@@ -296,12 +316,20 @@ class XbeeGatewayClient {
     }
   }
 
-  sendCmdDrive(cmd: CmdDrive) {
+  onLatencyTrace(handler: MessageHandler<GatewayLatencyTrace>) {
+    this.latencyTraceListeners.add(handler)
+    return () => {
+      this.latencyTraceListeners.delete(handler)
+    }
+  }
+
+  sendCmdDrive(cmd: CmdDrive, trace?: CmdDriveTrace) {
     this.send({
       type: 'cmd_drive',
       linear_x_m_s: cmd.linear_x_m_s,
       linear_y_m_s: cmd.linear_y_m_s,
       angular_z_rad_s: cmd.angular_z_rad_s,
+      ...(trace || {}),
     })
   }
 

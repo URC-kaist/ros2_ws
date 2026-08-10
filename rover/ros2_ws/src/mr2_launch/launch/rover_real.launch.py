@@ -154,6 +154,11 @@ def generate_launch_description():
         default_value="false",
         description="Start socat to emulate a XBEE serial port pair in real mode",
     )
+    enable_latency_diagnostics_arg = DeclareLaunchArgument(
+        "enable_latency_diagnostics",
+        default_value="false",
+        description="Publish experimental command and motion latency traces",
+    )
     xbee_sim_device_arg = DeclareLaunchArgument(
         "xbee_sim_device",
         default_value="/tmp/xbee_sim0",
@@ -410,6 +415,7 @@ def generate_launch_description():
             "xbee_device": LaunchConfiguration("xbee_device"),
             "xbee_sim_device": LaunchConfiguration("xbee_sim_device"),
             "xbee_sim_peer": LaunchConfiguration("xbee_sim_peer"),
+            "enable_latency_diagnostics": LaunchConfiguration("enable_latency_diagnostics"),
             "enable_aruco": LaunchConfiguration("enable_autonomous_module"),
             "aruco_cam_topic": "/front_camera/image_raw",
             "enable_video_streaming": LaunchConfiguration("enable_video_streaming"),
@@ -574,6 +580,7 @@ def generate_launch_description():
             use_mock_servos_arg,
             enable_manipulator_module_arg,
             enable_xbee_sim_arg,
+            enable_latency_diagnostics_arg,
             xbee_sim_device_arg,
             xbee_sim_peer_arg,
             xbee_device_arg,

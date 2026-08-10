@@ -12,6 +12,10 @@ base/gateway/node_modules
 tmp/
 base/gateway/.env.local
 base/gateway/*.tlog*
+*.pcap
+*.pcapng
+__pycache__/
+*.py[cod]
 scripts/dashboard_err.log
 
 scripts/nginx/mr2-dashboard.conf

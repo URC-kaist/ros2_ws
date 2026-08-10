@@ -7,6 +7,7 @@
 #include <functional>
 #include <limits>
 #include <mutex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -30,6 +31,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "ublox_ubx_msgs/msg/ubx_nav_svin.hpp"
 #include "rtcm_msgs/msg/message.hpp"
 
@@ -112,6 +114,10 @@ class XbeeBridgeNode : public rclcpp::Node {
             "base_svin_topic", "/base/ubx_nav_svin")),
         base_rtcm_topic_(declare_parameter<std::string>(
             "base_rtcm_topic", "/base/rtcm")),
+        latency_diagnostics_enabled_(
+            declare_parameter<bool>("latency_diagnostics_enabled", false)),
+        latency_trace_topic_(declare_parameter<std::string>(
+            "latency_trace_topic", "/latency/trace")),
         log_frames_(declare_parameter<bool>("log_frames", false)) {
     cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
     mission_control_pub_ =
@@ -129,6 +135,10 @@ class XbeeBridgeNode : public rclcpp::Node {
         base_svin_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
     base_rtcm_pub_ = create_publisher<rtcm_msgs::msg::Message>(
         base_rtcm_topic_, rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
+    if (latency_diagnostics_enabled_) {
+      latency_trace_pub_ =
+          create_publisher<std_msgs::msg::String>(latency_trace_topic_, 20);
+    }
 
     battery_sub_1_ = create_subscription<mr2_battery_monitor::msg::PackTelemetry>(
         battery_1_topic_, rclcpp::SensorDataQoS(),
@@ -149,7 +159,6 @@ class XbeeBridgeNode : public rclcpp::Node {
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
         odom_topic_, rclcpp::SensorDataQoS(),
         [this](const nav_msgs::msg::Odometry::SharedPtr msg) { odom_cb_(msg); });
-
     open_serial_();
     start_reader_();
 
@@ -327,7 +336,8 @@ class XbeeBridgeNode : public rclcpp::Node {
       case mr2_xbee_bridge::MsgId::kCmdDrive: {
         auto cmd = mr2_xbee_bridge::decode_cmd_drive(frame);
         if (cmd) {
-          handle_cmd_drive_(*cmd);
+          const int64_t rover_rx_epoch_us = system_epoch_us_();
+          handle_cmd_drive_(*cmd, frame.header.seq, rover_rx_epoch_us);
         }
         break;
       }
@@ -429,7 +439,9 @@ class XbeeBridgeNode : public rclcpp::Node {
     }
   }
 
-  void handle_cmd_drive_(const CmdDrive &cmd) {
+  void handle_cmd_drive_(const CmdDrive &cmd, uint8_t frame_seq,
+                         int64_t rover_rx_epoch_us,
+                         bool record_latency = true) {
     std::lock_guard<std::mutex> lock(command_smoothing_mutex_);
     const auto now_time = now();
     std::array<double, 3> target{
@@ -454,6 +466,11 @@ class XbeeBridgeNode : public rclcpp::Node {
     msg.linear.y = output[1];
     msg.angular.z = output[2];
     cmd_vel_pub_->publish(msg);
+    const int64_t cmd_publish_epoch_us = system_epoch_us_();
+    if (record_latency) {
+      publish_command_latency_trace_(cmd, frame_seq, rover_rx_epoch_us,
+                                     cmd_publish_epoch_us, output);
+    }
     if (log_frames_) {
       RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000,
                            "CMD_DRIVE target=(%.3f, %.3f, %.3f) out=(%.3f, %.3f, %.3f)",
@@ -461,6 +478,38 @@ class XbeeBridgeNode : public rclcpp::Node {
                            cmd.angular_z_rad_s, output[0], output[1],
                            output[2]);
     }
+  }
+
+  static int64_t system_epoch_us_() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+  }
+
+  void publish_command_latency_trace_(
+      const CmdDrive &cmd, uint8_t frame_seq, int64_t rover_rx_epoch_us,
+      int64_t cmd_publish_epoch_us, const std::array<double, 3> &output) {
+    if (!latency_diagnostics_enabled_ || !latency_trace_pub_) {
+      return;
+    }
+    const auto finite_or_zero = [](double value) {
+      return std::isfinite(value) ? value : 0.0;
+    };
+    std::ostringstream json;
+    json << "{\"schema_version\":1,\"event\":\"command\","
+         << "\"xbee_seq\":" << static_cast<unsigned int>(frame_seq) << ','
+         << "\"wire_timestamp_ms\":" << cmd.timestamp_ms << ','
+         << "\"rover_rx_epoch_us\":" << rover_rx_epoch_us << ','
+         << "\"cmd_publish_epoch_us\":" << cmd_publish_epoch_us << ','
+         << "\"target\":{\"x\":" << finite_or_zero(cmd.linear_x_m_s)
+         << ",\"y\":" << finite_or_zero(cmd.linear_y_m_s)
+         << ",\"yaw\":" << finite_or_zero(cmd.angular_z_rad_s) << "},"
+         << "\"output\":{\"x\":" << finite_or_zero(output[0])
+         << ",\"y\":" << finite_or_zero(output[1])
+         << ",\"yaw\":" << finite_or_zero(output[2]) << "}}";
+    std_msgs::msg::String trace;
+    trace.data = json.str();
+    latency_trace_pub_->publish(trace);
   }
 
   void handle_cmd_arm_(const CmdArmTwist &cmd) {
@@ -662,7 +711,7 @@ class XbeeBridgeNode : public rclcpp::Node {
     }
 
     CmdDrive zero_drive;
-    handle_cmd_drive_(zero_drive);
+    handle_cmd_drive_(zero_drive, 0, 0, false);
 
     CmdArmTwist zero_arm;
     handle_cmd_arm_(zero_arm);
@@ -866,6 +915,8 @@ class XbeeBridgeNode : public rclcpp::Node {
   std::string battery_2_topic_;
   std::string base_svin_topic_;
   std::string base_rtcm_topic_;
+  bool latency_diagnostics_enabled_;
+  std::string latency_trace_topic_;
   bool log_frames_;
 
   // ROS interfaces
@@ -878,6 +929,7 @@ class XbeeBridgeNode : public rclcpp::Node {
   rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr camera_turret_cmd_pub_;
   rclcpp::Publisher<ublox_ubx_msgs::msg::UBXNavSvin>::SharedPtr base_svin_pub_;
   rclcpp::Publisher<rtcm_msgs::msg::Message>::SharedPtr base_rtcm_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr latency_trace_pub_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr
       battery_sub_1_;
   rclcpp::Subscription<mr2_battery_monitor::msg::PackTelemetry>::SharedPtr

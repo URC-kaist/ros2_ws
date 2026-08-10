@@ -12,6 +12,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test:latency": "esbuild test/run.ts --bundle --platform=node --format=cjs --define:import.meta.env='{}' --outfile=/tmp/mr2-latency-dashboard-test.cjs && node /tmp/mr2-latency-dashboard-test.cjs",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.app.json",
     "check": "npm run typecheck && npm run lint && npm run build"

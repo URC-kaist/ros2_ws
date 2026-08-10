@@ -160,6 +160,46 @@ It owns:
 - per-stream subscriptions over `/video-ws`
 - browser-side H.264 chunk delivery to the WebCodecs renderer
 
+### Latency diagnostics
+
+The persistent control sidebar contains a `Latency diagnostics` panel with
+three independent measurement boundaries:
+
+- an armed command path through gateway T1 and rover T3/T4;
+- an imported rover/base RTP packet-capture report for the Rocket M2 path;
+- rolling selected-stream base-to-browser and browser decode/render timings.
+
+Before a field run:
+
+1. install the base-local chrony configuration from
+   `scripts/latency/chrony/README.md` on both hosts;
+2. launch the rover with `enable_latency_diagnostics:=true`;
+3. press `Check chrony sync` and wait for `Ready for synchronized RTP capture`;
+4. follow `scripts/latency/README.md` to capture the same RTP stream at the
+   rover and base and generate a JSON report;
+5. select the same video stream and press `Import RTP report` to load that JSON;
+6. press `Measure browser/base` for the live base-to-browser metric;
+7. optionally press `Arm command`, leave the controller neutral until the panel
+   says `Send command`, and make one input to measure T0/T1/T3/T4;
+8. export command and chrony observations as JSON Lines after the desired
+   repetitions.
+
+The chrony button does not start services or step clocks. It fetches base status
+from `/latency/clock-status` and combines it with rover
+`/system_status/clock`. Readiness requires both samples to be no older than five
+seconds, a synchronized rover, an absolute rover residual no greater than 2 ms,
+and a chrony root error bound no greater than 2 ms. Only then does the panel
+offer `--clock-offset-us 0` for the RTP analyzer.
+
+The imported report displays Rocket-link packet latency p50/p95/p99/max, loss,
+and offered/delivered bitrate. It is calculated from existing RTP identifiers;
+the video payload and wire protocol are unchanged. No wheel-motion or visual
+motion detector is used.
+
+Only the selected stream contributes live browser samples. These samples are
+bounded to 600 frames and UI updates are batched. The command event log remains
+bounded to 20,000 records.
+
 ## Current Refactor Status
 
 The dashboard has already been restructured around:

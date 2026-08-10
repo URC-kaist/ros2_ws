@@ -123,3 +123,42 @@ test('createGatewayHttpHandler serves video stream metadata', () => {
     ],
   })
 })
+
+test('createGatewayHttpHandler serves latency clock samples without caching', () => {
+  const handler = createGatewayHttpHandler()
+  const res = createResponseRecorder()
+
+  handler(
+    {
+      method: 'GET',
+      url: '/latency/time',
+    },
+    res
+  )
+
+  const body = JSON.parse(res.body)
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.headers['Cache-Control'], 'no-store')
+  assert.equal(Number.isInteger(body.server_receive_epoch_us), true)
+  assert.equal(Number.isInteger(body.server_send_epoch_us), true)
+  assert.equal(body.server_send_epoch_us >= body.server_receive_epoch_us, true)
+})
+
+test('createGatewayHttpHandler serves read-only chrony status without caching', async () => {
+  const handler = createGatewayHttpHandler({
+    getChronyStatus: async () => ({
+      schema_version: 1,
+      role: 'base',
+      available: true,
+      synchronized: true,
+      reference_id: '7F7F0101',
+    }),
+  })
+  const res = createResponseRecorder()
+
+  await handler({ method: 'GET', url: '/latency/clock-status' }, res)
+
+  assert.equal(res.statusCode, 200)
+  assert.equal(res.headers['Cache-Control'], 'no-store')
+  assert.equal(JSON.parse(res.body).reference_id, '7F7F0101')
+})

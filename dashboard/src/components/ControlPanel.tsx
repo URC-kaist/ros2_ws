@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import ControlEstopSection from './ControlPanel/ControlEstopSection'
 import ControlStatusList from './ControlPanel/ControlStatusList'
 import ControlVectorPlot, { type CmdVel } from './ControlPanel/ControlVectorPlot'
+import LatencyDiagnosticsPanel from './LatencyDiagnosticsPanel'
 import { useXbeeGateway } from '../hooks/useXbeeGateway'
+import { latencyDiagnostics } from '../lib/latencyDiagnostics'
 import './ControlPanel/ControlPanel.css'
 
 const sensitivityScale = {
@@ -67,11 +69,12 @@ const ControlPanel = () => {
         return
       }
       const latest = cmdVelRef.current
+      const trace = latencyDiagnostics.claimPendingCommandTrace()
       gateway.sendCmdDrive({
         linear_x_m_s: latest.y,
         linear_y_m_s: latest.x,
         angular_z_rad_s: latest.yaw,
-      })
+      }, trace)
     }, cmdRateMs)
     return () => window.clearInterval(cmdId)
   }, [gamepadConnected, gateway])
@@ -137,12 +140,13 @@ const ControlPanel = () => {
         const rightTrigger = pad.buttons[7]?.value ?? 0
         const baseY = (rightTrigger - leftTrigger) * yScale
         const addY = -rightY * yScale
-        const next = {
+      const next = {
           x: -rightX * xScale,
           y: baseY + addY,
           yaw: -leftX * yawScale,
-        }
+      }
 
+        latencyDiagnostics.observeControlInput(next)
         setCmdVel(next)
       } else if (gamepadConnectedRef.current) {
         gamepadConnectedRef.current = false
@@ -159,6 +163,7 @@ const ControlPanel = () => {
   return (
     <aside className="control-panel">
       <ControlStatusList />
+      <LatencyDiagnosticsPanel />
       <ControlVectorPlot
         cmdVel={cmdVel}
         sensitivity={sensitivity}

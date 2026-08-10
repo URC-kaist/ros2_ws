@@ -6,6 +6,8 @@ import rclpy
 from rclpy.node import Node
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 
+from mr2_system_status.chrony_status import read_chrony_status
+
 
 class SystemStatusNode(Node):
     def __init__(self) -> None:
@@ -34,8 +36,12 @@ class SystemStatusNode(Node):
         self.uptime_pub = self.create_publisher(
             DiagnosticArray, f"{base_topic}/uptime", 10
         )
+        self.clock_pub = self.create_publisher(
+            DiagnosticArray, f"{base_topic}/clock", 10
+        )
 
         self.timer = self.create_timer(1.0 / publish_rate_hz, self.publish)
+        self.clock_timer = self.create_timer(2.0, self.publish_clock_status)
         self._temps_ok = True
 
         # Prime psutil's CPU percent to avoid a misleading first sample.
@@ -119,6 +125,30 @@ class SystemStatusNode(Node):
             "uptime_sec": time.time() - psutil.boot_time(),
         }
         self._publish_status(self.uptime_pub, "uptime", uptime_payload)
+
+    def publish_clock_status(self) -> None:
+        payload = read_chrony_status()
+        status = DiagnosticStatus()
+        if not payload["available"]:
+            status.level = DiagnosticStatus.WARN
+            status.message = str(payload["error"] or "chrony unavailable")
+        elif not payload["synchronized"]:
+            status.level = DiagnosticStatus.ERROR
+            status.message = "chrony not synchronized"
+        else:
+            status.level = DiagnosticStatus.OK
+            status.message = "synchronized"
+        status.name = "clock"
+        status.hardware_id = "rover-system-clock"
+        status.values = [
+            KeyValue(key=key, value="" if value is None else str(value))
+            for key, value in payload.items()
+        ]
+
+        array = DiagnosticArray()
+        array.header.stamp = self.get_clock().now().to_msg()
+        array.status = [status]
+        self.clock_pub.publish(array)
 
 
 def main(args=None) -> None:
