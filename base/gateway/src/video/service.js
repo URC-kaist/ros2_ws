@@ -2,7 +2,11 @@
 
 const { WebSocketServer } = require('ws')
 
-const { encodeChunkMessage, encodeConfigMessage } = require('./protocol')
+const {
+  encodeChunkMessage,
+  encodeConfigMessage,
+  encodeTimedChunkMessage,
+} = require('./protocol')
 const { createVideoStreamReceiver } = require('./receiver')
 const { listBrowserStreams } = require('./stream_config')
 
@@ -20,6 +24,7 @@ function createStreamState(stream) {
     encodedHeight: 0,
     encodedWidth: 0,
     latestKeyAccessUnit: null,
+    lastDecodeTimestampUs: 0,
     pps: null,
     sps: null,
     stream,
@@ -186,11 +191,9 @@ function createVideoGateway(options = {}) {
       subscription.configVersionSent = state.configVersion
     }
 
-    const chunkMessage = encodeChunkMessage({
+    const chunkMessage = encodeAccessUnitMessage(state, {
+      ...keyUnit,
       key: true,
-      payload: keyUnit.payload,
-      stream_id: state.stream.stream_id,
-      timestamp_us: keyUnit.timestamp_us,
     })
     if (!trySend(client, chunkMessage, state.stream.stream_id)) {
       return false
@@ -217,17 +220,31 @@ function createVideoGateway(options = {}) {
         continue
       }
 
-      trySend(
-        client,
-        encodeChunkMessage({
-          key: accessUnit.key,
-          payload: accessUnit.payload,
-          stream_id: state.stream.stream_id,
-          timestamp_us: accessUnit.timestamp_us,
-        }),
-        state.stream.stream_id
-      )
+      trySend(client, encodeAccessUnitMessage(state, accessUnit), state.stream.stream_id)
     }
+  }
+
+  function encodeAccessUnitMessage(state, accessUnit) {
+    if (!accessUnit.correlation) {
+      return encodeChunkMessage({
+        key: accessUnit.key,
+        payload: accessUnit.payload,
+        stream_id: state.stream.stream_id,
+        timestamp_us: accessUnit.timestamp_us,
+      })
+    }
+    state.lastDecodeTimestampUs = Math.max(
+      state.lastDecodeTimestampUs + 1,
+      Math.floor(accessUnit.timestamp_us)
+    )
+    return encodeTimedChunkMessage({
+      key: accessUnit.key,
+      payload: accessUnit.payload,
+      stream_id: state.stream.stream_id,
+      decode_timestamp_us: state.lastDecodeTimestampUs,
+      base_access_unit_epoch_us: accessUnit.timestamp_us,
+      ...accessUnit.correlation,
+    })
   }
 
   function handleAccessUnit(streamId, accessUnit) {
@@ -242,6 +259,7 @@ function createVideoGateway(options = {}) {
 
     if (accessUnit.key && state.sps && state.pps) {
       state.latestKeyAccessUnit = {
+        correlation: accessUnit.correlation,
         payload: Buffer.from(accessUnit.payload),
         timestamp_us: accessUnit.timestamp_us,
       }

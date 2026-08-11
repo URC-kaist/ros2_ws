@@ -156,6 +156,26 @@ test('parseGatewayConfig accepts top-level MR2 network env fallbacks', () => {
   )
 })
 
+test('parseGatewayConfig reads automated uplink diagnostics settings', () => {
+  const config = parseGatewayConfig([], {
+    MR2_LATENCY_DIAGNOSTICS_ENABLE: 'true',
+    MR2_BASE_ROCKET_INTERFACE: 'eth1',
+    MR2_LATENCY_ARTIFACT_DIR: '/tmp/latency-test',
+    MR2_LATENCY_PUBLIC_BASE_URL: 'http://192.168.1.101:8081',
+    MR2_LATENCY_CAPTURE_DURATION_S: '12',
+    MR2_LATENCY_CAPTURE_EDGE_MARGIN_S: '4',
+    MR2_LATENCY_MAX_UPLOAD_BYTES: '1048576',
+  })
+
+  assert.equal(config.latencyDiagnosticsEnable, true)
+  assert.equal(config.latencyBaseInterface, 'eth1')
+  assert.equal(config.latencyArtifactRoot, '/tmp/latency-test')
+  assert.equal(config.latencyPublicBaseUrl, 'http://192.168.1.101:8081')
+  assert.equal(config.latencyCaptureDurationS, 12)
+  assert.equal(config.latencyCaptureEdgeMarginS, 4)
+  assert.equal(config.latencyMaxUploadBytes, 1048576)
+})
+
 test('parseGatewayConfig ignores removed legacy gateway env and flags', () => {
   const config = parseGatewayConfig(
     [

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 
-import { parseRtpLatencyReport } from '../src/lib/rtpLatencyReport'
+import {
+  parseAutomatedUplinkReport,
+  parseRtpLatencyReport,
+} from '../src/lib/rtpLatencyReport'
 
 const valid = {
   schema_version: 1,
@@ -37,6 +40,58 @@ assert.equal(parsed.streams[0].loss_percent, 1)
 assert.throws(
   () => parseRtpLatencyReport({ ...valid, kind: 'wrong' }),
   /Unsupported RTP latency report schema/
+)
+
+const segment = {
+  count: 2,
+  min: 100,
+  mean: 150,
+  p50: 150,
+  p95: 195,
+  p99: 199,
+  max: 200,
+}
+const automated = parseAutomatedUplinkReport({
+  schema_version: 2,
+  kind: 'mr2_automated_uplink_latency_report',
+  generated_at: '2026-08-11T00:00:00+00:00',
+  trial_id: 'trial-1',
+  feed_count: 1,
+  stream_ids: ['front_test_cam'],
+  clock: { base_minus_rover_us: 0, base_minus_browser_us: 25 },
+  aggregate: {
+    rocket_m2: segment,
+    base_to_browser: segment,
+    decode_render: segment,
+    total: segment,
+  },
+  matched_frames: 2,
+  browser_frames: 2,
+  warnings: [],
+  streams: [
+    {
+      stream_id: 'front_test_cam',
+      udp_port: 5000,
+      segments: {
+        rocket_m2: segment,
+        base_to_browser: segment,
+        decode_render: segment,
+        total: segment,
+      },
+      matched_frames: 2,
+      browser_frames: 2,
+      matched_packets: 10,
+      packet_loss_percent: 0,
+      rover_offered_bitrate_bps: 1000,
+      base_delivered_bitrate_bps: 1000,
+      warnings: [],
+    },
+  ],
+})
+assert.equal(automated.aggregate.total.p95, 195)
+assert.throws(
+  () => parseAutomatedUplinkReport({ ...automated, aggregate: { total: segment } }),
+  /aggregate.rocket_m2/
 )
 assert.throws(
   () =>

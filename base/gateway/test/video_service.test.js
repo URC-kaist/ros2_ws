@@ -274,3 +274,36 @@ test('video gateway preserves configured display dimensions separately from enco
 
   gateway.stop()
 })
+
+test('video gateway sends timed chunks when an access unit has RTP marker metadata', () => {
+  const routeRegistry = createRouteRegistry()
+  const receiverHarness = createReceiverHarness()
+  const gateway = createVideoGateway({
+    WebSocketServerImpl: FakeWebSocketServer,
+    createVideoStreamReceiverImpl: receiverHarness.factory,
+    routeRegistry,
+    videoConfig: createVideoConfig(),
+  })
+  const client = new FakeClient()
+  routeRegistry.wss.emit('connection', client)
+  client.emitJson({ type: 'subscribe', stream_id: 'front_nav_cam' })
+  const receiver = receiverHarness.callbacksByStream.get('front_nav_cam')
+  receiver.onAccessUnit('front_nav_cam', {
+    codec: 'avc1.42E01F',
+    correlation: { marker_sequence: 9, rtp_timestamp: 90000, ssrc: 42 },
+    delta: false,
+    key: true,
+    payload: Buffer.from([0x00, 0x00, 0x00, 0x01, 0x65, 0xe0]),
+    pps: Buffer.from([0x68, 0xce, 0x38, 0x80]),
+    sps: Buffer.from([0x67, 0x42, 0xe0, 0x1f]),
+    timestamp_us: 123456,
+  })
+  assert.equal(client.sent.length, 2)
+  const timed = client.sent[1]
+  assert.equal(timed.readUInt8(0), 3)
+  assert.equal(timed.readUInt32LE(12), 42)
+  assert.equal(timed.readUInt32LE(16), 90000)
+  assert.equal(timed.readUInt16LE(20), 9)
+  assert.equal(Number(timed.readBigUInt64LE(22)), 123456)
+  gateway.stop()
+})

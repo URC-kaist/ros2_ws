@@ -2,6 +2,7 @@
 
 const MESSAGE_TYPE_CONFIG = 1
 const MESSAGE_TYPE_CHUNK = 2
+const MESSAGE_TYPE_TIMED_CHUNK = 3
 const CHUNK_FLAG_KEY = 1 << 0
 const CHUNK_FLAG_DELTA = 1 << 1
 
@@ -75,11 +76,46 @@ function encodeChunkMessage(message) {
   return payload
 }
 
+function encodeTimedChunkMessage(message) {
+  const streamId = toBuffer(message.stream_id)
+  const accessUnit = toBuffer(message.payload)
+  const flags = message.key ? CHUNK_FLAG_KEY : CHUNK_FLAG_DELTA
+  const decodeTimestampUs = BigInt(Math.max(0, Math.floor(message.decode_timestamp_us || 0)))
+  const baseAccessUnitEpochUs = BigInt(
+    Math.max(0, Math.floor(message.base_access_unit_epoch_us || 0))
+  )
+  const totalLength = 34 + streamId.length + accessUnit.length
+  const payload = Buffer.alloc(totalLength)
+  let offset = 0
+  payload.writeUInt8(MESSAGE_TYPE_TIMED_CHUNK, offset++)
+  payload.writeUInt16LE(streamId.length, offset)
+  offset += 2
+  payload.writeUInt8(flags, offset++)
+  payload.writeBigUInt64LE(decodeTimestampUs, offset)
+  offset += 8
+  payload.writeUInt32LE(message.ssrc >>> 0, offset)
+  offset += 4
+  payload.writeUInt32LE(message.rtp_timestamp >>> 0, offset)
+  offset += 4
+  payload.writeUInt16LE(message.marker_sequence & 0xffff, offset)
+  offset += 2
+  payload.writeBigUInt64LE(baseAccessUnitEpochUs, offset)
+  offset += 8
+  payload.writeUInt32LE(accessUnit.length, offset)
+  offset += 4
+  streamId.copy(payload, offset)
+  offset += streamId.length
+  accessUnit.copy(payload, offset)
+  return payload
+}
+
 module.exports = {
   CHUNK_FLAG_DELTA,
   CHUNK_FLAG_KEY,
   MESSAGE_TYPE_CHUNK,
   MESSAGE_TYPE_CONFIG,
+  MESSAGE_TYPE_TIMED_CHUNK,
   encodeChunkMessage,
   encodeConfigMessage,
+  encodeTimedChunkMessage,
 }

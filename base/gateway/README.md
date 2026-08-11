@@ -346,9 +346,10 @@ The gateway broadcasts a JSON `latency_trace` mapping the dashboard `trial_id`
 to the encoded `(xbee_seq, wire_timestamp_ms)` key. Untagged commands and the
 XBEE wire protocol are unchanged.
 
-Rocket M2 video-link latency is not derived from the post-GStreamer browser
-timestamp. Use the matched rover/base RTP capture tools documented in
-`scripts/latency/README.md`; they do not change the gateway video wire format.
+Rocket M2 video-link latency uses matched rover/base RTP captures. The
+dashboard can create and run these trials through `/latency/uplink/trials` when
+the `MR2_LATENCY_*` settings documented in `scripts/latency/README.md` are
+configured. This does not change the gateway video wire format.
 
 ### Dashboard -> Gateway
 
@@ -389,6 +390,20 @@ Notes:
   becomes `false` if no heartbeat is received within `BASE_XBEE_LINK_TIMEOUT_MS`.
 
 ## HTTP Endpoints
+
+### `/latency/uplink/trials`
+
+- `POST /latency/uplink/trials`: create one validated trial
+- `POST /latency/uplink/trials/<id>/start`: start base capture and issue rover upload credentials
+- `PUT /latency/uplink/trials/<id>/rover-metadata`: upload rover capture metadata
+- `PUT /latency/uplink/trials/<id>/rover-capture`: stream the rover pcap
+- `POST /latency/uplink/trials/<id>/browser-samples`: upload correlated browser receive/render samples
+- `GET /latency/uplink/trials/<id>`: read progress and the completed report
+- `DELETE /latency/uplink/trials/<id>`: cancel and clean up the active capture
+
+Only one Uplink trial can be active. Uploads require the per-trial bearer token,
+explicit content length/type, and remain bounded by
+`MR2_LATENCY_MAX_UPLOAD_BYTES`.
 
 ### `GET /rocket-m2/status`
 

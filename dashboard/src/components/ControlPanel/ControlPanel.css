@@ -1,4 +1,5 @@
 .control-panel {
+  box-sizing: border-box;
   background: linear-gradient(180deg, #101827 0%, #0c111a 100%);
   padding: 20px;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
@@ -9,6 +10,7 @@
   top: 0;
   left: 0;
   width: 20%;
+  max-width: 100vw;
   height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
@@ -18,7 +20,8 @@
 @media (max-width: 960px) {
   .control-panel {
     position: relative;
-    width: 100%;
+    width: 100vw;
+    min-width: 0;
     height: auto;
   }
 }

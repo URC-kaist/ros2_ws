@@ -1,0 +1,5 @@
+string owner_id
+---
+bool released
+string message
+string[] restored_stream_ids

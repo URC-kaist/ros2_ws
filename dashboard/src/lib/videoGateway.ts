@@ -124,8 +124,10 @@ class VideoGatewayClient {
         message.browserReceiveEpochUs = browserReceiveEpochUs
         latencyDiagnostics.observeVideoReceive(
           message.streamId,
+          message.timestampUs,
           message.baseIngestTimestampUs,
-          browserReceiveEpochUs
+          browserReceiveEpochUs,
+          message.correlation
         )
       }
       const streamListeners = this.listeners.get(message.streamId)

@@ -1,0 +1,7 @@
+string trial_id
+float64 duration_s
+string upload_base_url
+string upload_token
+---
+bool accepted
+string message

@@ -6,6 +6,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(mr2_latency_msgs REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -27,6 +28,7 @@ target_link_libraries(video_streaming_node
   nlohmann_json::nlohmann_json
 )
 ament_target_dependencies(video_streaming_node
+  mr2_latency_msgs
   rclcpp
   sensor_msgs
   std_srvs

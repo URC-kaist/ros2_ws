@@ -2,6 +2,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const { Readable } = require('node:stream')
 
 const {
   handleRocketM2Status,
@@ -161,4 +162,31 @@ test('createGatewayHttpHandler serves read-only chrony status without caching', 
   assert.equal(res.statusCode, 200)
   assert.equal(res.headers['Cache-Control'], 'no-store')
   assert.equal(JSON.parse(res.body).reference_id, '7F7F0101')
+})
+
+test('createGatewayHttpHandler routes automated uplink trial creation', async () => {
+  let received = null
+  const handler = createGatewayHttpHandler({
+    uplinkTrialManager: {
+      createTrial(body) {
+        received = body
+        return { schema_version: 1, trial_id: 'trial-1', phase: 'created' }
+      },
+    },
+  })
+  const request = Readable.from([
+    Buffer.from(
+      JSON.stringify({ feed_count: 2, stream_ids: ['front', 'rear'], duration_s: 15 })
+    ),
+  ])
+  request.method = 'POST'
+  request.url = '/latency/uplink/trials'
+  request.headers = { 'content-type': 'application/json' }
+  const res = createResponseRecorder()
+
+  await handler(request, res)
+
+  assert.equal(res.statusCode, 201)
+  assert.deepEqual(received.stream_ids, ['front', 'rear'])
+  assert.equal(JSON.parse(res.body).trial_id, 'trial-1')
 })

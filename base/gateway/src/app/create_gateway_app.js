@@ -5,6 +5,7 @@ const { execFile } = require('child_process')
 const { promisify } = require('util')
 
 const { AntennaTracker } = require('../antenna/tracker')
+const { UplinkTrialManager } = require('../latency/uplink_trial_manager')
 const {
   MsgId,
   createSequencer,
@@ -72,6 +73,21 @@ function createGatewayApp(options = {}) {
   const execFileAsync = options.execFileAsync || promisify(execFile)
   const getChronyStatus = createChronyStatusProvider({ execFileAsync })
   const videoConfig = loadVideoConfig(config.videoConfigPath)
+  const uplinkTrialManager = options.uplinkTrialManager || new UplinkTrialManager({
+    enabled: config.latencyDiagnosticsEnable,
+    interfaceName: config.latencyBaseInterface,
+    artifactRoot: config.latencyArtifactRoot,
+    publicBaseUrl: config.latencyPublicBaseUrl,
+    captureDurationS: config.latencyCaptureDurationS,
+    captureEdgeMarginS: config.latencyCaptureEdgeMarginS,
+    maxUploadBytes: config.latencyMaxUploadBytes,
+    pythonBinary: config.latencyPythonBinary,
+    tcpdumpBinary: config.latencyTcpdumpBinary,
+    analyzerPath: config.latencyAnalyzerPath,
+    videoConfigPath: config.videoConfigPath,
+    streams: videoConfig.streams,
+    spawn: options.latencySpawn,
+  })
 
   const nextSeq = createSequencer()
   const serialLink = new XbeeSerialLink({
@@ -99,6 +115,7 @@ function createGatewayApp(options = {}) {
       getRocketM2State: () => getRocketM2FleetState(),
       getVideoStreams: () => (videoGateway ? videoGateway.getBrowserStreams() : []),
       getChronyStatus,
+      uplinkTrialManager,
     })
   )
   const routeRegistry = createWsRouteRegistry({ server })
@@ -472,6 +489,8 @@ function createGatewayApp(options = {}) {
       mavproxy.stop()
       mavproxy = null
     }
+
+    await uplinkTrialManager.stop()
 
     serialLink.stop()
     if (videoGateway) {

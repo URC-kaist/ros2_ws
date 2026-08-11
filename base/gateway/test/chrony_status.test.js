@@ -35,6 +35,15 @@ test('parseChronycTracking maps synchronized base status and slow sign', () => {
   assert.equal(status.sampled_at_epoch_ms, 1234)
 })
 
+test('parseChronycTracking accepts an empty reference name', () => {
+  const status = parseChronycTracking(TRACKING.replace('(LOCAL)', '()'), 1234)
+
+  assert.equal(status.available, true)
+  assert.equal(status.synchronized, true)
+  assert.equal(status.reference_id, '7F7F0101')
+  assert.equal(status.reference_name, null)
+})
+
 test('parseChronycTracking maps fast sign and unsynchronized leap state', () => {
   const status = parseChronycTracking(
     TRACKING.replace('0.000125000 seconds slow', '0.000300000 seconds fast')

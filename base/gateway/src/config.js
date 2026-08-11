@@ -47,6 +47,16 @@ const DEFAULTS = {
   mavproxyOut: 'udp:192.168.1.108:14550',
   mavproxyDefaultModules: '',
   rosTopicRelayEnable: true,
+  latencyDiagnosticsEnable: false,
+  latencyBaseInterface: '',
+  latencyArtifactRoot: '/tmp/mr2-latency-base',
+  latencyPublicBaseUrl: '',
+  latencyCaptureDurationS: 15,
+  latencyCaptureEdgeMarginS: 5,
+  latencyMaxUploadBytes: 268435456,
+  latencyPythonBinary: 'python3',
+  latencyTcpdumpBinary: 'tcpdump',
+  latencyAnalyzerPath: path.resolve(__dirname, '../../../scripts/latency/analyze_rtp_latency.py'),
 }
 
 function loadGatewayEnv(baseDir) {
@@ -294,6 +304,50 @@ function parseGatewayConfig(args = process.argv.slice(2), env = process.env) {
         env.BASE_ROS_TOPIC_RELAY_ENABLE ||
         profileDefaults.rosTopicRelayEnable
     ),
+    latencyDiagnosticsEnable: toBool(
+      getArg(args, '--latency-diagnostics-enable') ||
+        env.MR2_LATENCY_DIAGNOSTICS_ENABLE ||
+        DEFAULTS.latencyDiagnosticsEnable
+    ),
+    latencyBaseInterface:
+      getArg(args, '--latency-base-interface') ||
+      env.MR2_BASE_ROCKET_INTERFACE ||
+      DEFAULTS.latencyBaseInterface,
+    latencyArtifactRoot:
+      getArg(args, '--latency-artifact-dir') ||
+      env.MR2_LATENCY_ARTIFACT_DIR ||
+      DEFAULTS.latencyArtifactRoot,
+    latencyPublicBaseUrl:
+      getArg(args, '--latency-public-base-url') ||
+      env.MR2_LATENCY_PUBLIC_BASE_URL ||
+      DEFAULTS.latencyPublicBaseUrl,
+    latencyCaptureDurationS: toFloat(
+      getArg(args, '--latency-capture-duration-s') ||
+        env.MR2_LATENCY_CAPTURE_DURATION_S ||
+        DEFAULTS.latencyCaptureDurationS
+    ),
+    latencyCaptureEdgeMarginS: toFloat(
+      getArg(args, '--latency-capture-edge-margin-s') ||
+        env.MR2_LATENCY_CAPTURE_EDGE_MARGIN_S ||
+        DEFAULTS.latencyCaptureEdgeMarginS
+    ),
+    latencyMaxUploadBytes: toInt(
+      getArg(args, '--latency-max-upload-bytes') ||
+        env.MR2_LATENCY_MAX_UPLOAD_BYTES ||
+        DEFAULTS.latencyMaxUploadBytes
+    ),
+    latencyPythonBinary:
+      getArg(args, '--latency-python') ||
+      env.MR2_LATENCY_PYTHON ||
+      DEFAULTS.latencyPythonBinary,
+    latencyTcpdumpBinary:
+      getArg(args, '--latency-tcpdump') ||
+      env.MR2_LATENCY_TCPDUMP ||
+      DEFAULTS.latencyTcpdumpBinary,
+    latencyAnalyzerPath:
+      getArg(args, '--latency-analyzer') ||
+      env.MR2_LATENCY_ANALYZER ||
+      DEFAULTS.latencyAnalyzerPath,
   }
 }
 

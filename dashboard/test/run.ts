@@ -1,3 +1,7 @@
 import './chronyStatus.test'
+import './downlinkTrial.test'
+import './latencyStatistics.test'
 import './latencyDiagnostics.test'
 import './rtpLatencyReport.test'
+import './uplinkTrial.test'
+import './videoProtocol.test'

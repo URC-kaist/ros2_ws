@@ -29,6 +29,36 @@ The central `video_streams.json` supplies the UDP-port-to-stream-ID mapping.
 4. Install `tcpdump`. Capturing normally requires root or appropriate
    `CAP_NET_RAW`/`CAP_NET_ADMIN` capabilities.
 
+For automated browser-triggered capture, configure the capability once on both
+base and rover:
+
+```bash
+scripts/latency/install_capture_permissions.bash --check
+scripts/latency/install_capture_permissions.bash
+```
+
+Set these values in the base environment before starting the gateway:
+
+```bash
+MR2_LATENCY_DIAGNOSTICS_ENABLE=true
+MR2_BASE_ROCKET_INTERFACE=<base-rocket-interface>
+MR2_LATENCY_PUBLIC_BASE_URL=http://192.168.1.101
+MR2_LATENCY_ARTIFACT_DIR=/tmp/mr2-latency-base
+```
+
+Set the rover interface before launching with diagnostics enabled:
+
+```bash
+export MR2_ROVER_ROCKET_INTERFACE=<rover-rocket-interface>
+ros2 launch mr2_launch rover_real.launch.py \
+  enable_latency_diagnostics:=true enable_video_streaming:=true
+```
+
+The automated Uplink workflow performs stream leasing, rover/base capture,
+artifact upload, RTP marker-to-browser-frame matching, cancellation, and timeout
+cleanup. It reports Rocket M2, base-to-browser, decode/render, and end-to-end
+distributions from the same rendered frame samples.
+
 The analyzer defines the optional correction as:
 
 ```text
@@ -111,17 +141,20 @@ uses tcpdump's classic pcap output.
 
 ## Dashboard
 
-Open the persistent `Latency diagnostics` panel and press `Import RTP report`.
-Choose the analyzer JSON, not a pcap or CSV. The browser reads the report
-locally and does not upload it to the gateway. Selecting a dashboard video
-stream selects the matching report entry when present.
+Select `Uplink feeds` and press `Measure uplink latency` to run the automated
+capture workflow. The selected count enables exactly the first N streams in
+central display order for the duration of the trial and restores the previous
+stream state afterward. The panel renders every selected stream, waits for all
+of them to produce a frame, captures browser receive/draw timestamps, and shows
+aggregate and per-stream segment tables when analysis completes.
 
-The Rocket report and the live browser numbers have different boundaries:
+The automated report uses these measurement boundaries:
 
 ```text
-RTP report p50/p95: rover Rocket-facing capture -> base Rocket-facing capture
-Base -> browser:    post-GStreamer T7a -> browser WebSocket callback T7b
-Decode/render:      browser callback T7b -> canvas draw completion T7c
+Rocket M2:       rover marker packet capture -> base marker packet capture
+Base -> browser: base marker packet capture -> browser WebSocket callback
+Decode/render:   browser callback -> canvas draw completion
+Total:           rover marker packet capture -> canvas draw completion
 ```
 
 ## Diagnosing a bandwidth limit

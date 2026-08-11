@@ -1,33 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { FiArrowDown, FiArrowUp, FiClock, FiDownload, FiRotateCcw, FiX } from 'react-icons/fi'
+import { useLatencyClockReadiness } from '../hooks/useLatencyClockReadiness'
 import { useLatencyDiagnostics } from '../hooks/useLatencyDiagnostics'
 import { useRosBridge } from '../hooks/useRosBridge'
 import { useXbeeGateway } from '../hooks/useXbeeGateway'
-import { fetchVideoStreams, type VideoStreamInfo } from '../lib/videoGateway'
-import type { DiagnosticArray } from '../lib/rosMessages'
+import { downlinkPhaseLabel } from '../lib/latency/downlinkTrial'
+import {
+  cancelUplinkTrial,
+  createUplinkTrial,
+  getUplinkTrial,
+  startUplinkTrial,
+  uploadUplinkBrowserSamples,
+} from '../lib/latency/latencyApi'
+import { mapGatewayUplinkPhase, uplinkPhaseLabel } from '../lib/latency/uplinkTrial'
 import {
   chronyStatusForLog,
-  evaluateChronyReadiness,
-  fetchBaseChronyStatus,
-  parseRoverChronyDiagnostic,
-  type ChronyStatus,
 } from '../lib/chronyStatus'
 import {
   latencyDiagnostics,
-  type LatencyStage,
   type RoverLatencyTrace,
 } from '../lib/latencyDiagnostics'
-import {
-  parseRtpLatencyReport,
-  type RtpLatencyReport,
-} from '../lib/rtpLatencyReport'
+import { parseAutomatedUplinkReport } from '../lib/rtpLatencyReport'
+import { fetchVideoStreams, type VideoStreamInfo } from '../lib/videoGateway'
+import LatencyResultTable from './LatencyResultTable'
+import VideoStreamCard from './VideoStreamCard'
 import './ControlPanel/LatencyDiagnosticsPanel.css'
-
-const STAGE_ROWS: Array<{ stage: LatencyStage; label: string }> = [
-  { stage: 'input_t0', label: 'T0 Input' },
-  { stage: 'gateway_command_received_t1', label: 'T1 Gateway' },
-  { stage: 'rover_command_received_t3', label: 'T3 Rover RX' },
-  { stage: 'rover_cmd_vel_published_t4', label: 'T4 cmd_vel' },
-]
 
 function formatMs(value: number | null | undefined) {
   return value == null || !Number.isFinite(value) ? '--' : `${value.toFixed(1)} ms`
@@ -37,25 +34,40 @@ function formatUsAsMs(value: number | null | undefined) {
   return value == null || !Number.isFinite(value) ? '--' : `${(value / 1000).toFixed(2)} ms`
 }
 
-function formatMbps(value: number | null | undefined) {
-  return value == null || !Number.isFinite(value) ? '--' : `${(value / 1_000_000).toFixed(2)} Mbps`
+function uplinkErrorCode(error: unknown) {
+  const explicit = (error as { code?: unknown } | null)?.code
+  if (typeof explicit === 'string') return explicit
+  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  if (message.includes('browser/base') || message.includes('clock offset')) {
+    return 'browser_clock_unreliable'
+  }
+  if (message.includes('clock') || message.includes('chrony')) return 'clock_not_ready'
+  if (message.includes('correlated browser frame')) return 'browser_samples_missing'
+  if (message.includes('render') || message.includes('video feed')) return 'stream_warmup_timeout'
+  if (message.includes('ros bridge') || message.includes('rover')) return 'rover_agent_unavailable'
+  return 'uplink_measurement_failed'
 }
 
 const LatencyDiagnosticsPanel = () => {
   const snapshot = useLatencyDiagnostics()
-  const { gateway } = useXbeeGateway()
-  const { ros } = useRosBridge()
+  const { gateway, connected: gatewayConnected } = useXbeeGateway()
+  const { ros, connected: rosConnected } = useRosBridge()
+  const clockReadiness = useLatencyClockReadiness(ros)
+  const checkClockNow = clockReadiness.checkNow
   const [streams, setStreams] = useState<VideoStreamInfo[]>([])
-  const [rtpReport, setRtpReport] = useState<RtpLatencyReport | null>(null)
-  const [rtpReportError, setRtpReportError] = useState<string | null>(null)
-  const [baseChrony, setBaseChrony] = useState<ChronyStatus | null>(null)
-  const [roverChrony, setRoverChrony] = useState<ChronyStatus | null>(null)
-  const [chronyChecking, setChronyChecking] = useState(false)
-  const [chronyError, setChronyError] = useState<string | null>(null)
-  const [chronyNowMs, setChronyNowMs] = useState(Date.now())
-  const [chronyCopyStatus, setChronyCopyStatus] = useState<string | null>(null)
+  const [feedCount, setFeedCount] = useState(1)
+  const [uplinkElapsedS, setUplinkElapsedS] = useState(0)
+  const uplinkOperationRef = useRef(0)
+  const renderedUplinkStreamsRef = useRef(new Set<string>())
 
-  useEffect(() => gateway.onLatencyTrace((trace) => latencyDiagnostics.ingestGatewayTrace(trace)), [gateway])
+  const markUplinkFrameRendered = useCallback((streamId: string) => {
+    renderedUplinkStreamsRef.current.add(streamId)
+  }, [])
+
+  useEffect(
+    () => gateway.onLatencyTrace((trace) => latencyDiagnostics.ingestGatewayTrace(trace)),
+    [gateway]
+  )
 
   useEffect(() => {
     return ros.subscribe<{ data?: string }>(
@@ -68,34 +80,12 @@ const LatencyDiagnosticsPanel = () => {
           if (trace.event !== 'command') return
           latencyDiagnostics.ingestRoverTrace(trace)
         } catch {
-          // Ignore malformed diagnostics without affecting control or video.
+          // Malformed diagnostics must not affect command or video operation.
         }
       },
       { queueSize: 10 }
     )
   }, [ros])
-
-  useEffect(() => {
-    return ros.subscribe<DiagnosticArray>(
-      '/system_status/clock',
-      'diagnostic_msgs/DiagnosticArray',
-      (message) => {
-        try {
-          setRoverChrony(parseRoverChronyDiagnostic(message))
-        } catch (error) {
-          setChronyError(
-            error instanceof Error ? error.message : 'Invalid rover chrony status'
-          )
-        }
-      },
-      { throttleRate: 500, queueSize: 5 }
-    )
-  }, [ros])
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setChronyNowMs(Date.now()), 1_000)
-    return () => window.clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     let active = true
@@ -105,81 +95,318 @@ const LatencyDiagnosticsPanel = () => {
         setStreams(nextStreams)
       })
       .catch(() => undefined)
-    void latencyDiagnostics.synchronizeGatewayClock()
     return () => {
       active = false
     }
   }, [])
 
+  useEffect(() => {
+    if (!snapshot.uplink.active) {
+      setUplinkElapsedS(0)
+      return
+    }
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => {
+      setUplinkElapsedS(Math.floor((Date.now() - startedAt) / 1000))
+    }, 500)
+    return () => window.clearInterval(timer)
+  }, [snapshot.uplink.active])
+
   const trial = snapshot.currentTrial
-  const t0 = trial?.stages.input_t0
-  const clockOffsetUs = snapshot.clock.offsetUs
-  const stageDelta = (stage: LatencyStage) => {
-    const value = trial?.stages[stage]
-    if (value == null || t0 == null) return null
-    const isBrowserStage = stage === 'input_t0'
-    const normalizedT0 = isBrowserStage || clockOffsetUs == null ? t0 : t0 + clockOffsetUs
-    return (value - normalizedT0) / 1000
-  }
-  const reportStream =
-    rtpReport?.streams.find((stream) => stream.stream_id === snapshot.selectedStreamId) ??
-    rtpReport?.streams[0] ??
-    null
-  const chronyReadiness = evaluateChronyReadiness(baseChrony, roverChrony, chronyNowMs)
+  const selectedUplinkStreams = streams.slice(0, Math.min(feedCount, streams.length))
+  const automatedUplinkReport = snapshot.uplink.report
+  const downlinkStatusTone =
+    snapshot.downlink.phase === 'completed'
+      ? trial?.metrics.valid
+        ? 'ready'
+        : 'blocked'
+      : snapshot.downlink.phase === 'failed'
+        ? 'blocked'
+        : snapshot.downlink.active
+          ? 'measuring'
+          : 'idle'
+  const uplinkStatusTone =
+    snapshot.uplink.phase === 'completed'
+      ? 'ready'
+      : snapshot.uplink.phase === 'failed'
+        ? 'blocked'
+        : snapshot.uplink.active
+          ? 'measuring'
+          : 'idle'
 
-  const importRtpReport = async (file: File | undefined) => {
-    if (!file) return
-    try {
-      const report = parseRtpLatencyReport(await file.text())
-      setRtpReport(report)
-      setRtpReportError(null)
-      if (
-        snapshot.selectedStreamId == null ||
-        !report.streams.some((stream) => stream.stream_id === snapshot.selectedStreamId)
-      ) {
-        latencyDiagnostics.selectStream(report.streams[0].stream_id)
+  const startDownlinkMeasurement = async () => {
+    if (!latencyDiagnostics.startDownlinkPreflight()) return
+    if (!gatewayConnected) {
+      latencyDiagnostics.failDownlinkTrial(
+        'gateway_unavailable',
+        'Base gateway WebSocket is not connected.'
+      )
+      return
+    }
+    if (!rosConnected) {
+      latencyDiagnostics.failDownlinkTrial(
+        'rover_trace_unavailable',
+        'ROS bridge is not connected for rover trace collection.'
+      )
+      return
+    }
+
+    const readiness = await clockReadiness.checkNow()
+    if (!readiness.ready) {
+      latencyDiagnostics.failDownlinkTrial(
+        'clock_not_ready',
+        readiness.reasons.join(' ')
+      )
+      return
+    }
+
+    const browserClockReady = await latencyDiagnostics.synchronizeGatewayClock()
+    if (!browserClockReady) {
+      latencyDiagnostics.failDownlinkTrial(
+        'browser_clock_unavailable',
+        latencyDiagnostics.getSnapshot().clock.error ||
+          'Browser/base clock offset could not be measured.'
+      )
+      return
+    }
+    latencyDiagnostics.armDownlinkTrial()
+  }
+
+  const waitForSelectedStreams = async (streamIds: string[], operationId: number) => {
+    const deadline = Date.now() + 12_000
+    while (Date.now() < deadline) {
+      if (uplinkOperationRef.current !== operationId) {
+        throw new Error('Uplink measurement was cancelled.')
       }
+      const nextStreams = await fetchVideoStreams()
+      setStreams(nextStreams)
+      const byId = new Map(nextStreams.map((stream) => [stream.stream_id, stream]))
+      if (streamIds.every((streamId) => byId.get(streamId)?.available)) return
+      await new Promise((resolve) => window.setTimeout(resolve, 500))
+    }
+    throw new Error('Selected video feeds did not become available in time.')
+  }
+
+  const waitForRenderedStreams = async (streamIds: string[], operationId: number) => {
+    const deadline = Date.now() + 12_000
+    while (Date.now() < deadline) {
+      if (uplinkOperationRef.current !== operationId) {
+        throw new Error('Uplink measurement was cancelled.')
+      }
+      if (streamIds.every((streamId) => renderedUplinkStreamsRef.current.has(streamId))) return
+      await new Promise((resolve) => window.setTimeout(resolve, 100))
+    }
+    throw new Error('Selected video feeds did not render in the browser in time.')
+  }
+
+  const startUplinkMeasurement = async () => {
+    const streamIds = selectedUplinkStreams.map((stream) => stream.stream_id)
+    if (streamIds.length !== feedCount || streamIds.length === 0) return
+    if (!latencyDiagnostics.startUplinkPreflight(feedCount, streamIds)) return
+    renderedUplinkStreamsRef.current.clear()
+    const operationId = ++uplinkOperationRef.current
+    let trialId: string | null = null
+    let roverPrepared = false
+    try {
+      if (!gatewayConnected) throw new Error('Base gateway WebSocket is not connected.')
+      if (!rosConnected) throw new Error('ROS bridge is not connected.')
+      const readiness = await checkClockNow()
+      if (!readiness.ready) throw new Error(readiness.reasons.join(' '))
+      if (!(await latencyDiagnostics.synchronizeGatewayClock())) {
+        throw new Error(
+          latencyDiagnostics.getSnapshot().clock.error ||
+            'Browser/base clock offset could not be measured.'
+        )
+      }
+
+      const created = await createUplinkTrial(feedCount, streamIds, 15)
+      trialId = created.trial_id
+      latencyDiagnostics.bindUplinkTrial(trialId)
+      const prepared = await ros.callService<
+        { trial_id: string; stream_ids: string[] },
+        { accepted: boolean; message: string }
+      >(
+        '/latency/uplink/prepare',
+        'mr2_latency_msgs/srv/PrepareUplinkTrial',
+        { trial_id: trialId, stream_ids: streamIds }
+      )
+      if (!prepared.accepted) throw new Error(prepared.message || 'Rover prepare failed.')
+      roverPrepared = true
+      await waitForSelectedStreams(streamIds, operationId)
+      await waitForRenderedStreams(streamIds, operationId)
+
+      const clock = latencyDiagnostics.getSnapshot().clock
+      if (clock.offsetUs == null || clock.rttUs == null || clock.syncedAtEpochUs == null) {
+        throw new Error('Browser/base clock snapshot is unavailable.')
+      }
+      const chronySnapshot = {
+        ready: readiness.ready,
+        reasons: readiness.reasons,
+        rover_error_bound_s: readiness.roverErrorBoundS,
+        base: chronyStatusForLog(clockReadiness.base),
+        rover: chronyStatusForLog(clockReadiness.rover),
+      }
+      const started = await startUplinkTrial(
+        trialId,
+        {
+          offset_us: clock.offsetUs,
+          rtt_us: clock.rttUs,
+          sampled_at_epoch_us: clock.syncedAtEpochUs,
+        },
+        chronySnapshot
+      )
+      if (!started.upload_base_url || !started.upload_token) {
+        throw new Error('Base gateway did not provide rover upload credentials.')
+      }
+      const startBrowserClockOffsetUs = clock.offsetUs
+      if (!latencyDiagnostics.beginUplinkBrowserCapture(trialId, streamIds)) {
+        throw new Error('Browser frame capture could not be started.')
+      }
+      const roverStarted = await ros.callService<
+        {
+          trial_id: string
+          duration_s: number
+          upload_base_url: string
+          upload_token: string
+        },
+        { accepted: boolean; message: string }
+      >(
+        '/latency/uplink/start',
+        'mr2_latency_msgs/srv/StartUplinkTrial',
+        {
+          trial_id: trialId,
+          duration_s: started.duration_s,
+          upload_base_url: started.upload_base_url,
+          upload_token: started.upload_token,
+        }
+      )
+      if (!roverStarted.accepted) {
+        throw new Error(roverStarted.message || 'Rover capture failed to start.')
+      }
+      latencyDiagnostics.updateUplinkPhase('capturing', 0.3)
+
+      await new Promise((resolve) => window.setTimeout(resolve, (started.duration_s + 0.75) * 1000))
+      if (uplinkOperationRef.current !== operationId) return
+      const browserSamples = latencyDiagnostics.finishUplinkBrowserCapture(trialId)
+      if (browserSamples.length === 0) {
+        throw new Error('No correlated browser frames were rendered during capture.')
+      }
+      const endReadiness = await checkClockNow()
+      if (!endReadiness.ready) {
+        throw new Error(`Clock verification failed after capture: ${endReadiness.reasons.join(' ')}`)
+      }
+      if (!(await latencyDiagnostics.synchronizeGatewayClock(4))) {
+        throw new Error('Ending browser/base clock offset could not be measured.')
+      }
+      const endOffsetUs = latencyDiagnostics.getSnapshot().clock.offsetUs
+      if (endOffsetUs == null || Math.abs(endOffsetUs - startBrowserClockOffsetUs) > 2_000) {
+        throw new Error('Browser/base clock offset drift exceeded 2 ms during capture.')
+      }
+      latencyDiagnostics.updateUplinkPhase('uploading', 0.6)
+      await uploadUplinkBrowserSamples(trialId, browserSamples)
+
+      const deadline = Date.now() + (started.duration_s + 45) * 1000
+      while (Date.now() < deadline) {
+        if (uplinkOperationRef.current !== operationId) return
+        const status = await getUplinkTrial(trialId)
+        const phase = status.phase === 'waiting_for_rover_artifacts' &&
+          status.browser_samples_received
+          ? 'uploading'
+          : mapGatewayUplinkPhase(status.phase)
+        if (phase === 'completed') {
+          if (!status.report) throw new Error('Uplink report is missing.')
+          latencyDiagnostics.completeUplinkTrial(parseAutomatedUplinkReport(status.report))
+          return
+        }
+        if (phase === 'failed' || phase === 'cancelled') {
+          const failure = new Error(status.error?.message || `Uplink trial ${phase}.`) as Error & {
+            code?: string
+          }
+          failure.code = status.error?.code
+          throw failure
+        }
+        latencyDiagnostics.updateUplinkPhase(phase, status.progress)
+        await new Promise((resolve) => window.setTimeout(resolve, 750))
+      }
+      throw new Error('Uplink measurement timed out.')
     } catch (error) {
-      setRtpReport(null)
-      setRtpReportError(error instanceof Error ? error.message : 'Invalid RTP report')
+      if (uplinkOperationRef.current !== operationId) return
+      if (roverPrepared && trialId) {
+        void ros.callService(
+          '/latency/uplink/cancel',
+          'mr2_latency_msgs/srv/CancelUplinkTrial',
+          { trial_id: trialId }
+        ).catch(() => undefined)
+      }
+      if (trialId) void cancelUplinkTrial(trialId).catch(() => undefined)
+      latencyDiagnostics.failUplinkTrial(
+        uplinkErrorCode(error),
+        error instanceof Error ? error.message : 'Uplink measurement failed.'
+      )
     }
   }
 
-  const checkChronySync = async () => {
-    if (chronyChecking) return
-    setChronyChecking(true)
-    setChronyError(null)
-    setChronyCopyStatus(null)
-    try {
-      setBaseChrony(await fetchBaseChronyStatus())
-      setChronyNowMs(Date.now())
-    } catch (error) {
-      setBaseChrony(null)
-      setChronyError(error instanceof Error ? error.message : 'Chrony status check failed')
-    } finally {
-      setChronyChecking(false)
-    }
-  }
-
-  const copyZeroOffset = async () => {
-    if (!chronyReadiness.ready) return
-    try {
-      await navigator.clipboard.writeText('--clock-offset-us 0')
-      setChronyCopyStatus('Copied')
-    } catch {
-      setChronyCopyStatus('Copy failed')
-    }
+  const cancelUplinkMeasurement = async () => {
+    const trialId = snapshot.uplink.trialId
+    uplinkOperationRef.current += 1
+    latencyDiagnostics.cancelUplinkMeasurement()
+    if (!trialId) return
+    await Promise.allSettled([
+      cancelUplinkTrial(trialId),
+      ros.callService(
+        '/latency/uplink/cancel',
+        'mr2_latency_msgs/srv/CancelUplinkTrial',
+        { trial_id: trialId }
+      ),
+    ])
   }
 
   useEffect(() => {
     latencyDiagnostics.setChronyStatusSnapshot({
-      ready: chronyReadiness.ready,
-      reasons: chronyReadiness.reasons,
-      rover_error_bound_s: chronyReadiness.roverErrorBoundS,
-      base: chronyStatusForLog(baseChrony),
-      rover: chronyStatusForLog(roverChrony),
+      ready: clockReadiness.readiness.ready,
+      reasons: clockReadiness.readiness.reasons,
+      rover_error_bound_s: clockReadiness.readiness.roverErrorBoundS,
+      base: chronyStatusForLog(clockReadiness.base),
+      rover: chronyStatusForLog(clockReadiness.rover),
     })
-  }, [baseChrony, chronyReadiness.ready, chronyReadiness.reasons, chronyReadiness.roverErrorBoundS, roverChrony])
+  }, [
+    clockReadiness.base,
+    clockReadiness.readiness.ready,
+    clockReadiness.readiness.reasons,
+    clockReadiness.readiness.roverErrorBoundS,
+    clockReadiness.rover,
+  ])
+
+  useEffect(() => {
+    if (snapshot.downlink.phase !== 'verifying_clocks') return
+    let active = true
+    const verifyEndClocks = async () => {
+      const readiness = await checkClockNow()
+      if (!active) return
+      if (!readiness.ready) {
+        latencyDiagnostics.failDownlinkTrial(
+          'end_clock_not_ready',
+          readiness.reasons.join(' ')
+        )
+        return
+      }
+      const browserClockReady = await latencyDiagnostics.synchronizeGatewayClock(4)
+      if (!active) return
+      if (!browserClockReady) {
+        latencyDiagnostics.failDownlinkTrial(
+          'end_browser_clock_unavailable',
+          latencyDiagnostics.getSnapshot().clock.error ||
+            'The ending browser/base clock offset could not be measured.'
+        )
+        return
+      }
+      latencyDiagnostics.completeDownlinkClockVerification()
+    }
+    void verifyEndClocks()
+    return () => {
+      active = false
+    }
+  }, [checkClockNow, snapshot.downlink.phase])
 
   return (
     <section className="latency-diagnostics" aria-label="Latency diagnostics">
@@ -189,163 +416,287 @@ const LatencyDiagnosticsPanel = () => {
       </div>
 
       <label className="latency-diagnostics__field">
-        <span>Video stream</span>
+        <span>Uplink feeds</span>
         <select
-          value={snapshot.selectedStreamId ?? ''}
-          onChange={(event) => latencyDiagnostics.selectStream(event.target.value || null)}
+          value={feedCount}
+          disabled={snapshot.uplink.active || streams.length === 0}
+          onChange={(event) => setFeedCount(Number(event.target.value))}
         >
-          {!snapshot.selectedStreamId && (
-            <option value="">{streams.length === 0 ? 'No streams' : 'Waiting for video'}</option>
-          )}
-          {streams.map((stream) => (
-            <option key={stream.stream_id} value={stream.stream_id}>
-              {stream.display.label || stream.stream_id}
-            </option>
+          {Array.from({ length: streams.length }, (_, index) => index + 1).map((count) => (
+            <option value={count} key={count}>{count}</option>
           ))}
         </select>
       </label>
+      <small>
+        {selectedUplinkStreams.map((stream) => stream.display.label || stream.stream_id).join(', ') ||
+          'No video streams available'}
+      </small>
 
-      <div className="latency-diagnostics__actions">
-        <button type="button" onClick={() => latencyDiagnostics.armTrial()}>
-          {snapshot.armed
-            ? snapshot.neutralSeen
-              ? 'Send command'
-              : 'Return neutral'
-            : 'Arm command'}
+      <div className="latency-diagnostics__actions latency-diagnostics__actions--primary">
+        <button
+          type="button"
+          disabled={snapshot.downlink.active}
+          title="Measure downlink latency"
+          aria-label="Measure downlink latency"
+          onClick={() => void startDownlinkMeasurement()}
+        >
+          <FiArrowDown aria-hidden="true" />
+          {snapshot.downlink.phase === 'checking_clocks'
+            ? 'Checking...'
+            : 'Downlink'}
         </button>
         <button
           type="button"
-          onClick={() => void latencyDiagnostics.synchronizeGatewayClock()}
+          disabled={snapshot.uplink.active || selectedUplinkStreams.length !== feedCount}
+          title="Measure uplink latency"
+          aria-label="Measure uplink latency"
+          onClick={() => void startUplinkMeasurement()}
         >
-          {snapshot.clock.syncing ? 'Syncing…' : 'Measure browser/base'}
+          <FiArrowUp aria-hidden="true" />
+          {snapshot.uplink.phase === 'checking_clocks'
+            ? 'Checking...'
+            : 'Uplink'}
         </button>
-        <button type="button" onClick={() => latencyDiagnostics.exportJsonl()}>
-          Export
+        <button
+          type="button"
+          disabled={clockReadiness.checking}
+          title="Check chrony synchronization"
+          aria-label="Check chrony synchronization"
+          onClick={() => void clockReadiness.checkNow()}
+        >
+          <FiClock aria-hidden="true" />
+          {clockReadiness.checking ? 'Checking...' : 'Chrony sync'}
         </button>
-        <button type="button" onClick={() => latencyDiagnostics.resetSession()}>
-          Reset
-        </button>
-        <button type="button" disabled={chronyChecking} onClick={() => void checkChronySync()}>
-          {chronyChecking ? 'Checking chrony…' : 'Check chrony sync'}
-        </button>
-        <label className="latency-diagnostics__import">
-          Import RTP report
-          <input
-            type="file"
-            accept="application/json,.json"
-            onChange={(event) => {
-              void importRtpReport(event.target.files?.[0])
-              event.target.value = ''
-            }}
-          />
-        </label>
       </div>
 
+      {snapshot.uplink.active && selectedUplinkStreams.length > 0 && (
+        <div className="latency-diagnostics__feed-grid" aria-label="Measured Uplink feeds">
+          {selectedUplinkStreams.map((stream) => (
+            <div key={stream.stream_id} className="latency-diagnostics__feed">
+              <span>{stream.display.label || stream.stream_id}</span>
+              <VideoStreamCard
+                stream={stream}
+                onFrameRendered={markUplinkFrameRendered}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        className={`latency-diagnostics__readiness latency-diagnostics__readiness--${downlinkStatusTone}`}
+        role="status"
+      >
+        {downlinkPhaseLabel(snapshot.downlink.phase)}
+      </div>
+      {snapshot.downlink.active && (
+        <button
+          className="latency-diagnostics__secondary-command"
+          type="button"
+          onClick={() => latencyDiagnostics.cancelDownlinkTrial()}
+        >
+          <FiX aria-hidden="true" />
+          Cancel measurement
+        </button>
+      )}
+      {snapshot.downlink.error && (
+        <div className="latency-diagnostics__error">
+          {snapshot.downlink.error.message}
+        </div>
+      )}
+
+      <div className="latency-diagnostics__section-title">Downlink result</div>
+      <div className="latency-diagnostics__segments">
+        {(trial?.segments ?? []).map((segment) => (
+          <div key={segment.id}>
+            <span>{segment.label}</span>
+            <strong>{formatMs(segment.distribution.p50Ms)}</strong>
+          </div>
+        ))}
+        {!trial && <small>No downlink measurement yet.</small>}
+      </div>
+      {trial?.metrics.warning && (
+        <div className="latency-diagnostics__error">{trial.metrics.warning}</div>
+      )}
+      {trial?.clock.browserClockDriftUs != null && (
+        <div className="latency-diagnostics__clock">
+          Browser/base clock drift {formatUsAsMs(trial.clock.browserClockDriftUs)}
+        </div>
+      )}
+
+      <div className="latency-diagnostics__section-title">Uplink result</div>
+      <div
+        className={`latency-diagnostics__readiness latency-diagnostics__readiness--${uplinkStatusTone}`}
+        role="status"
+      >
+        {uplinkPhaseLabel(snapshot.uplink.phase)}
+        {snapshot.uplink.active &&
+          ` / ${uplinkElapsedS}s / ${snapshot.uplink.feedCount} feeds / ${Math.round(snapshot.uplink.progress * 100)}%`}
+      </div>
+      {snapshot.uplink.active && (
+        <button
+          className="latency-diagnostics__secondary-command"
+          type="button"
+          onClick={() => void cancelUplinkMeasurement()}
+        >
+          <FiX aria-hidden="true" />
+          Cancel uplink measurement
+        </button>
+      )}
+      {snapshot.uplink.error && (
+        <div className="latency-diagnostics__error">{snapshot.uplink.error.message}</div>
+      )}
+      {automatedUplinkReport ? (
+        <>
+          <div className="latency-diagnostics__result-heading">
+            <strong>Aggregate</strong>
+            <span>
+              {automatedUplinkReport.matched_frames} frames / {automatedUplinkReport.feed_count} feeds
+            </span>
+          </div>
+          <LatencyResultTable segments={automatedUplinkReport.aggregate} />
+        </>
+      ) : (
+        <small>No Uplink measurement yet.</small>
+      )}
+      {automatedUplinkReport && (
+        <div className="latency-diagnostics__stream-results">
+          {automatedUplinkReport.streams.map((stream) => (
+            <section key={stream.stream_id} className="latency-diagnostics__stream-result">
+              <div className="latency-diagnostics__result-heading">
+                <strong>{stream.stream_id}</strong>
+                <span>
+                  {stream.matched_frames} frames /{' '}
+                  {stream.packet_loss_percent == null
+                    ? '-- loss'
+                    : `${stream.packet_loss_percent.toFixed(1)}% loss`}
+                </span>
+              </div>
+              <LatencyResultTable segments={stream.segments} />
+              {stream.warnings.map((warning) => (
+                <small className="latency-diagnostics__warning" key={warning}>{warning}</small>
+              ))}
+            </section>
+          ))}
+          {automatedUplinkReport.warnings.map((warning) => (
+            <small className="latency-diagnostics__warning" key={warning}>{warning}</small>
+          ))}
+        </div>
+      )}
+
       <div className="latency-diagnostics__clock">
-        Base − browser {formatMs(snapshot.clock.offsetUs == null ? null : snapshot.clock.offsetUs / 1000)}
-        {' · '}RTT {formatMs(snapshot.clock.rttUs == null ? null : snapshot.clock.rttUs / 1000)}
-        {snapshot.clock.error && <span className="latency-diagnostics__error"> {snapshot.clock.error}</span>}
+        Base - browser{' '}
+        {formatMs(snapshot.clock.offsetUs == null ? null : snapshot.clock.offsetUs / 1000)}
+        {' / '}RTT{' '}
+        {formatMs(snapshot.clock.rttUs == null ? null : snapshot.clock.rttUs / 1000)}
+        {snapshot.clock.error && (
+          <span className="latency-diagnostics__error"> {snapshot.clock.error}</span>
+        )}
       </div>
 
       <div className="latency-diagnostics__section-title">Base/rover chrony</div>
       <div
-        className={`latency-diagnostics__readiness latency-diagnostics__readiness--${chronyReadiness.ready ? 'ready' : 'blocked'}`}
+        className={`latency-diagnostics__readiness latency-diagnostics__readiness--${clockReadiness.readiness.ready ? 'ready' : 'blocked'}`}
       >
-        {chronyReadiness.ready ? 'Ready for synchronized RTP capture' : 'Clock sync not ready'}
+        {clockReadiness.readiness.ready
+          ? 'Ready for synchronized measurement'
+          : 'Clock sync not ready'}
       </div>
       <div className="latency-diagnostics__summary">
         <div>
           <span>Base</span>
-          <strong>{baseChrony?.synchronized ? 'Synchronized' : baseChrony ? 'Not ready' : '--'}</strong>
+          <strong>
+            {clockReadiness.base?.synchronized
+              ? 'Synchronized'
+              : clockReadiness.base
+                ? 'Not ready'
+                : '--'}
+          </strong>
         </div>
         <div>
           <span>Base reference</span>
-          <strong>{baseChrony?.referenceName ?? baseChrony?.referenceId ?? '--'}</strong>
+          <strong>
+            {clockReadiness.base?.referenceName ??
+              clockReadiness.base?.referenceId ??
+              '--'}
+          </strong>
         </div>
         <div>
           <span>Rover</span>
-          <strong>{roverChrony?.synchronized ? 'Synchronized' : roverChrony ? 'Not ready' : '--'}</strong>
+          <strong>
+            {clockReadiness.rover?.synchronized
+              ? 'Synchronized'
+              : clockReadiness.rover
+                ? 'Not ready'
+                : '--'}
+          </strong>
         </div>
         <div>
           <span>Rover reference</span>
-          <strong>{roverChrony?.referenceName ?? roverChrony?.referenceId ?? '--'}</strong>
+          <strong>
+            {clockReadiness.rover?.referenceName ??
+              clockReadiness.rover?.referenceId ??
+              '--'}
+          </strong>
         </div>
         <div>
           <span>Rover residual</span>
-          <strong>{formatUsAsMs(roverChrony?.systemTimeOffsetS == null ? null : roverChrony.systemTimeOffsetS * 1_000_000)}</strong>
+          <strong>
+            {formatUsAsMs(
+              clockReadiness.rover?.systemTimeOffsetS == null
+                ? null
+                : clockReadiness.rover.systemTimeOffsetS * 1_000_000
+            )}
+          </strong>
         </div>
         <div>
           <span>Rover error bound</span>
-          <strong>{formatUsAsMs(chronyReadiness.roverErrorBoundS == null ? null : chronyReadiness.roverErrorBoundS * 1_000_000)}</strong>
+          <strong>
+            {formatUsAsMs(
+              clockReadiness.readiness.roverErrorBoundS == null
+                ? null
+                : clockReadiness.readiness.roverErrorBoundS * 1_000_000
+            )}
+          </strong>
         </div>
         <div>
           <span>Stratum base/rover</span>
-          <strong>{baseChrony?.stratum ?? '--'} / {roverChrony?.stratum ?? '--'}</strong>
+          <strong>
+            {clockReadiness.base?.stratum ?? '--'} /{' '}
+            {clockReadiness.rover?.stratum ?? '--'}
+          </strong>
         </div>
       </div>
-      {chronyReadiness.ready ? (
-        <button className="latency-diagnostics__copy" type="button" onClick={() => void copyZeroOffset()}>
-          Copy --clock-offset-us 0{chronyCopyStatus ? ` · ${chronyCopyStatus}` : ''}
-        </button>
-      ) : (
+      {!clockReadiness.readiness.ready && (
         <div className="latency-diagnostics__reasons">
-          {chronyReadiness.reasons.map((reason) => <small key={reason}>{reason}</small>)}
-        </div>
-      )}
-      {chronyError && <div className="latency-diagnostics__error">{chronyError}</div>}
-      <small>chronyd synchronizes continuously; this button only checks status and never steps a clock.</small>
-
-      <div className="latency-diagnostics__section-title">Command path</div>
-      <div className="latency-diagnostics__stages">
-        {STAGE_ROWS.map(({ stage, label }) => (
-          <div key={stage}>
-            <span>{label}</span>
-            <strong>{formatMs(stageDelta(stage))}</strong>
-          </div>
-        ))}
-      </div>
-
-      <div className="latency-diagnostics__summary">
-        <div><span>Computer → gateway</span><strong>{formatMs(trial?.metrics.computerToGatewayMs)}</strong></div>
-        <div><span>Computer → rover</span><strong>{formatMs(trial?.metrics.computerToRoverMs)}</strong></div>
-        <div><span>Rover RX → publish</span><strong>{formatMs(trial?.metrics.roverPublishMs)}</strong></div>
-      </div>
-
-      <div className="latency-diagnostics__section-title">Rocket M2 RTP report</div>
-      {rtpReportError && <div className="latency-diagnostics__error">{rtpReportError}</div>}
-      {reportStream ? (
-        <div className="latency-diagnostics__summary">
-          <div><span>Report stream</span><strong>{reportStream.stream_id}</strong></div>
-          <div><span>Matched packets</span><strong>{reportStream.matched_packets}</strong></div>
-          <div><span>Packet loss</span><strong>{reportStream.loss_percent == null ? '--' : `${reportStream.loss_percent.toFixed(2)}%`}</strong></div>
-          <div><span>Link latency p50</span><strong>{formatUsAsMs(reportStream.link_latency_us.p50)}</strong></div>
-          <div><span>Link latency p95</span><strong>{formatUsAsMs(reportStream.link_latency_us.p95)}</strong></div>
-          <div><span>Link latency p99</span><strong>{formatUsAsMs(reportStream.link_latency_us.p99)}</strong></div>
-          <div><span>Link latency max</span><strong>{formatUsAsMs(reportStream.link_latency_us.max)}</strong></div>
-          <div><span>Rover offered</span><strong>{formatMbps(reportStream.rover_offered_bitrate_bps)}</strong></div>
-          <div><span>Base delivered</span><strong>{formatMbps(reportStream.base_delivered_bitrate_bps)}</strong></div>
-          <div><span>Clock offset</span><strong>{formatUsAsMs(rtpReport?.clock_offset_us)}</strong></div>
-          {rtpReport?.clock_offset_assumed && (
-            <div className="latency-diagnostics__error">Clock offset was assumed to be zero.</div>
-          )}
-          {rtpReport?.warnings.map((warning) => (
-            <div className="latency-diagnostics__error" key={warning}>{warning}</div>
+          {clockReadiness.readiness.reasons.map((reason) => (
+            <small key={reason}>{reason}</small>
           ))}
         </div>
-      ) : (
-        <small>Run the dual RTP capture analyzer, then import its JSON report.</small>
+      )}
+      {clockReadiness.error && (
+        <div className="latency-diagnostics__error">{clockReadiness.error}</div>
       )}
 
-      <div className="latency-diagnostics__section-title">Browser live</div>
-      <div className="latency-diagnostics__summary">
-        <div><span>Frame samples</span><strong>{snapshot.videoTiming.sampleCount}</strong></div>
-        <div><span>Base → browser p50</span><strong>{formatMs(snapshot.videoTiming.baseToBrowser.p50Ms)}</strong></div>
-        <div><span>Base → browser p95</span><strong>{formatMs(snapshot.videoTiming.baseToBrowser.p95Ms)}</strong></div>
-        <div><span>Decode/render p50</span><strong>{formatMs(snapshot.videoTiming.decodeRender.p50Ms)}</strong></div>
-        <div><span>Decode/render p95</span><strong>{formatMs(snapshot.videoTiming.decodeRender.p95Ms)}</strong></div>
+      <div className="latency-diagnostics__secondary-actions">
+        <button
+          type="button"
+          title="Export latency session"
+          aria-label="Export latency session"
+          onClick={() => latencyDiagnostics.exportJsonl()}
+        >
+          <FiDownload aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          disabled={snapshot.downlink.active || snapshot.uplink.active}
+          title="Reset latency session"
+          aria-label="Reset latency session"
+          onClick={() => latencyDiagnostics.resetSession()}
+        >
+          <FiRotateCcw aria-hidden="true" />
+        </button>
       </div>
-
-      <small>Rocket latency comes only from matched rover/base RTP pcaps. Synchronize rover and base clocks.</small>
     </section>
   )
 }

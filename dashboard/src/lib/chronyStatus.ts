@@ -98,6 +98,9 @@ function resolveClockStatusUrl() {
 export async function fetchBaseChronyStatus(): Promise<ChronyStatus> {
   const response = await fetch(resolveClockStatusUrl(), { cache: 'no-store' })
   if (!response.ok) throw new Error(`Clock status endpoint returned ${response.status}`)
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('Clock status endpoint returned a non-JSON response')
+  }
   const value = (await response.json()) as unknown
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('Clock status endpoint returned invalid JSON')
@@ -128,7 +131,12 @@ export function evaluateChronyReadiness(
       reasons.push(`${label} chrony status is missing`)
       return
     }
-    if (nowEpochMs - status.receivedAtEpochMs > CHRONY_MAX_AGE_MS) {
+    const sampleAgeMs = nowEpochMs - status.sampledAtEpochMs
+    const receiveAgeMs = nowEpochMs - status.receivedAtEpochMs
+    if (
+      Math.abs(sampleAgeMs) > CHRONY_MAX_AGE_MS ||
+      Math.abs(receiveAgeMs) > CHRONY_MAX_AGE_MS
+    ) {
       reasons.push(`${label} chrony status is stale`)
     }
     if (!status.available) reasons.push(`${label} chronyc is unavailable`)

@@ -1,4 +1,5 @@
 export type RtpLatencyDistribution = {
+  count?: number
   min: number | null
   mean: number | null
   p50: number | null
@@ -31,8 +32,49 @@ export type RtpLatencyReport = {
   clock_offset_us: number
   clock_offset_definition: 'base_clock_minus_rover_clock'
   clock_offset_assumed: boolean
+  aggregate_link_latency_us: RtpLatencyDistribution
   warnings: string[]
   streams: RtpLatencyStreamReport[]
+}
+
+export type AutomatedUplinkStreamReport = {
+  stream_id: string
+  udp_port: number
+  segments: AutomatedUplinkSegments
+  matched_frames: number
+  browser_frames: number
+  matched_packets: number
+  packet_loss_percent: number | null
+  rover_offered_bitrate_bps: number | null
+  base_delivered_bitrate_bps: number | null
+  warnings: string[]
+}
+
+export type AutomatedLatencyDistribution = RtpLatencyDistribution & { count: number }
+
+export type AutomatedUplinkSegments = {
+  rocket_m2: AutomatedLatencyDistribution
+  base_to_browser: AutomatedLatencyDistribution
+  decode_render: AutomatedLatencyDistribution
+  total: AutomatedLatencyDistribution
+}
+
+export type AutomatedUplinkLatencyReport = {
+  schema_version: 2
+  kind: 'mr2_automated_uplink_latency_report'
+  generated_at: string
+  trial_id: string
+  feed_count: number
+  stream_ids: string[]
+  clock: {
+    base_minus_rover_us: number
+    base_minus_browser_us: number
+  }
+  aggregate: AutomatedUplinkSegments
+  matched_frames: number
+  browser_frames: number
+  warnings: string[]
+  streams: AutomatedUplinkStreamReport[]
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -63,6 +105,7 @@ function packetCount(value: unknown, field: string) {
 function distribution(value: unknown, field: string): RtpLatencyDistribution {
   if (!isObject(value)) throw new Error(`${field} must be an object`)
   return {
+    count: value.count == null ? undefined : packetCount(value.count, `${field}.count`),
     min: nullableNumber(value.min, `${field}.min`),
     mean: nullableNumber(value.mean, `${field}.mean`),
     p50: nullableNumber(value.p50, `${field}.p50`),
@@ -153,7 +196,117 @@ export function parseRtpLatencyReport(input: string | unknown): RtpLatencyReport
     clock_offset_us: finiteNumber(value.clock_offset_us, 'clock_offset_us'),
     clock_offset_definition: 'base_clock_minus_rover_clock',
     clock_offset_assumed: value.clock_offset_assumed,
+    aggregate_link_latency_us: isObject(value.aggregate_link_latency_us)
+      ? distribution(value.aggregate_link_latency_us, 'aggregate_link_latency_us')
+      : {
+          min: null,
+          mean: null,
+          p50: null,
+          p95: null,
+          p99: null,
+          max: null,
+        },
     warnings: [...value.warnings],
     streams: value.streams.map(streamReport),
+  }
+}
+
+function stringArray(value: unknown, field: string) {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+    throw new Error(`${field} must be a string array`)
+  }
+  return [...value]
+}
+
+function automatedSegments(value: unknown, field: string): AutomatedUplinkSegments {
+  if (!isObject(value)) throw new Error(`${field} must be an object`)
+  const requiredDistribution = (input: unknown, name: string) => {
+    const parsed = distribution(input, name)
+    if (parsed.count == null) throw new Error(`${name}.count is required`)
+    return parsed as AutomatedLatencyDistribution
+  }
+  return {
+    rocket_m2: requiredDistribution(value.rocket_m2, `${field}.rocket_m2`),
+    base_to_browser: requiredDistribution(value.base_to_browser, `${field}.base_to_browser`),
+    decode_render: requiredDistribution(value.decode_render, `${field}.decode_render`),
+    total: requiredDistribution(value.total, `${field}.total`),
+  }
+}
+
+export function parseAutomatedUplinkReport(
+  input: string | unknown
+): AutomatedUplinkLatencyReport {
+  const value = typeof input === 'string' ? (JSON.parse(input) as unknown) : input
+  if (!isObject(value) || value.schema_version !== 2 ||
+      value.kind !== 'mr2_automated_uplink_latency_report') {
+    throw new Error('Unsupported automated Uplink report schema')
+  }
+  if (typeof value.generated_at !== 'string' || typeof value.trial_id !== 'string') {
+    throw new Error('Automated Uplink report identity is invalid')
+  }
+  const feedCount = packetCount(value.feed_count, 'feed_count')
+  const streamIds = stringArray(value.stream_ids, 'stream_ids')
+  if (feedCount < 1 || feedCount !== streamIds.length) {
+    throw new Error('feed_count must match stream_ids')
+  }
+  if (!isObject(value.clock)) throw new Error('clock must be an object')
+  if (!Array.isArray(value.streams) || value.streams.length !== feedCount) {
+    throw new Error('streams must match feed_count')
+  }
+  const streams = value.streams.map((item, index) => {
+    const field = `streams[${index}]`
+    if (!isObject(item) || typeof item.stream_id !== 'string') {
+      throw new Error(`${field} is invalid`)
+    }
+    return {
+      stream_id: item.stream_id,
+      udp_port: packetCount(item.udp_port, `${field}.udp_port`),
+      segments: automatedSegments(item.segments, `${field}.segments`),
+      matched_frames: packetCount(item.matched_frames, `${field}.matched_frames`),
+      browser_frames: packetCount(item.browser_frames, `${field}.browser_frames`),
+      matched_packets: packetCount(item.matched_packets, `${field}.matched_packets`),
+      packet_loss_percent: nullableNumber(
+        item.packet_loss_percent,
+        `${field}.packet_loss_percent`,
+        true
+      ),
+      rover_offered_bitrate_bps: nullableNumber(
+        item.rover_offered_bitrate_bps,
+        `${field}.rover_offered_bitrate_bps`,
+        true
+      ),
+      base_delivered_bitrate_bps: nullableNumber(
+        item.base_delivered_bitrate_bps,
+        `${field}.base_delivered_bitrate_bps`,
+        true
+      ),
+      warnings: stringArray(item.warnings, `${field}.warnings`),
+    }
+  })
+  if (streams.some((stream, index) => stream.stream_id !== streamIds[index])) {
+    throw new Error('stream report order must match stream_ids')
+  }
+  return {
+    schema_version: 2,
+    kind: 'mr2_automated_uplink_latency_report',
+    generated_at: value.generated_at,
+    trial_id: value.trial_id,
+    feed_count: feedCount,
+    stream_ids: streamIds,
+    clock: {
+      base_minus_rover_us: finiteNumber(
+        value.clock.base_minus_rover_us,
+        'clock.base_minus_rover_us'
+      ),
+      base_minus_browser_us: finiteNumber(
+        value.clock.base_minus_browser_us,
+        'clock.base_minus_browser_us'
+      ),
+    },
+    aggregate: automatedSegments(value.aggregate, 'aggregate'),
+    matched_frames: packetCount(value.matched_frames, 'matched_frames'),
+    browser_frames: packetCount(value.browser_frames, 'browser_frames'),
+    warnings: stringArray(value.warnings, 'warnings'),
+    streams,
   }
 }

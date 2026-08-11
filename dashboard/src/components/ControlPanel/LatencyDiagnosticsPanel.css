@@ -1,6 +1,10 @@
 .latency-diagnostics {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   gap: 8px;
   padding: 10px;
   border: 1px solid rgba(95, 196, 255, 0.25);
@@ -12,6 +16,7 @@
 
 .latency-diagnostics__header,
 .latency-diagnostics__stages > div,
+.latency-diagnostics__segments > div,
 .latency-diagnostics__summary > div {
   display: flex;
   justify-content: space-between;
@@ -22,13 +27,15 @@
 .latency-diagnostics__clock,
 .latency-diagnostics small,
 .latency-diagnostics__stages span,
+.latency-diagnostics__segments span,
 .latency-diagnostics__summary span {
   color: #8fa5bd;
 }
 
 .latency-diagnostics__field {
   display: grid;
-  grid-template-columns: auto 1fr;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
@@ -45,13 +52,57 @@
 
 .latency-diagnostics__actions {
   display: grid;
+  min-width: 0;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.latency-diagnostics__actions--primary button,
+.latency-diagnostics__secondary-actions button,
+.latency-diagnostics__secondary-command {
+  padding: 5px;
+  cursor: pointer;
+}
+
+.latency-diagnostics__actions--primary button {
+  min-height: 48px;
+  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.latency-diagnostics__actions--primary svg,
+.latency-diagnostics__secondary-command svg {
+  flex: 0 0 auto;
+}
+
+.latency-diagnostics__actions--primary button:first-child {
+  border-color: rgba(90, 199, 145, 0.45);
+  background: #17322f;
+}
+
+.latency-diagnostics__secondary-actions {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
 }
 
-.latency-diagnostics__actions button {
-  padding: 5px;
-  cursor: pointer;
+.latency-diagnostics__secondary-actions button {
+  display: grid;
+  min-height: 30px;
+  place-items: center;
+}
+
+.latency-diagnostics__secondary-command {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
 .latency-diagnostics button:disabled {
@@ -81,13 +132,22 @@
   color: #ffadad;
 }
 
+.latency-diagnostics__readiness--measuring {
+  background: rgba(255, 196, 77, 0.14);
+  color: #ffd477;
+}
+
+.latency-diagnostics__readiness--idle {
+  background: rgba(143, 165, 189, 0.12);
+  color: #b8c9da;
+}
+
 .latency-diagnostics__reasons {
   display: grid;
   gap: 2px;
 }
 
 .latency-diagnostics__import {
-  grid-column: 1 / -1;
   padding: 5px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 5px;
@@ -108,9 +168,102 @@
 }
 
 .latency-diagnostics__stages,
+.latency-diagnostics__segments,
 .latency-diagnostics__summary {
   display: grid;
   gap: 3px;
+}
+
+.latency-diagnostics__feed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.latency-diagnostics__feed {
+  min-width: 0;
+}
+
+.latency-diagnostics__feed > span {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 3px;
+  color: #8fa5bd;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latency-diagnostics__feed .video-stream-card {
+  min-height: 72px;
+  aspect-ratio: 16 / 9;
+}
+
+.latency-diagnostics__feed .video-stream-overlay {
+  font-size: 0.62rem;
+}
+
+.latency-diagnostics__result-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.latency-diagnostics__result-heading span {
+  color: #8fa5bd;
+}
+
+.latency-diagnostics__stream-results,
+.latency-diagnostics__stream-result {
+  display: grid;
+  gap: 5px;
+}
+
+.latency-diagnostics__stream-result {
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.latency-result-table__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.latency-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.latency-result-table th,
+.latency-result-table td {
+  padding: 3px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.latency-result-table th:first-child {
+  width: 38%;
+  text-align: left;
+}
+
+.latency-result-table thead th {
+  color: #8fa5bd;
+  font-weight: 500;
+}
+
+.latency-diagnostics__warning {
+  color: #ffd477 !important;
+}
+
+.latency-diagnostics__segments > div:last-of-type {
+  margin-top: 2px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .latency-diagnostics__summary {

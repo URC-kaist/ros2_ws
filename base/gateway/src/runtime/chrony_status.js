@@ -24,7 +24,7 @@ function parseChronycTracking(output, sampledAtEpochMs = Date.now()) {
   const leapStatus = fields.get('Leap status') || ''
   const stratum = parseNumberField(fields, 'Stratum')
   const referenceRaw = fields.get('Reference ID') || ''
-  const referenceMatch = /^([^\s]+)(?:\s+\((.+)\))?$/.exec(referenceRaw)
+  const referenceMatch = /^([^\s]+)(?:\s+\((.*)\))?$/.exec(referenceRaw)
   const systemTimeRaw = fields.get('System time') || ''
   const systemTimeMatch =
     /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+seconds\s+(fast|slow)\s+of\s+NTP\s+time$/i.exec(

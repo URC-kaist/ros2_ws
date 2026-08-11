@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -25,6 +27,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "mr2_latency_msgs/srv/acquire_video_stream_lease.hpp"
+#include "mr2_latency_msgs/srv/release_video_stream_lease.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_srvs/srv/set_bool.hpp"
@@ -83,6 +87,15 @@ bool is_jetson_hardware_encoder(const std::string & encoder_type) {
 bool is_supported_encoder_type(const std::string & encoder_type) {
   return encoder_type == "x264" || encoder_type == "x264enc" ||
          is_jetson_hardware_encoder(encoder_type);
+}
+
+bool is_valid_lease_owner(const std::string & value) {
+  if (value.empty() || value.size() > 128) {
+    return false;
+  }
+  return std::all_of(value.begin(), value.end(), [](unsigned char ch) {
+    return std::isalnum(ch) || ch == '-' || ch == '_' || ch == '.';
+  });
 }
 
 std::string trim_copy(const std::string & value) {
@@ -910,6 +923,7 @@ class VideoStreamingNode : public rclcpp::Node {
       : rclcpp::Node("video_streaming"),
         video_config_path_(declare_parameter<std::string>("video_config_path", "")),
         base_host_(declare_parameter<std::string>("base_host", default_base_host())),
+        stream_lease_timeout_s_(declare_parameter<double>("stream_lease_timeout_s", 60.0)),
         disabled_stream_ids_(parse_disabled_stream_ids(
             declare_parameter<std::string>("disabled_stream_ids", ""))) {
     if (video_config_path_.empty()) {
@@ -924,13 +938,10 @@ class VideoStreamingNode : public rclcpp::Node {
 
     const auto streams = load_streams_from_file(video_config_path_);
     for (const auto & stream : streams) {
-      if (disabled_stream_ids_.count(stream.stream_id) > 0) {
-        RCLCPP_INFO(
-            get_logger(), "Skipping disabled video stream %s", stream.stream_id.c_str());
-        continue;
-      }
-
       auto pipeline = std::make_shared<StreamPipeline>(stream, base_host_, get_logger());
+      if (disabled_stream_ids_.count(stream.stream_id) > 0) {
+        pipeline->set_enabled(false);
+      }
 
       if (stream.source_type == StreamSourceType::RosTopic) {
         auto subscription = create_subscription<sensor_msgs::msg::Image>(
@@ -949,9 +960,16 @@ class VideoStreamingNode : public rclcpp::Node {
           std::string(get_fully_qualified_name()) + "/streams/" + stream.stream_id + "/set_enabled";
       auto service = create_service<std_srvs::srv::SetBool>(
           service_name,
-          [pipeline, stream_id = stream.stream_id](
+          [this, pipeline, stream_id = stream.stream_id](
               const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
               std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+            expire_stream_lease_if_needed();
+            if (stream_lease_active()) {
+              response->success = false;
+              response->message = "stream configuration is locked by latency trial " +
+                stream_lease_owner_;
+              return;
+            }
             const bool changed = pipeline->set_enabled(request->data);
             response->success = true;
             response->message =
@@ -986,7 +1004,25 @@ class VideoStreamingNode : public rclcpp::Node {
       RCLCPP_INFO(get_logger(), "%s", details.str().c_str());
     }
 
+    acquire_stream_lease_service_ =
+      create_service<mr2_latency_msgs::srv::AcquireVideoStreamLease>(
+        std::string(get_fully_qualified_name()) + "/acquire_stream_lease",
+        [this](
+          const std::shared_ptr<mr2_latency_msgs::srv::AcquireVideoStreamLease::Request> request,
+          std::shared_ptr<mr2_latency_msgs::srv::AcquireVideoStreamLease::Response> response) {
+          acquire_stream_lease(*request, *response);
+        });
+    release_stream_lease_service_ =
+      create_service<mr2_latency_msgs::srv::ReleaseVideoStreamLease>(
+        std::string(get_fully_qualified_name()) + "/release_stream_lease",
+        [this](
+          const std::shared_ptr<mr2_latency_msgs::srv::ReleaseVideoStreamLease::Request> request,
+          std::shared_ptr<mr2_latency_msgs::srv::ReleaseVideoStreamLease::Response> response) {
+          release_stream_lease(*request, *response);
+        });
+
     monitor_timer_ = create_wall_timer(std::chrono::milliseconds(500), [this]() {
+      expire_stream_lease_if_needed();
       for (const auto & pipeline : pipelines_) {
         pipeline->poll_runtime();
       }
@@ -1013,6 +1049,110 @@ class VideoStreamingNode : public rclcpp::Node {
   }
 
  private:
+  bool stream_lease_active() const {
+    return !stream_lease_owner_.empty() &&
+           std::chrono::steady_clock::now() < stream_lease_expires_at_;
+  }
+
+  void expire_stream_lease_if_needed() {
+    if (!stream_lease_owner_.empty() &&
+        std::chrono::steady_clock::now() >= stream_lease_expires_at_) {
+      const auto owner = stream_lease_owner_;
+      restore_stream_lease();
+      RCLCPP_WARN(get_logger(), "Expired video stream lease for %s", owner.c_str());
+    }
+  }
+
+  std::shared_ptr<StreamPipeline> find_pipeline(const std::string & stream_id) const {
+    const auto found = std::find_if(
+      pipelines_.begin(), pipelines_.end(), [&stream_id](const auto & pipeline) {
+        return pipeline->stream_id() == stream_id;
+      });
+    return found == pipelines_.end() ? nullptr : *found;
+  }
+
+  void acquire_stream_lease(
+    const mr2_latency_msgs::srv::AcquireVideoStreamLease::Request & request,
+    mr2_latency_msgs::srv::AcquireVideoStreamLease::Response & response) {
+    expire_stream_lease_if_needed();
+    if (!is_valid_lease_owner(request.owner_id)) {
+      response.message = "invalid lease owner";
+      return;
+    }
+    if (stream_lease_active()) {
+      response.message = "video streams are already leased by " + stream_lease_owner_;
+      return;
+    }
+    if (request.stream_ids.empty()) {
+      response.message = "at least one stream is required";
+      return;
+    }
+
+    std::set<std::string> selected;
+    for (const auto & stream_id : request.stream_ids) {
+      if (!find_pipeline(stream_id)) {
+        response.message = "unknown stream " + stream_id;
+        return;
+      }
+      selected.insert(stream_id);
+    }
+
+    stream_lease_previous_states_.clear();
+    for (const auto & pipeline : pipelines_) {
+      stream_lease_previous_states_[pipeline->stream_id()] = pipeline->is_enabled();
+      if (pipeline->is_enabled()) {
+        response.previous_stream_ids.push_back(pipeline->stream_id());
+      }
+      pipeline->set_enabled(selected.count(pipeline->stream_id()) > 0);
+      if (pipeline->is_enabled()) {
+        response.effective_stream_ids.push_back(pipeline->stream_id());
+      }
+    }
+    stream_lease_owner_ = request.owner_id;
+    const double requested_timeout = request.lease_timeout_s > 0.0 ?
+      request.lease_timeout_s : stream_lease_timeout_s_;
+    const double timeout_s = std::clamp(requested_timeout, 5.0, 300.0);
+    stream_lease_expires_at_ = std::chrono::steady_clock::now() +
+      std::chrono::milliseconds(static_cast<int64_t>(timeout_s * 1000.0));
+    response.accepted = true;
+    response.message = "video stream lease acquired";
+  }
+
+  std::vector<std::string> restore_stream_lease() {
+    std::vector<std::string> restored;
+    for (const auto & pipeline : pipelines_) {
+      const auto previous = stream_lease_previous_states_.find(pipeline->stream_id());
+      if (previous == stream_lease_previous_states_.end()) {
+        continue;
+      }
+      pipeline->set_enabled(previous->second);
+      if (pipeline->is_enabled()) {
+        restored.push_back(pipeline->stream_id());
+      }
+    }
+    stream_lease_owner_.clear();
+    stream_lease_previous_states_.clear();
+    stream_lease_expires_at_ = std::chrono::steady_clock::time_point::min();
+    return restored;
+  }
+
+  void release_stream_lease(
+    const mr2_latency_msgs::srv::ReleaseVideoStreamLease::Request & request,
+    mr2_latency_msgs::srv::ReleaseVideoStreamLease::Response & response) {
+    expire_stream_lease_if_needed();
+    if (stream_lease_owner_.empty()) {
+      response.message = "no active video stream lease";
+      return;
+    }
+    if (request.owner_id != stream_lease_owner_) {
+      response.message = "lease owner does not match";
+      return;
+    }
+    response.restored_stream_ids = restore_stream_lease();
+    response.released = true;
+    response.message = "video stream lease released";
+  }
+
   static std::string default_base_host() {
     const char * env_base_ip = std::getenv("MR2_BASE_IP");
     if (env_base_ip != nullptr && env_base_ip[0] != '\0') {
@@ -1077,13 +1217,22 @@ class VideoStreamingNode : public rclcpp::Node {
 
   std::string video_config_path_;
   std::string base_host_;
+  double stream_lease_timeout_s_{60.0};
   std::set<std::string> disabled_stream_ids_;
+  std::string stream_lease_owner_;
+  std::map<std::string, bool> stream_lease_previous_states_;
+  std::chrono::steady_clock::time_point stream_lease_expires_at_{
+    std::chrono::steady_clock::time_point::min()};
   GMainLoop * gst_main_loop_{nullptr};
   std::thread gst_main_loop_thread_;
   rclcpp::TimerBase::SharedPtr monitor_timer_;
   std::vector<std::shared_ptr<StreamPipeline>> pipelines_;
   std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subscriptions_;
   std::vector<rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr> stream_enable_services_;
+  rclcpp::Service<mr2_latency_msgs::srv::AcquireVideoStreamLease>::SharedPtr
+    acquire_stream_lease_service_;
+  rclcpp::Service<mr2_latency_msgs::srv::ReleaseVideoStreamLease>::SharedPtr
+    release_stream_lease_service_;
 };
 
 }  // namespace mr2_video_streaming

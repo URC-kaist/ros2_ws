@@ -11,6 +11,7 @@
   <buildtool_depend>pkg-config</buildtool_depend>
 
   <build_depend>nlohmann-json-dev</build_depend>
+  <depend>mr2_latency_msgs</depend>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>std_srvs</depend>

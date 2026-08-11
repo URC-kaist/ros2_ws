@@ -1,0 +1,8 @@
+string owner_id
+string[] stream_ids
+float64 lease_timeout_s
+---
+bool accepted
+string message
+string[] previous_stream_ids
+string[] effective_stream_ids

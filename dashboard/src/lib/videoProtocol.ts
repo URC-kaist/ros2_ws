@@ -1,5 +1,12 @@
 export const VIDEO_MESSAGE_CONFIG = 1
 export const VIDEO_MESSAGE_CHUNK = 2
+export const VIDEO_MESSAGE_TIMED_CHUNK = 3
+
+export type VideoFrameCorrelation = {
+  ssrc: number
+  rtpTimestamp: number
+  markerSequence: number
+}
 
 export type VideoConfigMessage = {
   kind: 'config'
@@ -20,6 +27,7 @@ export type VideoChunkMessage = {
   timestampUs: number
   /** Set by videoGateway at WebSocket message callback entry (T7b). */
   browserReceiveEpochUs: number | null
+  correlation: VideoFrameCorrelation | null
   key: boolean
   delta: boolean
   payload: Uint8Array
@@ -98,6 +106,39 @@ export function decodeVideoMessage(buffer: ArrayBuffer): VideoGatewayMessage | n
       baseIngestTimestampUs: timestampUs,
       timestampUs,
       browserReceiveEpochUs: null,
+      correlation: null,
+      key: (flags & CHUNK_FLAG_KEY) !== 0,
+      delta: (flags & CHUNK_FLAG_DELTA) !== 0,
+      payload,
+    }
+  }
+
+  if (type === VIDEO_MESSAGE_TIMED_CHUNK) {
+    if (!ensureBounds(view, 1, 33)) return null
+    const streamIdLength = view.getUint16(1, true)
+    const flags = view.getUint8(3)
+    const decodeTimestampUs = Number(view.getBigUint64(4, true))
+    const ssrc = view.getUint32(12, true)
+    const rtpTimestamp = view.getUint32(16, true)
+    const markerSequence = view.getUint16(20, true)
+    const baseAccessUnitEpochUs = Number(view.getBigUint64(22, true))
+    const payloadLength = view.getUint32(30, true)
+    const bodyOffset = 34
+    const totalLength = streamIdLength + payloadLength
+    if (!ensureBounds(view, bodyOffset, totalLength)) return null
+    const bytes = new Uint8Array(buffer)
+    const streamId = decodeText(bytes.slice(bodyOffset, bodyOffset + streamIdLength))
+    const payload = bytes.slice(
+      bodyOffset + streamIdLength,
+      bodyOffset + streamIdLength + payloadLength
+    )
+    return {
+      kind: 'chunk',
+      streamId,
+      baseIngestTimestampUs: baseAccessUnitEpochUs,
+      timestampUs: decodeTimestampUs,
+      browserReceiveEpochUs: null,
+      correlation: { ssrc, rtpTimestamp, markerSequence },
       key: (flags & CHUNK_FLAG_KEY) !== 0,
       delta: (flags & CHUNK_FLAG_DELTA) !== 0,
       payload,

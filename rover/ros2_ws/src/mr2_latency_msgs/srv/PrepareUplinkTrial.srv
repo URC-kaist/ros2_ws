@@ -1,0 +1,5 @@
+string trial_id
+string[] stream_ids
+---
+bool accepted
+string message

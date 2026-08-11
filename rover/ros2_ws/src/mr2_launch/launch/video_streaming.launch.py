@@ -26,6 +26,11 @@ def generate_launch_description():
         default_value="",
         description="Comma-separated stream IDs to skip from the central video config",
     )
+    stream_lease_timeout_arg = DeclareLaunchArgument(
+        "stream_lease_timeout_s",
+        default_value="60.0",
+        description="Maximum automatic latency trial stream lease duration",
+    )
 
     video_streaming_node = Node(
         package="mr2_video_streaming",
@@ -37,6 +42,7 @@ def generate_launch_description():
                 "video_config_path": LaunchConfiguration("video_config"),
                 "base_host": LaunchConfiguration("video_base_host"),
                 "disabled_stream_ids": LaunchConfiguration("disabled_stream_ids"),
+                "stream_lease_timeout_s": LaunchConfiguration("stream_lease_timeout_s"),
             }
         ],
     )
@@ -46,6 +52,7 @@ def generate_launch_description():
             video_config_arg,
             video_base_host_arg,
             disabled_stream_ids_arg,
+            stream_lease_timeout_arg,
             video_streaming_node,
         ]
     )

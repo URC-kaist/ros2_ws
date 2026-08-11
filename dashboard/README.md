@@ -162,37 +162,41 @@ It owns:
 
 ### Latency diagnostics
 
-The persistent control sidebar contains a `Latency diagnostics` panel with
-three independent measurement boundaries:
+The persistent control sidebar contains a `Latency diagnostics` panel. The
+downlink command path and the complete Uplink RTP-to-render path are automated.
 
-- an armed command path through gateway T1 and rover T3/T4;
-- an imported rover/base RTP packet-capture report for the Rocket M2 path;
-- rolling selected-stream base-to-browser and browser decode/render timings.
+- an automated command path through gateway T1 and rover T3/T4;
+- an automated RTP marker-to-browser-render report for the complete Uplink path;
+- aggregate and per-stream latency distributions and packet-loss context.
 
 Before a field run:
 
 1. install the base-local chrony configuration from
    `scripts/latency/chrony/README.md` on both hosts;
 2. launch the rover with `enable_latency_diagnostics:=true`;
-3. press `Check chrony sync` and wait for `Ready for synchronized RTP capture`;
-4. follow `scripts/latency/README.md` to capture the same RTP stream at the
-   rover and base and generate a JSON report;
-5. select the same video stream and press `Import RTP report` to load that JSON;
-6. press `Measure browser/base` for the live base-to-browser metric;
-7. optionally press `Arm command`, leave the controller neutral until the panel
-   says `Send command`, and make one input to measure T0/T1/T3/T4;
+3. wait for `Ready for synchronized measurement`, or press `Check chrony sync`
+   to refresh immediately;
+4. press `Measure downlink latency`, leave the controller neutral until the
+   panel says `Send one command`, and make one deliberate input;
+5. read the browser-to-gateway, gateway-to-rover, rover receive-to-publish, and
+   total rows after the ending clock check completes;
+6. select the Uplink feed count and press `Measure uplink latency`; capture
+   begins after every selected feed renders in the panel;
+7. read aggregate and per-stream Rocket M2, base-to-browser, decode/render,
+   and total distributions together with frame count and packet loss;
 8. export command and chrony observations as JSON Lines after the desired
    repetitions.
 
-The chrony button does not start services or step clocks. It fetches base status
-from `/latency/clock-status` and combines it with rover
-`/system_status/clock`. Readiness requires both samples to be no older than five
-seconds, a synchronized rover, an absolute rover residual no greater than 2 ms,
-and a chrony root error bound no greater than 2 ms. Only then does the panel
-offer `--clock-offset-us 0` for the RTP analyzer.
+The chrony button does not start services or step clocks. While the panel is
+mounted, it polls base `/latency/clock-status` every two seconds and combines it
+with rover `/system_status/clock`; the button triggers an immediate refresh.
+Readiness requires both samples to be no older than five seconds, synchronized
+base and rover clocks, an absolute rover residual no greater than 2 ms, and a
+chrony root error bound no greater than 2 ms. A downlink trial also samples the
+browser/base offset before and after the command and rejects drift over 2 ms.
 
-The imported report displays Rocket-link packet latency p50/p95/p99/max, loss,
-and offered/delivered bitrate. It is calculated from existing RTP identifiers;
+The automated report displays same-frame segment latency and Rocket-link loss.
+It is calculated from existing RTP identifiers;
 the video payload and wire protocol are unchanged. No wheel-motion or visual
 motion detector is used.
 

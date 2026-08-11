@@ -3,6 +3,7 @@
 const { spawn } = require('child_process')
 
 const { AnnexBAccessUnitParser } = require('./h264')
+const { RtpStreamParser } = require('./rtp_stream_parser')
 
 function buildGstReceiveArgs(stream, options = {}) {
   const latencyMs = Math.max(0, Math.floor(options.jitterLatencyMs || 0))
@@ -17,6 +18,12 @@ function buildGstReceiveArgs(stream, options = {}) {
     `latency=${latencyMs}`,
     'drop-on-latency=true',
     '!',
+    'tee',
+    'name=rtp',
+    'rtp.',
+    '!',
+    'queue',
+    '!',
     'rtph264depay',
     '!',
     'h264parse',
@@ -26,6 +33,15 @@ function buildGstReceiveArgs(stream, options = {}) {
     '!',
     'fdsink',
     'fd=1',
+    'sync=false',
+    'rtp.',
+    '!',
+    'queue',
+    '!',
+    'rtpstreampay',
+    '!',
+    'fdsink',
+    'fd=3',
     'sync=false',
   ]
 }
@@ -49,7 +65,69 @@ function createVideoStreamReceiver(options = {}) {
   let restartTimer = null
   let availabilityTimer = null
   let parser = new AnnexBAccessUnitParser()
+  let rtpParser = new RtpStreamParser()
+  let pendingAccessUnits = []
+  let pendingMarkers = []
+  let pairingTimer = null
   let available = false
+
+  const maximumPairingQueue = Math.max(4, Math.floor(options.maximumPairingQueue || 64))
+  const pairingTimeoutMs = Math.max(25, Math.floor(options.pairingTimeoutMs || 100))
+
+  function resetCorrelation() {
+    if (pairingTimer) {
+      clearTimeout(pairingTimer)
+      pairingTimer = null
+    }
+    parser = new AnnexBAccessUnitParser()
+    rtpParser = new RtpStreamParser()
+    pendingAccessUnits = []
+    pendingMarkers = []
+  }
+
+  function emitAccessUnit(accessUnit, marker = null) {
+    touchAvailability()
+    onAccessUnit(stream.stream_id, {
+      ...accessUnit,
+      ...(marker ? { correlation: marker } : {}),
+      timestamp_us: Date.now() * 1000,
+    })
+  }
+
+  function schedulePairingFlush() {
+    if (pairingTimer || (pendingAccessUnits.length === 0 && pendingMarkers.length === 0)) return
+    pairingTimer = setTimeout(() => {
+      pairingTimer = null
+      const cutoff = Date.now() - pairingTimeoutMs
+      while (pendingAccessUnits[0]?.queuedAt <= cutoff) {
+        emitAccessUnit(pendingAccessUnits.shift().value)
+        log(`[video:${stream.stream_id}] emitted an access unit without RTP correlation`)
+      }
+      while (pendingMarkers[0]?.queuedAt <= cutoff) {
+        pendingMarkers.shift()
+        log(`[video:${stream.stream_id}] discarded an unpaired RTP marker`)
+      }
+      pairFrames()
+    }, pairingTimeoutMs)
+    pairingTimer.unref?.()
+  }
+
+  function pairFrames() {
+    while (pendingAccessUnits.length > 0 && pendingMarkers.length > 0) {
+      const accessUnit = pendingAccessUnits.shift().value
+      const marker = pendingMarkers.shift().value
+      emitAccessUnit(accessUnit, marker)
+    }
+    if (pendingAccessUnits.length > maximumPairingQueue) {
+      pendingAccessUnits.splice(0, pendingAccessUnits.length - maximumPairingQueue)
+      log(`[video:${stream.stream_id}] dropped unpaired H.264 access units`)
+    }
+    if (pendingMarkers.length > maximumPairingQueue) {
+      pendingMarkers.splice(0, pendingMarkers.length - maximumPairingQueue)
+      log(`[video:${stream.stream_id}] dropped unpaired RTP markers`)
+    }
+    schedulePairingFlush()
+  }
 
   function setAvailability(nextAvailable) {
     if (available === nextAvailable) return
@@ -83,11 +161,29 @@ function createVideoStreamReceiver(options = {}) {
   function handleStdout(chunk) {
     for (const accessUnit of parser.push(chunk)) {
       if (!accessUnit.payload || accessUnit.payload.length === 0) continue
-      touchAvailability()
-      onAccessUnit(stream.stream_id, {
-        ...accessUnit,
-        timestamp_us: Date.now() * 1000,
-      })
+      pendingAccessUnits.push({ queuedAt: Date.now(), value: accessUnit })
+    }
+    pairFrames()
+  }
+
+  function handleRtpStream(chunk) {
+    try {
+      for (const packet of rtpParser.push(chunk)) {
+        if (!packet.marker) continue
+        pendingMarkers.push({
+          queuedAt: Date.now(),
+          value: {
+            marker_sequence: packet.sequence,
+            rtp_timestamp: packet.rtp_timestamp,
+            ssrc: packet.ssrc,
+          },
+        })
+      }
+      pairFrames()
+    } catch (error) {
+      log(`[video:${stream.stream_id}] RTP metadata parse error: ${error.message || error}`)
+      rtpParser.reset()
+      pendingMarkers = []
     }
   }
 
@@ -106,9 +202,9 @@ function createVideoStreamReceiver(options = {}) {
     })
     log(`[video:${stream.stream_id}] spawning ${gstBinary} ${args.join(' ')}`)
 
-    parser = new AnnexBAccessUnitParser()
+    resetCorrelation()
     child = spawnImpl(gstBinary, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
     })
     let ended = false
 
@@ -116,7 +212,7 @@ function createVideoStreamReceiver(options = {}) {
       if (ended) return
       ended = true
       clearAvailabilityTimer()
-      parser = new AnnexBAccessUnitParser()
+      resetCorrelation()
       child = null
       setAvailability(false)
       if (logMessage) {
@@ -127,6 +223,11 @@ function createVideoStreamReceiver(options = {}) {
 
     child.stdout.on('data', handleStdout)
     child.stderr.on('data', handleStderr)
+    if (child.stdio?.[3]?.on) {
+      child.stdio[3].on('data', handleRtpStream)
+    } else {
+      log(`[video:${stream.stream_id}] RTP metadata output fd=3 is unavailable`)
+    }
     child.on('error', (error) => {
       finalizeChild(
         `[video:${stream.stream_id}] receiver process error: ${error.message || String(error)}`

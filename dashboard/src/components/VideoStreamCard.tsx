@@ -8,6 +8,7 @@ type VideoStreamCardProps = {
   stream: VideoStreamInfo
   videoWidth?: number
   videoHeight?: number
+  onFrameRendered?: (streamId: string) => void
 }
 
 type H264PayloadFormat = 'annexb' | 'avcc'
@@ -143,7 +144,12 @@ async function selectDecoderConfiguration(message: VideoConfigMessage) {
   return null
 }
 
-const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardProps) => {
+const VideoStreamCard = ({
+  stream,
+  videoWidth,
+  videoHeight,
+  onFrameRendered,
+}: VideoStreamCardProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const decoderRef = useRef<VideoDecoder | null>(null)
   const decoderConfigRef = useRef<VideoDecoderConfig | null>(null)
@@ -252,6 +258,7 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
           waitingForKeyframeRef.current = false
           setHasFrame(true)
           setStatus('Live')
+          onFrameRendered?.(stream.stream_id)
         },
         error: (error) => {
           if (!active || generation !== decoderGeneration) return
@@ -372,7 +379,15 @@ const VideoStreamCard = ({ stream, videoWidth, videoHeight }: VideoStreamCardPro
       payloadFormatRef.current = 'avcc'
       waitingForKeyframeRef.current = true
     }
-  }, [stream.height, stream.stream_id, stream.width, videoHeight, videoWidth, webCodecsAvailable])
+  }, [
+    onFrameRendered,
+    stream.height,
+    stream.stream_id,
+    stream.width,
+    videoHeight,
+    videoWidth,
+    webCodecsAvailable,
+  ])
 
   return (
     <div className="video-stream-card" style={videoStyle}>

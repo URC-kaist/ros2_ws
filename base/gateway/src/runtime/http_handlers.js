@@ -56,6 +56,86 @@ function handleRocketM2Status(_req, res, options = {}) {
   )
 }
 
+function sendJson(res, statusCode, body) {
+  res.writeHead(statusCode, {
+    'Cache-Control': 'no-store',
+    'Content-Type': 'application/json',
+  })
+  res.end(JSON.stringify(body))
+}
+
+function readJsonBody(req, maximumBytes = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    req.on('data', (chunk) => {
+      size += chunk.length
+      if (size > maximumBytes) {
+        reject(new Error('request body is too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.once('error', reject)
+    req.once('end', () => {
+      try {
+        const text = Buffer.concat(chunks).toString('utf8')
+        resolve(text ? JSON.parse(text) : {})
+      } catch (_) {
+        reject(new Error('request body is not valid JSON'))
+      }
+    })
+  })
+}
+
+async function handleUplinkTrialRequest(req, res, manager, parsedUrl) {
+  const parts = parsedUrl.pathname.split('/').filter(Boolean)
+  const trialId = parts[3] || null
+  const action = parts[4] || null
+  try {
+    if (req.method === 'POST' && !trialId) {
+      sendJson(res, 201, manager.createTrial(await readJsonBody(req)))
+      return
+    }
+    if (req.method === 'POST' && trialId && action === 'start') {
+      sendJson(res, 200, manager.startTrial(trialId, await readJsonBody(req)))
+      return
+    }
+    if (req.method === 'GET' && trialId && !action) {
+      sendJson(res, 200, manager.getTrial(trialId))
+      return
+    }
+    if (req.method === 'DELETE' && trialId && !action) {
+      sendJson(res, 200, await manager.cancelTrial(trialId))
+      return
+    }
+    if (req.method === 'PUT' && trialId &&
+        (action === 'rover-metadata' || action === 'rover-capture')) {
+      sendJson(
+        res,
+        200,
+        await manager.receiveArtifact(trialId, action, req, req.headers)
+      )
+      return
+    }
+    if (req.method === 'POST' && trialId && action === 'browser-samples') {
+      const body = await readJsonBody(req, 2 * 1024 * 1024)
+      sendJson(res, 200, manager.saveBrowserSamples(trialId, body.samples))
+      return
+    }
+    sendJson(res, 404, { error: 'uplink endpoint not found' })
+  } catch (error) {
+    const message = error.message || String(error)
+    const notFound = message.includes('not found')
+    const unavailable = error.code === 'not_configured' || message.includes('another uplink')
+    sendJson(res, notFound ? 404 : unavailable ? 503 : 400, {
+      error: message,
+      code: error.code || 'invalid_request',
+    })
+  }
+}
+
 function createGatewayHttpHandler(options = {}) {
   const getRocketM2State =
     typeof options.getRocketM2State === 'function'
@@ -73,9 +153,20 @@ function createGatewayHttpHandler(options = {}) {
           synchronized: false,
           error: 'chrony status provider is not configured',
         })
+  const uplinkTrialManager = options.uplinkTrialManager || null
 
   return async function gatewayHttpHandler(req, res) {
     const requestEpochUs = Date.now() * 1000
+    const parsedUrl = new URL(req.url || '/', 'http://gateway.local')
+
+    if (parsedUrl.pathname.startsWith('/latency/uplink/trials')) {
+      if (!uplinkTrialManager) {
+        sendJson(res, 503, { error: 'uplink diagnostics are unavailable' })
+        return
+      }
+      await handleUplinkTrialRequest(req, res, uplinkTrialManager, parsedUrl)
+      return
+    }
 
     if (req.method === 'GET' && req.url && req.url.startsWith('/latency/time')) {
       const sendEpochUs = Date.now() * 1000
@@ -128,5 +219,8 @@ function createGatewayHttpHandler(options = {}) {
 
 module.exports = {
   createGatewayHttpHandler,
+  handleUplinkTrialRequest,
   handleRocketM2Status,
+  readJsonBody,
+  sendJson,
 }

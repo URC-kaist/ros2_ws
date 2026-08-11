@@ -10,6 +10,7 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>aruco_opencv</exec_depend>
+  <exec_depend>mr2_latency_diagnostics</exec_depend>
   <exec_depend>mr2_video_streaming</exec_depend>
   <exec_depend>mr2_panorama</exec_depend>
   <exec_depend>mr2_science_module</exec_depend>

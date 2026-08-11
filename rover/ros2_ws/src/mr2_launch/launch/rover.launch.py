@@ -133,6 +133,20 @@ def generate_launch_description():
         default_value="false",
         description="Publish experimental command and motion latency traces",
     )
+    latency_capture_interface_arg = DeclareLaunchArgument(
+        "latency_capture_interface",
+        default_value=EnvironmentVariable(
+            "MR2_ROVER_ROCKET_INTERFACE", default_value=""
+        ),
+        description="Rover network interface facing the Rocket M2 link",
+    )
+    latency_artifact_directory_arg = DeclareLaunchArgument(
+        "latency_artifact_directory",
+        default_value=EnvironmentVariable(
+            "MR2_LATENCY_ARTIFACT_DIR", default_value="/tmp/mr2-latency-rover"
+        ),
+        description="Rover directory for temporary latency capture artifacts",
+    )
     enable_aruco_arg = DeclareLaunchArgument(
         "enable_aruco",
         default_value="true",
@@ -208,6 +222,25 @@ def generate_launch_description():
         executable="system_status",
         name="system_status",
         output="screen",
+    )
+
+    latency_uplink_agent = Node(
+        package="mr2_latency_diagnostics",
+        executable="uplink_agent",
+        name="latency_uplink_agent",
+        output="screen",
+        parameters=[
+            {
+                "capture_interface": LaunchConfiguration(
+                    "latency_capture_interface"
+                ),
+                "video_config_path": LaunchConfiguration("video_config"),
+                "artifact_directory": LaunchConfiguration(
+                    "latency_artifact_directory"
+                ),
+            }
+        ],
+        condition=IfCondition(LaunchConfiguration("enable_latency_diagnostics")),
     )
 
     xbee_sim_launch = IncludeLaunchDescription(
@@ -467,6 +500,8 @@ def generate_launch_description():
         xbee_sim_peer_arg,
         xbee_device_arg,
         enable_latency_diagnostics_arg,
+        latency_capture_interface_arg,
+        latency_artifact_directory_arg,
         enable_aruco_arg,
         aruco_cam_topic_arg,
         enable_video_streaming_arg,
@@ -481,6 +516,7 @@ def generate_launch_description():
         rover_real_launch,
         localization_launch,
         system_status,
+        latency_uplink_agent,
         aruco_tracker,
         yolo_detector,
         servo_launch,

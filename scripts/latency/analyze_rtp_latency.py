@@ -63,6 +63,7 @@ class MatchedPacket:
     ssrc: int
     sequence: int
     rtp_timestamp: int
+    marker: bool
     rover_capture_epoch_us: float
     base_capture_epoch_us: float
     link_latency_us: float
@@ -217,8 +218,12 @@ def percentile(values: Sequence[float], quantile: float) -> float | None:
 
 def distribution(values: Sequence[float]) -> dict[str, float | None]:
     if not values:
-        return {key: None for key in ("min", "mean", "p50", "p95", "p99", "max")}
+        return {
+            "count": 0,
+            **{key: None for key in ("min", "mean", "p50", "p95", "p99", "max")},
+        }
     return {
+        "count": len(values),
         "min": min(values),
         "mean": statistics.fmean(values),
         "p50": percentile(values, 0.50),
@@ -269,6 +274,7 @@ def match_stream_packets(
                     ssrc=rover_packet.ssrc,
                     sequence=rover_packet.sequence,
                     rtp_timestamp=rover_packet.rtp_timestamp,
+                    marker=rover_packet.marker,
                     rover_capture_epoch_us=rover_packet.capture_epoch_us,
                     base_capture_epoch_us=base_packet.capture_epoch_us,
                     link_latency_us=(
@@ -386,10 +392,151 @@ def analyze_captures(
         "captures": capture_metadata,
         "packet_match_key": ["udp_port", "ssrc", "sequence", "rtp_timestamp"],
         "percentile_method": "linear_interpolation_at_(n-1)*q",
+        "aggregate_link_latency_us": distribution(
+            [sample.link_latency_us for sample in samples]
+        ),
         "warnings": warnings,
         "streams": stream_summaries,
     }
     return report, samples
+
+
+def load_browser_samples(path: Path) -> list[dict[str, object]]:
+    with path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    values = payload.get("samples") if isinstance(payload, dict) else None
+    if not isinstance(values, list):
+        raise ValueError("browser samples file must contain a samples array")
+    samples: list[dict[str, object]] = []
+    required_numbers = (
+        "ssrc",
+        "rtp_timestamp",
+        "marker_sequence",
+        "browser_receive_epoch_us",
+        "browser_render_epoch_us",
+    )
+    for index, value in enumerate(values):
+        if not isinstance(value, dict) or not isinstance(value.get("stream_id"), str):
+            raise ValueError(f"browser sample {index} is invalid")
+        if any(not isinstance(value.get(field), (int, float)) for field in required_numbers):
+            raise ValueError(f"browser sample {index} has invalid timestamps or RTP key")
+        if value["browser_render_epoch_us"] < value["browser_receive_epoch_us"]:
+            raise ValueError(f"browser sample {index} renders before it is received")
+        samples.append(value)
+    return samples
+
+
+def build_automated_uplink_report(
+    link_report: dict[str, object],
+    matched_packets: Sequence[MatchedPacket],
+    browser_samples: Sequence[dict[str, object]],
+    browser_clock_offset_us: float,
+    trial_id: str,
+    feed_count: int,
+) -> dict[str, object]:
+    matched_by_key: dict[tuple[str, int, int, int], list[MatchedPacket]] = defaultdict(list)
+    for packet in matched_packets:
+        if packet.marker:
+            matched_by_key[
+                (packet.stream_id, packet.ssrc, packet.sequence, packet.rtp_timestamp)
+            ].append(packet)
+    for values in matched_by_key.values():
+        values.sort(key=lambda packet: packet.base_capture_epoch_us)
+
+    browser_by_key: dict[tuple[str, int, int, int], list[dict[str, object]]] = defaultdict(list)
+    for sample in browser_samples:
+        key = (
+            str(sample["stream_id"]),
+            int(sample["ssrc"]),
+            int(sample["marker_sequence"]),
+            int(sample["rtp_timestamp"]),
+        )
+        browser_by_key[key].append(sample)
+    for values in browser_by_key.values():
+        values.sort(key=lambda sample: float(sample["browser_receive_epoch_us"]))
+
+    frames_by_stream: dict[str, list[dict[str, float]]] = defaultdict(list)
+    duplicate_keys = 0
+    for key in matched_by_key.keys() | browser_by_key.keys():
+        packet_values = matched_by_key.get(key, [])
+        browser_values = browser_by_key.get(key, [])
+        pair_count = min(len(packet_values), len(browser_values))
+        duplicate_keys += max(0, len(packet_values) - 1) + max(0, len(browser_values) - 1)
+        for packet, browser in zip(packet_values[:pair_count], browser_values[:pair_count]):
+            browser_receive = float(browser["browser_receive_epoch_us"])
+            browser_render = float(browser["browser_render_epoch_us"])
+            rover_in_base_clock = packet.rover_capture_epoch_us + float(
+                link_report["clock_offset_us"]
+            )
+            receive_in_base_clock = browser_receive + browser_clock_offset_us
+            render_in_base_clock = browser_render + browser_clock_offset_us
+            frames_by_stream[packet.stream_id].append(
+                {
+                    "rocket_m2": packet.base_capture_epoch_us - rover_in_base_clock,
+                    "base_to_browser": receive_in_base_clock - packet.base_capture_epoch_us,
+                    "decode_render": browser_render - browser_receive,
+                    "total": render_in_base_clock - rover_in_base_clock,
+                }
+            )
+
+    stream_reports = []
+    aggregate_frames: list[dict[str, float]] = []
+    link_streams = {str(stream["stream_id"]): stream for stream in link_report["streams"]}
+    warnings = list(link_report["warnings"])
+    if duplicate_keys:
+        warnings.append(f"paired {duplicate_keys} duplicate RTP/browser frame keys by time order")
+    for stream_id, link_stream in link_streams.items():
+        frames = frames_by_stream.get(stream_id, [])
+        aggregate_frames.extend(frames)
+        stream_warnings: list[str] = []
+        if not frames:
+            stream_warnings.append("no marker frames matched browser render samples")
+        segments = {
+            name: distribution([frame[name] for frame in frames])
+            for name in ("rocket_m2", "base_to_browser", "decode_render", "total")
+        }
+        stream_reports.append(
+            {
+                "stream_id": stream_id,
+                "udp_port": link_stream["udp_port"],
+                "segments": segments,
+                "matched_frames": len(frames),
+                "browser_frames": sum(
+                    1 for sample in browser_samples if sample["stream_id"] == stream_id
+                ),
+                "matched_packets": link_stream["matched_packets"],
+                "packet_loss_percent": link_stream["loss_percent"],
+                "rover_offered_bitrate_bps": link_stream["rover_offered_bitrate_bps"],
+                "base_delivered_bitrate_bps": link_stream["base_delivered_bitrate_bps"],
+                "warnings": stream_warnings,
+            }
+        )
+        warnings.extend(f"{stream_id}: {warning}" for warning in stream_warnings)
+
+    if not aggregate_frames:
+        raise ValueError("no RTP marker frames could be correlated with browser render samples")
+    aggregate = {
+        name: distribution([frame[name] for frame in aggregate_frames])
+        for name in ("rocket_m2", "base_to_browser", "decode_render", "total")
+    }
+    return {
+        "schema_version": 2,
+        "kind": "mr2_automated_uplink_latency_report",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "trial_id": trial_id,
+        "feed_count": feed_count,
+        "stream_ids": [stream["stream_id"] for stream in stream_reports],
+        "clock": {
+            "base_minus_rover_us": link_report["clock_offset_us"],
+            "base_minus_browser_us": browser_clock_offset_us,
+        },
+        "aggregate": aggregate,
+        "streams": stream_reports,
+        "captures": link_report["captures"],
+        "matched_frames": len(aggregate_frames),
+        "browser_frames": len(browser_samples),
+        "warnings": warnings,
+    }
 
 
 def prepare_output(path: Path, overwrite: bool) -> None:
@@ -428,11 +575,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", default=str(DEFAULT_VIDEO_CONFIG))
     parser.add_argument("--payload-type", type=int, default=96)
     parser.add_argument("--clock-offset-us", type=float)
+    parser.add_argument("--browser-samples")
+    parser.add_argument("--browser-clock-offset-us", type=float)
+    parser.add_argument("--trial-id")
+    parser.add_argument("--feed-count", type=int)
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
 
 def print_summary(report: dict[str, object]) -> None:
+    if report["schema_version"] == 2:
+        print("Automated Uplink frame latency")
+        for stream in report["streams"]:
+            latency = stream["segments"]["total"]
+            p50 = latency["p50"]
+            p50_text = "--" if p50 is None else f"{p50 / 1000.0:.3f} ms"
+            print(f"  {stream['stream_id']}: frames={stream['matched_frames']} total_p50={p50_text}")
+        for warning in report["warnings"]:
+            print(f"warning: {warning}", file=sys.stderr)
+        return
     print("Rocket M2 RTP link latency")
     for stream in report["streams"]:
         latency = stream["link_latency_us"]
@@ -467,6 +628,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             clock_offset_us,
             clock_offset_assumed,
         )
+        automated_arguments = (
+            args.browser_samples,
+            args.browser_clock_offset_us,
+            args.trial_id,
+            args.feed_count,
+        )
+        if any(value is not None for value in automated_arguments):
+            if any(value is None for value in automated_arguments):
+                raise ValueError(
+                    "browser samples, browser clock offset, trial ID, and feed count are required together"
+                )
+            if args.feed_count != len(streams):
+                raise ValueError("feed count must match selected streams")
+            report = build_automated_uplink_report(
+                report,
+                samples,
+                load_browser_samples(Path(args.browser_samples).resolve()),
+                args.browser_clock_offset_us,
+                args.trial_id,
+                args.feed_count,
+            )
         write_report(Path(args.output).resolve(), report, args.overwrite)
         if args.samples_csv:
             write_samples(Path(args.samples_csv).resolve(), samples, args.overwrite)

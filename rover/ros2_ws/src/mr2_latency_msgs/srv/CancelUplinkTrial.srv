@@ -1,0 +1,4 @@
+string trial_id
+---
+bool cancelled
+string message

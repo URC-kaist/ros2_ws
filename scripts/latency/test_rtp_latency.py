@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scripts.latency.analyze_rtp_latency import (
     analyze_captures,
+    build_automated_uplink_report,
     main as analyze_main,
     read_rtp_pcap,
     write_report,
@@ -120,6 +121,61 @@ class CaptureConfigurationTest(unittest.TestCase):
 
 
 class RtpPcapAnalysisTest(unittest.TestCase):
+    def test_builds_same_frame_uplink_segments_and_direct_total_percentiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rover = root / "rover.pcap"
+            base = root / "base.pcap"
+            first = make_rtp_packet(5000, 10, 1000, ssrc=42)
+            second = make_rtp_packet(5000, 11, 2000, ssrc=42)
+            write_pcap(rover, [(1_000_000, first), (2_000_000, second)])
+            write_pcap(base, [(1_001_000, first), (2_009_000, second)])
+            link_report, packets = analyze_captures(
+                rover,
+                base,
+                [VideoStream("front", 5000)],
+                payload_type=96,
+                clock_offset_us=0,
+                clock_offset_assumed=False,
+            )
+            report = build_automated_uplink_report(
+                link_report,
+                packets,
+                [
+                    {
+                        "stream_id": "front",
+                        "ssrc": 42,
+                        "marker_sequence": 10,
+                        "rtp_timestamp": 1000,
+                        "browser_receive_epoch_us": 1_009_000,
+                        "browser_render_epoch_us": 1_010_000,
+                    },
+                    {
+                        "stream_id": "front",
+                        "ssrc": 42,
+                        "marker_sequence": 11,
+                        "rtp_timestamp": 2000,
+                        "browser_receive_epoch_us": 2_010_000,
+                        "browser_render_epoch_us": 2_011_000,
+                    },
+                ],
+                browser_clock_offset_us=0,
+                trial_id="trial-1",
+                feed_count=1,
+            )
+            aggregate = report["aggregate"]
+            self.assertEqual(report["matched_frames"], 2)
+            self.assertEqual(aggregate["rocket_m2"]["p50"], 5000)
+            self.assertEqual(aggregate["base_to_browser"]["p50"], 4500)
+            self.assertEqual(aggregate["decode_render"]["p50"], 1000)
+            self.assertEqual(aggregate["total"]["p50"], 10500)
+            self.assertNotEqual(
+                aggregate["total"]["p95"],
+                aggregate["rocket_m2"]["p95"]
+                + aggregate["base_to_browser"]["p95"]
+                + aggregate["decode_render"]["p95"],
+            )
+
     def test_matches_fixed_delay_with_clock_offset_and_sequence_wrap(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -150,6 +206,7 @@ class RtpPcapAnalysisTest(unittest.TestCase):
             self.assertEqual(stream["link_latency_us"]["p50"], 5000)
             self.assertEqual(stream["link_latency_us"]["p95"], 5000)
             self.assertEqual(stream["link_latency_us"]["max"], 5000)
+            self.assertEqual(report["aggregate_link_latency_us"]["p95"], 5000)
             self.assertEqual([sample.sequence for sample in samples], sequences)
 
     def test_reports_loss_duplicates_ports_and_negative_latency(self) -> None:
