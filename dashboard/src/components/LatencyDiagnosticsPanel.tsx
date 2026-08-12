@@ -3,6 +3,7 @@ import { FiArrowDown, FiArrowUp, FiClock, FiDownload, FiRotateCcw, FiX } from 'r
 import { useLatencyClockReadiness } from '../hooks/useLatencyClockReadiness'
 import { useLatencyDiagnostics } from '../hooks/useLatencyDiagnostics'
 import { useRosBridge } from '../hooks/useRosBridge'
+import { useVideoStreams } from '../hooks/useVideoStreams'
 import { useXbeeGateway } from '../hooks/useXbeeGateway'
 import { downlinkPhaseLabel } from '../lib/latency/downlinkTrial'
 import {
@@ -13,6 +14,7 @@ import {
   uploadUplinkBrowserSamples,
 } from '../lib/latency/latencyApi'
 import { mapGatewayUplinkPhase, uplinkPhaseLabel } from '../lib/latency/uplinkTrial'
+import { selectOnlineUplinkStreams } from '../lib/latency/uplinkStreamSelection'
 import {
   chronyStatusForLog,
 } from '../lib/chronyStatus'
@@ -21,7 +23,8 @@ import {
   type RoverLatencyTrace,
 } from '../lib/latencyDiagnostics'
 import { parseAutomatedUplinkReport } from '../lib/rtpLatencyReport'
-import { fetchVideoStreams, type VideoStreamInfo } from '../lib/videoGateway'
+import { fetchVideoStreams } from '../lib/videoGateway'
+import type { UplinkTrialStatusMsg } from '../lib/rosMessages'
 import LatencyResultTable from './LatencyResultTable'
 import VideoStreamCard from './VideoStreamCard'
 import './ControlPanel/LatencyDiagnosticsPanel.css'
@@ -54,11 +57,14 @@ const LatencyDiagnosticsPanel = () => {
   const { ros, connected: rosConnected } = useRosBridge()
   const clockReadiness = useLatencyClockReadiness(ros)
   const checkClockNow = clockReadiness.checkNow
-  const [streams, setStreams] = useState<VideoStreamInfo[]>([])
-  const [feedCount, setFeedCount] = useState(1)
+  const { streams, loading: streamsLoading, error: streamsError } = useVideoStreams()
+  const [excludedUplinkStreamIds, setExcludedUplinkStreamIds] = useState<Set<string>>(
+    () => new Set()
+  )
   const [uplinkElapsedS, setUplinkElapsedS] = useState(0)
   const uplinkOperationRef = useRef(0)
   const renderedUplinkStreamsRef = useRef(new Set<string>())
+  const roverUplinkStatusRef = useRef<UplinkTrialStatusMsg | null>(null)
 
   const markUplinkFrameRendered = useCallback((streamId: string) => {
     renderedUplinkStreamsRef.current.add(streamId)
@@ -88,17 +94,15 @@ const LatencyDiagnosticsPanel = () => {
   }, [ros])
 
   useEffect(() => {
-    let active = true
-    void fetchVideoStreams()
-      .then((nextStreams) => {
-        if (!active) return
-        setStreams(nextStreams)
-      })
-      .catch(() => undefined)
-    return () => {
-      active = false
-    }
-  }, [])
+    return ros.subscribe<UplinkTrialStatusMsg>(
+      '/latency/uplink/status',
+      'mr2_latency_msgs/msg/UplinkTrialStatus',
+      (message) => {
+        roverUplinkStatusRef.current = message
+      },
+      { queueSize: 10 }
+    )
+  }, [ros])
 
   useEffect(() => {
     if (!snapshot.uplink.active) {
@@ -113,7 +117,14 @@ const LatencyDiagnosticsPanel = () => {
   }, [snapshot.uplink.active])
 
   const trial = snapshot.currentTrial
-  const selectedUplinkStreams = streams.slice(0, Math.min(feedCount, streams.length))
+  const onlineUplinkStreams = streams.filter((stream) => stream.available)
+  const selectedUplinkStreams = selectOnlineUplinkStreams(
+    streams,
+    excludedUplinkStreamIds
+  )
+  const measuredUplinkStreams = snapshot.uplink.active
+    ? streams.filter((stream) => snapshot.uplink.streamIds.includes(stream.stream_id))
+    : selectedUplinkStreams
   const automatedUplinkReport = snapshot.uplink.report
   const downlinkStatusTone =
     snapshot.downlink.phase === 'completed'
@@ -179,7 +190,6 @@ const LatencyDiagnosticsPanel = () => {
         throw new Error('Uplink measurement was cancelled.')
       }
       const nextStreams = await fetchVideoStreams()
-      setStreams(nextStreams)
       const byId = new Map(nextStreams.map((stream) => [stream.stream_id, stream]))
       if (streamIds.every((streamId) => byId.get(streamId)?.available)) return
       await new Promise((resolve) => window.setTimeout(resolve, 500))
@@ -199,27 +209,50 @@ const LatencyDiagnosticsPanel = () => {
     throw new Error('Selected video feeds did not render in the browser in time.')
   }
 
+  const throwIfRoverTrialFailed = (trialId: string) => {
+    const status = roverUplinkStatusRef.current
+    if (status?.trial_id !== trialId || status.phase !== 'failed') return
+    const error = new Error(
+      status.message || 'Rover capture failed before artifacts were uploaded.'
+    ) as Error & { code?: string }
+    error.code = status.error_code || 'rover_capture_failed'
+    throw error
+  }
+
+  const waitForCaptureWindow = async (
+    trialId: string,
+    durationS: number,
+    operationId: number
+  ) => {
+    const deadline = Date.now() + (durationS + 0.75) * 1000
+    while (Date.now() < deadline) {
+      if (uplinkOperationRef.current !== operationId) return false
+      throwIfRoverTrialFailed(trialId)
+      await new Promise((resolve) => window.setTimeout(resolve, 100))
+    }
+    throwIfRoverTrialFailed(trialId)
+    return true
+  }
+
   const startUplinkMeasurement = async () => {
     const streamIds = selectedUplinkStreams.map((stream) => stream.stream_id)
-    if (streamIds.length !== feedCount || streamIds.length === 0) return
+    const feedCount = streamIds.length
+    if (feedCount === 0) return
     if (!latencyDiagnostics.startUplinkPreflight(feedCount, streamIds)) return
     renderedUplinkStreamsRef.current.clear()
+    roverUplinkStatusRef.current = null
     const operationId = ++uplinkOperationRef.current
     let trialId: string | null = null
     let roverPrepared = false
     try {
       if (!gatewayConnected) throw new Error('Base gateway WebSocket is not connected.')
       if (!rosConnected) throw new Error('ROS bridge is not connected.')
-      const readiness = await checkClockNow()
-      if (!readiness.ready) throw new Error(readiness.reasons.join(' '))
-      if (!(await latencyDiagnostics.synchronizeGatewayClock())) {
-        throw new Error(
-          latencyDiagnostics.getSnapshot().clock.error ||
-            'Browser/base clock offset could not be measured.'
-        )
-      }
+      const initialReadiness = await checkClockNow()
+      if (!initialReadiness.ready) throw new Error(initialReadiness.reasons.join(' '))
 
-      const created = await createUplinkTrial(feedCount, streamIds, 15)
+      // Five seconds yields many matched RTP marker frames at camera frame
+      // rates without delaying results with an unnecessarily long pcap.
+      const created = await createUplinkTrial(feedCount, streamIds, 5)
       trialId = created.trial_id
       latencyDiagnostics.bindUplinkTrial(trialId)
       const prepared = await ros.callService<
@@ -235,16 +268,27 @@ const LatencyDiagnosticsPanel = () => {
       await waitForSelectedStreams(streamIds, operationId)
       await waitForRenderedStreams(streamIds, operationId)
 
+      // Preparation and stream warm-up can take longer than the gateway's
+      // five-second freshness window. Take both authoritative clock snapshots
+      // only after video is ready and immediately before starting capture.
+      const startReadiness = await checkClockNow()
+      if (!startReadiness.ready) throw new Error(startReadiness.reasons.join(' '))
+      if (!(await latencyDiagnostics.synchronizeGatewayClock())) {
+        throw new Error(
+          latencyDiagnostics.getSnapshot().clock.error ||
+            'Browser/base clock offset could not be measured.'
+        )
+      }
       const clock = latencyDiagnostics.getSnapshot().clock
       if (clock.offsetUs == null || clock.rttUs == null || clock.syncedAtEpochUs == null) {
         throw new Error('Browser/base clock snapshot is unavailable.')
       }
       const chronySnapshot = {
-        ready: readiness.ready,
-        reasons: readiness.reasons,
-        rover_error_bound_s: readiness.roverErrorBoundS,
-        base: chronyStatusForLog(clockReadiness.base),
-        rover: chronyStatusForLog(clockReadiness.rover),
+        ready: startReadiness.ready,
+        reasons: startReadiness.reasons,
+        rover_error_bound_s: startReadiness.roverErrorBoundS,
+        base: chronyStatusForLog(startReadiness.base),
+        rover: chronyStatusForLog(startReadiness.rover),
       }
       const started = await startUplinkTrial(
         trialId,
@@ -285,8 +329,7 @@ const LatencyDiagnosticsPanel = () => {
       }
       latencyDiagnostics.updateUplinkPhase('capturing', 0.3)
 
-      await new Promise((resolve) => window.setTimeout(resolve, (started.duration_s + 0.75) * 1000))
-      if (uplinkOperationRef.current !== operationId) return
+      if (!(await waitForCaptureWindow(trialId, started.duration_s, operationId))) return
       const browserSamples = latencyDiagnostics.finishUplinkBrowserCapture(trialId)
       if (browserSamples.length === 0) {
         throw new Error('No correlated browser frames were rendered during capture.')
@@ -308,6 +351,7 @@ const LatencyDiagnosticsPanel = () => {
       const deadline = Date.now() + (started.duration_s + 45) * 1000
       while (Date.now() < deadline) {
         if (uplinkOperationRef.current !== operationId) return
+        throwIfRoverTrialFailed(trialId)
         const status = await getUplinkTrial(trialId)
         const phase = status.phase === 'waiting_for_rover_artifacts' &&
           status.browser_samples_received
@@ -415,21 +459,41 @@ const LatencyDiagnosticsPanel = () => {
         <span>{snapshot.recordCount} events</span>
       </div>
 
-      <label className="latency-diagnostics__field">
-        <span>Uplink feeds</span>
-        <select
-          value={feedCount}
-          disabled={snapshot.uplink.active || streams.length === 0}
-          onChange={(event) => setFeedCount(Number(event.target.value))}
-        >
-          {Array.from({ length: streams.length }, (_, index) => index + 1).map((count) => (
-            <option value={count} key={count}>{count}</option>
-          ))}
-        </select>
-      </label>
+      <fieldset className="latency-diagnostics__camera-selection">
+        <legend>Uplink cameras ({onlineUplinkStreams.length} online)</legend>
+        {onlineUplinkStreams.map((stream) => (
+          <label key={stream.stream_id} className="latency-diagnostics__camera-option">
+            <input
+              type="checkbox"
+              checked={!excludedUplinkStreamIds.has(stream.stream_id)}
+              disabled={snapshot.uplink.active}
+              onChange={(event) => {
+                const checked = event.target.checked
+                setExcludedUplinkStreamIds((current) => {
+                  const next = new Set(current)
+                  if (checked) {
+                    next.delete(stream.stream_id)
+                  } else {
+                    next.add(stream.stream_id)
+                  }
+                  return next
+                })
+              }}
+            />
+            <span>{stream.display.label || stream.stream_id}</span>
+          </label>
+        ))}
+        {onlineUplinkStreams.length === 0 && (
+          <small>{streamsLoading ? 'Checking camera availability...' : 'No cameras online'}</small>
+        )}
+      </fieldset>
+      {streamsError && (
+        <small className="latency-diagnostics__error">{streamsError}</small>
+      )}
       <small>
-        {selectedUplinkStreams.map((stream) => stream.display.label || stream.stream_id).join(', ') ||
-          'No video streams available'}
+        {selectedUplinkStreams.length > 0
+          ? `${selectedUplinkStreams.length} camera${selectedUplinkStreams.length === 1 ? '' : 's'} selected`
+          : 'Select at least one online camera'}
       </small>
 
       <div className="latency-diagnostics__actions latency-diagnostics__actions--primary">
@@ -447,7 +511,7 @@ const LatencyDiagnosticsPanel = () => {
         </button>
         <button
           type="button"
-          disabled={snapshot.uplink.active || selectedUplinkStreams.length !== feedCount}
+          disabled={snapshot.uplink.active || selectedUplinkStreams.length === 0}
           title="Measure uplink latency"
           aria-label="Measure uplink latency"
           onClick={() => void startUplinkMeasurement()}
@@ -469,9 +533,9 @@ const LatencyDiagnosticsPanel = () => {
         </button>
       </div>
 
-      {snapshot.uplink.active && selectedUplinkStreams.length > 0 && (
+      {snapshot.uplink.active && measuredUplinkStreams.length > 0 && (
         <div className="latency-diagnostics__feed-grid" aria-label="Measured Uplink feeds">
-          {selectedUplinkStreams.map((stream) => (
+          {measuredUplinkStreams.map((stream) => (
             <div key={stream.stream_id} className="latency-diagnostics__feed">
               <span>{stream.display.label || stream.stream_id}</span>
               <VideoStreamCard

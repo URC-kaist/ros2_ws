@@ -638,6 +638,7 @@ export class LatencyDiagnostics {
     this.clockSyncPromise = (async () => {
       try {
         const samples: Array<{ offsetUs: number; rttUs: number }> = []
+        let latestBaseSampleEpochUs: number | null = null
         const url = resolveLatencyTimeUrl()
         for (let index = 0; index < sampleCount; index += 1) {
           const browserSendUs = browserEpochUs()
@@ -661,12 +662,16 @@ export class LatencyDiagnostics {
               (serverSendUs - browserReceiveUs)) /
             2
           samples.push({ offsetUs, rttUs })
+          // The gateway uses this timestamp to reject old preflight snapshots.
+          // Base it on the server wall clock: performance.timeOrigin remains
+          // fixed when NTP/Chrony steps wall time in a long-lived browser tab.
+          latestBaseSampleEpochUs = serverSendUs
         }
         samples.sort((left, right) => left.rttUs - right.rttUs)
         const selected = samples.slice(0, Math.max(1, Math.ceil(samples.length / 2)))
         this.gatewayClockOffsetUs = median(selected.map((sample) => sample.offsetUs))
         this.gatewayClockRttUs = median(selected.map((sample) => sample.rttUs))
-        this.clockSyncedAtEpochUs = browserEpochUs()
+        this.clockSyncedAtEpochUs = latestBaseSampleEpochUs
         return this.gatewayClockOffsetUs != null
       } catch (error) {
         this.clockError = error instanceof Error ? error.message : 'Clock synchronization failed'

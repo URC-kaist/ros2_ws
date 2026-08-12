@@ -25,6 +25,8 @@ from rclpy.node import Node
 from .capture import (
     build_capture_args,
     load_stream_ports,
+    probe_upload_target,
+    resolve_capture_interface,
     run_capture,
     upload_bytes,
     upload_file,
@@ -33,7 +35,7 @@ from .trial_state import UplinkTrial, validate_duration, validate_trial_id
 
 
 class UplinkAgent(Node):
-    """Own at most one rover capture and always release its video stream lease."""
+    """Coordinate one rover capture and any stream lease it acquires."""
 
     def __init__(self) -> None:
         super().__init__("latency_uplink_agent")
@@ -143,23 +145,40 @@ class UplinkAgent(Node):
                 }:
                     raise ValueError("another rover uplink trial is active")
 
-            if not self._lease_client.wait_for_service(timeout_sec=3.0):
-                raise RuntimeError("video stream lease service is unavailable")
-            lease_request = AcquireVideoStreamLease.Request()
-            lease_request.owner_id = trial_id
-            lease_request.stream_ids = stream_ids
-            lease_request.lease_timeout_s = self._max_duration_s + 30.0
-            lease = self._wait_for_future(
-                self._lease_client.call_async(lease_request), 5.0
+            lease_acquired = self._lease_client.wait_for_service(
+                timeout_sec=3.0
             )
-            if not lease.accepted:
-                raise RuntimeError(lease.message or "video stream lease was rejected")
+            if lease_acquired:
+                lease_request = AcquireVideoStreamLease.Request()
+                lease_request.owner_id = trial_id
+                lease_request.stream_ids = stream_ids
+                lease_request.lease_timeout_s = self._max_duration_s + 30.0
+                lease = self._wait_for_future(
+                    self._lease_client.call_async(lease_request), 5.0
+                )
+                if not lease.accepted:
+                    raise RuntimeError(
+                        lease.message or "video stream lease was rejected"
+                    )
+            else:
+                self.get_logger().warning(
+                    f"Video stream lease service {self._lease_service_name} "
+                    "is unavailable; continuing with selected-port capture"
+                )
 
             with self._lock:
-                self._trial = UplinkTrial(trial_id=trial_id, stream_ids=stream_ids)
+                self._trial = UplinkTrial(
+                    trial_id=trial_id,
+                    stream_ids=stream_ids,
+                    lease_acquired=lease_acquired,
+                )
                 self._cancel_event = threading.Event()
             response.accepted = True
-            response.message = "rover uplink trial prepared"
+            response.message = (
+                "rover uplink trial prepared"
+                if lease_acquired
+                else "rover uplink trial prepared with selected-port capture"
+            )
             self._publish_status()
         except (OSError, RuntimeError, TimeoutError, ValueError) as error:
             response.accepted = False
@@ -180,6 +199,26 @@ class UplinkAgent(Node):
                     raise ValueError("trial_id is not prepared")
                 if trial.phase != "prepared":
                     raise ValueError(f"trial cannot start from phase {trial.phase}")
+                ports = [self._stream_ports[item] for item in trial.stream_ids]
+            capture_interface = resolve_capture_interface(
+                self._capture_interface, parsed_url.hostname
+            )
+            command = build_capture_args(
+                self._tcpdump_binary,
+                capture_interface,
+                Path("rover.pcap"),
+                ports,
+            )
+            probe_upload_target(request.upload_base_url.rstrip("/"), trial.trial_id)
+            if not self._capture_interface:
+                self.get_logger().info(
+                    f"Resolved latency capture interface {capture_interface} "
+                    f"from route to {parsed_url.hostname}"
+                )
+            with self._lock:
+                trial = self._trial
+                if trial is None or trial.trial_id != request.trial_id:
+                    raise ValueError("trial_id is not prepared")
                 trial.transition("capturing", "Capturing rover RTP", 0.2)
                 self._worker = threading.Thread(
                     target=self._run_trial,
@@ -188,6 +227,7 @@ class UplinkAgent(Node):
                         duration_s,
                         request.upload_base_url.rstrip("/"),
                         request.upload_token,
+                        capture_interface,
                     ),
                     daemon=True,
                 )
@@ -210,7 +250,7 @@ class UplinkAgent(Node):
             if trial.phase in {"completed", "failed", "cancelled"}:
                 response.message = f"trial is already {trial.phase}"
                 return response
-            release_now = trial.phase == "prepared"
+            release_now = trial.phase == "prepared" and trial.lease_acquired
             trial.cancel()
             self._cancel_event.set()
         if release_now:
@@ -226,6 +266,7 @@ class UplinkAgent(Node):
         duration_s: float,
         upload_base_url: str,
         upload_token: str,
+        capture_interface: str,
     ) -> None:
         trial_directory = Path(
             tempfile.mkdtemp(prefix="uplink-", dir=self._artifact_root)
@@ -239,9 +280,10 @@ class UplinkAgent(Node):
                     return
                 ports = [self._stream_ports[item] for item in trial.stream_ids]
                 stream_ids = list(trial.stream_ids)
+                lease_acquired = trial.lease_acquired
             command = build_capture_args(
                 self._tcpdump_binary,
-                self._capture_interface,
+                capture_interface,
                 capture_path,
                 ports,
             )
@@ -254,8 +296,9 @@ class UplinkAgent(Node):
                 "role": "rover",
                 "trial_id": trial_id,
                 "hostname": os.uname().nodename,
-                "interface": self._capture_interface,
+                "interface": capture_interface,
                 "stream_ids": stream_ids,
+                "stream_lease_acquired": lease_acquired,
                 "started_epoch_us": started_us,
                 "finished_epoch_us": finished_us,
                 "tcpdump_exit_code": exit_code,
@@ -288,7 +331,13 @@ class UplinkAgent(Node):
             with self._lock:
                 if self._trial is not None:
                     self._trial.transition(
-                        "restoring_streams", "Restoring video streams", 0.95
+                        "restoring_streams",
+                        (
+                            "Restoring video streams"
+                            if lease_acquired
+                            else "Finalizing selected-port capture"
+                        ),
+                        0.95,
                     )
             self._publish_status()
         except (OSError, RuntimeError, TimeoutError, ValueError) as error:
@@ -297,7 +346,13 @@ class UplinkAgent(Node):
                     self._trial.fail("rover_capture_failed", str(error))
             self._publish_status()
         finally:
-            released = self._release_lease(trial_id)
+            with self._lock:
+                lease_acquired = (
+                    self._trial is not None
+                    and self._trial.trial_id == trial_id
+                    and self._trial.lease_acquired
+                )
+            released = not lease_acquired or self._release_lease(trial_id)
             with self._lock:
                 if self._trial is not None and self._trial.trial_id == trial_id:
                     if self._cancel_event.is_set():

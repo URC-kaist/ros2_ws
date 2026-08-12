@@ -21,6 +21,7 @@ class UplinkTrial:
     message: str = "Prepared"
     cancel_requested: bool = False
     metadata: dict[str, object] = field(default_factory=dict)
+    lease_acquired: bool = False
 
     def transition(self, phase: str, message: str, progress: float) -> None:
         if self.phase in TERMINAL_PHASES:

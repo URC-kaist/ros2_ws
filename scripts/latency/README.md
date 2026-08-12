@@ -59,6 +59,11 @@ artifact upload, RTP marker-to-browser-frame matching, cancellation, and timeout
 cleanup. It reports Rocket M2, base-to-browser, decode/render, and end-to-end
 distributions from the same rendered frame samples.
 
+If the rover's stream lease service is not discoverable, the Uplink agent falls
+back to capturing only the selected streams' UDP ports. The trial continues, and
+the rover metadata records `stream_lease_acquired: false`; unselected streams are
+not included in the latency report but may remain active as background link load.
+
 The analyzer defines the optional correction as:
 
 ```text

@@ -16,6 +16,63 @@ from urllib.parse import urlsplit
 INTERFACE_PATTERN = re.compile(r"^[A-Za-z0-9_.:@-]{1,64}$")
 
 
+def resolve_capture_interface(
+    configured_interface: str,
+    destination_host: str,
+    run=subprocess.run,
+) -> str:
+    """Return an explicit interface or the kernel route to the upload host."""
+    if configured_interface:
+        if not INTERFACE_PATTERN.fullmatch(configured_interface):
+            raise ValueError("invalid capture interface")
+        return configured_interface
+    try:
+        result = run(
+            ["ip", "-j", "route", "get", destination_host],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        routes = json.loads(result.stdout)
+        first_route = routes[0] if isinstance(routes, list) and routes else None
+        interface = first_route.get("dev") if isinstance(first_route, dict) else None
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            f"could not resolve capture interface for {destination_host}: {error}"
+        ) from error
+    if not isinstance(interface, str) or not INTERFACE_PATTERN.fullmatch(interface):
+        raise RuntimeError(f"route to {destination_host} has no valid interface")
+    return interface
+
+
+def probe_upload_target(url: str, expected_trial_id: str) -> None:
+    """Fail before capture when the Rover cannot reach its Base trial URL."""
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("invalid upload URL")
+    connection_type = (
+        http.client.HTTPSConnection
+        if parsed.scheme == "https"
+        else http.client.HTTPConnection
+    )
+    connection = connection_type(parsed.hostname, parsed.port, timeout=5)
+    path = parsed.path or "/"
+    try:
+        connection.request("GET", path, headers={"Accept": "application/json"})
+        response = connection.getresponse()
+        body = response.read()
+        if response.status < 200 or response.status >= 300:
+            raise RuntimeError(f"artifact upload probe returned HTTP {response.status}")
+        payload = json.loads(body)
+        if not isinstance(payload, dict) or payload.get("trial_id") != expected_trial_id:
+            raise RuntimeError("artifact upload probe returned the wrong trial")
+    except (OSError, http.client.HTTPException, json.JSONDecodeError) as error:
+        raise RuntimeError(f"artifact upload target is unreachable: {error}") from error
+    finally:
+        connection.close()
+
+
 def load_stream_ports(config_path: Path) -> dict[str, int]:
     with config_path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)

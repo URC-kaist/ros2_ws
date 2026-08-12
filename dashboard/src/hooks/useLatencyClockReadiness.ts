@@ -65,9 +65,14 @@ export function useLatencyClockReadiness(ros: RosBridgeClient) {
     setChecking(true)
     try {
       const nextBase = await refreshBase()
+      const nextRover = roverRef.current
       const now = Date.now()
       if (mountedRef.current) setNowEpochMs(now)
-      return evaluateChronyReadiness(nextBase, roverRef.current, now)
+      return {
+        ...evaluateChronyReadiness(nextBase, nextRover, now),
+        base: nextBase,
+        rover: nextRover,
+      }
     } finally {
       if (mountedRef.current) setChecking(false)
     }

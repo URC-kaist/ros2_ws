@@ -129,6 +129,15 @@ export type DiagnosticArray = {
   status: DiagnosticStatus[]
 }
 
+export type UplinkTrialStatusMsg = {
+  trial_id: string
+  phase: string
+  progress: number
+  error_code: string
+  message: string
+  stream_ids: string[]
+}
+
 export type PackTelemetry = {
   state_of_charge_pct?: number
   health_pct?: number

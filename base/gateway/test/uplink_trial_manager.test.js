@@ -67,9 +67,13 @@ test('uplink trial starts base capture before accepting rover artifacts and anal
     () => manager.createTrial({ feed_count: 1, stream_ids: ['front'], duration_s: 5 }),
     /another uplink trial/
   )
+  // Simulate a long-lived browser whose monotonic epoch is 30 seconds behind
+  // Base wall time. Raw samples stay in browser time and validation must use
+  // the measured browser-to-Base offset.
+  const browserClockOffsetUs = 30_000_000
   const started = manager.startTrial(created.trial_id, {
     browser_clock: {
-      offset_us: 10,
+      offset_us: browserClockOffsetUs,
       rtt_us: 100,
       sampled_at_epoch_us: Date.now() * 1000,
     },
@@ -109,7 +113,7 @@ test('uplink trial starts base capture before accepting rover artifacts and anal
     Buffer.from('rover pcap'),
     'application/vnd.tcpdump.pcap'
   )
-  const browserEpochUs = Date.now() * 1000
+  const browserEpochUs = Date.now() * 1000 - browserClockOffsetUs
   manager.saveBrowserSamples(created.trial_id, [
     {
       stream_id: 'front',

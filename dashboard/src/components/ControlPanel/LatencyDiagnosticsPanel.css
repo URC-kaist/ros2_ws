@@ -40,6 +40,47 @@
   gap: 8px;
 }
 
+.latency-diagnostics__camera-selection {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  gap: 5px;
+}
+
+.latency-diagnostics__camera-selection legend {
+  padding: 0 4px;
+  color: #c8ddf4;
+  font-weight: 600;
+}
+
+.latency-diagnostics__camera-option {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.latency-diagnostics__camera-option input {
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: #5fc4ff;
+}
+
+.latency-diagnostics__camera-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latency-diagnostics__camera-option:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .latency-diagnostics select,
 .latency-diagnostics button {
   min-width: 0;

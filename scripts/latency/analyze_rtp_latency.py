@@ -350,6 +350,11 @@ def analyze_captures(
                 "role": sidecar.get("role") if isinstance(sidecar, dict) else None,
                 "hostname": sidecar.get("hostname") if isinstance(sidecar, dict) else None,
                 "interface": sidecar.get("interface") if isinstance(sidecar, dict) else None,
+                "stream_lease_acquired": (
+                    sidecar.get("stream_lease_acquired")
+                    if isinstance(sidecar, dict)
+                    else None
+                ),
                 "kernel_dropped_packets": dropped,
             }
             if isinstance(sidecar, dict) and sidecar.get("role") != role:
@@ -357,6 +362,15 @@ def analyze_captures(
             if dropped is not None and dropped > 0:
                 warnings.append(
                     f"{role} capture dropped {dropped} packets in the host kernel; loss is unreliable"
+                )
+            if (
+                role == "rover"
+                and isinstance(sidecar, dict)
+                and sidecar.get("stream_lease_acquired") is False
+            ):
+                warnings.append(
+                    "rover stream lease was unavailable; unselected streams may "
+                    "have remained active as background link load"
                 )
         except (OSError, json.JSONDecodeError) as error:
             capture_metadata[role] = {"metadata_path": str(sidecar_path), "error": str(error)}

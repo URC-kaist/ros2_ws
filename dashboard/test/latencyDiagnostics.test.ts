@@ -5,12 +5,15 @@ import { LatencyDiagnostics } from '../src/lib/latencyDiagnostics'
 
 const originalFetch = globalThis.fetch
 const originalWindow = globalThis.window
+let baseClockDisplacementUs = 0
 Object.defineProperty(globalThis, 'window', {
   configurable: true,
   value: { location: { origin: 'http://localhost:5173' } },
 })
 globalThis.fetch = async () => {
-  const serverEpochUs = Math.round((performance.timeOrigin + performance.now()) * 1000)
+  const serverEpochUs =
+    Math.round((performance.timeOrigin + performance.now()) * 1000) +
+    baseClockDisplacementUs
   return new Response(
     JSON.stringify({
       server_receive_epoch_us: serverEpochUs,
@@ -91,6 +94,22 @@ async function runLatencyDiagnosticsTest() {
     assert.ok(snapshot.videoTiming.baseToBrowser.p50Ms != null)
     assert.equal(snapshot.videoTiming.decodeRender.p50Ms, 20)
     assert.equal(snapshot.videoTiming.decodeRender.p95Ms, 20)
+
+    // A wall-clock correction after the tab opened can put the browser's
+    // monotonic epoch more than five seconds away from Base. A fresh snapshot
+    // must still be stamped in the Base clock domain.
+    baseClockDisplacementUs = 30_000_000
+    assert.equal(await diagnostics.synchronizeGatewayClock(2), true)
+    const displacedSnapshotEpochUs = diagnostics.getSnapshot().clock.syncedAtEpochUs
+    assert.ok(displacedSnapshotEpochUs != null)
+    assert.ok(
+      Math.abs(
+        displacedSnapshotEpochUs -
+        (Math.round((performance.timeOrigin + performance.now()) * 1000) +
+          baseClockDisplacementUs)
+      ) < 1_000_000
+    )
+    baseClockDisplacementUs = 0
 
     assert.equal(diagnostics.startUplinkPreflight(1, ['front_test_cam']), true)
     diagnostics.bindUplinkTrial('uplink-1')

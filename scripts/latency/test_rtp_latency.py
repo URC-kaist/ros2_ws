@@ -273,6 +273,7 @@ class RtpPcapAnalysisTest(unittest.TestCase):
                         "role": "rover",
                         "hostname": "rover",
                         "interface": "eth0",
+                        "stream_lease_acquired": False,
                         "tcpdump_stderr": "1 packet captured\n3 packets dropped by kernel",
                     }
                 ),
@@ -287,7 +288,13 @@ class RtpPcapAnalysisTest(unittest.TestCase):
                 clock_offset_assumed=False,
             )
             self.assertEqual(report["captures"]["rover"]["kernel_dropped_packets"], 3)
+            self.assertFalse(
+                report["captures"]["rover"]["stream_lease_acquired"]
+            )
             self.assertTrue(any("loss is unreliable" in warning for warning in report["warnings"]))
+            self.assertTrue(
+                any("background link load" in warning for warning in report["warnings"])
+            )
 
     def test_ignores_truncated_and_wrong_payload_type_packets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

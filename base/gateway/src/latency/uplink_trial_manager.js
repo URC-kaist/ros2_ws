@@ -267,6 +267,10 @@ class UplinkTrialManager {
       throw new Error('browser samples must be a non-empty array')
     }
     if (samples.length > 20000) throw new Error('too many browser samples')
+    const browserClockOffsetUs = Number(trial.clock?.browser?.offset_us)
+    if (!Number.isFinite(browserClockOffsetUs)) {
+      throw new Error('trial browser clock offset is unavailable')
+    }
     const allowedStreams = new Set(trial.streamIds)
     const earliestEpochUs = trial.startedAtEpochMs * 1000 - 5_000_000
     const latestEpochUs = Date.now() * 1000 + 5_000_000
@@ -290,8 +294,13 @@ class UplinkTrialManager {
           sample.marker_sequence < 0 || sample.marker_sequence > 0xffff) {
         throw new Error(`browser sample ${index} has an invalid RTP key`)
       }
-      if (sample.browser_receive_epoch_us < earliestEpochUs ||
-          sample.browser_render_epoch_us > latestEpochUs ||
+      // Browser samples deliberately remain in the browser clock domain; the
+      // analyzer applies this same offset when calculating latency. Normalize
+      // only for validation against the Base trial window.
+      const receiveInBaseEpochUs = sample.browser_receive_epoch_us + browserClockOffsetUs
+      const renderInBaseEpochUs = sample.browser_render_epoch_us + browserClockOffsetUs
+      if (receiveInBaseEpochUs < earliestEpochUs ||
+          renderInBaseEpochUs > latestEpochUs ||
           sample.browser_render_epoch_us < sample.browser_receive_epoch_us) {
         throw new Error(`browser sample ${index} is outside the trial time range`)
       }

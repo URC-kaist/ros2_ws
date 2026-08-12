@@ -17,7 +17,21 @@ server {
   listen [::]:80;
   server_name base base.local __MR2_BASE_IP__;
 
-  return 301 https://$host$request_uri;
+  # Rover artifact uploads use a small fixed HTTP client that intentionally
+  # rejects redirects and cannot trust the base's self-signed dashboard
+  # certificate. Keep this bearer-token-protected path available on the
+  # Rocket link while redirecting the browser-facing surface to HTTPS.
+  location /latency/uplink/ {
+    proxy_pass http://mr2_gateway;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_request_buffering off;
+    client_max_body_size 256m;
+  }
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
 }
 
 server {

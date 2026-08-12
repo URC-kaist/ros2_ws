@@ -1,4 +1,9 @@
-import { decodeVideoMessage, type VideoGatewayMessage } from './videoProtocol'
+import {
+  decodeVideoMessage,
+  type VideoChunkMessage,
+  type VideoConfigMessage,
+  type VideoGatewayMessage,
+} from './videoProtocol'
 import { browserEpochUs, latencyDiagnostics } from './latencyDiagnostics'
 
 export type VideoStreamInfo = {
@@ -46,13 +51,19 @@ function resolveVideoStreamsUrl() {
   return `${window.location.origin}/video/streams`
 }
 
-class VideoGatewayClient {
+type StreamBootstrap = {
+  config: VideoConfigMessage | null
+  keyChunk: VideoChunkMessage | null
+}
+
+export class VideoGatewayClient {
   private ws: WebSocket | null = null
   private readonly url: string
   private reconnectTimer: number | null = null
   private reconnectDelayMs = RECONNECT_BASE_MS
   private listeners = new Map<string, Set<StreamListener>>()
   private subscribedStreams = new Set<string>()
+  private streamBootstraps = new Map<string, StreamBootstrap>()
 
   constructor(url: string) {
     this.url = url
@@ -68,6 +79,11 @@ class VideoGatewayClient {
     this.connect()
     if (streamListeners.size === 1) {
       this.sendSubscription('subscribe', streamId)
+    } else {
+      // The gateway bootstraps only the first upstream subscription. A later
+      // local viewer (such as Uplink while Live Feed is open) needs the same
+      // codec config/keyframe before it can decode the shared chunk stream.
+      this.replayBootstrap(streamId, listener)
     }
 
     return () => {
@@ -76,6 +92,7 @@ class VideoGatewayClient {
       current.delete(listener)
       if (current.size === 0) {
         this.listeners.delete(streamId)
+        this.streamBootstraps.delete(streamId)
         this.sendSubscription('unsubscribe', streamId)
       }
       if (this.listeners.size === 0) {
@@ -88,6 +105,7 @@ class VideoGatewayClient {
     this.clearReconnectTimer()
     this.reconnectDelayMs = RECONNECT_BASE_MS
     this.subscribedStreams.clear()
+    this.streamBootstraps.clear()
 
     if (this.ws) {
       const ws = this.ws
@@ -120,7 +138,12 @@ class VideoGatewayClient {
       if (!(event.data instanceof ArrayBuffer)) return
       const message = decodeVideoMessage(event.data)
       if (!message) return
-      if (message.kind === 'chunk') {
+      if (message.kind === 'config') {
+        this.streamBootstraps.set(message.streamId, {
+          config: message,
+          keyChunk: null,
+        })
+      } else {
         message.browserReceiveEpochUs = browserReceiveEpochUs
         latencyDiagnostics.observeVideoReceive(
           message.streamId,
@@ -129,6 +152,13 @@ class VideoGatewayClient {
           browserReceiveEpochUs,
           message.correlation
         )
+        if (message.key) {
+          const bootstrap = this.streamBootstraps.get(message.streamId)
+          this.streamBootstraps.set(message.streamId, {
+            config: bootstrap?.config ?? null,
+            keyChunk: message,
+          })
+        }
       }
       const streamListeners = this.listeners.get(message.streamId)
       if (!streamListeners) return
@@ -140,6 +170,7 @@ class VideoGatewayClient {
       if (this.ws !== ws) return
       this.ws = null
       this.subscribedStreams.clear()
+      this.streamBootstraps.clear()
       if (this.listeners.size > 0) {
         this.scheduleReconnect()
       }
@@ -158,6 +189,7 @@ class VideoGatewayClient {
     this.ws.close()
     this.ws = null
     this.subscribedStreams.clear()
+    this.streamBootstraps.clear()
   }
 
   private scheduleReconnect() {
@@ -173,6 +205,15 @@ class VideoGatewayClient {
     if (this.reconnectTimer == null) return
     window.clearTimeout(this.reconnectTimer)
     this.reconnectTimer = null
+  }
+
+  private replayBootstrap(streamId: string, listener: StreamListener) {
+    const bootstrap = this.streamBootstraps.get(streamId)
+    if (!bootstrap?.config) return
+    listener(bootstrap.config)
+    if (bootstrap.keyChunk) {
+      listener(bootstrap.keyChunk)
+    }
   }
 
   private sendSubscription(type: 'subscribe' | 'unsubscribe', streamId: string) {
