@@ -10,8 +10,19 @@
   left: 0;
   width: 20%;
   height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   z-index: 2;
+}
+
+.control-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.control-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(142, 163, 184, 0.25);
 }
 
 @media (max-width: 960px) {
